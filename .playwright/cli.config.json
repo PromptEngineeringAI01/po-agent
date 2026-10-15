@@ -1,0 +1,15 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "isolated": true,
+    "launchOptions": {
+      "headless": false
+    }
+  },
+  "outputDir": "private/captures/test",
+  "network": {
+    "blockedOrigins": [
+      "https://prompt.mysys.com.au"
+    ]
+  }
+}

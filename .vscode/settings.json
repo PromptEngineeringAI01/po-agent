@@ -1,0 +1,17 @@
+{
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests", "-m", "not live_claude and not testsite and not real_data"],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/state": true,
+    "**/uv.lock": true
+  }
+}
