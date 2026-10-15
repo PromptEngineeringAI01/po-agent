@@ -1,5 +1,7 @@
 # PO Agent — hosting research (CEO decision 3), updated 13 Oct 2026
 
+> **15 Oct 2026: CEO decision 3 is made.** The agent runs on the **office Mac Mini** (already purchased), for the MVP trial and production; it replaces the cloud routine for the trial and the expected Sydney VM. See `docs/decisions.md` and `docs/specs/ADR-002-po-agent-hosting.md` (Accepted); setup in `docs/macmini-setup.md`. The research below is kept as it was.
+
 > **14 Oct 2026 update:** the trial now runs on an **Anthropic cloud routine** running the script (ADR-002 Option C, with gates H2 and H5 waived for the trial only; `docs/decisions.md`). Production is still CEO decision 3, pending; Joey expects the **Sydney cloud VM** row below to be the most likely outcome. The figures below are unchanged.
 
 Deep-research run (22 sources, adversarially verified) plus Anthropic pricing checked directly. Prices are list prices read on 13 Oct 2026 and converted at the RBA rate of 1 USD = 1.433 AUD; AUD figures include 10% GST. **Decision 3 is pending with the CEO.**

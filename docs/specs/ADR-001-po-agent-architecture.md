@@ -35,6 +35,8 @@ Adopt **Option B: Hybrid with two independent readers**.
 
 *Note (14 Oct 2026):* running this script from an Anthropic cloud routine for the trial (ADR-002) doesn't change this decision. The routine's own Claude session only starts the script; it doesn't read POs or drive MySys. Option D below stays rejected.
 
+*Note (15 Oct 2026):* the trial and production now run on the office Mac Mini (ADR-002 Accepted, CEO decision 3). A shell script started by launchd runs the agent; no Claude session runs there. This decision is unchanged.
+
 ## Evaluation method
 
 ### Gates (pass/fail; failing any one removes the option)

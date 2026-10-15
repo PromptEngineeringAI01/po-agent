@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 14 Oct 2026)
+# PO Agent — decision log (updated 15 Oct 2026)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -7,19 +7,34 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 ## Status
 
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
-- **Pending (block go-live only):** decision 2 (Claude reading real client POs) and decision 3 (production hosting and maintenance). **The CEO hasn't made either decision yet** (14 Oct 2026). Joey has decided decision 2 as "yes" for now, **CEO to confirm** (entry below).
+- **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
+- **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
+
+## 15 Oct 2026 — CEO decision 3: the office Mac Mini runs the trial and production (CEO; setup choices by Joey)
+
+- **Host = the office Mac Mini** (ADR-002 Option D, now **Accepted**), for the MVP trial **and** production. It replaces the Anthropic cloud routine for the trial (Option C, 14 Oct entry below) and the expected Sydney cloud VM for production. ADR-002's 14 Oct scores (A 4.60, B 4.20, D 2.80) are kept as the record; the CEO chose D. Maintainer: Joey, with a named backup admin.
+- **The trial waiver is withdrawn.** On the Mac Mini, gate H2 passes (secrets in the agent user's Keychain; no AI session on the machine) and H5 passes (company-owned; Joey's and a backup admin account). `SPEC.md` → Trial waiver becomes **Trial conditions**: test-site credentials only, a dedicated low-limit Anthropic key, no real client data on the Mac Mini during the MVP.
+- **A separate standard macOS user `poagent`** runs the agent; Joey and the backup have admin accounts. Claude Code is never installed for `poagent`.
+- **FileVault on, no automatic login** (Joey, 15 Oct 2026). macOS allows one or the other. The Mac Mini will hold the live MySys password and handle real POs in production, and a missed run only delays POs (they stay in the pool), while a stolen unencrypted Mac gives up the agent's Keychain. Cost: after an unplanned restart (e.g. power failure) the Mac powers back on but waits at the FileVault screen until someone logs in as `poagent`. Revisit if this costs too many runs.
+- **Schedule:** a launchd LaunchAgent in `poagent`'s session at **7 minutes past each hour, 07:07–17:07, Monday–Friday**, Mac clock set to **Australia/Perth**. A LaunchAgent (not a LaunchDaemon) because keyring needs `poagent`'s login Keychain, which is unlocked only while that user is logged in. launchd never starts the job while it is still running.
+- **The Mac Mini stays up:** no sleep, starts up automatically after a power failure, macOS updates download automatically but are installed by hand **outside 07:00–18:00** (weekday evenings or weekends).
+- **Secrets:** in `poagent`'s login Keychain through `keyring` (service `po-agent`, the same names). No `PO_AGENT_*` variables on the Mac Mini; env vars remain for CI and tests.
+- **What the routine's Claude session did moves to a small script**, `scripts/macmini-run.sh` (M1): pull `main` (so `enabled = false` on `main` still stops the next run), `uv sync --locked`, run the agent with a 20-minute limit, append the short run output to `~/Library/Logs/po-agent/runs.log`, and on any `ALERT` line or non-zero exit open a GitHub issue labelled `po-agent-alert`. The Mac Mini's GitHub access is one fine-grained token for this repo only (contents read, issues write), kept in the Keychain by `gh`.
+- **The MVP still keeps no state between runs** (Joey's 14 Oct choice, now for scope, not because of the host). `runs.log` is a record for Joey, not state the agent reads. v1's skip list, logs and `STOP` file go on the Mac Mini's disk.
+- **First step on the Mac Mini:** a MySys test-site login by hand from it, before anything else is installed (`docs/macmini-setup.md` section 2).
+- Setup steps: `docs/macmini-setup.md` (replaces `docs/routine-setup.md`). `SPEC.md` v1.6; `docs/specs/spec.md`, `tech-stack.md` and `roadmap.md` v1.3.
 
 ## 15 Oct 2026 — Repeatable demo (Joey)
 
 - **The demo must be repeatable, at least 3 times** (to Joey's boss and the CEO). After each demo Joey resets the test site with his own account: cancel the 3 trial tasks, place fresh copies of the 3 Notes (`docs/demo-runbook.md`). The test profile's duplicate check ignores Cancelled tasks, so the agent books the same POs again. New success criterion `SPEC.md` S8; `SPEC.md` v1.5.
-- Demos can be shown from the laptop (`--headed --slow-mo 500`, the browser visible) or from the routine (**Run now**).
+- Demos can be shown from the laptop (`--headed --slow-mo 500`, the browser visible) or from the routine (**Run now**). *(The routine is replaced by the Mac Mini: CEO decision 3, entry above.)*
 
 ## 15 Oct 2026 — MVP spec approved (Joey)
 
 - **`SPEC.md` approved** (v1.4). Next: M0 screen mapping, then `/plan` in Claude Code.
 - **Test-site reset:** Joey's own account can **cancel** tasks on the test site; that's how the test site is reset (`docs/workflow.md` Stage 6.1). The agent itself still never presses Cancel.
 - **Duplicate check, test profile only:** ignores Compaction Test tasks whose status is Cancelled (`duplicate_ignores_cancelled = true` in `config/test.toml`). On live every existing task counts. Seam 1 tests both settings.
-- **Joey's Claude plan is Pro:** the routine's environment isn't shared; routine runs use Pro usage; the claude.ai model-training setting must be off before Claude Code reads real data.
+- **Joey's Claude plan is Pro:** the routine's environment isn't shared; routine runs use Pro usage; *(routine parts superseded by CEO decision 3)* the claude.ai model-training setting must be off before Claude Code reads real data.
 - **Node.js can be installed** on Joey's laptop, so Playwright CLI is used for screen mapping.
 
 ## 15 Oct 2026 — Screens mapped with Playwright CLI; all 3 trial POs at every stage (Joey)
@@ -45,6 +60,8 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - C4 (rules-only address reader) becomes unlikely to be needed; it stays deferred until the CEO confirms decision 2.
 
 ## 14 Oct 2026 — MVP first, on an Anthropic cloud routine (Joey)
+
+*The hosting parts of this entry (trial host, waiver, routine alerts, secrets on the routine, production host) are superseded by CEO decision 3, 15 Oct 2026 (above). The MVP scope stands.*
 
 - **Build an MVP first** to prove the agent works end to end on the test site, before the full v1 hardening. Scope chosen by Joey: **happy path + core safety** (`SPEC.md` → Objective): the full ADR-001 design (two readers, verify-not-extract, agreement), all checks before any write, action guard, read-back, skip → pool through Assign, `enabled` kill switch, Perth window, deterministic-only switch, test site only. Deferred to v1: skip list and 24 h retry, partial-write auto-resume (MVP: alert, Note left assigned to the agent, Joey finishes by hand), agent-written `STOP` file (MVP: exit code 3 + alert; Joey turns the routine off), circuit breaker (MVP: first failure stops the run), start-of-run sweep, single-run lock, daily logs with retention, live profile, sender-domain check, email/Teams alerts.
 - **Trial host = ADR-002 Option C: an Anthropic cloud routine running the script.** The script still does every click and Claude (the reader) still only reads; the routine's own Claude session only runs three fixed commands and reports.
@@ -81,7 +98,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 ## Safeguards (approved with decision 1)
 
 - **Half-finished bookings:** the agent records the partial write, alerts Joey, and completes its own booking on the next run after re-running every check. Exception to "no exception report" and "duplicate → skip", for the agent's own task only. *(MVP: alert, Note left assigned to the agent, run stops; Joey finishes by hand; auto-resume in v1.)*
-- **Stop after any error:** a booking error (wrong project, wrong PO number or missing PDF found on read-back) makes the agent create a `STOP` file and alert Joey. Only a person removes it, after the CEO approves a restart. *(MVP on the routine: no `STOP` file; exit code 3 + alert, and Joey switches the routine off and sets `enabled = false`.)*
+- **Stop after any error:** a booking error (wrong project, wrong PO number or missing PDF found on read-back) makes the agent create a `STOP` file and alert Joey. Only a person removes it, after the CEO approves a restart. *(MVP: no `STOP` file; exit code 3 + alert, and Joey unloads the Mac Mini's launchd job and sets `enabled = false`.)*
 - **Without Claude:** POs go to the admin as today.
 - **Alerts:** to Joey only, never to customers. Channel (email or Teams webhook) still to choose for v1; MVP uses a GitHub issue.
 
@@ -89,12 +106,12 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 
 - No database. State is a skip-list JSON file plus daily JSON-lines logs (one line per Note, one summary line per run), kept 90 days. Extra detail and screenshots only on failures.
 
-## Hosting (CEO decision 3 — pending)
+## Hosting (CEO decision 3 — decided 15 Oct 2026)
 
 - The existing company server is very old; it won't host the agent.
-- **Trial (14 Oct 2026):** an Anthropic cloud routine running the script, with H2/H5 waived for the trial (above).
-- **Production:** most likely a Sydney cloud VM (about A$16–19/month), not decided. ADR-002's scoring still ranks a VM provided by IT in Perth first (4.60) and the Sydney VM second (4.20); either fits the code unchanged. Joey as maintainer plus one named backup. Test MySys access from the chosen machine first.
-- Full comparison: `docs/hosting-research.md`. A VM request for IT has been drafted.
+- **Trial and production: the office Mac Mini** (already purchased), ADR-002 Option D, Accepted. Setup: `docs/macmini-setup.md`. Joey as maintainer plus one named backup admin. Test MySys access from the Mac Mini first.
+- *History:* the trial was first planned on an Anthropic cloud routine (14 Oct 2026, H2/H5 waived), and production was expected on a Sydney cloud VM. Both superseded by decision 3.
+- Full comparison: `docs/hosting-research.md` (research as of 13–14 Oct). The drafted VM request for IT isn't needed.
 - **ADR-002 proposed (14 Oct 2026):** `docs/specs/ADR-002-po-agent-hosting.md`. An Anthropic cloud routine running the script was not chosen for production (2.45): it fails the secrets gate, has no state between runs, and belongs to a personal account. Claude-driven options (routine with a browser tool, Cowork + Claude in Chrome) stay rejected under ADR-001 G2/G3. Estimated 3-year cost (hosting + Claude): IT VM about A$40–330; Sydney VM about A$610–1,010.
 
 ## Confirmed SOP (live)
@@ -132,7 +149,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - Backlog at go-live: read as "process existing /048 notes like new ones" — to confirm, incl. any age cut-off.
 - Fake PDF addresses match their test projects exactly.
 - Architecture: approved by the CEO (decision 1, recorded 13 Oct 2026).
-- Trial host: Anthropic cloud routine running the script (Joey, 14 Oct 2026).
+- Trial and production host: the office Mac Mini (CEO decision 3, 15 Oct 2026; replaces the cloud routine Joey chose for the trial on 14 Oct).
 
 ## Rules
 
@@ -144,11 +161,11 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - Agent only reads emails via MySys Notes; never deletes, replies, forwards; no Outlook access.
 - Credentials never stored in docs or code.
 - Config switch reader = deterministic-only must always work (Option A fallback). *(In the MVP.)*
-- Any booking error → agent stops itself until the CEO approves a restart. *(MVP: exit 3 + alert; Joey switches the routine off.)*
+- Any booking error → agent stops itself until the CEO approves a restart. *(MVP: exit 3 + alert; Joey unloads the launchd job.)*
 
 ## Schedule
 
-- Hourly, weekdays 07:00–18:00 Perth time. Routine cron: `7 7-17 * * 1-5` (Perth), 7 minutes past because runs on the hour can start late.
+- Hourly, weekdays 07:00–18:00 Perth time. On the Mac Mini: a launchd job at 7 minutes past each hour, 07:07–17:07 Monday–Friday, with the Mac's clock on Australia/Perth (7 minutes past, so a slow start never lands on the hour).
 
 ## Problem / volume
 
@@ -175,8 +192,8 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 
 ## Still open
 
-- **CEO decision 2:** confirm Joey's "yes" (Claude may read real client data). **CEO decision 3:** production host. Both block go-live.
+- **CEO decision 2:** confirm Joey's "yes" (Claude may read real client data). Blocks go-live. (Decision 3 was made on 15 Oct 2026: the office Mac Mini.)
 - Test-site checks before the first write: C1 (Hold dialog checkboxes pre-ticked?), C3 (return a Note to the pool without Unassign) and MFA/password expiry on the agent account — `SPEC.md` open questions 1–3.
-- CEO/IT OK on the private GitHub repo and the cloud-routine trial.
+- CEO/IT OK on the private GitHub repo (the Mac Mini pulls the code from it).
 - Backlog reading confirmation (and age cut-off).
 - Alert channel for Joey for v1 (email or Teams webhook).

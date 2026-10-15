@@ -1,7 +1,7 @@
 # PO Agent — Requirements and Design Spec (v1)
 
-**Status:** Approved for build. The CEO approved the design and trial, including the safeguards (CEO decision brief, decision 1; recorded 13 Oct 2026). Decisions 2 (Claude reading real client POs) and 3 (production hosting) are pending and block go-live only. Remaining blockers are in [Areas of concern](#areas-of-concern-policy-conflicts-and-risks).
-**Version:** 1.2 · 14 Oct 2026 (1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
+**Status:** Approved for build. The CEO approved the design and trial, including the safeguards (CEO decision brief, decision 1; recorded 13 Oct 2026). Decision 3 (hosting) was made on 15 Oct 2026: the office Mac Mini, for the trial and production. Decision 2 (Claude reading real client POs) is pending and blocks go-live only. Remaining blockers are in [Areas of concern](#areas-of-concern-policy-conflicts-and-risks).
+**Version:** 1.3 · 15 Oct 2026 (1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
 **Author:** Joey Wu (PE AI Champion), drafted with Claude · **Decision owner:** CEO
 **Built from:** `docs/intent.md`, `docs/decisions.md`, `docs/specs/ADR-001-po-agent-architecture.md` (approved by the CEO through the CEO decision brief, decision 1, recorded 13 Oct 2026), `docs/specs/ADR-002-po-agent-hosting.md`.
 **Companions:** `SPEC.md` (active MVP spec) · `docs/specs/mission.md` · `docs/specs/tech-stack.md` · `docs/specs/roadmap.md` · `docs/specs/README.md` (glossary and reading order)
@@ -39,7 +39,7 @@ Success is measured by the four criteria in `mission.md`: accuracy (hard line), 
 
 This spec describes **v1**. It's delivered in two steps:
 
-1. **MVP** (`SPEC.md`, roadmap phase 1): the design above, all checks before any write, read-back and the action guard, on the **test site only**, run hourly by an **Anthropic cloud routine** running the script (ADR-002 trial decision, gates H2/H5 waived for the trial only). Some items are in a simpler form or deferred; the table in `SPEC.md` → Objective lists them.
+1. **MVP** (`SPEC.md`, roadmap phase 1): the design above, all checks before any write, read-back and the action guard, on the **test site only**, run hourly on the **office Mac Mini** by a launchd job (ADR-002 Option D, Accepted: CEO decision 3). Some items are in a simpler form or deferred; the table in `SPEC.md` → Objective lists them.
 2. **v1 hardening** (roadmap phase 2): everything else in this spec, before the CEO trial gate.
 
 Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file governs v1.
@@ -138,7 +138,7 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 ### 1. Components
 
 ```
- Scheduler (hourly, Mon–Fri 07:00–18:00 AWST): cloud routine (trial) | OS scheduler (production)
+ Scheduler (hourly, Mon–Fri 07:00–18:00 AWST): launchd on the office Mac Mini (trial and production)
      │
      ▼
  Run controller ── checks: enabled (kill switch) · time window · single-run lock
@@ -154,7 +154,7 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
      │
      ├─► Booker (write sequence with read-back, via driver)
      │
-     └─► State: skip list file · daily log file · STOP file · heartbeat  (host disk; none on the MVP routine)
+     └─► State: skip list file · daily log file · STOP file · heartbeat  (Mac Mini disk; none in the MVP)
 ```
 
 | Component | Responsibility | Notes |
@@ -166,7 +166,7 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 | **Claude reader** | Reads the PDF and Note text and returns the reading schema (§3). | No tools, no browsing, no MySys access. Output validated against the schema. |
 | **Decision engine** | Combines readings, runs every check in a fixed order, consults MySys through a read-only lookup, and returns PROCEED or SKIP. | **This is test seam 1.** Contains no clicking. |
 | **Booker** | Runs the SOP write steps in fixed order, reading each one back. | Only runs on PROCEED. |
-| **State** | A skip list (retry deadlines, and the agent's own partial bookings) and a daily log file. | Plain files in a state directory; no database (see `tech-stack.md`). They live in `state_dir` on a host (laptop, VM). The MVP on the cloud routine keeps no state between runs (`SPEC.md` assumption 4). |
+| **State** | A skip list (retry deadlines, and the agent's own partial bookings) and a daily log file. | Plain files in a state directory; no database (see `tech-stack.md`). They live in `state_dir` on the host's disk (laptop, Mac Mini). The MVP keeps no state between runs (`SPEC.md` assumption 5). |
 | **Config and secrets** | Site, pool, title rule, reader mode, kill switch, model ID, limits; secrets from the secret store. | Config has no secrets. Secrets: `PO_AGENT_*` env var first, else keyring. |
 
 ### 2. Processing order for one Note (all checks before any write)
@@ -207,7 +207,7 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 
 **Log line** (one JSON line per Note per run that the agent assigns to itself, in a daily log file): time (AWST), run id, site, note id, outcome (booked / skipped / partial), skip reason, PO number, pln, both readings, model ID, Claude input/output tokens, task ID if a task was created. Each run ends with one summary line: Notes seen, booked, skipped, partial, duration. Only failures get extra detail: the failing check or write step, plus a screenshot.
 
-**Run output** (stdout) is separate from the log and deliberately short: `INFO`, `NOTE`, `ALERT` and `RUN_SUMMARY` lines only, with no PDF text, addresses, Note bodies or Claude readings (`SPEC.md` → Code style). On the cloud routine an AI session reads it, so untrusted PDF content must never reach it.
+**Run output** (stdout) is separate from the log and deliberately short: `INFO`, `NOTE`, `ALERT` and `RUN_SUMMARY` lines only, with no PDF text, addresses, Note bodies or Claude readings (`SPEC.md` → Code style). It goes into the Mac Mini's run log and alert issues, so untrusted PDF content must never reach it.
 
 **Skip list** (one small file, written atomically): note id, reason, first skipped at, retry until (for `PROJECT_NOT_FOUND`), and for partial bookings the task ID and the last completed write step.
 
@@ -279,10 +279,10 @@ The email body written into the task Note comes from the deterministic reader (t
 
 ### 8. Run controls
 
-- **Schedule:** hourly, 07:00–18:00 Australia/Perth (no daylight saving), Monday–Friday. On the cloud routine: cron `7 7-17 * * 1-5` (7 minutes past, because runs on the hour can start late). Public holidays aren't excluded (none stated).
-- **Kill switch:** `enabled = false` in config, or a `STOP` file in the state directory, is checked at run start and before every write step (W1–W5). The agent creates the `STOP` file itself after any accuracy breach; only a person removes it, after the CEO approves a restart (approved safeguard). If it flips mid-Note between W2 and W5, the Note becomes a `PARTIAL_WRITE`; that's preferred to ignoring the switch. During the trial the routine's on/off switch is a third kill switch. *(MVP on the routine: `enabled` and the on/off switch only; with no state, an accuracy breach exits with code 3 and an alert, and Joey switches the routine off.)*
-- **Alerts:** to Joey only, never to customers. The v1 channel (email or a Teams webhook) is still to be chosen; the MVP uses a GitHub issue opened by the routine. Sent for partial writes, accuracy breaches, guard refusals, circuit-breaker stops and login failures.
-- **Single-run lock**, so overlapping runs exit immediately. *(Not needed on the routine, where each run has its own VM and a 12-minute cap; needed on a VM.)*
+- **Schedule:** hourly, 07:00–18:00 Australia/Perth (no daylight saving), Monday–Friday. On the Mac Mini: a launchd job at 7 minutes past each hour, 07:07–17:07 Monday–Friday, with the Mac's clock on Australia/Perth (7 minutes past, so a slow start never lands on the hour). Public holidays aren't excluded (none stated).
+- **Kill switch:** `enabled = false` in config, or a `STOP` file in the state directory, is checked at run start and before every write step (W1–W5). The agent creates the `STOP` file itself after any accuracy breach; only a person removes it, after the CEO approves a restart (approved safeguard). If it flips mid-Note between W2 and W5, the Note becomes a `PARTIAL_WRITE`; that's preferred to ignoring the switch. Unloading the launchd job (`launchctl bootout`) is a third kill switch. *(MVP: `enabled` and unloading the job only; with no state, an accuracy breach exits with code 3 and an alert, and Joey unloads the job.)*
+- **Alerts:** to Joey only, never to customers. The v1 channel (email or a Teams webhook) is still to be chosen; the MVP uses a GitHub issue opened by the Mac Mini's run script. Sent for partial writes, accuracy breaches, guard refusals, circuit-breaker stops and login failures.
+- **Single-run lock**, so overlapping runs exit immediately. *(launchd never starts the scheduled job while it's still running, but a manual run can overlap it, so v1 keeps the lock.)*
 - **Circuit breaker:** 3 `UNEXPECTED_SCREEN` or `PARTIAL_WRITE` results in one run stop the run (value configurable). *(MVP: the first one stops the run.)*
 - **Run cap:** a configurable maximum number of Notes per run (default 25) and a maximum run time (default 12 minutes), so a run finishes well inside the hour. 50 POs a week is well under capacity.
 - **Login:** fresh login each run with credentials from the secret store. Browser session state is not saved to disk.
@@ -292,13 +292,13 @@ The email body written into the task Note comes from the deterministic reader (t
 
 ### 9. Configuration (no secrets)
 
-`site` (test | live), `base_url` (test: `https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component`; live: `https://prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component`), `pool_name` (Agent Pool | PO Allocation Pool), `title_rule` (test-body-filename | live-b1-title), `require_sender_domain` (live only; concern C6), `reader_mode` (hybrid | deterministic-only), `enabled`, `claude_model_id`, `claude_price_table`, `duplicate_ignores_cancelled` (test only, true: Joey resets the test site by cancelling tasks; never on live), `max_notes_per_run`, `max_run_minutes` (12), `circuit_breaker_limit`, `retry_window_hours` (24), `run_window` (07:00–18:00 Mon–Fri, Australia/Perth), `state_dir` (host disk; unused on the MVP routine), `log_retention_days` (90), `alert_channel`.
+`site` (test | live), `base_url` (test: `https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component`; live: `https://prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component`), `pool_name` (Agent Pool | PO Allocation Pool), `title_rule` (test-body-filename | live-b1-title), `require_sender_domain` (live only; concern C6), `reader_mode` (hybrid | deterministic-only), `enabled`, `claude_model_id`, `claude_price_table`, `duplicate_ignores_cancelled` (test only, true: Joey resets the test site by cancelling tasks; never on live), `max_notes_per_run`, `max_run_minutes` (12), `circuit_breaker_limit`, `retry_window_hours` (24), `run_window` (07:00–18:00 Mon–Fri, Australia/Perth), `state_dir` (host disk; unused in the MVP), `log_retention_days` (90), `alert_channel`.
 
 ### 10. Data handling
 
 - Claude may read the PO PDF and Note text (G7, approved 12 Oct 2026; real client POs allowed by Joey on 14 Oct 2026, CEO to confirm as decision 2). Nothing else is sent to Claude: no MySys pages, credentials or project data.
-- Real client data used during the build (real PDFs, live-screen captures, real-PO test cases) stays on Joey's laptop in the git-ignored `private/` folder; never in the repository, the claude.ai project or the cloud routine.
-- The daily logs hold addresses and PO details. They're stored only on the agent host, never in the project docs or on the code repository's `main` branch, and deleted after `log_retention_days` (default 90; see concern C11). During the MVP on the cloud routine there are no log files: the short run output in each routine transcript (no addresses or PDF text) is the record, and it holds fake data only. The agent doesn't store PDFs (MySys keeps them).
+- Real client data used during the build (real PDFs, live-screen captures, real-PO test cases) stays on Joey's laptop in the git-ignored `private/` folder; never in the repository, the claude.ai project or on the Mac Mini during the MVP.
+- The daily logs hold addresses and PO details. They're stored only on the agent host, never in the project docs or on the code repository's `main` branch, and deleted after `log_retention_days` (default 90; see concern C11). During the MVP there are no daily log files on the Mac Mini: the short run output appended to `~/Library/Logs/po-agent/runs.log` (no addresses or PDF text) is the record, and it holds fake data only. The agent doesn't store PDFs (MySys keeps them).
 - Logs and screenshots must never contain credentials. Screenshots are taken only on failures and follow the same retention.
 
 ---
@@ -385,7 +385,7 @@ None in this company: this is the first MySys automation. The seams and fixture 
 - OCR for scanned or image-only PDFs (they're skipped).
 - MySys internal web requests or database access; any MySys API (none exists).
 - An exception report (by decision), apart from the approved alerts to Joey for partial writes, accuracy breaches and stops.
-- Production hosting choice (CEO decision 3; blocks go-live, not the MVP or trial). Running live from a cloud routine (ADR-002: fails H2).
+- Running live from a cloud routine (ADR-002: fails H2). (The hosting choice itself was made: CEO decision 3, the office Mac Mini.)
 
 ---
 
@@ -410,10 +410,10 @@ I looked for company guidelines or security policies among the skills and projec
 | Forbidden controls can never be pressed (G2) | Allowlist + denylist guard; build check | Met. **Conflicts: C1, C3** |
 | All checks before Create New Task (G3) | Fixed order in §2; Booker only after PROCEED | Met |
 | Email read-only; no notifications (G4) | Notification unticked + read back; no email features | Met. Internal alerts to Joey only (approved) |
-| Unattended hourly schedule (G5) | Scheduler + run controller | Trial: cloud routine. Production: once hosting is decided (CEO decision 3, pending) |
-| Credentials from a secret store (G6, ADR-002 H2) | Secrets loaded at run time; nothing in code or config | Laptop: OS keychain. Trial routine: environment variables, **H2 waived for the test site only** (C8). Production store follows decision 3 |
+| Unattended hourly schedule (G5) | Scheduler + run controller | launchd on the office Mac Mini, trial and production (CEO decision 3) |
+| Credentials from a secret store (G6, ADR-002 H2) | Secrets loaded at run time; nothing in code or config | Laptop: OS keychain. Mac Mini (trial and production): the agent user's login Keychain, no AI session on the machine; H2 met |
 | Claude may read PO data (G7) | Only PDF + Note text sent | Met. Real POs allowed by Joey (14 Oct 2026); CEO to confirm (decision 2, C7) |
-| Claude never clicks | No tools; driver separate. The routine's session only starts the script | Met |
+| Claude never clicks | No tools; driver separate. On the Mac Mini a shell script starts the agent; no Claude session | Met |
 | Skip → back to pool; no exception report | §2 | Met; alert exception approved (C2). **C3 still to check** |
 | Project-not-found retried 24 h; others final | Skip list | Met in v1 (MVP: all final). **Edge cases (C5, C10)** |
 | Option A fallback via config | `reader_mode` | Met as approved: address extractor deferred (C4); mode built in the MVP |
@@ -454,14 +454,14 @@ If Submit succeeds but Hold, Link or Resolve fails, the agent records the partia
 
 **C7. Scope of approval for sending PO data to Claude; no company policy found.**
 *Problem:* PO PDFs hold client names, site addresses and possibly prices, sent to a third-party API. I couldn't find a company data or privacy policy to check this against.
-*Decision so far:* **Joey decided on 14 Oct 2026 that the agent may read real client data** (the reader through the Anthropic API; Claude Code on Joey's laptop during the build). Real data stays in the git-ignored `private/` folder and never goes into the repository or the cloud routine. Bookings stay on the test site until go-live.
+*Decision so far:* **Joey decided on 14 Oct 2026 that the agent may read real client data** (the reader through the Anthropic API; Claude Code on Joey's laptop during the build). Real data stays in the git-ignored `private/` folder and never goes into the repository or onto the Mac Mini during the MVP. Bookings stay on the test site until go-live.
 *Still needed (CEO):* confirm it as decision 2 in the CEO decision brief (recommended: after a short check of company policy and any agreement with Scott Park Group). On a Pro/Max Claude plan, the model-training setting must be off before Claude Code reads real data.
 
-**C8. Secret store and hosting aren't decided for production; MFA/password expiry unknown. Blocks go-live.**
+**C8. MFA/password expiry unknown (secret store and hosting decided 15 Oct 2026). Blocks go-live.**
 *Rules:* "credentials from a secret store" (G6, ADR-002 H2), "never in docs or code".
-*Problem:* the production secret store depends on where the agent runs, which is open. If the MySys agent account has MFA or forced password expiry, unattended runs fail, or a TOTP seed must be stored as a secret.
-*Spec default (trial, 14 Oct 2026):* development on Joey's laptop with credentials in the OS keychain; the MVP and trial on an Anthropic cloud routine with the **test-site** credentials and a dedicated, spend-limited API key in the routine's environment variables (**H2 waived for the trial only**; mitigations in `SPEC.md` → Trial waiver). No browser session saved to disk. Live credentials never go into a routine.
-*Decision needed (CEO):* decision 3 in the CEO decision brief, pending. ADR-002 ranks a VM provided by IT (not on the old, very old server) first and a small Linux cloud VM in Sydney second; Joey expects the Sydney VM, with secrets in a root-only env file. Joey to confirm the MFA and password-expiry settings for the agent account (MVP slice M0).
+*Problem:* if the MySys agent account has MFA or forced password expiry, unattended runs fail, or a TOTP seed must be stored as a secret.
+*Decided (CEO decision 3, 15 Oct 2026):* the trial and production run on the office Mac Mini as a standard user `poagent`, with credentials in that user's login Keychain (FileVault on; no AI tools for that user). The trial holds only the **test-site** credentials and a dedicated, spend-limited API key (`SPEC.md` → Trial conditions); live credentials go in only after the CEO's go-live sign-off. Development stays on Joey's laptop with credentials in the OS keychain. No browser session saved to disk.
+*Still needed:* Joey to confirm the MFA and password-expiry settings for the agent account (MVP slice M0).
 
 **C9. The action guard is the only control on Discard, Unlink, Cancel and Unassign.**
 *Problem:* the agent account "can't delete anything", but nothing says it lacks permission for Discard, Unlink, Cancel or Unassign. A bug in the guard would be the only line of defence. The agent has its own account on **live** too (Joey, 14 Oct 2026); its rights should match the test account's.
@@ -486,14 +486,14 @@ If Submit succeeds but Hold, Link or Resolve fails, the agent records the partia
 
 **C17. MySys terms of use for automation.** MySys is a third-party product. Its terms may restrict automated or scripted use of the web interface, even under a dedicated account. *Decision needed (Joey):* check the MySys agreement, or ask the vendor, before go-live.
 
-**C18. The routine's Claude session can see the trial secrets and the run output (trial only).** *Problem:* on the cloud routine an AI session starts the script, can read the environment variables, and reads the script's output; a crafted PDF could try to reach it through that output. *Spec default:* run output carries no PDF text, addresses or readings; the routine prompt allows three fixed commands; repo hooks block printing environment variables and the live site; no connectors; test-site credentials only; the trial key is spend-limited and rotated at the end. *Accepted by Joey for the trial (ADR-002 H2/H5 waiver).* Not acceptable for live.
+**C18. Closed 15 Oct 2026 (CEO decision 3): the trial no longer runs on a cloud routine, and no Claude session runs on the Mac Mini.** *As written for the routine:* **The routine's Claude session can see the trial secrets and the run output (trial only).** *Problem:* on the cloud routine an AI session starts the script, can read the environment variables, and reads the script's output; a crafted PDF could try to reach it through that output. *Spec default:* run output carries no PDF text, addresses or readings; the routine prompt allows three fixed commands; repo hooks block printing environment variables and the live site; no connectors; test-site credentials only; the trial key is spend-limited and rotated at the end. *Accepted by Joey for the trial (ADR-002 H2/H5 waiver).* Not acceptable for live.
 
 ---
 
 ## Open Questions
 
 1. **Backlog:** confirm that existing `/048` Notes are processed like new ones, and whether there's an age cut-off. *(intent OQ1)*
-2. **Production hosting:** where the agent runs in production and who maintains it (CEO decision 3, pending; most likely a Sydney cloud VM). **Blocks go-live.** The trial host is decided (cloud routine).
+2. ~~**Production hosting**~~ **Decided 15 Oct 2026 (CEO decision 3):** the office Mac Mini, for the trial and production; Joey maintains it, with a named backup admin.
 3. **C1:** are the Hold dialog related-task checkboxes ever pre-ticked? **Blocks the first booking.**
 4. **Claude reading real client POs:** Joey said yes on 14 Oct 2026; CEO to confirm (decision 2). **Blocks go-live until confirmed.**
 5. **C3:** how does a Note go back to the pool without Unassign? **Blocks skips.**
