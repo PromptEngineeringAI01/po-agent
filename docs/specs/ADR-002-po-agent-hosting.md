@@ -48,12 +48,14 @@ Facts that shape the choice:
 
 Adopt **Option D: the office Mac Mini** (already purchased), for the MVP trial on the test site and, after the CEO's go-live sign-off, for production. Setup: `docs/macmini-setup.md`.
 
+**Why:** the company had already bought the Mac Mini. Using it needs no new purchase or vendor, so the CEO chose it over the higher-scoring A and B.
+
 - **How it runs:** a separate **standard** macOS user (`poagent`) runs the script from a launchd LaunchAgent at 7 minutes past each hour, 07:07–17:07 Monday–Friday, with the Mac's clock on Australia/Perth. No sleep; starts up after a power failure; macOS updates installed by hand outside 07:00–18:00.
 - **Secrets:** in `poagent`'s login Keychain through `keyring`. Claude Code and other AI tools are never installed for `poagent`, so **H2 passes**.
 - **Ownership:** company-owned; Joey's and a backup admin's accounts, so **H5 passes**.
 - **Disk:** FileVault on, no automatic login (Joey, 15 Oct 2026; `docs/decisions.md`). After an unplanned restart someone logs in as `poagent` before runs resume; missed runs leave POs in the pool for the admin.
 - **State (v1):** on the Mac Mini's disk (**H3 passes**). The MVP still keeps none.
-- **Scores:** the CEO chose D (2.80) over A (4.60) and B (4.20). The scores below are as scored on 14 Oct, before the Mac Mini was bought. D's main weaknesses there (reliability in office power and internet outages; Joey patches the OS) are accepted; "no spare machine" no longer applies.
+- **Scores:** the CEO chose D (2.80) over A (4.60) and B (4.20) because the Mac Mini was already bought. The scores below are as scored on 14 Oct, before the Mac Mini was bought. D's main weaknesses there (reliability in office power and internet outages; Joey patches the OS) are accepted; "no spare machine" no longer applies.
 - **Not chosen:** A (IT VM), B (Sydney cloud VM), and C (cloud routine; fails H2).
 
 ## Evaluation method
