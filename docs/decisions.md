@@ -10,6 +10,26 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
 
+## 16 Oct 2026 — The 3 trial POs are real; SPEC fixed against the screen map (Joey; defaults by Claude to confirm)
+
+- **Found:** the 3 trial POs on the test site (2609017B, 2609034B, 2610002B) are **real B1 POs**, with real site addresses and client names. The test site's 2609017B PDF is byte-identical to the live one in `private/pdfs/`.
+- **Decision (Joey): keep them as the trial POs and change the rules.** Their internal numbers, PO numbers and test-site plns may appear in committed files and run output (they already do). Their PDFs, addresses, client names and other PDF content stay in MySys and `private/`; test-site captures and screenshots now count as real data. The Mac Mini reads them from the test site in memory and sends them to Claude, as on live, so **the CEO must confirm decision 2 before the first Mac Mini run that downloads one** (M3). Seam 1's committed fixtures become 3 **generated fake** POs (M2; the generator's dependency needs Joey's OK). The 3 trial POs join the laptop-only real-PO seam. `docs/specs/spec.md`'s address examples were replaced with fake ones, in case they were real (ADR-001 line 125 still has the old example; ADRs are left as recorded, Joey to decide). A check of the tracked files found no address or name from the 3 PDFs.
+- **Live Projects search (Joey):** 3–4 projects come back per internal number, and only one ends with `/048`; the others are ignored. Rule: exactly one row with Company B1 Homes and Client Ref No. `<internal no>/048` (on test, where Client Ref No. is the bare number, `<internal no>`). SPEC assumes the column is Client Ref No.; confirm in Stage 3B.
+- **Defaults chosen by Claude on Joey's "fix them", for Joey to confirm** (all in `SPEC.md` v1.10 → MySys screen rules):
+  - **Duplicate check, MVP:** any non-Cancelled Compaction Test task on the project → `DUPLICATE_TASK`, whatever its PO number (the task table doesn't show PO numbers). v1 compares PO numbers from the task detail screen.
+  - **New skip reason `NOTE_ALREADY_LINKED`** (step 2a), plus step 0 needs the Note Pool's Project cell to read `---`. Otherwise a pre-linked Note would pass every check and fail at W4 after the task exists.
+  - **"close" is denylisted** (it removes the attached PDF and clears Task Client). The agent never clicks a window Close: it reloads `base_url` between Notes.
+  - **Upload to PO Documents** (as in the walkthrough), not Documents; **task Note = the Note's body**, not its title (the captures show a one-line body).
+  - **Send Email Notification** is unticked and read back before every write on the Note window (Assign, Link, Solved), not only before Assign.
+  - **Assign to pool:** user list `--Select User--` + pool list Agent Pool, because the user list pre-selects the agent.
+  - **Assignee check:** a fresh Note Pool search by Note ID, not the open Note window.
+  - **W2:** the new task is the one Compaction Test number that wasn't there before Submit; PO number, document and Note are read back on the task detail screen.
+  - **W3:** before confirming Hold, also check Reset unticked, reminder ticked with 0, the heading names the new task (check 3.1).
+  - **Attachments** are counted before any click (two links → `MULTIPLE_PDFS`, not a guard refusal). **Note Pool:** oldest first, page 1 only.
+  - **"Changes nothing" on a rerun** means no task, link, Solved or final-assignee change; the Assign log lines from re-checking a skipped Note are expected.
+- **New slice M0b** (Joey clicks, Claude observes): task detail screen, Link to Project search/select, Notes with 0 and 2 attachments, Note-window refresh and Note Pool search by ID, PO Number prefill. M3 needs the attachment and assignee parts; M4 needs task detail and Link.
+- **Corrections:** the Compaction Test sub-form has no Creator (the one Creator is in the Client section); test Notes come in both title styles (below). `CLAUDE.md` Must never #2 and #6 updated. `SPEC.md` v1.10, `docs/specs/spec.md` v1.6, `docs/screen-map.md` v1.1.
+
 ## 16 Oct 2026 — Screen map written; the denylist grows (Joey)
 
 - **`docs/screen-map.md` v1.0** maps Stage 3A rows 01–16 on the test site, with fake values only. The checks below come from it.
@@ -189,8 +209,8 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 
 ## Test-site differences (from note 235957 screenshot, 12 Oct 2026)
 
-- Testing only: Joey plays B1 Homes and places fake PO requests directly in the **Agent Pool** (not PO Allocation Pool).
-- Note title = email body text, e.g. "Please find attached Purchase Order / Quotation file 2609034B_048_1.pdf" (no "[B1 Homes] Order …/048").
+- Testing only: Joey plays B1 Homes and places the trial PO requests directly in the **Agent Pool** (not PO Allocation Pool). *16 Oct 2026: the trial POs are real B1 POs (entry above).*
+- Note title = email body text, e.g. "Please find attached Purchase Order / Quotation file 2609034B_048_1.pdf" (no "[B1 Homes] Order …/048"). *16 Oct 2026: newer test Notes have the live-style title "[B1 Homes] Order 2609034B/048" with that text as the body; both styles are in the pool (`docs/screen-map.md` row 01).*
 - Source shows "Agent 1 (MySys Only)" because Joey creates the notes (no sender email). Agent's user name in the Assign dropdown is "Agent 1 (MySys Only)".
 - Everything else follows the live SOP.
 
@@ -200,7 +220,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - B1 Homes check: PDF issuer "B1 Homes Pty Ltd" on both sites; on live `[B1 Homes]` title also required.
 - Locked filter: applied on both sites.
 - Backlog at go-live: read as "process existing /048 notes like new ones" — to confirm, incl. any age cut-off.
-- Fake PDF addresses match their test projects exactly.
+- The trial PDFs' addresses match their test projects (lot, street, suburb; the project adds a house number, postcode and state). *16 Oct 2026: the trial PDFs are real, not fake.*
 - Architecture: approved by the CEO (decision 1, recorded 13 Oct 2026).
 - Trial and production host: the office Mac Mini (CEO decision 3, 15 Oct 2026; replaces the cloud routine Joey chose for the trial on 14 Oct).
 
@@ -236,7 +256,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - Test site: https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component
 - Live: https://prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component
 - Before the trial: decision-seam tests on the full fixture set (3 trial PDFs + mutated copies); any false PROCEED blocks.
-- Pass = 3 good fake POs processed end to end, every step correct, no human help:
+- Pass = 3 good trial POs (real B1 POs, 16 Oct 2026 entry) processed end to end, every step correct, no human help:
   - 2609017B → pln_66935
   - 2609034B → pln_66938
   - 2610002B → pln_66940

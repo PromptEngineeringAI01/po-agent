@@ -1,7 +1,7 @@
 # PO Agent — Requirements and Design Spec (v1)
 
 **Status:** Approved for build. The CEO approved the design and trial, including the safeguards (CEO decision brief, decision 1; recorded 13 Oct 2026). Decision 3 (hosting) was made on 15 Oct 2026: the office Mac Mini, for the trial and production. Decision 2 (Claude reading real client POs) is pending and blocks go-live only. Remaining blockers are in [Areas of concern](#areas-of-concern-policy-conflicts-and-risks).
-**Version:** 1.5 · 16 Oct 2026 (1.5: the denylist adds Pending on the Note, Undo Cancellation, Un-Hold and Change Project, from the screen map. 1.4: W5 is the Note's **Solved** button, because the test site has no Resolve button. 1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
+**Version:** 1.6 · 16 Oct 2026 (1.6: fixed against `docs/screen-map.md` v1.1: step 0 needs an unlinked Note, new step 2a and skip reason `NOTE_ALREADY_LINKED`, project match on Client Ref No. `<internal no>/048`, project-address parse, "close" denylisted, W1–W3 read-backs as in `SPEC.md` → MySys screen rules; the 3 trial POs are real B1 POs, so seam 1's committed fixtures are generated fakes and the address examples are fake. 1.5: the denylist adds Pending on the Note, Undo Cancellation, Un-Hold and Change Project, from the screen map. 1.4: W5 is the Note's **Solved** button, because the test site has no Resolve button. 1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
 **Author:** Joey Wu (PE AI Champion), drafted with Claude · **Decision owner:** CEO
 **Built from:** `docs/intent.md`, `docs/decisions.md`, `docs/specs/ADR-001-po-agent-architecture.md` (approved by the CEO through the CEO decision brief, decision 1, recorded 13 Oct 2026), `docs/specs/ADR-002-po-agent-hosting.md`.
 **Companions:** `SPEC.md` (active MVP spec) · `docs/specs/mission.md` · `docs/specs/tech-stack.md` · `docs/specs/roadmap.md` · `docs/specs/README.md` (glossary and reading order)
@@ -122,7 +122,7 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 
 ### Trial and go-live
 
-52. As Joey, I want to place fake B1 Homes POs in the test site's Agent Pool and have the agent process them exactly as it would on live, so that the trial is a fair test.
+52. As Joey, I want to place B1 Homes trial POs in the test site's Agent Pool and have the agent process them exactly as it would on live, so that the trial is a fair test.
 53. As the CEO, I want the decision-seam tests to show zero false PROCEEDs before the live trial, so that I know the readers can't approve a bad PO.
 54. As the CEO, I want to review the 3 trial tasks and the cost per PO before approving live, so that go-live is my decision, based on evidence.
 55. As the PO admin, I want live to start only after hosting, maintenance ownership and the live agent account are confirmed, so that someone is responsible when it breaks.
@@ -173,15 +173,16 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 
 | Step | What happens | Fail → |
 |---|---|---|
-| 0 | **Eligibility from the list view only** (nothing opened). Live: title matches `[B1 Homes] Order <internal no>/048`. Test: title contains a file name `<internal no>_048[_n].pdf`. | Not eligible → leave untouched. |
+| 0 | **Eligibility from the list view only** (nothing opened). Live: title matches `[B1 Homes] Order <internal no>/048`. Test: the Subject/Note cell (title and body joined) contains a file name `<internal no>_048[_n].pdf`. Both: the Project cell reads `---` (not linked). | Not eligible → leave untouched. |
 | 1 | Skip-list check: Note has a final skip, or a retryable skip whose next attempt isn't due. | Leave untouched. |
 | 2 | Assign Note to the agent account. Read back the assignee. | Abort this Note (nothing to undo). |
+| 2a | The Note window shows **Link to Project** (no project button, no Change Project). | `NOTE_ALREADY_LINKED` |
 | 3 | Exactly one PDF attachment; download it. | `NO_PDF` / `MULTIPLE_PDFS` |
 | 4 | Deterministic read (text layer present, issuer, COMPACTION, PO number, internal no, file name PO, live title PO). | `PDF_UNREADABLE`, `NOT_B1`, `NOT_COMPACTION`, `PO_MISMATCH` |
 | 5 | (Live, if enabled) sender domain check. See concern C6. | `NOT_B1` |
 | 6 | Claude read (skipped in deterministic-only mode). Validate schema. | `CLAUDE_UNAVAILABLE`, `CLAUDE_INVALID_OUTPUT` |
 | 7 | Agreement: issuer, COMPACTION, PO number and internal no must be identical across readers. | `READERS_DISAGREE` |
-| 8 | Project lookup by internal no (read-only): exactly one pln. | `PROJECT_NOT_FOUND` (retryable), `PROJECT_AMBIGUOUS` |
+| 8 | Project lookup by internal no (read-only): exactly one matching row, i.e. Company B1 Homes and Client Ref No. `<internal no>/048` (live; on test the bare internal no). Rows with other suffixes are ignored: on live the search returns 3–4 projects per internal number (Joey, 16 Oct 2026). | `PROJECT_NOT_FOUND` (retryable), `PROJECT_AMBIGUOUS` |
 | 9 | Address verify (§4): lot, street, suburb. | `ADDRESS_MISMATCH`, `ADDRESS_UNVERIFIABLE` |
 | 10 | Duplicate check: project has no Compaction Test with this PO number, unless it's the agent's own partial booking recorded in the skip list (then resume it, §6). | `DUPLICATE_TASK` |
 | 11 | **PROCEED** with values: pln, PO number, email body, PDF. | — |
@@ -199,9 +200,9 @@ Any skip → assign the Note back to the pool it came from (see concern C3), wri
 | contains_compaction | yes/no | yes |
 | po_number | text or empty | `2609034B/048` |
 | client_internal_no | text or empty | `2609034B` |
-| site_lot | text or empty | `315` |
-| site_street | text or empty | `Discover Way` |
-| site_suburb | text or empty | `Yanchep` |
+| site_lot | text or empty | `123` |
+| site_street | text or empty | `Sample Lane` |
+| site_suburb | text or empty | `Sampleville` |
 
 The deterministic reading also carries `po_from_filename` and, on live, `po_from_title`.
 
@@ -221,6 +222,7 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 | `CLAUDE_UNAVAILABLE`, `CLAUDE_INVALID_OUTPUT` | No (by policy; see concern C5) |
 | `READERS_DISAGREE` | No |
 | `PROJECT_AMBIGUOUS` | No |
+| `NOTE_ALREADY_LINKED` | No |
 | `ADDRESS_MISMATCH`, `ADDRESS_UNVERIFIABLE` | No |
 | `DUPLICATE_TASK` | No |
 | `UNEXPECTED_SCREEN` (before any write) | No |
@@ -231,18 +233,18 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 - **Claude extracts** lot, street and suburb from the PDF's site/delivery address.
 - **Deterministic code verifies** each one:
   1. it appears in the PDF text layer, and all three appear **together in the same address line or block** (not scattered across the document; see concern C15)
-  2. it equals the MySys project's lot, street and suburb after normalisation.
+  2. it equals the MySys project's lot, street and suburb after normalisation. MySys holds one Address string (`Lot <lot> [(#<house no>)] <street> <suburb> [<postcode>] [<state>]`), so the lot is the token after "Lot", the `(#…)` group is dropped, and Claude's street and suburb together must equal the remaining text (`SPEC.md` → MySys screen rules → Project address).
 - **Normalisation:** case-fold; collapse whitespace and punctuation; strip a leading "Lot"; map street-type abbreviations to one form (St/Street, Rd/Road, Ave/Avenue, Dr/Drive, Cres/Crescent, Ct/Court, Pl/Place, Bvd/Boulevard, Pde/Parade, Tce/Terrace, Cl/Close, Hwy/Highway, Ln/Lane, and others found in fixtures); ignore postcode and state.
-- **Not normalised:** lot numbers must be equal as strings after stripping "Lot"; street names and suburbs must be equal after the rules above (no fuzzy matching, no edit distance).
-- Example that must pass: PDF "Lot 315 / Discover Way Yanchep WA" vs project "Lot 315 Discover Way Yanchep 6035 WA".
+- **Not normalised:** lot numbers must be equal as strings after stripping "Lot" (they can carry a letter, e.g. `12A`); street names and suburbs must be equal after the rules above (no fuzzy matching, no edit distance).
+- Example that must pass (fake values): PDF "Job Address: Lot 123 / Sample Lane Sampleville WA" vs project "Lot 123 (#45) Sample Lane Sampleville 6000 WA".
 - Any of the three missing, not found in the PDF, or different → skip.
 - **Deterministic-only mode** has no Claude extraction to verify. Until a deterministic address extractor is built, it skips every PO with `ADDRESS_UNVERIFIABLE`, so the admin works the pool as today (approved; concern C4).
 
 ### 5. Action guard
 
-- The driver can click, type, tick or upload **only** through named actions on an allowlist: open pool, set pool filter, set locked filter, open Note, assign Note (to agent / to pool), download attachment, search project, open project, open Create New Task, set Creator, tick Compaction Test, set PO Number, upload document, set task Note, untick Send Email Notification, Submit task, open Hold, set hold note, confirm Hold, Link to Project (search, select), Solved.
-- Each action is bound to one element found by accessible role and name, inside the expected page or dialog. Zero or more than one match → refuse.
-- **Denylist, checked on every action as a second layer:** any element whose name or text contains Discard, Unlink, Cancel (this also catches Undo Cancellation), Un-Hold, Change Project, Unassign, Remove, Delete; the **Pending** button in the Note's Status buttons; and **any checkbox inside the Hold dialog**. Names are matched as substrings, case-insensitive. The Note Pool's Status filter lists a Discard option, so the agent leaves that filter at its default (Pending) and never sets it. A denylist hit refuses, even if an allowlisted action resolved to it.
+- The driver can click, type, tick or upload **only** through named actions on an allowlist: open pool, set pool filter, set locked filter, open Note, assign Note (to agent / to pool), download attachment, search project, open project, open Create New Task, set Creator, tick Compaction Test, set PO Number, upload document, set task Note, untick Send Email Notification, Submit task, open Hold, set hold note, confirm Hold, Link to Project (search, select), Solved; and (1.6) select user or pool in the Note window's lists, search the Note Pool by Note ID (assignee check), open a task's detail screen (read-only).
+- Each action is bound to one element found by accessible role and name (or, where it has no accessible name, by its visible label), inside the expected MySys window, found by its heading. Zero or more than one match → refuse.
+- **Denylist, checked on every action as a second layer:** any element whose name or text contains Discard, Unlink, Cancel (this also catches Undo Cancellation), Un-Hold, Change Project, Unassign, Remove, Delete, **close** (the attached PDF's remove cell, Task Client's clear, every window Close: the driver reloads the page instead of closing windows); the **Pending** button in the Note's Status buttons; and **any checkbox inside the Hold dialog**. Names are matched as substrings, case-insensitive. The Note Pool's Status filter lists a Discard option, so the agent leaves that filter at its default (Pending) and never sets it. A denylist hit refuses, even if an allowlisted action resolved to it.
 - No other code may call the browser's click, fill, check, upload or script-execution functions. A test fails the build if it finds any.
 - A refusal aborts the run (not only the Note) and is recorded.
 - Abandoning a half-filled dialog is done by closing the browser context, never by clicking Cancel. Nothing is saved because nothing was submitted.
@@ -251,9 +253,9 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 
 | # | Write | Read back before continuing |
 |---|---|---|
-| W1 | Open the project (pln) → Create New Task. Set Creator = "Perth Scheduling", tick Compaction Test, PO Number, upload PDF, Note = email body only; untick Send Email Notification if shown. | All form values, the uploaded file name, Send Email Notification unticked. **Any mismatch → abandon form (close context), `WRITE_NOT_STARTED`.** |
-| W2 | Submit. | Task exists on this pln, type Compaction Test, PO number matches, document attached. |
-| W3 | Hold → note "ON HOLD UNTIL CALL UP" → Hold. Related-task checkboxes not touched. | Before confirming: every related-task checkbox is unticked (see concern C1). After: task status On Hold, hold note text. |
+| W1 | Open the project (pln) → Create New Task. Set Creator (Client section) = "Perth Scheduling", tick Compaction Test, PO Number, upload PDF to **PO Documents**, Note = email body only (the Note's body, not its title). Create New Task has no Send Email Notification (screen map, check 3.3). | All form values, the uploaded file name, Compaction Test the only ticked box (`SPEC.md` → MySys screen rules → W1). **Any mismatch → abandon form (close context), `WRITE_NOT_STARTED`.** |
+| W2 | Submit. | Exactly one new Compaction Test task on this pln (task numbers compared with those read at step 10); on its detail screen, PO number matches, document attached, Note = email body. |
+| W3 | Hold → note "ON HOLD UNTIL CALL UP" → Hold. No Hold-dialog checkbox touched. | Before confirming: the heading names the new task; every related-task checkbox and Reset turn around time unticked; the reminder "every … days" ticked with 0 and "at this date" unticked (see concern C1, check 3.1). After: task status On-hold, hold note text. |
 | W4 | On the Note: Link to Project → search pln → select. | Note shows link to this pln. |
 | W5 | On the Note: **Solved** (Status buttons; never Pending or Discard). | Note status "Solved by" the agent, a log line "Status changed … Pending to Solved", and the Note gone from the Pending list. |
 
@@ -298,7 +300,7 @@ The email body written into the task Note comes from the deterministic reader (t
 
 - Claude may read the PO PDF and Note text (G7, approved 12 Oct 2026; real client POs allowed by Joey on 14 Oct 2026, CEO to confirm as decision 2). Nothing else is sent to Claude: no MySys pages, credentials or project data.
 - Real client data used during the build (real PDFs, live-screen captures, real-PO test cases) stays on Joey's laptop in the git-ignored `private/` folder; never in the repository, the claude.ai project or on the Mac Mini during the MVP.
-- The daily logs hold addresses and PO details. They're stored only on the agent host, never in the project docs or on the code repository's `main` branch, and deleted after `log_retention_days` (default 90; see concern C11). During the MVP there are no daily log files on the Mac Mini: the short run output appended to `~/Library/Logs/po-agent/runs.log` (no addresses or PDF text) is the record, and it holds fake data only. The agent doesn't store PDFs (MySys keeps them).
+- The daily logs hold addresses and PO details. They're stored only on the agent host, never in the project docs or on the code repository's `main` branch, and deleted after `log_retention_days` (default 90; see concern C11). During the MVP there are no daily log files on the Mac Mini: the short run output appended to `~/Library/Logs/po-agent/runs.log` (no addresses or PDF text) is the record. It holds only the PO numbers and test-site plns of the 3 trial POs, which are real B1 POs (`SPEC.md` assumption 2). The agent doesn't store PDFs (MySys keeps them).
 - Logs and screenshots must never contain credentials. Screenshots are taken only on failures and follow the same retention.
 
 ---
@@ -321,7 +323,7 @@ Run in two modes:
 - **Live-Claude mode** (the agreement measurement in ADR action item 3): every fixture goes through both real readers. Report agreement per field and the PROCEED/SKIP result per fixture. Record tokens and cost.
 - **Stubbed-Claude mode** (fast, repeatable, in CI): Claude's reading is supplied by the fixture. This tests the agreement and verification rules, including deliberately wrong Claude readings.
 
-**Fixture set:** the 3 trial PDFs (2609017B → pln_66935, 2609034B → pln_66938, 2610002B → pln_66940) plus mutated copies:
+**Fixture set:** 3 generated fake B1-style PDFs plus mutated copies (committed). The 3 trial PDFs (2609017B → pln_66935, 2609034B → pln_66938, 2610002B → pln_66940) are real B1 POs, so they run only in the laptop's real-PO seam (`SPEC.md` → Testing Strategy):
 
 | Case | Expected |
 |---|---|

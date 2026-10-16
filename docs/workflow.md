@@ -383,7 +383,7 @@ Before Claude Code reads real data: you're on a **Pro** plan, so turn off the mo
 Read everything in private/captures/ (snapshots, screenshots, notes.md, and codegen-raw.py if I used the fallback). Write docs/screen-map.md: one section per SOP screen in order, with each control's role and accessible name, what the agent must read back after each step, the defaults, and the differences between live and test. Use fake values only: no real names, addresses or PO numbers. Add dated entries to docs/decisions.md for checks 3.1–3.6. Don't copy any file from private/ into the repo. Done means: docs/screen-map.md covers rows 01–18 with fake values only, and docs/decisions.md has one dated entry per check 3.1–3.6.
 ```
 
-Check the diff for real data and credentials. You may copy **test-site** screenshots into `docs/screen-map/` yourself once you've checked they show only your fake data. `/exit`, then commit on a branch and open a PR (Stage 5 steps 1, 8, 9).
+Check the diff for real data and credentials. Don't copy test-site screenshots into `docs/screen-map/`: the 3 trial POs are real B1 POs (16 Oct 2026, `docs/decisions.md`), so test-site screenshots are real data. `/exit`, then commit on a branch and open a PR (Stage 5 steps 1, 8, 9).
 
 ✓ `docs/screen-map.md` merged; checks 3.1–3.6 have recorded answers; `private/` holds the captures, the real PDFs and `cases.toml`. If 3.1, 3.2 or 3.4 went the wrong way, stop and take it to the CEO first.
 

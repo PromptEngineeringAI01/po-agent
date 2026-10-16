@@ -21,10 +21,10 @@ Automates the PO admin's B1 Homes `/048` compaction pre-bookings in MySys. First
 | `docs/workflow.md` | Step-by-step build runbook (Addy Osmani's agent-skills) |
 | `docs/macmini-setup.md` | How to set up the Mac Mini: agent user, power, clock, updates, secrets, launchd job |
 | `docs/demo-runbook.md` | How to reset the test site and demo the agent again (as often as you like) |
-| `docs/screen-map/` | M0 test-site screenshots (fake data only) |
+| `docs/screen-map/` | Committed fake material only (test-site screenshots show the real trial POs, so they stay in `private/`) |
 | `.playwright/cli.config.json` | Playwright CLI settings for screen mapping (live site blocked) |
 | `private/` (you create it) | **Real client data, laptop only, git-ignored:** live screenshots, real PO PDFs, `cases.toml` |
-| `tests/seam1/fixtures/pdfs/` | Where the 3 fake PO PDFs go |
+| `tests/seam1/fixtures/pdfs/` | Where the 3 generated fake PO PDFs go (never the trial PDFs: they're real) |
 | `docs/project-context.md` | One-page summary: what, where it stands, open items |
 | `docs/intent.md` | What the business wants and why |
 | `docs/decisions.md` | Decision log (wins over every spec) |

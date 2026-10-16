@@ -1,8 +1,8 @@
 # MySys screen map (test site)
 
-**Version:** 1.0 · 16 Oct 2026 · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
+**Version:** 1.1 · 16 Oct 2026 (1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
 
-Every value below is **fake**. The real captures stay in `private/`.
+Every value below is **fake**. The real captures stay in `private/`. **The test site's 3 trial POs are real B1 POs** (16 Oct 2026), so test-site captures and screenshots are real data too: never commit them.
 
 | Fake value | Stands for |
 |---|---|
@@ -41,7 +41,7 @@ Names kept as they are, because the agent uses them: the agent's account **Agent
 | "close" beside Task Client | Create New Task → Compaction Test | Clears the task client |
 | any checkbox | Hold Task dialog (reminder, reset turn-around time, related tasks) | Changes the hold or holds other jobs |
 
-Match these by **substring or regex, not exact name**: "Undo Cancellation" contains "Cancel", and Playwright's own locator for the task's Cancel needed `exact: true`. The spec's denylist (`docs/specs/spec.md` §5, v1.5) covers all of these, matched as substrings. The Note Pool's Status filter lists a **Discard** option, so the agent leaves that filter at its default (Pending).
+Match these by **substring or regex, not exact name**: "Undo Cancellation" contains "Cancel", and Playwright's own locator for the task's Cancel needed `exact: true`. The spec's denylist (`docs/specs/spec.md` §5, v1.6) covers all of these, matched as substrings; v1.6 added **close**, which also covers the window Close controls (the agent reloads the page instead of closing windows). The Note Pool's Status filter lists a **Discard** option, so the agent leaves that filter at its default (Pending).
 
 ---
 
@@ -62,12 +62,12 @@ Project (top tab) → **Note Pool**.
 | checkbox | "Filter No Company Note" | `getByRole('checkbox', { name: 'Filter No Company Note' })` | Unticked |
 | button | "Refresh", "Reset Filter", "New Note" | by role and name | |
 | button | "edit Batch Edit (0)" | | Disabled until rows are ticked; the agent never ticks rows |
-| table | columns ID, Assignee, Project, Task, Company, Date, Source, Subject/Note, Status, Note Type | | One row per Note; a row checkbox in the first cell; the row opens the Note |
+| table | columns ID, Assignee, Project, Task, Company, Date, Source, Subject/Note, Status, Note Type | | One row per Note; a row checkbox in the first cell; the row opens the Note. **Newest first.** Subject/Note shows the title and body joined; Project, Task and Company read `---` until the Note is linked |
 | combobox | page size | | Default **50**; footer "Page 1 of 1(N Items)" |
 
 **Read:** find the Note's row by the subject text and take the **ID cell** (e.g. `300001`).
 **Test-site findings:**
-- The same PO can have **two Notes**: one titled `[B1 Homes] Order 2600001B/048 Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf`, one titled only `Please find attached …`. Filtering by Agent Pool can hide a copy assigned elsewhere. The duplicate rule needs to say what to do (open item).
+- The same PO can have **two Notes**: an older one titled only `Please find attached …` (title = body), and a newer one titled `[B1 Homes] Order 2600001B/048` with body `Please find attached …`; Subject/Note shows `[B1 Homes] Order 2600001B/048 Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf`. Filtering by Agent Pool can hide a copy assigned elsewhere. `SPEC.md` → MySys screen rules: the first copy processed is booked, any other skips `DUPLICATE_TASK`.
 - A Note that is linked shows the project in the **Project** column and **B1 Homes** in **Company**; the **Task** column stays `---`.
 
 ### Row 02 · Note window
@@ -76,7 +76,7 @@ Opens from a Note Pool row. Heading **"Note 300001 - created on 12 Oct 2026"**; 
 
 | Role | Accessible name | Locator | Notes |
 |---|---|---|---|
-| heading (3) | the Note title | | `[B1 Homes] Order 2600001B/048 Please find attached …` or `Please find attached …` |
+| heading (3) | the Note title | | `[B1 Homes] Order 2600001B/048` (newer Notes, as on live) or `Please find attached …` (older Notes) |
 | text | "Assignee:" + name | | e.g. **Agent Pool**, **Agent 1 (MySys Only)** |
 | button | "Unlink" | `getByRole('button', { name: 'Unlink' })` | **Danger** |
 | list | Logs | | Newest first: "16 Oct 2026 09:53 User Assigned: (By Agent 1 (MySys Only)) From X to Y", "Status changed: … From Pending to Solved" |
@@ -89,7 +89,7 @@ Opens from a Note Pool row. Heading **"Note 300001 - created on 12 Oct 2026"**; 
 | button | "Link to Project" | `getByRole('button', { name: 'Link to Project' })` | Replaced after linking (row 13) |
 | text | Source, Created, Type, Status | | Status e.g. **Pending**, **Solved by Agent 1 (MySys Only)** |
 | link | "Download document" | `getByRole('link', { name: 'Download document' })` | Next to the file name |
-| text | the Note body | | e.g. three lines: title, "Please find attached …", file name |
+| text | the Note body | | One line, below the attachment: `Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf`. This is the "email body" for the task Note |
 
 **Read:** title, body, file name, assignee, status.
 **Opening a Note changes nothing visible:** no log line, no status change (check 3.5).
@@ -176,11 +176,10 @@ Window heading **"Create New Task"**.
 
 ### Row 09 · Create New Task, Compaction Test ticked
 
-Ticking **- Compaction Test** opens a sub-form under it:
+Ticking **- Compaction Test** opens a sub-form under it. (**Creator** isn't in the sub-form: the only Creator field is the one in the Client section, row 08, set to **Perth Scheduling** in the walkthrough.)
 
 | Field | Role / name | Locator | Default / value |
 |---|---|---|---|
-| Creator | combobox | weak | Set to **Perth Scheduling** |
 | Task Client | text "Same as Project", button "Select Client", "close" | `getByRole('button', { name: 'Select Client' })` | Same as Project. **The "close" clears it: never touch** |
 | Task Name | textbox "Task Name" | `getByRole('textbox', { name: 'Task Name' })` | Empty |
 | PO Number | textbox (no name) | weak: `div:nth-child(2) > .controls > input` | `2600001B/048` |
@@ -287,12 +286,13 @@ Row 17 (a Create New Task error) was skipped as optional. Row 18 (a cancelled ta
 
 ## Open items
 
-1. **Duplicate Notes per PO (test):** which copy the agent books, and what happens to the other.
-2. **Read back PO number and document after Submit:** they aren't in the project's task table; the task detail screen isn't mapped yet.
-3. **Note field:** left empty in the walkthrough; the SOP says email body. Confirm, and which upload (PO Documents vs Documents) the SOP means by "Documents".
-4. **Creator and PO Number:** Creator defaults to the project's creator (agent sets Perth Scheduling). Was PO Number typed or prefilled?
-5. **Link to Project search screens** (row 13) weren't captured.
-6. **Note-to-task link:** the Note links to the project only (Task `---`). Confirm that's all the SOP needs.
+1. ~~Duplicate Notes per PO~~ **Done:** the first copy processed is booked, any other skips `DUPLICATE_TASK` (`SPEC.md` → MySys screen rules → Note Pool).
+2. **Read back PO number and document after Submit:** they aren't in the project's task table; the task detail screen is mapped in **slice M0b**. Until then the MVP's duplicate check counts any non-Cancelled Compaction Test task.
+3. **Note field and upload:** Note = the Note's body (`SPEC.md` → MySys screen rules). Upload: SPEC uses **PO Documents**, as in the walkthrough; PO admin to confirm (`SPEC.md` open question 11).
+4. **Creator** ~~and PO Number~~: one Creator field (row 08), set to Perth Scheduling. Whether PO Number is prefilled: **slice M0b** (the agent's fill replaces any prefill anyway).
+5. **Link to Project search screens** (row 13) weren't captured: **slice M0b**.
+6. **Note-to-task link:** the Note links to the project only (Task `---`). That's what `SPEC.md` S4 checks.
 7. ~~Denylist additions~~ **Done:** Pending, Undo Cancellation, Un-Hold and Change Project are in the spec's denylist (v1.5) and `SPEC.md` → Never (v1.9).
 8. **Weak locators to anchor on labels:** Assigned Pool / Status / Locked filters, the Note window's user and pool lists, Projects search, Creator, Multiple Units, PO Number, PO Contact, Delivery Office, Note, both Choose File inputs, the Hold confirm button.
-9. **Live:** pool, title, Locked filter, and whether a Resolve button exists (Stage 3B).
+9. **Live:** pool, title, Locked filter, whether a Resolve button exists, and which Projects search column ends with `/048` (3–4 results per internal number on live; Stage 3B).
+10. **Notes with no attachment or two attachments**, and whether an open Note window refreshes its Assignee: **slice M0b**.

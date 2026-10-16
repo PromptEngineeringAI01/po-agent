@@ -62,7 +62,7 @@ If it can't complete a PO safely, it sends the note back to the pool for a perso
 
 ## Delivery order (14 Oct 2026)
 
-1. **MVP** (`SPEC.md`): the smallest build that proves the 3 fake POs book end to end on the test site, run hourly on the **office Mac Mini** by a launchd job. Some safeguards are in a simpler form (e.g. a half-finished booking stops the agent and Joey finishes it by hand).
+1. **MVP** (`SPEC.md`): the smallest build that proves the 3 trial POs book end to end on the test site, run hourly on the **office Mac Mini** by a launchd job. Some safeguards are in a simpler form (e.g. a half-finished booking stops the agent and Joey finishes it by hand).
 2. **v1 hardening** (`docs/specs/spec.md`, roadmap phase 2): every approved safeguard in full, the fallback mode and the live profile.
 3. **Trial and CEO sign-off**, then **production** on the same office Mac Mini (decision 3).
 
@@ -72,7 +72,7 @@ URL: `https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=management
 
 **Where it runs:** the office Mac Mini runs the script hourly as a separate standard macOS user, with its secrets in that user's Keychain (ADR-002 Option D, Accepted; `SPEC.md` → Trial conditions; `docs/macmini-setup.md`). Live credentials go there only after the CEO's go-live sign-off.
 
-For testing only, Joey plays B1 Homes and places fake PO requests directly in the test site's Agent Pool. The workflow is the same as on live, except for these differences:
+For testing only, Joey plays B1 Homes and places the trial PO requests (real B1 POs, 16 Oct 2026) directly in the test site's Agent Pool. The workflow is the same as on live, except for these differences:
 
 | | Live | Test site |
 |---|---|---|
@@ -102,7 +102,7 @@ Test POs and projects:
 3. **Locked filter:** applied on both sites.
 4. **Backlog:** read as "process existing `/048` notes like new ones". *Still to confirm, including whether there's an age cut-off.*
 5. **Hosting:** the office Mac Mini (already purchased), for the trial and production (CEO decision 3, 15 Oct 2026). It replaces the cloud routine planned for the trial on 14 Oct. The existing company server is very old and won't be used. See `docs/specs/ADR-002-po-agent-hosting.md` and `docs/hosting-research.md`.
-6. **Fake data:** each fake PDF's address matches its test project, so all 3 trial POs should pass the address check.
+6. **Trial data:** each trial PDF's address matches its test project, so all 3 trial POs should pass the address check. The trial POs are real B1 POs (16 Oct 2026, `docs/decisions.md`).
 7. **Architecture:** the CEO approved the design, trial and safeguards (decision 1, recorded 13 Oct 2026). ADR-001 is Accepted.
 
 ## Open questions

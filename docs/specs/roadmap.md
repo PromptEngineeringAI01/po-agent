@@ -13,7 +13,7 @@ Phases run in order, and each has an exit check. 🔴 = blocker from `spec.md` �
 - Find every screen that shows "Send Email Notification", and how to untick it and read it back (open question 9).
 - Map the SOP screens by accessible role and name: Note Pool filters, Assign, attachment download, Projects search (0/1/many results), Create New Task, Hold, Link to Project, Solved; and how each result can be read back → `docs/screen-map.md`.
 - Create an Anthropic API key for the trial with a spend limit.
-- Collect the 3 fake PO PDFs and their project data as fixtures (committed). Record the full SOP walkthrough on the test site; view-only captures of live and real PO PDFs with their project data (3 for the MVP, 10–20 before go-live) into `private/` (laptop only, never committed). See `docs/workflow.md` Stage 3.
+- Collect the 3 trial PO PDFs and their project data into `private/` (they're real B1 POs, 16 Oct 2026, so never committed; CI's seam 1 uses 3 generated fake POs, M2). Record the full SOP walkthrough on the test site; view-only captures of live and real PO PDFs with their project data (3 for the MVP, 10–20 before go-live) into `private/` (laptop only, never committed). See `docs/workflow.md` Stage 3.
 
 **Exit:** ✅ CEO approved decision 1 (13 Oct 2026); `SPEC.md` approved; C1, C3 and C8 answered (or escalated to the CEO); screen map written.
 
@@ -43,8 +43,8 @@ Build the items the MVP deferred, as approved in `spec.md`:
 
 ## Phase 3 — Trial (CEO gate)
 
-- Run on the hourly schedule on the test site for a few days with fresh fake POs, unattended. Host: the office Mac Mini (CEO decision 3).
-- Clean test-site state; Joey places the 3 fake POs (`2609017B`, `2609034B`, `2610002B`) in the Agent Pool; scheduled runs process them with no human help.
+- Run on the hourly schedule on the test site for a few days with fresh copies of the trial POs, unattended. Host: the office Mac Mini (CEO decision 3).
+- Clean test-site state; Joey places the 3 trial POs (`2609017B`, `2609034B`, `2610002B`; real B1 POs) in the Agent Pool; scheduled runs process them with no human help.
 - **CEO review pack:**
   - the 3 tasks
   - the logs for the trial runs
