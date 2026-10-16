@@ -10,7 +10,7 @@ Automates the PO admin's B1 Homes `/048` compaction pre-bookings in MySys. First
 2. Open it: `code C:\Users\<you>\code\po-agent`, then **Terminal → New Terminal**.
 3. Follow `docs/workflow.md` Stages 0–2: tools, git + private GitHub repo, and Addy Osmani's agent-skills plugin (the skills plan is at the top of the workflow). If VS Code offers the recommended extensions, accept.
 4. Map the screens (workflow Stage 3): on the test site you click through the SOP (full SOP for 2609017B; read-only screens for 2609034B and 2610002B) while Claude Code takes Playwright CLI snapshots and screenshots; reset the test site; then view-only captures of live and the 3 most recent real PO PDFs (10–20 before go-live). Everything goes into `private/` first.
-5. Check `SPEC.md` against the screen map (workflow Stage 4.1), then `/plan`.
+5. Check `SPEC.md` against the screen map (workflow Stage 4.1, done), then `/agent-skills:plan` (Stage 4.2).
 
 ## What's where
 

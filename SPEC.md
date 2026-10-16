@@ -15,7 +15,7 @@
 7. **CEO decisions 1 and 3 are made.** Decision 2 is Joey's call pending the CEO's confirmation. Because the trial POs are real, it now gates the **first Mac Mini run that downloads a trial PO** (M3 on the Mac Mini); work on the laptop isn't blocked.
 8. **Built on Joey's Windows laptop** in VS Code with Claude Code; Python 3.12 via uv; private GitHub repo (the Mac Mini pulls `main` from it); Addy Osmani's agent-skills.
 
-→ Correct any of these before `/plan`.
+→ Correct any of these before `/agent-skills:plan`.
 
 ## Objective
 
@@ -120,7 +120,7 @@ Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
 ```text
 SPEC.md                         active spec (this file)
 CLAUDE.md                       rules for every Claude Code session
-tasks/plan.md, tasks/todo.md    written by /plan
+tasks/plan.md, tasks/todo.md    written by /agent-skills:plan
 pyproject.toml, uv.lock         [project.scripts] po-agent = "po_agent.cli:main"
 src/po_agent/
   cli.py                        argument parsing; maps errors to exit codes
@@ -340,7 +340,7 @@ Joey decided on 14 Oct 2026 that the agent may read real client data (CEO to con
 - **Turn off model training first:** Joey is on a **Pro** plan, so before Claude Code reads any real data, the model-training setting in claude.ai privacy settings must be off. (The reader's API key is under commercial terms and isn't used for training by default.)
 - `.gitignore` excludes `private/`; a commit hook and CI check also block any staged path under `private/` and any PDF outside `tests/seam1/fixtures/pdfs/`.
 
-## Expected slices (input for `/plan`)
+## Expected slices (input for `/agent-skills:plan`)
 
 | Slice | Delivers | Needs |
 |---|---|---|

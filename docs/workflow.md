@@ -1,8 +1,15 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.8 · 16 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.9 · 16 Oct 2026 · **Owner:** Joey Wu
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
+
+**v5.9:** after the SPEC check (4.1, done 16 Oct 2026, PR #5):
+- **Type `/agent-skills:plan` and `/agent-skills:review`, not `/plan` and `/review`.** Claude Code has its own built-in `/plan` (it only switches plan mode on: "Already in plan mode. No plan written yet.") and `/review`, and those win over the plugin's short names. Run 4.2 with plan mode **off**, because plan mode stops Claude writing `tasks/plan.md`.
+- **The 3 trial POs are real B1 POs.** Test-site captures are real data; seam 1's committed fixtures are generated fakes (M2); the CEO confirms decision 2 before the first Mac Mini run that downloads one (6.3).
+- **New Stage 3E (slice M0b):** the screens the screen map is missing (task detail, Link to Project search, Notes with 0 and 2 attachments, Note-window refresh, PO Number prefill). Do it any time before M3; it doesn't block the plan or M1–M2.
+- Before 4.2: confirm PR #5's defaults and merge PRs #1–#5, so `/agent-skills:plan` plans from `SPEC.md` v1.10 on `main`. The 4.2 prompt now includes M0b.
+- Stage 3B's `cases.toml` template records what MySys shows (every search row, the raw Address, task status); the reset (6.1) leaves exactly one unlinked Pending Note per trial PO.
 
 **v5.8:** Stage 3B collects the **3 most recent** real PO PDFs for the MVP (10–20 before go-live).
 
@@ -43,7 +50,7 @@
 | Define | `spec-driven-development` (`/spec`) | **Done** (`SPEC.md`); again for every later change | Stage 4; Stage 8 |
 | Define | `interview-me` | **Yes**, for open questions you're unsure about | Stage 4 |
 | Define | `idea-refine` | Skip | The idea is settled |
-| Plan | `planning-and-task-breakdown` (`/plan`) | **Yes** | Stage 4 |
+| Plan | `planning-and-task-breakdown` (`/agent-skills:plan`; plain `/plan` is Claude Code's plan-mode command) | **Yes** | Stage 4 |
 | Build | `incremental-implementation` (`/build`) | **Yes**, every task | Stage 5 |
 | Build | `test-driven-development` (`/test`) | **Yes**, every task (test first) | Stage 5 |
 | Build | `context-engineering` | **Yes**: keeps `CLAUDE.md` true to the code | After M1; whenever CLAUDE.md drifts |
@@ -54,7 +61,7 @@
 | Verify | `browser-testing-with-devtools` | **Skip for MySys** | It lets Claude Code drive the browser itself; we use Playwright CLI in observe-only mode instead, and Claude never clicks MySys |
 | Verify | **Playwright CLI** (`@playwright/cli`, a tool, not a skill) | **Yes, observe only** | M0 screen mapping; later whenever a screen changes. Don't install its bundled skills: they teach Claude to click, which we deny |
 | Verify | `debugging-and-error-recovery` | **Yes** | Any failure that isn't obvious |
-| Review | `code-review-and-quality` (`/review`) | **Yes**, every PR | Stage 5 |
+| Review | `code-review-and-quality` (`/agent-skills:review`; plain `/review` is Claude Code's built-in) | **Yes**, every PR | Stage 5 |
 | Review | `security-and-hardening` | **Yes** | M1 (secrets, hooks), M4 (first write), before M6, before production |
 | Review | `code-simplification` (`/code-simplify`) | **Yes**, once | After M6 |
 | Review | `performance-optimization` (`/webperf`) | Skip | Web-page performance; not relevant |
@@ -82,6 +89,7 @@ So Addy's skills stay the workflow, and `improve-codebase-architecture` is used 
 
 | Slice | Pace | Why |
 |---|---|---|
+| M0b screens still to map (Stage 3E) | By hand: you click, Claude observes | No code; before M3 |
 | M1 walking skeleton (guard, secrets, hooks) | `/build`, one task at a time, plan mode first | The guard and the hooks protect everything after |
 | M2 decision seam | `/build auto` once M1's guardrails are merged | Offline, well specified, test-first |
 | M3 decide-only | `/build`, one task at a time | First run that assigns and returns Notes |
@@ -95,8 +103,8 @@ So Addy's skills stay the workflow, and `improve-codebase-architecture` is used 
 
 | Question | Answer | Why |
 |---|---|---|
-| GitHub or local? | **Private GitHub repo.** Required: the Mac Mini pulls `main` from GitHub and opens alert issues there. Get the OK from CEO/IT (no real client data and no credentials in it). | The Mac Mini, CI on every push, PRs for review. |
-| Where's the plan? | `tasks/plan.md` and `tasks/todo.md`, written by `/plan`. | The skills' default; `/build` reads them. |
+| GitHub or local? | **Private GitHub repo.** Required: the Mac Mini pulls `main` from GitHub and opens alert issues there. Get the OK from CEO/IT (no credentials, PDFs or addresses in it; only the 3 trial POs' internal numbers, PO numbers and test plns, 16 Oct 2026). | The Mac Mini, CI on every push, PRs for review. |
+| Where's the plan? | `tasks/plan.md` and `tasks/todo.md`, written by `/agent-skills:plan`. | The skills' default; `/build` reads them. |
 | Parallel agents / worktrees? | **No.** Tasks run in order. | Serial chain; easier to trust the guard. |
 | Hooks? | **Yes, created in M1**, then changed only by Joey. | Must-never rules enforced in code, not advice. |
 | Evals? | **The seam 1 fixture set is the eval suite**, plus the real-PO set on the laptop. Every bug adds a fixture. | Proves "zero false PROCEED". |
@@ -111,7 +119,7 @@ So Addy's skills stay the workflow, and `improve-codebase-architecture` is used 
 | CEO decisions 1, 2, 3 | **CEO decision brief** in the claude.ai project | `docs/decisions.md` records date and outcome |
 | Plan and tasks | `tasks/plan.md`, `tasks/todo.md` | — |
 | Run output | `~/Library/Logs/po-agent/runs.log` on the Mac Mini; `logs/` on the laptop (git-ignored); the Mac Mini's `state_dir` in v1 | Never in the repo or the claude.ai project |
-| Real client data | `private/` on Joey's laptop (git-ignored) | Nowhere else |
+| Real client data | `private/` on Joey's laptop (git-ignored); the 3 trial POs also live on the MySys test site | The trial POs only in memory during runs (laptop, Mac Mini); their identifiers in docs and run output |
 | Credentials | keyring: Windows Credential Manager on the laptop; `poagent`'s login Keychain on the Mac Mini | Nowhere else |
 
 ---
@@ -156,7 +164,7 @@ git config --global init.defaultBranch main
 
 **The zip version doesn't update itself.** To update later, download the new Windows zip from github.com/cli/cli/releases and replace the contents of `C:\Users\JoeyWu\tools\gh`. Not needed now.
 
-**Get the OK:** one email to the CEO/IT: *"OK to keep the PO Agent code in a private GitHub repo (account PromptEngineeringAI01) and have the office Mac Mini pull it to run the agent? No real client data and no credentials go in it. To do this I've installed the GitHub CLI (portable version, in my user folder, no admin rights) and signed it in to that account."*
+**Get the OK:** one email to the CEO/IT: *"OK to keep the PO Agent code in a private GitHub repo (account PromptEngineeringAI01) and have the office Mac Mini pull it to run the agent? No credentials, PO PDFs or addresses go in it, only the identifiers of 3 trial POs. To do this I've installed the GitHub CLI (portable version, in my user folder, no admin rights) and signed it in to that account."*
 
 ---
 
@@ -232,7 +240,7 @@ playwright-cli --help
 What are the must-never rules, what's the check command, and what's the active spec? Which agent-skills commands are available?
 ```
 
-✓ All 9 rules, `uv run scripts/check.py`, `SPEC.md`, and `/spec`, `/plan`, `/build`, `/test`, `/review`, `/code-simplify`, `/ship`. Then `/exit`.
+✓ All 9 rules, `uv run scripts/check.py`, `SPEC.md`, and `/spec`, `/agent-skills:plan`, `/build`, `/test`, `/agent-skills:review`, `/code-simplify`, `/ship`. (`/plan` and `/review` on their own are Claude Code's built-ins.) Then `/exit`.
 
 ---
 
@@ -250,7 +258,7 @@ The job has four parts, plus the screens off the happy path:
 | **4. Link and mark Solved** | Back on the Note: **Link to Project**, then **Solved** | 13–14 |
 | **5. Off the happy path** | Send a Note back to the pool, search for a project that doesn't exist, a form error, a cancelled task | 15–18 |
 
-**Why Claude needs this:** the agent finds every button by its role and name on the screen (for example, button "Solved"). Claude can't log in to MySys or click anything, so it learns each screen from your walkthrough: the buttons the agent will press, the defaults it must check, and the buttons it must never press (Discard, Unlink, Cancel, Unassign, Remove).
+**Why Claude needs this:** the agent finds every button by its role and name on the screen (for example, button "Solved"). Claude can't log in to MySys or click anything, so it learns each screen from your walkthrough: the buttons the agent will press, the defaults it must check, and the buttons it must never press (Discard, Unlink, Cancel, Undo Cancellation, Un-Hold, Change Project, Unassign, Remove, Pending, anything named "close").
 
 **Which PO gets what:**
 
@@ -262,7 +270,7 @@ The job has four parts, plus the screens off the happy path:
 
 The two "look only" POs show Claude how Notes, PDFs and addresses vary. Booking them as well would add nothing and mean more resets.
 
-No recording file is needed: Claude takes each screen's accessibility tree (every element's role and name, which boxes are ticked) and a screenshot itself, with Playwright CLI. Never use a video, a HAR file or saved cookies; they capture the password. Everything goes into `private/` (git-ignored, laptop only), because the test site may hold copies of real data.
+No recording file is needed: Claude takes each screen's accessibility tree (every element's role and name, which boxes are ticked) and a screenshot itself, with Playwright CLI. Never use a video, a HAR file or saved cookies; they capture the password. Everything goes into `private/` (git-ignored, laptop only), because the 3 trial POs on the test site are real B1 POs (16 Oct 2026).
 
 ### 3A. Test site: the walkthrough
 
@@ -308,7 +316,7 @@ No recording file is needed: Claude takes each screen's accessibility tree (ever
 
 | Row | Do this | Look for |
 |---|---|---|
-| 09 | Fill in: Creator **Perth Scheduling**; tick **Compaction Test**; PO Number `2609017B/048`; upload the PDF; Note = the email body; **untick Send Email Notification**. Don't submit yet | Every field, just before Submit |
+| 09 | Fill in: Creator **Perth Scheduling** (the Client section); tick **Compaction Test**; PO Number `2609017B/048`; upload the PDF to **PO Documents**; Note = the email body. (This form has no Send Email Notification.) Don't submit yet | Every field, just before Submit |
 | 10 | **Submit** | Where the task type, PO number and document show |
 | 11 | **Hold** → type `ON HOLD UNTIL CALL UP`; don't press the Hold button yet | ⚠ **Every related-task checkbox, and whether it's ticked** (check 3.1) |
 | 12 | Press **Hold** | How "On Hold" and the hold note show |
@@ -347,21 +355,27 @@ Real client data, so it stays in `private/`. **Change nothing on live:** no Assi
 
 1. Log in to live in your normal browser. Screenshots to `private\captures\live\`: the PO Allocation Pool with the Locked filter; 3–4 real B1 Notes (title, body, attachments); one non-B1 or `/023` Note for contrast.
 2. Save the **3 most recent real B1 `/048` PO PDFs** to `private\pdfs\` for the MVP. Before go-live, add more to reach 10–20 (mostly `/048`, a few other suffixes, and any odd ones you remember).
-3. For each one, look up its project (view only) and fill one case in `private\fixtures\cases.toml`:
+3. For each one, look up its project (view only) and fill one case in `private\fixtures\cases.toml`. Copy **what MySys shows**, so the tests also check how the agent reads it (`SPEC.md` → Testing Strategy). Add one case for each of the 3 trial POs too, with `site = "test"` and their test-site lookups (pln_66935, pln_66938, pln_66940). The cases you already typed need the new `lookup.search`, `lookup.address` and `lookup.tasks` fields:
 
    ```toml
    [[case]]
+   site = "live"                         # "test" for the 3 trial POs
    pdf = "2610123B_048_1.pdf"
    note_title = "[B1 Homes] Order 2610123B/048"
    note_body = "Please find attached Purchase Order / Quotation file 2610123B_048_1.pdf"
-   lookup.project_matches = 1            # how many projects the internal number finds
-   lookup.pln = "pln_00000"
-   lookup.lot = "12"
-   lookup.street = "Example Street"
-   lookup.suburb = "Sampleville"
-   lookup.existing_compaction_po = []    # PO numbers of Compaction Test tasks already on the project
+   note_project = "---"                  # the Note Pool's Project cell
+   lookup.search = [                     # every row Projects search shows for the internal number
+     { pln = "pln_00000", client_ref = "2610123B/048", company = "B1 Homes" },
+     { pln = "pln_00001", client_ref = "2610123B/023", company = "B1 Homes" },
+   ]
+   lookup.address = "Lot 12 (#3) Example Street Sampleville 6000 WA"   # the project's Address, exactly as shown
+   lookup.tasks = []                     # Compaction Test tasks on the project, e.g. [{ task = "tsk_1", status = "On-hold" }]
    expect = "PROCEED"                    # or "SKIP" when a person would need to look at it
    expect_reason = ""                    # e.g. "ADDRESS_MISMATCH" when expect = "SKIP"
+   expect_pln = "pln_00000"
+   expect_lot = "12"                     # what you'd split the address into by hand
+   expect_street = "Example Street"
+   expect_suburb = "Sampleville"
    ```
 
 ### 3C. The six checks (answer them during the walkthrough)
@@ -387,11 +401,26 @@ Check the diff for real data and credentials. Don't copy test-site screenshots i
 
 ✓ `docs/screen-map.md` merged; checks 3.1–3.6 have recorded answers; `private/` holds the captures, the real PDFs and `cases.toml`. If 3.1, 3.2 or 3.4 went the wrong way, stop and take it to the CEO first.
 
+### 3E. Slice M0b: the screens still to map (about an hour, before M3)
+
+The screen map is missing a few screens the agent needs (`SPEC.md` → Expected slices → M0b). Same set-up as 3A: start `claude`, paste the 3A prompt, log in as the agent account, then give Claude each row. It doesn't block the plan (Stage 4) or M1–M2; rows 21–23 are needed before M3, rows 19, 20 and 24 before M4.
+
+| Row | Do this | Look for |
+|---|---|---|
+| 19 | Book 2609017B again by hand up to **Submit** (rows 06–10). Then open the new task's **detail screen** (try the project's "-- Select Task --" list, or the task number) | Where the PO number, the PO document and the Note show; how you got there |
+| 20 | Finish Hold (rows 11–12), then on the Note: **Link to Project** → the search box → type `pln_66935` → the result list → select | Each screen of the search and select (row 13 only had the result) |
+| 21 | As B1 Homes, place a Note with **no attachment** in the Agent Pool; open it | What the attachment area shows when it's empty |
+| 22 | Place a Note with **two** PDFs; open it | How two attachments show (two "Download document" links?) |
+| 23 | Open a Note in the Playwright window. In your normal browser, as yourself, assign that Note to someone else. Back in the Playwright window: does its "Assignee:" change by itself? Then Note Pool → Assigned Pool **All Pools** → Search/filter = the Note ID, with a project window still open | Whether the open Note window refreshes; the Note's row and its Assignee cell |
+| 24 | On any project: **Create New Task** → tick **- Compaction Test**, before typing anything | Is PO Number empty or prefilled? |
+
+Then reset (6.1): cancel the task from rows 19–20 with your own account, place a fresh 2609017B Note, and put the row 21–23 Notes somewhere other than the Agent Pool (or Solve them yourself). Ask Claude: `Update docs/screen-map.md (rows 19–24, fake values only) and SPEC.md → MySys screen rules from private/captures/test/ rows 19–24, with a dated docs/decisions.md entry. Done means: no M0b item is left in SPEC.md or the screen map's open items.` Commit on a branch and open a PR.
+
 ---
 
 ## Stage 4 — Define and plan (one session, about 1–2 hours)
 
-**4.1 Check `SPEC.md` against the screen map.** The spec was approved on 15 Oct 2026 (v1.4). M0 may still change details (labels, C1, C3, how a cancelled task shows), so start `claude`:
+**4.1 Check `SPEC.md` against the screen map.** ✅ **Done 16 Oct 2026** (17 issues fixed in `SPEC.md` v1.10, PR #5); kept for the next time a screen changes. Start `claude`:
 
 ```text
 Read SPEC.md, CLAUDE.md, docs/screen-map.md, docs/specs/spec.md and docs/decisions.md. List anything in SPEC.md that the screen map contradicts, that is ambiguous, or that an engineer couldn't build from. Don't change files yet. Done means: a numbered list of issues, each naming the SPEC.md section and the screen-map evidence, or "none found".
@@ -399,11 +428,18 @@ Read SPEC.md, CLAUDE.md, docs/screen-map.md, docs/specs/spec.md and docs/decisio
 
 For any point you're unsure about: `Use the interview-me skill on <the point>.` Ask Claude to make the agreed edits to `SPEC.md` with a dated entry in `docs/decisions.md`, bump the version, and commit.
 
-**4.2 Plan.** Press **Shift+Tab** until **plan mode on**, then:
+**4.2 Plan.** First, **before planning:**
+
+1. Read PR #5's `docs/decisions.md` entry (16 Oct 2026, "The 3 trial POs are real") and confirm its defaults, or ask Claude to change the ones you don't want.
+2. Merge the PR stack in order (#1 → #5; after each merge, change the next PR's base to `main`), so `main` has `SPEC.md` v1.10. Then `git switch main`, `git pull`, `git switch -c plan-mvp`.
+
+Make sure plan mode is **off** (Shift+Tab until the footer no longer shows plan mode): the skill writes `tasks/plan.md` itself and stops for your review, and plan mode would stop it writing. Then type the namespaced command (plain `/plan` only switches plan mode on):
 
 ```text
-/plan SPEC.md — slices M1–M6 from "Expected slices" (M0 is done). Vertical slices, each with acceptance criteria, a verify step and the files it touches, no task over ~5 files. Mark each task "step" or "auto" using the build-pace table in docs/workflow.md. Write tasks/plan.md and tasks/todo.md and stop.
+/agent-skills:plan SPEC.md — slices M0b and M1–M6 from "Expected slices" (M0 is done). M0b is by hand (Joey clicks, Claude observes, no code; Stage 3E of docs/workflow.md) and must come before M3. Vertical slices, each with acceptance criteria, a verify step and the files it touches, no task over ~5 files. Mark each task "step", "auto" or "by hand" using the build-pace table in docs/workflow.md. Write tasks/plan.md and tasks/todo.md and stop.
 ```
+
+✓ `tasks/plan.md` and `tasks/todo.md` exist, and Claude has stopped. If you see "Already in plan mode" or "Enabled plan mode", you typed the built-in `/plan`: press Shift+Tab to turn plan mode off and type `/agent-skills:plan …`.
 
 **4.3 Doubt the plan** in a **fresh session** (`/exit`, then `claude`):
 
@@ -438,6 +474,7 @@ Fix what it finds and repeat until the answer is "nothing".
 
    - **"auto" tasks** (M2, after M1 is merged): `/build auto` for the M2 tasks only. It still works test-first and commits each task, and pauses on failures or risky steps.
    - **M1:** add `Follow "Appendix A — M1 build notes" in docs/workflow.md.`
+   - **M2:** the 3 seam-1 fixture PDFs are **generated fakes**, never the trial PDFs (they're real). The generator needs a new dependency: Claude asks you first.
    - **M1, M2, M4** (Playwright, Anthropic SDK, pdfplumber): add `Use the source-driven-development skill: build from the current official docs for each library call and cite them.`
    - **M4** (first write to MySys): before building, in a fresh session, `Use the doubt-driven-development skill on the booker design in tasks/plan.md against docs/screen-map.md.`
 4. **Test-first pause.** Claude shows a failing test and stops. If it tests what the task and spec say: `Test looks right. Commit it and continue.`
@@ -446,7 +483,7 @@ Fix what it finds and repeat until the answer is "nothing".
 7. **Review:**
 
    ```text
-   /review
+   /agent-skills:review
    ```
 
    For M1, M4 and M5 PRs, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any.
@@ -526,12 +563,12 @@ Change the expected result in one seam-1 fixture.
 **6.1 Reset the test site** (after the walkthrough, before M3, after every booking test, and before the M6 demo), with **your own account**, by hand. The agent never cancels anything.
 
 - [ ] On pln_66935, pln_66938 and pln_66940: **cancel** every non-cancelled Compaction Test task with the trial PO numbers (2609017B/048, 2609034B/048, 2610002B/048).
-- [ ] The 3 trial Notes (2609017B, 2609034B, 2610002B) are in the **Agent Pool**, unassigned, with their PDFs. Place fresh copies if earlier ones were Solved.
+- [ ] **Exactly one** Pending Note per trial PO (2609017B, 2609034B, 2610002B) in the **Agent Pool**: unassigned, **not linked** to a project (its Project column reads `---`), with its PDF. Place fresh copies if earlier ones were Solved; move any extra copy out of the Agent Pool (a second copy is skipped as `DUPLICATE_TASK`).
 - [ ] Nothing is left assigned to the agent account.
 
 **6.2 Seam 2 from the laptop:** `uv run pytest tests/seam2 -m testsite` (Claude may run it if you ask). ✓ All cases pass; reset again afterwards.
 
-**6.3 On the Mac Mini:** as `poagent`, `~/po-agent/scripts/macmini-run.sh decide-only` (M3), then `launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent` (M4, one PO). ✓ `runs.log` ends with `RUN_SUMMARY` and `"exit_code": 0`.
+**6.3 On the Mac Mini:** the trial POs are real, so **the CEO must have confirmed decision 2 first** (`SPEC.md` → Trial conditions). Then, as `poagent`, `~/po-agent/scripts/macmini-run.sh decide-only` (M3), then `launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent` (M4, one PO). ✓ `runs.log` ends with `RUN_SUMMARY` and `"exit_code": 0`.
 
 ---
 
@@ -560,7 +597,7 @@ Change the expected result in one seam-1 fixture.
      ```
 
    - **Run it** in a fresh session: `/improve-codebase-architecture`. Tell it: *ADRs live in `docs/specs/` as `ADR-NNN-<name>.md`; the glossary is in `docs/specs/README.md`; the must-never rules in CLAUDE.md and the action guard are fixed.* It writes an HTML report of "deepening" candidates (shallow modules to merge into deeper ones), then grills you on the one you pick.
-   - Turn the chosen change into work the Addy way: `/spec` (a short change spec) → `/plan` → `/build`.
+   - Turn the chosen change into work the Addy way: `/spec` (a short change spec) → `/agent-skills:plan` → `/build`.
    - **Remove the four skills afterwards** (the installer's remove command, or delete their folders from your user skills folder) so `grilling` and `domain-modeling` don't compete with Addy's skills day to day.
 3. **v1 hardening** (roadmap phase 2): for each change, `/spec` on a new `intent/<change>/` folder, then Stages 4–5. Use `observability-and-instrumentation` for the v1 alerts and logs.
 4. **Production on the Mac Mini** (roadmap phase 4; CEO decision 3 made): live credentials into `poagent`'s Keychain after the go-live sign-off, `/ship` plus `engineering:deploy-checklist` in Cowork.
@@ -649,7 +686,8 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 | `git push` asks for a password, or fails with 403 | Run `gh auth setup-git`, then push again. |
 | Push refused with `GH007` (private email) | GitHub is hiding your email. Use the noreply address from GitHub → Settings → Emails: `git config --global user.email "<id>+PromptEngineeringAI01@users.noreply.github.com"`, then `git commit --amend --reset-author --no-edit` and push again. |
 | `&&` "is not a valid statement separator" | Run the commands on separate lines. |
-| `/plan`, `/build` not listed | `/reload-plugins`, or `/exit` and start `claude` again. Check `claude plugin list`. |
+| `/plan` says "Already in plan mode" or "Enabled plan mode", and writes no plan | That's Claude Code's built-in `/plan`. Turn plan mode off (Shift+Tab) and type `/agent-skills:plan …`. Same for `/review` → `/agent-skills:review`. |
+| `/agent-skills:plan`, `/build` not listed | `/reload-plugins`, or `/exit` and start `claude` again. Check `claude plugin list`. |
 | Every skill appears twice | You installed agent-skills both as a plugin and with `npx skills`. Remove one. |
 | `playwright-cli` "not recognized" | Close and reopen the terminal after installing Node.js; check `npm install -g @playwright/cli@latest` finished. |
 | `playwright-cli open` says the browser is missing | Follow the install command it prints, then open again. |
@@ -669,14 +707,14 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 | Not sure which skill | `Use the using-agent-skills skill to pick one.` |
 | An open question you can't answer yet | `Use the interview-me skill on …` |
 | A change to what the agent does | `/spec` (new `intent/<change>/` folder) |
-| Spec → plan and tasks | `/plan` |
+| Spec → plan and tasks | `/agent-skills:plan` (plan mode off) |
 | Challenge a plan or a risky design in a fresh session | `Use the doubt-driven-development skill on …` |
 | Build the next task (test-first, small commits) | `/build` (or `/build auto` for "auto" tasks) |
 | Library calls (Playwright, Anthropic SDK, pdfplumber) | `Use the source-driven-development skill …` |
-| Map or re-check a MySys screen | Playwright CLI: you click, Claude runs `snapshot` / `screenshot` (Stage 3A) |
+| Map or re-check a MySys screen | Playwright CLI: you click, Claude runs `snapshot` / `screenshot` (Stage 3A; the M0b screens in 3E) |
 | Run and prove it | `/test` |
 | Something fails and it isn't obvious | `Use the debugging-and-error-recovery skill on …` |
-| Before every PR | `/review` (+ `security-and-hardening` for M1, M4, M5) |
+| Before every PR | `/agent-skills:review` (+ `security-and-hardening` for M1, M4, M5) |
 | CLAUDE.md out of date | `Use the context-engineering skill …` |
 | After the MVP works | `/code-simplify` |
 | Before automation #2 / before v1 | Matt Pocock's `/improve-codebase-architecture` (Stage 8) |

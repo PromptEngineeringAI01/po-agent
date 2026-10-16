@@ -50,10 +50,10 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 
 ## Where things are
 
-- Active spec: `SPEC.md`. Plan and task list: `tasks/plan.md`, `tasks/todo.md` (written by `/plan`).
+- Active spec: `SPEC.md`. Plan and task list: `tasks/plan.md`, `tasks/todo.md` (written by `/agent-skills:plan`).
 - Full v1 spec pack: `docs/specs/` (mission, spec, tech-stack, roadmap, README glossary). ADRs: `docs/specs/ADR-NNN-<name>.md`.
 - Intent: `docs/intent.md`. Decisions: `docs/decisions.md`. Build workflow: `docs/workflow.md`. Mac Mini setup: `docs/macmini-setup.md`. Demo and reset: `docs/demo-runbook.md`. Screen map: `docs/screen-map.md` (written in M0).
-- Skills: Addy Osmani's agent-skills plugin (`/spec`, `/plan`, `/build`, `/test`, `/review`, `/code-simplify`, `/ship`).
+- Skills: Addy Osmani's agent-skills plugin (`/spec`, `/agent-skills:plan`, `/build`, `/test`, `/agent-skills:review`, `/code-simplify`, `/ship`; plain `/plan` and `/review` are Claude Code built-ins).
 
 ## Lessons
 
