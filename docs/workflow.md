@@ -532,7 +532,7 @@ Change the expected result in one seam-1 fixture.
 
 **Check CLAUDE.md matches the code:** `Use the context-engineering skill: does CLAUDE.md match how this repo now works? Propose only the changes needed.`
 
-**Set up the Mac Mini** and run the spike: follow `docs/macmini-setup.md` (section 2, the login by hand from the Mac Mini, first; then sections 3–9). ✓ SPEC criterion S1.
+**Set up the Mac Mini** and run the spike: follow `docs/macmini-setup.md` ("This Mac Mini" first: check it's the A3238 M4 model, wire it to Ethernet, keep a keyboard and display with it; then section 2, the login by hand from the Mac Mini; then sections 3–9). ✓ SPEC criterion S1.
 
 **If a screen turns out different later** (a selector fails in a test-site run): repeat Stage 3A for just that screen with Playwright CLI and ask Claude to update `docs/screen-map.md`.
 

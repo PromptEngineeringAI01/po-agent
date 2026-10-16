@@ -1,9 +1,28 @@
 # Mac Mini setup — PO Agent (office Mac Mini, test site first)
 
-**Version:** 1 · 15 Oct 2026 · **Owner:** Joey Wu · **Spec:** `SPEC.md` → Trial conditions, Commands · **Decision:** CEO decision 3 (`docs/decisions.md`, 15 Oct 2026; `docs/specs/ADR-002-po-agent-hosting.md`)
+**Version:** 1.1 · 16 Oct 2026 (1.1: "This Mac Mini" check for the office's model A3238) · **Owner:** Joey Wu · **Spec:** `SPEC.md` → Trial conditions, Commands · **Decision:** CEO decision 3 (`docs/decisions.md`, 15 Oct 2026; `docs/specs/ADR-002-po-agent-hosting.md`)
 Do this in slice **M1**, once `pyproject.toml`, `uv.lock`, `po-agent spike`, `scripts/macmini-run.sh` and `scripts/au.com.prompteng.po-agent.plist` exist on `main`. Section 2 (the test login) can be done today.
 
 The Mac Mini runs the agent for the MVP trial and, after go-live sign-off, for production. During the MVP it holds **test-site credentials only** and no real client data on disk. The one exception: the 3 trial POs are real, and runs read them from the test site in memory (`SPEC.md` → Trial conditions; the CEO confirms decision 2 before the first such run).
+
+## This Mac Mini (model A3238)
+
+The office Mac Mini is model **A3238**: the 2024 Mac mini with the **M4** chip, model ID **Mac16,10** (Apple silicon). The model number is printed on the underside. Every step below assumes Apple silicon; nothing else in this file depends on the model.
+
+**Check it**, as an admin in Terminal:
+
+| Check | Healthy |
+|---|---|
+| `sysctl -n hw.model` | `Mac16,10` (`Mac16,11` would be the M4 Pro, model A3239; the steps are the same) |
+| `uname -m` | `arm64` |
+| `sw_vers -productVersion` | The macOS version. Note it in the company password manager entry for this Mac, so later updates (section 5) can be checked against it |
+
+**Set it up:**
+
+- **Wired network:** plug an Ethernet cable from the Ethernet port on the back into the office router or switch, and use that rather than Wi-Fi for the hourly runs. System Settings → Network should show **Ethernet: Connected**.
+- **A keyboard and a display stay with it.** After any restart the Mac waits at the FileVault screen until someone logs in as `poagent` (section 10), and that needs a keyboard and a screen at the Mac.
+- **Power button:** it's on the **underside**, near the back edge. You only need it if the Mac doesn't start by itself after a power cut (section 4 sets that up).
+- **No Rosetta.** uv, Python 3.12, `gh` and Playwright's Chromium all have native Apple silicon builds. If macOS offers to install Rosetta during setup, decline. Homebrew installs into `/opt/homebrew`, which is already on the wrapper's `PATH` (section 8).
 
 ## 1. Before you start
 
