@@ -1,8 +1,10 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.7 · 16 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.8 · 16 Oct 2026 · **Owner:** Joey Wu
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
+
+**v5.8:** Stage 3B collects the **3 most recent** real PO PDFs for the MVP (10–20 before go-live).
 
 **v5.7:** Part 4 ends with **Solved**: the test site has no Resolve button. Stage 3A gets rows 15–18 for the screens off the happy path: a Note back to the pool, a project search with no match (moved out of row 06), a Create New Task error, and a cancelled task (was row 07b).
 
@@ -344,7 +346,7 @@ No recording file is needed: Claude takes each screen's accessibility tree (ever
 Real client data, so it stays in `private/`. **Change nothing on live:** no Assign, no edits, no bookings. First check on the test site that just opening a Note or downloading its PDF doesn't change it (check 3.5); if it does, capture live from the pool list only. Don't use Playwright CLI or the recorder on live; it's blocked in `.playwright/cli.config.json` too.
 
 1. Log in to live in your normal browser. Screenshots to `private\captures\live\`: the PO Allocation Pool with the Locked filter; 3–4 real B1 Notes (title, body, attachments); one non-B1 or `/023` Note for contrast.
-2. Save **10–20 recent real B1 PO PDFs** to `private\pdfs\` (mostly `/048`, a few other suffixes, and any odd ones you remember).
+2. Save the **3 most recent real B1 `/048` PO PDFs** to `private\pdfs\` for the MVP. Before go-live, add more to reach 10–20 (mostly `/048`, a few other suffixes, and any odd ones you remember).
 3. For each one, look up its project (view only) and fill one case in `private\fixtures\cases.toml`:
 
    ```toml

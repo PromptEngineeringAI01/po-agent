@@ -10,6 +10,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
 
+## 16 Oct 2026 — 3 real POs for the MVP's real-PO seam (Joey)
+
+- **The real-PO decision seam (`-m real_data`) uses the 3 most recent real B1 `/048` POs** for the MVP, not 10–20 (14 Oct entry below). Joey saved them to `private/pdfs/`, with their cases in `private/fixtures/cases.toml`, on the laptop only.
+- **What it proves is narrower:** 0 false PROCEED on 3 POs is weak evidence, and coverage can't be judged against 80% with 3. So S3 reports coverage without the 80% line, and any skip of a clean real PO is reviewed before M3.
+- **Before go-live, the set grows to 10–20** (mostly `/048`, plus other suffixes and odd ones), and the 80% coverage line applies then. The CEO's go-live sign-off uses that larger set.
+- `SPEC.md` v1.8 (testing strategy, M0, S3), `docs/workflow.md` v5.8 (Stage 3B), `README.md`, `docs/specs/roadmap.md`.
+
 ## 16 Oct 2026 — The last step is Solved; the test site has no Resolve button (Joey)
 
 - **Found in the Stage 3A walkthrough** (2609017B and 2610002B): after Link to Project, the Note's Status buttons are **Pending, Solved and Discard**. There is no Resolve button. This replaces SOP step 15's "Solved and Resolve are equivalent; use Resolve" and `docs/specs/spec.md` story 28's "using Resolve, not Solved".
