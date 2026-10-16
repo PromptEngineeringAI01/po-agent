@@ -2,7 +2,7 @@
 
 Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note → Compaction Test task on the project, PO PDF attached, On Hold, Note linked and resolved. Hybrid (ADR-001): a deterministic Playwright script does every click through the action guard; a deterministic reader and Claude (no tools, schema-bound) both read; proceed only when both agree with each other and with MySys. Anything uncertain → skip → Note back to the pool.
 
-**Now building: the MVP on the test site, run by an Anthropic cloud routine, with no state kept between runs. Active spec: `SPEC.md`.** Full v1 design: `docs/specs/spec.md`. Decisions: `docs/decisions.md` (wins over any spec).
+**Now building: the MVP on the test site, run hourly by launchd on the office Mac Mini (CEO decision 3), with no state kept between runs. Active spec: `SPEC.md`.** Full v1 design: `docs/specs/spec.md`. Decisions: `docs/decisions.md` (wins over any spec).
 
 ## Commands
 
@@ -21,7 +21,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 3. Touch the live site (`prompt.mysys.com.au`) in code, config, tests or commands. The MVP is test site only.
 4. Send, reply to, forward or delete email; access Outlook; leave "Send Email Notification" ticked.
 5. Put a secret in code, config, docs, logs, screenshots, run output or a chat. Secrets come from `PO_AGENT_*` env vars or keyring at run time.
-6. Commit or copy out anything from `private/` (real client data), `logs/`, `state/`, traces, or a codegen recording with credentials in it. Real data never goes into a committed file, PR, issue, run output or the cloud routine.
+6. Commit or copy out anything from `private/` (real client data), `logs/`, `state/`, traces, or a codegen recording with credentials in it. Real data never goes into a committed file, PR, issue or run output, and isn't copied to the Mac Mini during the MVP.
 7. Start a write (Create New Task) before every check in scope (`SPEC.md` → In the MVP; `docs/specs/spec.md` §2 steps 2–4 and 6–11) has passed.
 8. Edit a test, fixture or expected result to make it pass.
 9. Push to `main`, force-push, or merge a PR. Joey merges.
@@ -32,7 +32,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 - Touched readers, prompt, model ID or address rules → ask me, then run the live-Claude seam; show `false PROCEED: 0`.
 - Touched `mysys/` or the booker → run seam 2 on the test site (or ask me to run it); show the result.
 - Review every diff against Must never, `SPEC.md` and `tasks/plan.md`. Important = would break behaviour, write a wrong value to MySys, leak data or break a Must-never rule. Style and naming are Nits; report at most five.
-- Flag it when a change makes this file, `SPEC.md` or `docs/routine-setup.md` out of date.
+- Flag it when a change makes this file, `SPEC.md` or `docs/macmini-setup.md` out of date.
 
 ## TDD
 
@@ -52,7 +52,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 
 - Active spec: `SPEC.md`. Plan and task list: `tasks/plan.md`, `tasks/todo.md` (written by `/plan`).
 - Full v1 spec pack: `docs/specs/` (mission, spec, tech-stack, roadmap, README glossary). ADRs: `docs/specs/ADR-NNN-<name>.md`.
-- Intent: `docs/intent.md`. Decisions: `docs/decisions.md`. Build workflow: `docs/workflow.md`. Routine setup: `docs/routine-setup.md`. Demo and reset: `docs/demo-runbook.md`. Screen map: `docs/screen-map.md` (written in M0).
+- Intent: `docs/intent.md`. Decisions: `docs/decisions.md`. Build workflow: `docs/workflow.md`. Mac Mini setup: `docs/macmini-setup.md`. Demo and reset: `docs/demo-runbook.md`. Screen map: `docs/screen-map.md` (written in M0).
 - Skills: Addy Osmani's agent-skills plugin (`/spec`, `/plan`, `/build`, `/test`, `/review`, `/code-simplify`, `/ship`).
 
 ## Lessons

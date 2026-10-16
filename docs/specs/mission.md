@@ -24,13 +24,13 @@ Each PO takes about 2 minutes, at 0–50 POs a week, and someone has to check th
 | Who | What changes for them |
 |---|---|
 | PO admin | Only handles the Notes the agent hands back to the pool. |
-| CEO | Approved the design and trial (decision 1). Still to confirm Joey's call that Claude may read real POs (decision 2), and to decide hosting (decision 3). Reviews the trial evidence (3 tasks, cost per PO) and approves go-live. |
+| CEO | Approved the design and trial (decision 1). Decided hosting: the office Mac Mini (decision 3, 15 Oct 2026). Still to confirm Joey's call that Claude may read real POs (decision 2). Reviews the trial evidence (3 tasks, cost per PO) and approves go-live. |
 | B1 Homes (Scott Park Group) | Nothing. They keep emailing POs as now. |
 | Engineer / maintainer | Builds and runs the agent. The production maintainer hasn't been named yet (open question). |
 
 ## Success criteria (all four)
 
-1. **Accuracy (hard line).** No task on the wrong project, with the wrong PO number, or without the PO PDF. Any breach switches the agent off until the CEO approves a restart (approved safeguard; in the MVP, Joey switches the routine off).
+1. **Accuracy (hard line).** No task on the wrong project, with the wrong PO number, or without the PO PDF. Any breach switches the agent off until the CEO approves a restart (approved safeguard; in the MVP, Joey unloads the Mac Mini's launchd job).
 2. **Coverage.** At least 80% of `/048` POs handled end to end; the rest go back to the pool cleanly.
 3. **Speed.** Every `/048` PO is processed or returned within 1 hour during run hours (weekdays 07:00–18:00 Perth time).
 4. **Workload.** The admin only touches POs the agent skipped.

@@ -1,11 +1,9 @@
 # ADR-002: Where the PO Agent runs (hosting)
 
-**Status:** Split.
-- **Trial host: Decided** (Joey, 14 Oct 2026): Option C, an Anthropic cloud routine running the script, on the test site only, with gates H2 and H5 **waived for the trial only**. See *Trial decision* below.
-- **Production host: Proposed.** For CEO decision 3 (CEO decision brief), which hasn't been made. This ADR's scoring ranks a VM provided by IT in Perth first (Option A) and a Sydney cloud VM second (Option B). Joey expects **Option B, a Sydney cloud VM**, to be the most likely outcome.
+**Status:** **Accepted** (CEO decision 3, 15 Oct 2026): **Option D, the office Mac Mini** (already purchased), for the MVP trial **and** production. This supersedes the 14 Oct trial decision (Option C, an Anthropic cloud routine) and the 14 Oct production proposal (Option A or B). See *Decision* below. The context, options and scores are kept as they were on 14 Oct.
 
-**Date:** 14 Oct 2026 (proposed; trial amendment the same day)
-**Deciders:** CEO (production decision owner); Joey Wu (author, maintainer; trial host)
+**Date:** 14 Oct 2026 (proposed; trial amendment the same day) · 15 Oct 2026 (accepted: CEO decision 3)
+**Deciders:** CEO (decision owner); Joey Wu (author, maintainer; setup choices)
 **Inputs:** `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/spec.md` §8–§10, `docs/specs/tech-stack.md`, `docs/hosting-research.md`, `docs/decisions.md`, `SPEC.md`
 
 ## Context
@@ -34,7 +32,9 @@ Facts that shape the choice:
   - give each run a fresh Ubuntu 24.04 VM (about 4 vCPU, 16 GB RAM) with Python and uv preinstalled; Chromium is installed by a cached setup script.
 - Options where Claude drives MySys (a cloud routine with a browser tool, or a Cowork task with Claude in Chrome) are out of scope. They are ADR-001's Option D, which failed gates G2 and G3.
 
-## Trial decision (14 Oct 2026, Joey)
+## Trial decision (14 Oct 2026, Joey) — superseded 15 Oct 2026
+
+*Superseded by CEO decision 3: the trial runs on the office Mac Mini, and the H2/H5 waiver below is withdrawn. Kept for the record.*
 
 **Use Option C for the test-site trial and the MVP** (`SPEC.md`), to prove the agent works end to end before the CEO decides the production host, and without waiting for IT or a new cloud account.
 
@@ -44,13 +44,19 @@ Facts that shape the choice:
 - **What would end the trial on Option C early:** MySys blocks or challenges the routine's outbound addresses (tested in MVP slice M1), or any sign that a secret has leaked beyond the environment.
 - **This doesn't change the production assessment below.** Option C still fails H2 for live.
 
-## Decision (production — proposed, for CEO decision 3)
+## Decision (CEO decision 3, 15 Oct 2026)
 
-Adopt **Option A: a VM provided by IT in Perth**, on reliable hardware (not the old server), **or Option B: a small Linux cloud VM in Sydney** on a company account with a second admin. Run the agent there with the OS scheduler, a root-only secret store, and state files on local disk. The code is the same on both.
+Adopt **Option D: the office Mac Mini** (already purchased), for the MVP trial on the test site and, after the CEO's go-live sign-off, for production. Setup: `docs/macmini-setup.md`.
 
-- **Joey's expectation (14 Oct 2026):** Option B is the most likely outcome. It's within 0.40 of A on this ADR's scoring and doesn't depend on IT's lead time.
-- **Fallback:** if MySys blocks or challenges cloud addresses, use **Option D, a dedicated office mini PC**.
-- **Not chosen for production:** Option C, a cloud routine running the script. It fails gate H2.
+**Why:** the company had already bought the Mac Mini. Using it needs no new purchase or vendor, so the CEO chose it over the higher-scoring A and B.
+
+- **How it runs:** a separate **standard** macOS user (`poagent`) runs the script from a launchd LaunchAgent at 7 minutes past each hour, 07:07–17:07 Monday–Friday, with the Mac's clock on Australia/Perth. No sleep; starts up after a power failure; macOS updates installed by hand outside 07:00–18:00.
+- **Secrets:** in `poagent`'s login Keychain through `keyring`. Claude Code and other AI tools are never installed for `poagent`, so **H2 passes**.
+- **Ownership:** company-owned; Joey's and a backup admin's accounts, so **H5 passes**.
+- **Disk:** FileVault on, no automatic login (Joey, 15 Oct 2026; `docs/decisions.md`). After an unplanned restart someone logs in as `poagent` before runs resume; missed runs leave POs in the pool for the admin.
+- **State (v1):** on the Mac Mini's disk (**H3 passes**). The MVP still keeps none.
+- **Scores:** the CEO chose D (2.80) over A (4.60) and B (4.20) because the Mac Mini was already bought. The scores below are as scored on 14 Oct, before the Mac Mini was bought. D's main weaknesses there (reliability in office power and internet outages; Joey patches the OS) are accepted; "no spare machine" no longer applies.
+- **Not chosen:** A (IT VM), B (Sydney cloud VM), and C (cloud routine; fails H2).
 
 ## Evaluation method
 
@@ -86,7 +92,7 @@ IT creates a VM, not on the old server: Ubuntu 24.04 LTS or Windows Server; 2 vC
 **Pros:** inside the company network; reaches MySys from the company's own internet address; IT patches and backs it up; no new vendor or bill.
 **Cons:** depends on IT's lead time and spare capacity; reliability is only as good as IT's host hardware.
 
-### Option B: small Linux cloud VM in Sydney (most likely for production)
+### Option B: small Linux cloud VM in Sydney (expected on 14 Oct; not chosen)
 
 1 vCPU, 2 GB RAM from Vultr, DigitalOcean or AWS Lightsail, on a company account with two admins. Automatic security updates, SSH by key only, no inbound ports except SSH (or provider console only). Secrets in a root-only env file read by the systemd service; a systemd timer (`OnCalendar=Mon..Fri 07..17:07`, `Australia/Perth`).
 
@@ -95,9 +101,9 @@ IT creates a VM, not on the old server: Ubuntu 24.04 LTS or Windows Server; 2 vC
 
 *A Perth-hosted cloud is possible.* AWS has a Perth Local Zone (`ap-southeast-2-per-1a`, parent region Sydney). It usually costs more and offers fewer small instance types, and the Perth–Sydney distance (about 50 ms) doesn't matter for an hourly job. Not needed.
 
-### Option C: Anthropic cloud routine running the script (trial only; fails H2 for production)
+### Option C: Anthropic cloud routine running the script (planned for the trial on 14 Oct; superseded; fails H2)
 
-A routine scheduled at :07 past each hour clones the repo, uses the environment's cached setup script for Chromium, and runs `uv run po-agent run --site test` (`docs/routine-setup.md`). In the MVP it keeps no state between runs.
+A routine scheduled at :07 past each hour clones the repo, uses the environment's cached setup script for Chromium, and runs `uv run po-agent run --site test` (the 14 Oct `docs/routine-setup.md`, removed on 15 Oct). In the MVP it keeps no state between runs.
 
 **Pros:** no server to manage; no extra hosting bill; runs when laptops are off; available today.
 **Cons:**
@@ -109,24 +115,24 @@ A routine scheduled at :07 past each hour clones the repo, uses the environment'
 - The 2-minute default command timeout needs raising (`BASH_DEFAULT_TIMEOUT_MS`).
 - Each run draws down plan usage.
 
-### Option D: dedicated office mini PC (fallback)
+### Option D: dedicated office mini PC — chosen: the office Mac Mini
 
-A small PC left on in the office, used only by the agent.
+A small computer left on in the office, used only by the agent. **Chosen by the CEO on 15 Oct 2026: the office Mac Mini, already purchased.**
 
-**Pros:** reaches MySys from the office internet address; cheap to run; no cloud vendor.
-**Cons:** stops in office power or internet outages; Joey patches it; it must be physically secure; no spare machine.
+**Pros:** reaches MySys from the office internet address; cheap to run; no cloud vendor; no AI session near the secrets.
+**Cons:** stops in office power or internet outages; Joey patches it (macOS updates by hand, outside run hours); it must be physically secure; with FileVault on, someone must log in as the agent user after an unplanned restart.
 
-*Out of scope here (see `docs/hosting-research.md`):* serverless container jobs (too much setup for one maintainer), GitHub Actions (late or dropped runs, shared addresses), an external IT provider (A$50–200+/month unless a contract already covers it), the existing old server, and the PO admin's PC (superseded by the cloud routine for the trial).
+*Out of scope here (see `docs/hosting-research.md`):* serverless container jobs (too much setup for one maintainer), GitHub Actions (late or dropped runs, shared addresses), an external IT provider (A$50–200+/month unless a contract already covers it), the existing old server, and the PO admin's PC.
 
 ## Gates
 
-| Gate | A: IT VM | B: Sydney VM | C: Cloud routine | D: Mini PC |
+| Gate | A: IT VM | B: Sydney VM | C: Cloud routine | D: Mini PC (chosen: Mac Mini) |
 |---|---|---|---|---|
 | H1 Runs ADR-001 unchanged | Pass | Pass | Pass | Pass |
-| H2 Secrets unreadable by repo and AI | Pass | Pass | **Fail** (waived for the trial) | Pass |
-| H3 State persists, no real data in repo | Pass | Pass | Only with an external store (the MVP keeps no state) | Pass |
-| H4 Unattended, Perth schedule | Pass | Pass | Pass | Pass (office power permitting) |
-| H5 Company-owned, two admins | Pass | Pass (company account) | **Doubtful** (personal account; waived for the trial) | Pass |
+| H2 Secrets unreadable by repo and AI | Pass | Pass | **Fail** (was to be waived for the trial) | Pass (agent user's Keychain; no AI tools for that user) |
+| H3 State persists, no real data in repo | Pass | Pass | Only with an external store (the MVP keeps no state) | Pass (local disk) |
+| H4 Unattended, Perth schedule | Pass | Pass | Pass | Pass (office power permitting; a person logs in after an unplanned restart) |
+| H5 Company-owned, two admins | Pass | Pass (company account) | **Doubtful** (personal account) | Pass (Joey and a backup admin) |
 
 ## Scores
 
@@ -140,7 +146,9 @@ A small PC left on in the office, used only by the agent.
 | **U Reuse (10)** | **5** | **5** | **3**: one routine each, same state workaround each time | **4** |
 | **Weighted (out of 5)** | **4.60** | **4.20** | **2.45** | **2.80** |
 
-*C fails gate H2 and is scored only for comparison. It's used for the trial under a waiver, not on its score.
+*C fails gate H2 and is scored only for comparison.
+
+Scores as of 14 Oct 2026, before the Mac Mini was bought. The CEO chose D anyway (decision 3, 15 Oct 2026); they haven't been re-scored.
 
 ## Estimated cost in Perth (AUD, including GST)
 
@@ -154,7 +162,7 @@ Exchange rate: RBA 1 USD = A$1.433 (12 Oct 2026); USD cloud prices plus 10% GST.
 | **A: IT VM, Perth** | A$0 if IT is in-house. About A$300–700 if an external IT provider bills 2–4 hours at about A$150–180/h *(estimate)* | About A$0 extra if IT has capacity | A$1–9 | Setup about 1 day; about 1 h/month | **About A$40–330**, plus any IT setup charge |
 | **B: Sydney cloud VM** | A$0 | A$16–19 (Linux 2 GB); about A$35 for Windows on Lightsail | A$1–9 | Setup about 1 day; about 1 h/month | **About A$610–1,010** |
 | **C: Cloud routine** | A$0 | A$0 hosting; draws down plan usage | A$1–9 | Setup 2–4 days; transcript checks | **About A$40–330**, plus plan usage (trial: a few weeks only) |
-| **D: Office mini PC, Perth** | A$400–900 hardware *(estimate)* | About A$3 for power: about 12 W all day ≈ 105 kWh/year at about A$0.30–0.35/kWh *(estimate)* | A$1–9 | Setup about 1 day plus purchase; about 2 h/month | **About A$540–1,330** |
+| **D: Office mini PC, Perth** (chosen: the Mac Mini) | Already purchased (was estimated at A$400–900) | About A$3 for power: about 12 W all day ≈ 105 kWh/year at about A$0.30–0.35/kWh *(estimate)* | A$1–9 | Setup about 1 day; about 2 h/month | **About A$140–430 from now** (power + Claude; hardware already bought) |
 
 Claude API range: Haiku 5.5 is under A$1/month, Sonnet 5.5 about A$8–9/month, for about 217 POs/month at 1–2 pages each. The trial measures the real figure (ADR-001 action item 4).
 
@@ -172,26 +180,29 @@ The largest real cost in every option is Joey's time, not hosting. Option A also
 ## Consequences
 
 **Easier**
-- The trial starts now, without waiting for IT or a new cloud account, and proves MySys accepts the agent from a cloud address.
-- The code doesn't change between hosts. Moving from C to B (or A) needs only: secrets in a root-only env file, a systemd timer, `state_dir` on its disk, and the alert channel.
-- On A or B, the next 5–7 automations reuse the same host at no extra cost.
+- The trial and production use the same machine, with no monthly hosting bill and no cloud vendor.
+- MySys sees the office's own internet address.
+- No trial waiver: secrets sit in a Keychain that no AI session can read.
+- The next 5–7 automations can reuse the same Mac Mini.
+- The code stays host-agnostic: moving later to A or B needs only secrets in that host's store, its scheduler, `state_dir` on its disk, and the alert channel.
 
 **Harder**
-- During the trial, the test password and trial key are readable by the routine's session and environment users (accepted, test site only).
-- Joey checks routine transcripts during the trial; a green run status doesn't prove the run worked.
-- Joey still owns the agent's own updates (Playwright and Chromium monthly, Python dependencies, and the routine's setup script version) and the alerts.
+- Office power or internet outages stop runs. After an unplanned restart, someone must log in as `poagent` (FileVault) before runs resume.
+- Joey (or the backup) installs macOS updates by hand, outside run hours.
+- The Mac Mini must be physically secure.
+- Joey reads `~/Library/Logs/po-agent/runs.log` during the trial; a loaded launchd job doesn't prove the run worked.
+- Joey still owns the agent's own updates (Playwright and Chromium monthly, Python dependencies) and the alerts.
 
 **To revisit**
-- If Anthropic adds secrets usable in a web login, persistent state and organisation-owned routines, re-score Option C.
+- If outages or restarts cost too many runs, re-score A and B (no code change needed to move).
 - If IT later moves to a cloud provider, host the agent there under IT's management.
 
 ## Action items
 
-1. [x] Trial host decided: Option C with H2/H5 waived for the trial (Joey, 14 Oct 2026; `docs/decisions.md`).
-2. [ ] MVP slice M1: create the routine (`docs/routine-setup.md`) and run the spike — a MySys test-site login from the routine to check the address isn't blocked.
-3. [ ] CEO decides decision 3 (production) using this ADR. If accepted, set the production status to **Accepted** and record it in `docs/decisions.md`.
-4. [ ] Before committing to a production host: a 10-minute MySys test-site login from that host.
-5. [ ] If B is chosen: set it up on a company account with two admins (about 1 day). If A: send IT the VM request (requirements in Context; draft already prepared).
-6. [ ] Get local quotes for anything marked *(estimate)* above if the CEO needs firm figures.
-7. [ ] At the end of the trial: turn the routine off, delete its environment variables, revoke the trial key, ask for the test password to be changed.
-8. [ ] Update `docs/specs/tech-stack.md` (Hosting) and `docs/specs/roadmap.md` phase 4 to match the accepted production option.
+1. [x] ~~Trial host decided: Option C with H2/H5 waived for the trial (Joey, 14 Oct 2026).~~ Superseded by item 3.
+2. [ ] MVP slice M1: set up the Mac Mini (`docs/macmini-setup.md`). First a MySys test-site login by hand from it, to check the office address isn't blocked or challenged; then the spike.
+3. [x] CEO decided decision 3 (15 Oct 2026): Option D, the office Mac Mini, for the trial and production. Status set to **Accepted**; recorded in `docs/decisions.md`.
+4. [ ] Create the backup admin account on the Mac Mini and name the backup maintainer (H5).
+5. [ ] At the end of the trial: unload the launchd job, revoke the trial key, ask for the test password to be changed, delete the test items from the Keychain.
+6. [ ] At go-live (after the CEO's sign-off): live credentials into `poagent`'s Keychain on the same Mac Mini (roadmap phase 4).
+7. [x] `docs/specs/tech-stack.md` (Hosting) and `docs/specs/roadmap.md` phase 4 updated to the Mac Mini (15 Oct 2026).

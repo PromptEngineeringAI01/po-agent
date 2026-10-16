@@ -2,7 +2,7 @@
 
 Automates the PO admin's B1 Homes `/048` compaction pre-bookings in MySys. First of 5–7 planned MySys automations.
 
-**Current stage:** MVP spec **approved** (`SPEC.md` v1.5, 15 Oct 2026). No code yet. The MVP runs on the MySys **test site** from an Anthropic cloud routine; production hosting is CEO decision 3 (most likely a Sydney cloud VM).
+**Current stage:** MVP spec **approved** (`SPEC.md` v1.6, 15 Oct 2026). No code yet. The MVP runs on the MySys **test site** from the office Mac Mini; production runs on the same Mac Mini (CEO decision 3, 15 Oct 2026).
 
 ## Start here (Windows, VS Code)
 
@@ -16,10 +16,10 @@ Automates the PO admin's B1 Homes `/048` compaction pre-bookings in MySys. First
 
 | File | What it is |
 |---|---|
-| `SPEC.md` | **Active spec:** the MVP on a cloud routine |
+| `SPEC.md` | **Active spec:** the MVP on the office Mac Mini |
 | `CLAUDE.md` | Rules Claude Code reads every session |
 | `docs/workflow.md` | Step-by-step build runbook (Addy Osmani's agent-skills) |
-| `docs/routine-setup.md` | How to create the cloud routine, its environment and prompt |
+| `docs/macmini-setup.md` | How to set up the Mac Mini: agent user, power, clock, updates, secrets, launchd job |
 | `docs/demo-runbook.md` | How to reset the test site and demo the agent again (as often as you like) |
 | `docs/screen-map/` | M0 test-site screenshots (fake data only) |
 | `.playwright/cli.config.json` | Playwright CLI settings for screen mapping (live site blocked) |

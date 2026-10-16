@@ -1,7 +1,7 @@
 # Intent: PO Agent — B1 Homes compaction test pre-bookings
 
-Author: Joey Wu (PE AI Champion). **Status: design and trial approved by the CEO** (CEO decision brief, decision 1, recorded 13 Oct 2026), including the safeguards. Decisions 2 (Claude reading real client POs) and 3 (hosting) are pending; both block go-live, not the build. Date: 14 Oct 2026. Decision owner: CEO.
-Decision log: `docs/decisions.md`. Active spec: `SPEC.md` (MVP on a cloud routine).
+Author: Joey Wu (PE AI Champion). **Status: design and trial approved by the CEO** (CEO decision brief, decision 1, recorded 13 Oct 2026), including the safeguards. Decision 3 (hosting) was made on 15 Oct 2026: the office Mac Mini. Decision 2 (Claude reading real client POs) is pending; it blocks go-live, not the build. Date: 15 Oct 2026. Decision owner: CEO.
+Decision log: `docs/decisions.md`. Active spec: `SPEC.md` (MVP on the office Mac Mini).
 
 ## Problem
 
@@ -31,7 +31,7 @@ If it can't complete a PO safely, it sends the note back to the pool for a perso
 ## Affected users and systems
 
 - **PO admin:** works the pool today; picks up the POs the agent skips.
-- **CEO:** approved the design and trial (decision 1). Still to confirm Joey's call that Claude may read real client POs (decision 2), and to decide hosting (decision 3). Reviews the trial and approves go-live.
+- **CEO:** approved the design and trial (decision 1). Decided hosting: the office Mac Mini (decision 3, 15 Oct 2026). Still to confirm Joey's call that Claude may read real client POs (decision 2). Reviews the trial and approves go-live.
 - **B1 Homes (Scott Park Group):** sends the POs; nothing changes for them.
 - **MySys** (third-party, browser only): Note Pool, Projects, Create New Task, Hold, Link to Project, Resolve.
   - Live site: `prompt.mysys.com.au`
@@ -57,20 +57,20 @@ If it can't complete a PO safely, it sends the note back to the pool for a perso
 - **Schedule:** hourly, weekdays 07:00–18:00 Perth time.
 - **Approach: hybrid (ADR-001, approved by the CEO through decision 1).** A script does every click. Deterministic code and Claude both read the email and PDF, and the script proceeds only if they agree with each other and with MySys. For the address, the deterministic side verifies Claude's extraction (see Address check). Claude never clicks. Rationale and scoring: `docs/specs/ADR-001-po-agent-architecture.md`.
 - **Fallback:** a config setting (reader = deterministic-only) runs the agent without Claude (ADR Option A). Until the rules-only address reader is built, that mode returns every PO to the admin.
-- **Data:** the agent may read real client data (Joey, 14 Oct 2026; CEO to confirm as decision 2). Real PDFs and live-screen captures are used on Joey's laptop only (git-ignored `private/`), never in GitHub or the cloud routine. Bookings stay on the test site until go-live.
+- **Data:** the agent may read real client data (Joey, 14 Oct 2026; CEO to confirm as decision 2). Real PDFs and live-screen captures are used on Joey's laptop only (git-ignored `private/`), never in GitHub or on the Mac Mini during the MVP. Bookings stay on the test site until go-live.
 - **Records:** one log line per note and one summary line per run, in a daily log file kept 90 days, plus a skip list. No database.
 
 ## Delivery order (14 Oct 2026)
 
-1. **MVP** (`SPEC.md`): the smallest build that proves the 3 fake POs book end to end on the test site, run hourly by an **Anthropic cloud routine** running the script. Some safeguards are in a simpler form (e.g. a half-finished booking stops the agent and Joey finishes it by hand).
+1. **MVP** (`SPEC.md`): the smallest build that proves the 3 fake POs book end to end on the test site, run hourly on the **office Mac Mini** by a launchd job. Some safeguards are in a simpler form (e.g. a half-finished booking stops the agent and Joey finishes it by hand).
 2. **v1 hardening** (`docs/specs/spec.md`, roadmap phase 2): every approved safeguard in full, the fallback mode and the live profile.
-3. **Trial and CEO sign-off**, then **production** on the host the CEO chooses (decision 3; most likely a Sydney cloud VM).
+3. **Trial and CEO sign-off**, then **production** on the same office Mac Mini (decision 3).
 
 ## Trial plan (test site)
 
 URL: `https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component`
 
-**Where it runs:** an Anthropic cloud routine runs the script hourly (ADR-002 Option C, with gates H2 and H5 waived for the trial only; see `SPEC.md` → Trial waiver). Live credentials and real POs never go there.
+**Where it runs:** the office Mac Mini runs the script hourly as a separate standard macOS user, with its secrets in that user's Keychain (ADR-002 Option D, Accepted; `SPEC.md` → Trial conditions; `docs/macmini-setup.md`). Live credentials go there only after the CEO's go-live sign-off.
 
 For testing only, Joey plays B1 Homes and places fake PO requests directly in the test site's Agent Pool. The workflow is the same as on live, except for these differences:
 
@@ -101,13 +101,13 @@ Test POs and projects:
 2. **B1 Homes check:** the PDF issuer must be "B1 Homes Pty Ltd" on both sites; on live the `[B1 Homes]` title is also required.
 3. **Locked filter:** applied on both sites.
 4. **Backlog:** read as "process existing `/048` notes like new ones". *Still to confirm, including whether there's an age cut-off.*
-5. **Hosting:** trial on an Anthropic cloud routine (Joey, 14 Oct 2026). Production is CEO decision 3, pending; most likely a Sydney cloud VM. The existing company server is very old and won't be used. See `docs/specs/ADR-002-po-agent-hosting.md` and `docs/hosting-research.md`.
+5. **Hosting:** the office Mac Mini (already purchased), for the trial and production (CEO decision 3, 15 Oct 2026). It replaces the cloud routine planned for the trial on 14 Oct. The existing company server is very old and won't be used. See `docs/specs/ADR-002-po-agent-hosting.md` and `docs/hosting-research.md`.
 6. **Fake data:** each fake PDF's address matches its test project, so all 3 trial POs should pass the address check.
 7. **Architecture:** the CEO approved the design, trial and safeguards (decision 1, recorded 13 Oct 2026). ADR-001 is Accepted.
 
 ## Open questions
 
 1. The CEO's confirmation that Claude may read real client POs (decision 2; Joey has said yes). Blocks go-live.
-2. Where the agent runs in production, and who maintains it (CEO decision 3). Blocks go-live.
+2. ~~Where the agent runs in production, and who maintains it~~ Decided 15 Oct 2026 (CEO decision 3): the office Mac Mini, maintained by Joey with a named backup.
 3. Confirm the backlog reading (answered question 4) and any age cut-off.
 4. Alert channel for Joey (email or Teams webhook) for v1.

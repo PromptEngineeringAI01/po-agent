@@ -2,7 +2,7 @@
 
 Hand-off pack for the engineer building the PO Agent (B1 Homes `/048` compaction pre-bookings in MySys). Version 1.2, 14 Oct 2026.
 
-**Building now: the MVP in `SPEC.md` (repo root, approved 15 Oct 2026)**, run on the test site by an Anthropic cloud routine. This folder is the full v1 design the MVP is cut from; where `SPEC.md` is silent, these files apply.
+**Building now: the MVP in `SPEC.md` (repo root, approved 15 Oct 2026)**, run on the test site from the office Mac Mini (CEO decision 3, 15 Oct 2026). This folder is the full v1 design the MVP is cut from; where `SPEC.md` is silent, these files apply.
 
 ## Read in this order
 
@@ -14,14 +14,14 @@ Hand-off pack for the engineer building the PO Agent (B1 Homes `/048` compaction
 | `tech-stack.md` | Recommended stack with reasons, component map, security baseline, hosting, cost. |
 | `roadmap.md` | Phases 0–6 with exit checks (MVP is phase 1), the CEO gate, go-live blockers, rollback triggers. |
 | `ADR-001-po-agent-architecture.md` | Why hybrid (two readers, script clicks) was chosen over the alternatives. **Accepted.** |
-| `ADR-002-po-agent-hosting.md` | Where the agent runs. Trial: cloud routine (decided by Joey, H2/H5 waived). Production: **Proposed**, CEO decision 3 pending. |
+| `ADR-002-po-agent-hosting.md` | Where the agent runs. **Accepted** (CEO decision 3, 15 Oct 2026): the office Mac Mini, for the trial and production. |
 
 **Source of truth for decisions:** `docs/decisions.md`. **Intent:** `docs/intent.md`. **Build runbook:** `docs/workflow.md`.
 
 ## Before you start
 
 - **Blocks the first write:** C1 (Hold dialog checkboxes) and C3 (returning a Note to the pool without Unassign); also MFA/password expiry on the agent account (C8). All are checked by hand on the test site in MVP slice M0.
-- **Blocks go-live:** CEO decision 2 (Claude reading real POs, C7; Joey has said yes, CEO to confirm) and decision 3 (hosting and secrets, C8).
+- **Blocks go-live:** CEO decision 2 (Claude reading real POs, C7; Joey has said yes, CEO to confirm) (Decision 3, hosting and secrets, was made on 15 Oct 2026: the office Mac Mini.)
 - **Real client data** may be read, on Joey's laptop only (git-ignored `private/`); see `SPEC.md` → Real client data.
 - No company security or coding policy was available when this pack was written. A company IT/security review is still needed before go-live (`spec.md` → Areas of concern).
 - **The build is approved.** The CEO approved decision 1 (design, trial and safeguards), recorded 13 Oct 2026. ADR-001 is Accepted.
@@ -46,5 +46,5 @@ Hand-off pack for the engineer building the PO Agent (B1 Homes `/048` compaction
 | **Partial write** | The task was created but a later step (Hold, Link, Resolve) failed. It can't be undone by the agent. |
 | **Decision seam / run seam** | The two test boundaries: decision (offline) and a full run on the test site. |
 | **MVP** | The thin first build in `SPEC.md` that proves the agent works end to end on the test site. |
-| **Routine** | An Anthropic cloud routine: a saved Claude Code prompt + repo + environment run on a schedule in Anthropic's cloud. Here it only runs the script. |
-| **Run output** | The short `INFO`/`NOTE`/`ALERT`/`RUN_SUMMARY` lines a run prints (no PDF text or addresses). In the MVP the routine keeps no state between runs, so the transcript is the only record. |
+| **Mac Mini job** | The launchd job on the office Mac Mini that runs `scripts/macmini-run.sh` at 7 minutes past each hour, 07:07–17:07 on weekdays, as the standard user `poagent`. |
+| **Run output** | The short `INFO`/`NOTE`/`ALERT`/`RUN_SUMMARY` lines a run prints (no PDF text or addresses). In the MVP the agent keeps no state between runs; the Mac Mini appends this output to `runs.log` as the record. |
