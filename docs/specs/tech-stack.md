@@ -58,7 +58,7 @@ These come from the intent, the ADR gates and the engineering security-review ch
 - **Untrusted input:** PDF and Note text are data. Claude has no tools; its output is schema-validated; every value written is confirmed by the deterministic side and MySys. The email body written to the task comes from the deterministic reader and is typed as plain text. PDF text never appears in run output.
 - **Code-enforced guard:** only the action guard may call click/fill/check/upload/evaluate. A build check enforces this.
 - **Network:** the host needs outbound HTTPS to the MySys sites and `api.anthropic.com`, plus the alert channel. During setup and updates it also needs PyPI, GitHub and Playwright's browser download. No inbound access is needed (Remote Login for the two admins is optional).
-- **Data at rest:** logs (addresses, PO details) stay on the Mac Mini's FileVault-encrypted disk (trial: no daily log files; `runs.log` holds the short run output, fake data only) and are deleted after `log_retention_days` (default 90, to be confirmed). PDFs aren't kept.
+- **Data at rest:** logs (addresses, PO details) stay on the Mac Mini's FileVault-encrypted disk (trial: no daily log files; `runs.log` holds the short run output: the trial POs' PO numbers and test plns only) and are deleted after `log_retention_days` (default 90, to be confirmed). PDFs aren't kept.
 - **Dependencies:** a locked dependency file; update on purpose and rerun both seams after any update.
 - **Host:** the Mac Mini runs the agent as a standard user with no AI tools installed; FileVault on; macOS updates installed by hand outside run hours (`docs/macmini-setup.md`). No trial exception is needed (the earlier cloud-routine waiver is withdrawn; `SPEC.md` → Trial conditions).
 
