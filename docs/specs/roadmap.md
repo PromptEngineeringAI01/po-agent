@@ -13,7 +13,7 @@ Phases run in order, and each has an exit check. 🔴 = blocker from `spec.md` �
 - Find every screen that shows "Send Email Notification", and how to untick it and read it back (open question 9).
 - Map the SOP screens by accessible role and name: Note Pool filters, Assign, attachment download, Projects search (0/1/many results), Create New Task, Hold, Link to Project, Solved; and how each result can be read back → `docs/screen-map.md`.
 - Create an Anthropic API key for the trial with a spend limit.
-- Collect the 3 fake PO PDFs and their project data as fixtures (committed). Record the full SOP walkthrough on the test site; view-only captures of live and 10–20 real PO PDFs with their project data into `private/` (laptop only, never committed). See `docs/workflow.md` Stage 3.
+- Collect the 3 fake PO PDFs and their project data as fixtures (committed). Record the full SOP walkthrough on the test site; view-only captures of live and real PO PDFs with their project data (3 for the MVP, 10–20 before go-live) into `private/` (laptop only, never committed). See `docs/workflow.md` Stage 3.
 
 **Exit:** ✅ CEO approved decision 1 (13 Oct 2026); `SPEC.md` approved; C1, C3 and C8 answered (or escalated to the CEO); screen map written.
 
