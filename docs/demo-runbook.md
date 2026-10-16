@@ -5,7 +5,7 @@ Use this every time you show the agent to your boss or the CEO. The demo can be 
 
 ## Why a reset is needed
 
-After a demo, each trial project has an On Hold Compaction Test task and each trial Note is resolved. The agent only picks up unresolved Notes in the Agent Pool, and it skips a PO whose project already has a live task for that PO number. So before the next demo:
+After a demo, each trial project has an On Hold Compaction Test task and each trial Note is Solved. The agent only picks up Pending Notes in the Agent Pool, and it skips a PO whose project already has a live task for that PO number. So before the next demo:
 
 - the old tasks are **cancelled** by you (your own account). On the test site the agent ignores Cancelled tasks in its duplicate check, so it can book the same PO again
 - fresh copies of the 3 Notes go back in the Agent Pool.
@@ -20,7 +20,7 @@ Do this straight after each demo, so you're always ready for the next.
   - pln_66935: 2609017B/048
   - pln_66938: 2609034B/048
   - pln_66940: 2610002B/048
-- [ ] **Agent Pool:** exactly one unresolved, unassigned Note for each of 2609017B, 2609034B and 2610002B, each with its PDF. Create fresh copies for any that were resolved. The leftover 2609034B copy from the skip step (section 3) can stay as the next demo's 2609034B Note.
+- [ ] **Agent Pool:** exactly one Pending, unassigned Note for each of 2609017B, 2609034B and 2610002B, each with its PDF. Create fresh copies for any that were Solved. The leftover 2609034B copy from the skip step (section 3) can stay as the next demo's 2609034B Note.
 - [ ] Nothing left assigned to the agent account.
 - [ ] `config/test.toml` on `main` has `enabled = true`; the Mac Mini's launchd job is loaded and `poagent` is logged in (if you'll use it).
 
@@ -38,7 +38,7 @@ Don't start a manual run while a scheduled run is in progress (two runs at once 
 
 1. **Before:** the Agent Pool with the 3 trial Notes.
 2. **The run:** the browser (laptop) or `runs.log` (Mac Mini). Point out that it reads each PDF twice and checks the address before it creates anything.
-3. **After, on each project** (pln_66935, pln_66938, pln_66940): one Compaction Test task with the PO number, the PDF attached, Creator "Perth Scheduling", the email body as the Note, **On Hold — "ON HOLD UNTIL CALL UP"**, no notification sent. Each Note linked and resolved; the Agent Pool empty of trial Notes.
+3. **After, on each project** (pln_66935, pln_66938, pln_66940): one Compaction Test task with the PO number, the PDF attached, Creator "Perth Scheduling", the email body as the Note, **On Hold — "ON HOLD UNTIL CALL UP"**, no notification sent. Each Note linked and Solved; the Agent Pool empty of trial Notes.
 4. **The skip:** put a fresh copy of the 2609034B Note in the Agent Pool and run once more. The agent skips it as a duplicate and hands it back to the pool, changing nothing else. This shows what happens to anything it isn't sure about.
 5. **The cost:** the `RUN_SUMMARY` line's `cost_aud`, divided by 3.
 6. **The safety switch:** unloading the launchd job (`launchctl bootout`) and `enabled = false`.

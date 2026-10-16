@@ -175,7 +175,7 @@ Any one of these stops the agent:
 1. Set `enabled = false` in `config/test.toml` on `main` (through a PR). The next run pulls it and exits before login. Works from anywhere.
 2. On the Mac (or over Remote Login), as an admin: `sudo launchctl bootout gui/$(id -u poagent)/au.com.prompteng.po-agent`, or as `poagent`: `launchctl bootout gui/$(id -u)/au.com.prompteng.po-agent`. No more runs until it's bootstrapped again.
 
-After an `ALERT ACCURACY_BREACH`, do both, and restart only with the CEO's agreement (approved safeguard). After an `ALERT PARTIAL_WRITE`, the Note stays assigned to the agent: finish Hold, Link and Resolve by hand on the test site, then reassign nothing (the agent ignores Notes not in the pool).
+After an `ALERT ACCURACY_BREACH`, do both, and restart only with the CEO's agreement (approved safeguard). After an `ALERT PARTIAL_WRITE`, the Note stays assigned to the agent: finish Hold, Link and Solved by hand on the test site, then reassign nothing (the agent ignores Notes not in the pool).
 
 ## 12. At the end of the trial
 

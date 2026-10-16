@@ -1,6 +1,6 @@
 # PO Agent
 
-Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note → Compaction Test task on the project, PO PDF attached, On Hold, Note linked and resolved. Hybrid (ADR-001): a deterministic Playwright script does every click through the action guard; a deterministic reader and Claude (no tools, schema-bound) both read; proceed only when both agree with each other and with MySys. Anything uncertain → skip → Note back to the pool.
+Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note → Compaction Test task on the project, PO PDF attached, On Hold, Note linked and Solved. Hybrid (ADR-001): a deterministic Playwright script does every click through the action guard; a deterministic reader and Claude (no tools, schema-bound) both read; proceed only when both agree with each other and with MySys. Anything uncertain → skip → Note back to the pool.
 
 **Now building: the MVP on the test site, run hourly by launchd on the office Mac Mini (CEO decision 3), with no state kept between runs. Active spec: `SPEC.md`.** Full v1 design: `docs/specs/spec.md`. Decisions: `docs/decisions.md` (wins over any spec).
 

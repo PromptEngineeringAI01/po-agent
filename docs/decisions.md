@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 15 Oct 2026)
+# PO Agent — decision log (updated 16 Oct 2026)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -9,6 +9,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
+
+## 16 Oct 2026 — The last step is Solved; the test site has no Resolve button (Joey)
+
+- **Found in the Stage 3A walkthrough** (2609017B and 2610002B): after Link to Project, the Note's Status buttons are **Pending, Solved and Discard**. There is no Resolve button. This replaces SOP step 15's "Solved and Resolve are equivalent; use Resolve" and `docs/specs/spec.md` story 28's "using Resolve, not Solved".
+- **W5 = press Solved on the Note.** Read-back: the status reads "Solved by" the agent, a log line "Status changed … From Pending to Solved" appears, and the Note leaves the Pending list. Once a Note is Solved, **Pending** reopens it, so the agent never presses Pending.
+- **Live is still to check** in Stage 3B: if live has a Resolve button, decide then which one the live profile uses.
+- **Stage 3A gets new rows** for the screens off the happy path: 15 (send a Note back to Agent Pool with Assign, the skip path), 16 (Projects search with no match, moved out of row 06), 17 (optional: a Create New Task error) and 18 (a cancelled task, was row 07b).
+- `SPEC.md` v1.7, `docs/specs/spec.md` v1.4, `docs/workflow.md` v5.7, and the wording in `CLAUDE.md`, `docs/intent.md`, `docs/project-context.md`, `docs/demo-runbook.md`, `docs/macmini-setup.md`, `docs/specs/mission.md`, `README.md` and `roadmap.md`. ADR-001 is left as recorded.
 
 ## 15 Oct 2026 — CEO decision 3: the office Mac Mini runs the trial and production (CEO; setup choices by Joey)
 
@@ -130,7 +138,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 12. Note = email body only → Submit.
 13. Hold → Note "ON HOLD UNTIL CALL UP" → Hold.
 14. Back on note: Link to Project → search pln → select.
-15. Resolve (Solved and Resolve are equivalent; use Resolve).
+15. **Solved** (the Note's Status buttons). *16 Oct 2026: the test site has no Resolve button, so the agent uses Solved (entry above). Check in 3B whether live has a Resolve button.*
 
 - "Send Email Notification": leave unticked (it is ticked by default).
 

@@ -1,7 +1,7 @@
 # PO Agent — Requirements and Design Spec (v1)
 
 **Status:** Approved for build. The CEO approved the design and trial, including the safeguards (CEO decision brief, decision 1; recorded 13 Oct 2026). Decision 3 (hosting) was made on 15 Oct 2026: the office Mac Mini, for the trial and production. Decision 2 (Claude reading real client POs) is pending and blocks go-live only. Remaining blockers are in [Areas of concern](#areas-of-concern-policy-conflicts-and-risks).
-**Version:** 1.3 · 15 Oct 2026 (1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
+**Version:** 1.4 · 16 Oct 2026 (1.4: W5 is the Note's **Solved** button, because the test site has no Resolve button. 1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
 **Author:** Joey Wu (PE AI Champion), drafted with Claude · **Decision owner:** CEO
 **Built from:** `docs/intent.md`, `docs/decisions.md`, `docs/specs/ADR-001-po-agent-architecture.md` (approved by the CEO through the CEO decision brief, decision 1, recorded 13 Oct 2026), `docs/specs/ADR-002-po-agent-hosting.md`.
 **Companions:** `SPEC.md` (active MVP spec) · `docs/specs/mission.md` · `docs/specs/tech-stack.md` · `docs/specs/roadmap.md` · `docs/specs/README.md` (glossary and reading order)
@@ -18,13 +18,13 @@ B1 Homes (Scott Park Group) emails purchase orders (POs) to support@. MySys turn
 2. finds the matching project (**pln**) from the client internal number
 3. creates a **Compaction Test** task with the PO number and PDF
 4. puts the task on **Hold** ("ON HOLD UNTIL CALL UP")
-5. links the Note to the project and resolves it.
+5. links the Note to the project and marks it Solved.
 
 Each PO takes about 2 minutes. Volume is 0–50 a week, and someone has to check the pool every working day. The work is repetitive, but a mistake (wrong project, wrong PO number, task without its PDF) causes a wrong booking that someone has to find and fix by hand.
 
 ## Solution
 
-An agent with its own MySys account ("Agent 1 (MySys Only)") checks the pool every hour, 07:00–18:00 Perth time on weekdays. For each valid B1 Homes `/048` PO it does exactly what the admin does today: it creates an on-hold Compaction Test task on the correct project with the PO PDF attached, then links the Note to the project and resolves it.
+An agent with its own MySys account ("Agent 1 (MySys Only)") checks the pool every hour, 07:00–18:00 Perth time on weekdays. For each valid B1 Homes `/048` PO it does exactly what the admin does today: it creates an on-hold Compaction Test task on the correct project with the PO PDF attached, then links the Note to the project and marks it Solved.
 
 It works in two layers:
 
@@ -82,8 +82,8 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 24. As the PO admin, I want "Send Email Notification" to be unticked wherever it appears, so that no emails go out because of the agent.
 25. As the PO admin, I want every task put on Hold with the note "ON HOLD UNTIL CALL UP", so that pre-bookings aren't scheduled before the builder calls them up.
 26. As the PO admin, I want the related-task checkboxes in the Hold dialog never touched, so that other tasks on the project aren't held by mistake.
-27. As the CEO, I want the agent to read back each value after writing it (task type, PO number, document attached, on-hold status, link, resolved), so that a write that didn't take is caught straight away.
-28. As the PO admin, I want the Note linked to the right pln and then resolved (using Resolve, not Solved), so that the pool is cleared the same way I clear it.
+27. As the CEO, I want the agent to read back each value after writing it (task type, PO number, document attached, on-hold status, link, Solved), so that a write that didn't take is caught straight away.
+28. As the PO admin, I want the Note linked to the right pln and then marked Solved (the Note's Status button; the test site has no Resolve button), so that the pool is cleared the same way I clear it.
 
 ### Skips and retries
 
@@ -240,7 +240,7 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 
 ### 5. Action guard
 
-- The driver can click, type, tick or upload **only** through named actions on an allowlist: open pool, set pool filter, set locked filter, open Note, assign Note (to agent / to pool), download attachment, search project, open project, open Create New Task, set Creator, tick Compaction Test, set PO Number, upload document, set task Note, untick Send Email Notification, Submit task, open Hold, set hold note, confirm Hold, Link to Project (search, select), Resolve.
+- The driver can click, type, tick or upload **only** through named actions on an allowlist: open pool, set pool filter, set locked filter, open Note, assign Note (to agent / to pool), download attachment, search project, open project, open Create New Task, set Creator, tick Compaction Test, set PO Number, upload document, set task Note, untick Send Email Notification, Submit task, open Hold, set hold note, confirm Hold, Link to Project (search, select), Solved.
 - Each action is bound to one element found by accessible role and name, inside the expected page or dialog. Zero or more than one match → refuse.
 - **Denylist, checked on every action as a second layer:** any element whose name or text contains Discard, Unlink, Cancel, Unassign, Remove, Delete, and **any checkbox inside the Hold dialog**. A denylist hit refuses, even if an allowlisted action resolved to it.
 - No other code may call the browser's click, fill, check, upload or script-execution functions. A test fails the build if it finds any.
@@ -255,7 +255,7 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 | W2 | Submit. | Task exists on this pln, type Compaction Test, PO number matches, document attached. |
 | W3 | Hold → note "ON HOLD UNTIL CALL UP" → Hold. Related-task checkboxes not touched. | Before confirming: every related-task checkbox is unticked (see concern C1). After: task status On Hold, hold note text. |
 | W4 | On the Note: Link to Project → search pln → select. | Note shows link to this pln. |
-| W5 | Resolve. | Note status resolved. |
+| W5 | On the Note: **Solved** (Status buttons; never Pending or Discard). | Note status "Solved by" the agent, a log line "Status changed … Pending to Solved", and the Note gone from the Pending list. |
 
 A failure at or after W2 is a **partial write**. The agent can't undo it (Cancel, Unlink and remove-document are forbidden). Approved handling (CEO decision 1 safeguards):
 
@@ -352,11 +352,11 @@ Run in two modes:
 
 | Case | Expected MySys state |
 |---|---|
-| 3 trial POs | Each pln has one Compaction Test task: correct PO number, PDF attached, Creator "Perth Scheduling", Note = email body, On Hold with "ON HOLD UNTIL CALL UP", no notification sent. Each Note linked to its pln and resolved. |
+| 3 trial POs | Each pln has one Compaction Test task: correct PO number, PDF attached, Creator "Perth Scheduling", Note = email body, On Hold with "ON HOLD UNTIL CALL UP", no notification sent. Each Note linked to its pln and Solved. |
 | A skip case (e.g. address mutated) placed in the pool | Note back in Agent Pool, no task created, log line shows the reason |
 | Non-`/048` Note in the pool | Untouched: not assigned, not opened |
 | Run the agent again immediately | No changes at all |
-| Partial write, induced by setting the kill switch after W2 | Alert sent; next run (kill switch cleared) finishes Hold, Link and Resolve on the same task, with no second task *(v1)* |
+| Partial write, induced by setting the kill switch after W2 | Alert sent; next run (kill switch cleared) finishes Hold, Link and Solved on the same task, with no second task *(v1)* |
 | Guard refusal: test harness asks the driver for a denylisted action (e.g. Discard, a Hold-dialog checkbox) | Refused before any page interaction; run aborts; MySys unchanged |
 | Kill switch off | Run exits before login |
 | Run started outside the window | Exits without contacting MySys |
@@ -428,7 +428,7 @@ I looked for company guidelines or security policies among the skills and projec
 *Decision needed (Joey, then CEO):* check on the test site (MVP slice M0) whether they're ever pre-ticked. If they are, the CEO must decide whether "untick only, never tick" can be added to the allowlist.
 
 **C2. Partial writes — resolved (CEO decision 1, recorded 13 Oct 2026).**
-If Submit succeeds but Hold, Link or Resolve fails, the agent records the partial write, alerts Joey, and finishes its own booking on the next run after re-running every check (§6). This is an approved exception to "no exception report" and to "duplicate → skip", for the agent's own task only. *MVP:* alert, Note left assigned to the agent, run stops; Joey finishes by hand. *Still open (Joey):* the v1 alert channel, email or a Teams webhook.
+If Submit succeeds but Hold, Link or Solved fails, the agent records the partial write, alerts Joey, and finishes its own booking on the next run after re-running every check (§6). This is an approved exception to "no exception report" and to "duplicate → skip", for the agent's own task only. *MVP:* alert, Note left assigned to the agent, run stops; Joey finishes by hand. *Still open (Joey):* the v1 alert channel, email or a Teams webhook.
 
 **C3. "Assign back to the pool" may need the forbidden Unassign button. Blocks skips.**
 *Rules in conflict:* "skip → assign the Note back to the pool" vs "never Unassign".
@@ -500,7 +500,7 @@ If Submit succeeds but Hold, Link or Resolve fails, the agent records the partia
 6. **Alert channel** for Joey in v1: email or a Teams webhook (C2). MVP: GitHub issue.
 7. **C6:** does B1 Homes send only from `scottparkgroup.com.au`?
 8. **C8:** does the agent account have MFA or password expiry?
-9. On which screens does "Send Email Notification" appear (Create Task, Hold, Resolve, Link)? The agent must check every one.
+9. On which screens does "Send Email Notification" appear (Create Task, Hold, Link, Solved)? The agent must check every one.
 10. Is the client internal number always 7 digits + 1 letter (e.g. `2609034B`)? Check against real live Notes before go-live.
 11. **C11:** retention period for logs (default 90 days).
 
