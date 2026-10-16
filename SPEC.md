@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.8 (1.8: the real-PO decision seam uses the 3 most recent real POs for the MVP, 10–20 before go-live (16 Oct 2026); 1.7: the last write is the Note's **Solved** button, because the test site has no Resolve button (16 Oct 2026); 1.6: CEO decision 3, the trial runs on the office Mac Mini instead of an Anthropic cloud routine: a launchd job as a separate standard user, secrets in its Keychain, the trial waiver replaced by Trial conditions, `docs/macmini-setup.md` replaces `docs/routine-setup.md`; 1.5: the demo must be repeatable at least 3 times, S8 and `docs/demo-runbook.md`; 1.4: approved; the test site is reset by Joey cancelling tasks with his own account, and the test profile's duplicate check ignores cancelled tasks; Pro plan; 1.3: screens mapped with Playwright CLI while Joey clicks; `po-agent capture` dropped; all 3 trial POs named at every stage; 1.2: the 3 trial POs only, test-site reset, skip shown with a duplicate copy; 1.1: real client data allowed, kept on Joey's laptop)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.9 (1.9: M0 checks answered from the screen map, C1 and C3 pass on the test site; the denylist adds Pending, Undo Cancellation, Un-Hold and Change Project (16 Oct 2026); 1.8: the real-PO decision seam uses the 3 most recent real POs for the MVP, 10–20 before go-live (16 Oct 2026); 1.7: the last write is the Note's **Solved** button, because the test site has no Resolve button (16 Oct 2026); 1.6: CEO decision 3, the trial runs on the office Mac Mini instead of an Anthropic cloud routine: a launchd job as a separate standard user, secrets in its Keychain, the trial waiver replaced by Trial conditions, `docs/macmini-setup.md` replaces `docs/routine-setup.md`; 1.5: the demo must be repeatable at least 3 times, S8 and `docs/demo-runbook.md`; 1.4: approved; the test site is reset by Joey cancelling tasks with his own account, and the test profile's duplicate check ignores cancelled tasks; Pro plan; 1.3: screens mapped with Playwright CLI while Joey clicks; `po-agent capture` dropped; all 3 trial POs named at every stage; 1.2: the 3 trial POs only, test-site reset, skip shown with a duplicate copy; 1.1: real client data allowed, kept on Joey's laptop)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -52,7 +52,7 @@ The MVP proves that:
 | §6 booker W1–W5 with read-back | All |
 | §7 Claude reader | All: no tools, structured output validated again by pydantic, temperature 0, pinned model ID, 60 s timeout, one retry |
 | §8 run controls | `enabled` kill switch, Perth window, run cap, fresh login, assignee check before each write, **stop the run on the first unexpected screen or failed write** |
-| Skip → back to pool | Through **Assign** with the pool as assignee (depends on C3) |
+| Skip → back to pool | Through **Assign** with the pool as assignee (C3 answered yes, 16 Oct 2026: choose Agent Pool in the pool list, then Assign) |
 | `reader_mode = deterministic-only` | Yes: every PO skips `ADDRESS_UNVERIFIABLE` (approved C4 behaviour); a few lines of code |
 | `--decide-only` | Runs every check, returns each Note to the pool, books nothing. Used before the first booking |
 
@@ -226,7 +226,7 @@ Never print or log a secret, the environment, cookies or browser storage state. 
 
 **Never**
 - Touch the live site (`prompt.mysys.com.au`) or build a live profile.
-- Call click, fill, check, set_input_files, evaluate or dispatch_event outside `mysys/guard.py`. Never target Discard, Unlink, Cancel, Unassign, Remove, Delete, remove-document or any Hold-dialog checkbox. Abandon a dialog by closing the browser context.
+- Call click, fill, check, set_input_files, evaluate or dispatch_event outside `mysys/guard.py`. Never target Discard, Unlink, Cancel, Undo Cancellation, Un-Hold, Change Project, Unassign, Remove, Delete, remove-document, the Note's Pending button or any Hold-dialog checkbox. Abandon a dialog by closing the browser context.
 - Give the Claude reader tools, or let Claude's output choose what to click.
 - Run a Playwright CLI command that acts on the page, saves state or cookies, or lists network requests; or point Playwright CLI at anything but the test site.
 - Send, reply to, forward or delete email; touch Outlook.
@@ -287,12 +287,12 @@ Joey decided on 14 Oct 2026 that the agent may read real client data (CEO to con
 
 ## Open Questions
 
-1. **C1 and C3** (by hand in M0): are Hold-dialog related-task checkboxes ever pre-ticked? Can a Note go back to the Agent Pool through Assign? C3 blocks M3; C1 blocks M4.
+1. ~~C1 and C3~~ **Answered on the test site (16 Oct 2026, `docs/decisions.md`):** no Hold-dialog related-task checkbox was pre-ticked (C1), and a Note goes back to the Agent Pool through Assign (C3). Neither blocks M3 or M4. The agent still reads every Hold-dialog checkbox before confirming.
 2. **Does MySys accept a login from the Mac Mini?** It connects from the office internet address. A login by hand in Safari on the Mac Mini answers it first (`docs/macmini-setup.md` section 2), then S1. If blocked or challenged: stop, record it in `docs/decisions.md` and tell the CEO.
-3. **MFA or password expiry** on the test agent account? Unattended runs need neither.
+3. **MFA or password expiry** on the test agent account? Unattended runs need neither. **Partly answered (16 Oct 2026):** no MFA step seen at login; password expiry still to confirm with the MySys admin.
 4. **CEO/IT OK** for a private GitHub repo (no real client data; the Mac Mini pulls from it). **CEO to confirm** that Claude may read real client data (decision 2).
 5. ~~Your Claude plan~~ **Answered:** Pro. The model-training setting must be off before real data is read. (Mac Mini runs don't use the plan; only the reader's API key is billed.)
 6. **Reader model:** pin an exact Sonnet-class model ID in M2; try a Haiku-class model only after it passes seam 1.
 7. ~~Playwright download hosts for the routine's allowlist~~ **No longer needed:** the Mac Mini has no network allowlist (CEO decision 3).
-8. **Opening a live Note:** does viewing a Note or downloading its PDF change anything (lock it, mark it read, log an action against the agent)? Check on the test site first; if it does, capture live from the pool list and saved PDFs only.
-9. ~~Resetting the test site~~ **Answered:** Joey's own account can **cancel** a task on the test site. Reset = Joey cancels the trial POs' Compaction Test tasks and places fresh copies of the 3 Notes; the test profile's duplicate check ignores Cancelled tasks. The agent itself still never presses Cancel. Still to see in M0: how a cancelled task looks on the project page (row 07), so the duplicate check can read its status. Also check in M0 whether an **On Hold** task can be cancelled directly, or must be released from hold first (this decides the reset steps).
+8. **Opening a live Note:** does viewing a Note or downloading its PDF change anything (lock it, mark it read, log an action against the agent)? **Answered on the test site (16 Oct 2026, check 3.5):** neither adds a log line or changes the assignee or status; lock state isn't visible. Stage 3B may open live Notes and download PDFs (no other button).
+9. ~~Resetting the test site~~ **Answered:** Joey's own account can **cancel** a task on the test site. Reset = Joey cancels the trial POs' Compaction Test tasks and places fresh copies of the 3 Notes; the test profile's duplicate check ignores Cancelled tasks. The agent itself still never presses Cancel. Seen in M0 (16 Oct 2026, check 3.6): a cancelled task shows Status **Cancelled** with an **Undo Cancellation** button, and an **On Hold** task offers **Cancel** directly, so the reset doesn't need to release it first.

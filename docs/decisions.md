@@ -10,6 +10,44 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
 
+## 16 Oct 2026 — Screen map written; the denylist grows (Joey)
+
+- **`docs/screen-map.md` v1.0** maps Stage 3A rows 01–16 on the test site, with fake values only. The checks below come from it.
+- **The denylist adds four buttons** found in the walkthrough: **Pending** on the Note (reopens a Solved Note), **Undo Cancellation**, **Un-Hold** and **Change Project**. Names are matched as substrings, case-insensitive ("Undo Cancellation" contains "Cancel"). The Note Pool's Status filter lists a Discard option, so the agent never sets that filter. `docs/specs/spec.md` v1.5 §5 and `SPEC.md` v1.9 (Never, open questions 1, 3, 8 and 9). `CLAUDE.md` Must never #2 still lists only the original buttons: Joey to update it.
+
+## 16 Oct 2026 — Check 3.1 (C1): the Hold dialog's related-task checkboxes are unticked by default (Stage 3A, row 11)
+
+- **Found:** in the Hold Task dialog every Related Tasks checkbox (58 jobs on the walkthrough project) and the Select-all box were **unticked**. "Reset turn around time" and "Send me a reminder email at this date" were unticked. "Send me a reminder email every **0** days" was **ticked**, and 0 means no reminders.
+- **Decision:** C1 doesn't block Hold on the test site, so no CEO decision is needed before M4. The agent still touches no checkbox in the dialog (Must never #2). Before pressing Hold it reads every one: any related-task or reset box ticked, or the reminder not 0, → close the browser context, `PARTIAL_WRITE` alert (the task already exists).
+- **Live:** not seen (opening Hold on live would be a write). Confirm on the first live booking under supervision. `docs/screen-map.md` row 11.
+
+## 16 Oct 2026 — Check 3.2 (C3): a Note goes back to the pool with Assign, no Unassign (Stage 3A, row 15)
+
+- **Found:** on the Note window, choosing **Agent Pool** in the pool list and pressing **Assign** moved a Note from Agent 1 (MySys Only) to Agent Pool. Log: "User Assigned: … From Agent 1 (MySys Only) to Agent Pool"; Assignee reads Agent Pool; status stays Pending. No Unassign or Unlink was needed.
+- **Decision:** C3 is answered "yes"; the skip path ("Note back to the pool") uses Assign with the pool list, and no CEO decision is needed before M3. Unlink unassigns *without* putting the Note in a pool (seen at row 04), which is one more reason it stays denied.
+- **Live:** the pool there is PO Allocation Pool; not tried (view-only). `docs/screen-map.md` row 15.
+
+## 16 Oct 2026 — Check 3.3: Send Email Notification is only on the Note window (Stage 3A, rows 02–15)
+
+- **Found:** the checkbox appears **only** in the Note window's Assign controls, and it is **ticked every time a Note window opens**. It isn't on Create New Task, the Hold Task dialog (which has its own reminder-email checkbox, see check 3.1) or with Solved. An untick holds through Assign while the window stays open.
+- **Decision:** the agent unticks it and reads it back as unticked before **every** Assign, including the skip path. Joey's view (16 Oct 2026) is that a ticked box doesn't matter; CLAUDE.md Must never #4 and `SPEC.md` keep the untick until Joey changes them.
+- Not known: whether an email went out when the walkthrough assigned with the box ticked (row 03). `docs/screen-map.md` rows 02–04.
+
+## 16 Oct 2026 — Check 3.4: no MFA seen on the agent account; password expiry unknown
+
+- **Found:** the test-site login page has Username, Password and "Log in" (plus a "Microsoft account login" link the agent doesn't use). Joey logged in as the agent account four times on 16 Oct 2026 with no second step.
+- **Decision:** MFA doesn't block M1 on the test site. **Still open:** whether the agent account's password expires, and the live login. Joey to ask the MySys admin before the Mac Mini runs unattended; a failed login already stops the run (`LOGIN_FAILED` alert).
+
+## 16 Oct 2026 — Check 3.5: opening a Note or downloading its PDF changes nothing visible (Stage 3A, rows 02, 05)
+
+- **Found:** on three Notes, opening the Note window and downloading the PDF added **no log line** and left assignee and status unchanged. The download link carries a `user_note_id` that differs from the Note ID. Clicking the file row also opens a preview window.
+- **Decision:** Stage 3B may open live Notes and download their PDFs (still no Assign or any other button). Caveat: the Note window doesn't show lock state, so whether opening a Note locks it can't be seen; the Locked filter changed between captures, probably by hand.
+
+## 16 Oct 2026 — Check 3.6: how a cancelled task looks; an On Hold task offers Cancel (Stage 3A, rows 09–14)
+
+- **Found:** a cancelled task's row reads "(tsk_N) | Compaction Test" with an **Undo Cancellation** button and Status **Cancelled**. An On Hold task's row shows **Cancel** next to **Un-Hold**, so it can be cancelled directly (offered; the walkthrough didn't press it). A new task shows Cancel and Hold.
+- **Decision:** the test profile's duplicate check (ignore Cancelled, 15 Oct entry) recognises a cancelled task by its Status cell **Cancelled** (or the Undo Cancellation button). The reset (Stage 6.1) can cancel an On Hold task without releasing it first. The project table doesn't show the PO number, so the duplicate check must open each Compaction Test task to compare PO numbers (`docs/screen-map.md` open item 2). The agent never presses Cancel, Undo Cancellation or Un-Hold.
+
 ## 16 Oct 2026 — 3 real POs for the MVP's real-PO seam (Joey)
 
 - **The real-PO decision seam (`-m real_data`) uses the 3 most recent real B1 `/048` POs** for the MVP, not 10–20 (14 Oct entry below). Joey saved them to `private/pdfs/`, with their cases in `private/fixtures/cases.toml`, on the laptop only.
@@ -208,7 +246,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 ## Still open
 
 - **CEO decision 2:** confirm Joey's "yes" (Claude may read real client data). Blocks go-live. (Decision 3 was made on 15 Oct 2026: the office Mac Mini.)
-- Test-site checks before the first write: C1 (Hold dialog checkboxes pre-ticked?), C3 (return a Note to the pool without Unassign) and MFA/password expiry on the agent account — `SPEC.md` open questions 1–3.
+- Test-site checks before the first write: C1 and C3 answered on 16 Oct 2026 (entries above); MFA not seen, **password expiry still to confirm** with the MySys admin — `SPEC.md` open questions 1–3.
 - CEO/IT OK on the private GitHub repo (the Mac Mini pulls the code from it).
 - Backlog reading confirmation (and age cut-off).
 - Alert channel for Joey for v1 (email or Teams webhook).
