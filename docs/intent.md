@@ -5,20 +5,20 @@ Decision log: `docs/decisions.md`. Active spec: `SPEC.md` (MVP on the office Mac
 
 ## Problem
 
-B1 Homes sends purchase orders (POs) to support@. Each email becomes a MySys Note in the PO Allocation Pool. For every compaction PO (`/048`), an admin opens the note, reads the PDF, finds the project, creates a Compaction Test task, attaches the PO, puts it on hold, then links and resolves the note. It takes about 2 minutes per PO, at 0–50 POs a week, and someone has to check the pool every day.
+B1 Homes sends purchase orders (POs) to support@. Each email becomes a MySys Note in the PO Allocation Pool. For every compaction PO (`/048`), an admin opens the note, reads the PDF, finds the project, creates a Compaction Test task, attaches the PO, puts it on hold, then links the note and marks it Solved. It takes about 2 minutes per PO, at 0–50 POs a week, and someone has to check the pool every day.
 
 ## Proposed outcome
 
 An agent with its own MySys account checks the pool every hour (weekdays 07:00–18:00 Perth time). For each valid B1 Homes compaction PO it:
 
 - creates an on-hold Compaction Test task on the correct project
-- links the note to the project and resolves it.
+- links the note to the project and marks it Solved.
 
 If it can't complete a PO safely, it sends the note back to the pool for a person. The admin then only handles the POs the agent skipped.
 
 ## Scope
 
-- **In:** B1 Homes only; `/048` compaction POs only; existing projects; create task → hold → link → resolve.
+- **In:** B1 Homes only; `/048` compaction POs only; existing projects; create task → hold → link → Solved.
 - **Out:** other PO suffixes (e.g. `/023`, `/025`), which are other task types and are left untouched; other clients, creating projects, sending emails to anyone except internal alerts to Joey, Outlook, pricing or certification changes, and deleting, discarding or cancelling anything.
 
 ## Success criteria
@@ -33,7 +33,7 @@ If it can't complete a PO safely, it sends the note back to the pool for a perso
 - **PO admin:** works the pool today; picks up the POs the agent skips.
 - **CEO:** approved the design and trial (decision 1). Decided hosting: the office Mac Mini (decision 3, 15 Oct 2026). Still to confirm Joey's call that Claude may read real client POs (decision 2). Reviews the trial and approves go-live.
 - **B1 Homes (Scott Park Group):** sends the POs; nothing changes for them.
-- **MySys** (third-party, browser only): Note Pool, Projects, Create New Task, Hold, Link to Project, Resolve.
+- **MySys** (third-party, browser only): Note Pool, Projects, Create New Task, Hold, Link to Project, Solved.
   - Live site: `prompt.mysys.com.au`
   - Test site: `test-prompt.mysys.com.au`
 - **Agent account:** "Agent 1 (MySys Only)". It can't delete anything, and it has every permission the workflow needs.

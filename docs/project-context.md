@@ -4,7 +4,7 @@ One-page summary for anyone (or any Claude session) picking up the project. The 
 
 ## What it is
 
-An agent that books B1 Homes `/048` compaction POs in MySys exactly as the PO admin does: Note → Compaction Test task on the project with the PO PDF → On Hold ("ON HOLD UNTIL CALL UP") → link the Note → Resolve. Anything uncertain goes back to the pool for a person. First of 5–7 planned MySys automations. Owner and builder: Joey Wu. Decision owner: the CEO.
+An agent that books B1 Homes `/048` compaction POs in MySys exactly as the PO admin does: Note → Compaction Test task on the project with the PO PDF → On Hold ("ON HOLD UNTIL CALL UP") → link the Note → Solved. Anything uncertain goes back to the pool for a person. First of 5–7 planned MySys automations. Owner and builder: Joey Wu. Decision owner: the CEO.
 
 ## Design (fixed)
 

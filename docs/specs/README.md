@@ -37,13 +37,13 @@ Hand-off pack for the engineer building the PO Agent (B1 Homes `/048` compaction
 | **pln** | A MySys project ID, e.g. `pln_66938`. |
 | **Compaction Test task** | The task created on the project for each PO; always a pre-booking. |
 | **Hold** | Puts the task on hold with "ON HOLD UNTIL CALL UP". |
-| **Link / Resolve** | Link the Note to the pln, then resolve the Note. |
+| **Link / Solved** | Link the Note to the pln, then mark the Note **Solved** (its Status button; MySys has no Resolve button). |
 | **Reading** | One reader's structured result for a PO. There are two readers: deterministic and Claude. |
 | **Verify, not extract** | Claude extracts the address; code checks it against the PDF text and the project. |
 | **PROCEED / SKIP** | The decision for a Note. A skip returns the Note to its pool with a reason. |
 | **Final / retryable skip** | Only "project not found" is retried (24 h); every other skip is final. *(MVP: all final.)* |
 | **Action guard** | The only code allowed to click. Allowlist + denylist; a refusal aborts the run. |
-| **Partial write** | The task was created but a later step (Hold, Link, Resolve) failed. It can't be undone by the agent. |
+| **Partial write** | The task was created but a later step (Hold, Link, Solved) failed. It can't be undone by the agent. |
 | **Decision seam / run seam** | The two test boundaries: decision (offline) and a full run on the test site. |
 | **MVP** | The thin first build in `SPEC.md` that proves the agent works end to end on the test site. |
 | **Mac Mini job** | The launchd job on the office Mac Mini that runs `scripts/macmini-run.sh` at 7 minutes past each hour, 07:07–17:07 on weekdays, as the standard user `poagent`. |

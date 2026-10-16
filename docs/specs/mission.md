@@ -15,7 +15,7 @@ B1 Homes (Scott Park Group) emails purchase orders (POs) to support@. Each email
 2. finds the project
 3. creates a **Compaction Test** task and attaches the PO
 4. puts the task **on Hold**
-5. links the Note to the project and resolves it.
+5. links the Note to the project and marks it Solved.
 
 Each PO takes about 2 minutes, at 0–50 POs a week, and someone has to check the pool every working day.
 
@@ -51,5 +51,5 @@ Each PO takes about 2 minutes, at 0–50 POs a week, and someone has to check th
 
 ## Boundaries
 
-- **In:** B1 Homes only; `/048` compaction POs only; existing projects only; create task → Hold → Link → Resolve.
+- **In:** B1 Homes only; `/048` compaction POs only; existing projects only; create task → Hold → Link → Solved.
 - **Out:** other suffixes (e.g. `/023`, `/025`) and other clients (left untouched); creating projects; sending emails; Outlook; pricing or certification changes; deleting, discarding or cancelling anything.

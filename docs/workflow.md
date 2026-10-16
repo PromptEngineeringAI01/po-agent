@@ -1,8 +1,10 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.6 · 15 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.7 · 16 Oct 2026 · **Owner:** Joey Wu
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
+
+**v5.7:** Part 4 ends with **Solved**: the test site has no Resolve button. Stage 3A gets rows 15–18 for the screens off the happy path: a Note back to the pool, a project search with no match (moved out of row 06), a Create New Task error, and a cancelled task (was row 07b).
 
 **v5.6:** Stage 3 (M0) rewritten as the SOP in four parts (check the PO email, create the task, fill in the form, link and resolve), with the six checks marked on the rows where they come up. Also: "Done means" lines on the 3D, 4.1 and Stage 5 prompts, and a "When to clear context" table in Stage 5.
 
@@ -236,23 +238,24 @@ What are the must-never rules, what's the check command, and what's the active s
 
 **In one sentence:** you book one PO on the test site by hand, exactly as the PO admin does, and Claude Code takes a snapshot of every screen along the way. Nothing is built yet: the agent's code (M1 onwards) is written from these snapshots.
 
-The job has four parts:
+The job has four parts, plus the screens off the happy path:
 
 | Part | What you do in MySys | Rows |
 |---|---|---|
 | **1. Check the PO email** | Open the Note in the Agent Pool, assign it to the agent, download the PDF | 01–05 |
 | **2. Create the task** | Find the project by its internal number, open it, click **Create New Task** | 06–08 |
 | **3. Fill in the form** | Creator, Compaction Test, PO Number, PDF, Note → **Submit** → **Hold** | 09–12 |
-| **4. Link and resolve** | Back on the Note: **Link to Project**, then **Resolve** | 13–14 |
+| **4. Link and mark Solved** | Back on the Note: **Link to Project**, then **Solved** | 13–14 |
+| **5. Off the happy path** | Send a Note back to the pool, search for a project that doesn't exist, a form error, a cancelled task | 15–18 |
 
-**Why Claude needs this:** the agent finds every button by its role and name on the screen (for example, button "Resolve"). Claude can't log in to MySys or click anything, so it learns each screen from your walkthrough: the buttons the agent will press, the defaults it must check, and the buttons it must never press (Discard, Unlink, Cancel, Unassign, Remove).
+**Why Claude needs this:** the agent finds every button by its role and name on the screen (for example, button "Solved"). Claude can't log in to MySys or click anything, so it learns each screen from your walkthrough: the buttons the agent will press, the defaults it must check, and the buttons it must never press (Discard, Unlink, Cancel, Unassign, Remove).
 
 **Which PO gets what:**
 
 | Trial PO | Project | What you do |
 |---|---|---|
-| **2609017B** | pln_66935 | All four parts: a full booking (rows 01–14) |
-| **2609034B** | pln_66938 | Look only: rows 02, 05, 06, 07 (open the Note, download the PDF, search, open the project). No assigning, no booking |
+| **2609017B** | pln_66935 | Parts 1–4: a full booking (rows 01–14); then rows 16–18 |
+| **2609034B** | pln_66938 | Look only: rows 02, 05, 06, 07 (open the Note, download the PDF, search, open the project), then row 15 (assign its Note to the agent and back to Agent Pool). No booking |
 | **2610002B** | pln_66940 | Look only, same rows as 2609034B |
 
 The two "look only" POs show Claude how Notes, PDFs and addresses vary. Booking them as well would add nothing and mean more resets.
@@ -295,7 +298,7 @@ No recording file is needed: Claude takes each screen's accessibility tree (ever
 
 | Row | Do this | Look for |
 |---|---|---|
-| 06 | **Projects** (not Tasks) → search `2609017B`; then also try a made-up number | 1 result for the real number, **0 results** for the made-up one; 2 results if you can find a case |
+| 06 | **Projects** (not Tasks) → search `2609017B` | 1 result; where the internal number, company and address show (a made-up number is row 16) |
 | 07 | Open the project (pln_66935) | How lot, street and suburb show; the task list and where PO numbers show |
 | 08 | Click **Create New Task** (form still empty) | ⚠ **Send Email Notification**: ticked by default? (check 3.3); the Creator dropdown open; the task-type list |
 
@@ -308,19 +311,27 @@ No recording file is needed: Claude takes each screen's accessibility tree (ever
 | 11 | **Hold** → type `ON HOLD UNTIL CALL UP`; don't press the Hold button yet | ⚠ **Every related-task checkbox, and whether it's ticked** (check 3.1) |
 | 12 | Press **Hold** | How "On Hold" and the hold note show |
 
-**Part 4 — Link and resolve**
+**Part 4 — Link and mark Solved**
 
 | Row | Do this | Look for |
 |---|---|---|
 | 13 | Back on the Note: **Link to Project** → search pln_66935 → select | The search, the result list, after selecting |
-| 14 | **Resolve** | The button or dialog; how "resolved" shows; ⚠ does Send Email Notification appear here too? |
+| 14 | **Solved** (the Note's Status buttons; there is no Resolve button) | How "Solved by" shows, the new log line, the Note gone from the Pending list; ⚠ does Send Email Notification appear here too? |
 
-**Then the two "look only" POs:** rows 02, 05, 06 and 07 for 2609034B, then for 2610002B.
+**Then the two "look only" POs:** rows 02, 05, 06 and 07 for 2609034B, then for 2610002B. Then Part 5.
+
+**Part 5 — Off the happy path**
+
+| Row | Do this | Look for |
+|---|---|---|
+| 15 | On the 2609034B Note: assign it to the agent, then pick **Agent Pool** in the pool dropdown → **Assign** | ⚠ Where the Note lands and how the assignee shows; the log line; that Unassign/Unlink weren't needed (check 3.2) |
+| 16 | **Projects** → search a made-up number | **0 results**: the empty-list text; 2 results if you can find a case |
+| 17 | *(Optional)* On pln_66935, **Create New Task** → tick Compaction Test → **Submit** with no PO document | The error message, and that no task was created |
 
 **Reset, then finish:**
 
 1. In your normal browser, logged in as **yourself** (the agent never cancels), **cancel** the Compaction Test task on pln_66935. Note whether an On Hold task can be cancelled directly or must be released first (check 3.6).
-2. In the Playwright window, reload the pln_66935 page yourself and give Claude `row 07b, 2609017B`, so the screen map shows how a cancelled task looks.
+2. In the Playwright window, reload the pln_66935 page yourself and give Claude `row 18, 2609017B`, so the screen map shows how a cancelled task looks.
 3. As B1 Homes, place a fresh copy of the 2609017B Note in the Agent Pool (Stage 6.1).
 4. Ask Claude to run `playwright-cli close`.
 
@@ -356,18 +367,18 @@ Real client data, so it stays in `private/`. **Change nothing on live:** no Assi
 | # | Check | Where | If it goes the wrong way |
 |---|---|---|---|
 | 3.1 | **C1:** is any related-task checkbox in the Hold dialog ticked by default? | Row 11 | The agent can't safely put tasks on hold. CEO decision before M4 |
-| 3.2 | **C3:** can a Note go back to the Agent Pool using **Assign** (not Unassign)? | Row 03 | Every skip would break a rule. CEO decision before M3 |
+| 3.2 | **C3:** can a Note go back to the Agent Pool using **Assign** (not Unassign)? | Rows 03, 15 | Every skip would break a rule. CEO decision before M3 |
 | 3.3 | Which screens show **Send Email Notification**? | Rows 08, 09, 14 | The agent must untick it everywhere |
 | 3.4 | **MFA or password expiry** on the agent account? | Logging in | Unattended runs fail. Blocks M1 |
 | 3.5 | Does opening a Note or downloading its PDF change anything? | Rows 02, 05 | Live capture (3B) is done from the pool list only |
-| 3.6 | How does a **cancelled** task look? Can an **On Hold** task be cancelled directly? | Reset, row 07b | Changes the duplicate check and the reset steps |
+| 3.6 | How does a **cancelled** task look? Can an **On Hold** task be cancelled directly? | Reset, row 18 | Changes the duplicate check and the reset steps |
 
 ### 3D. Turn it into the screen map
 
 Before Claude Code reads real data: you're on a **Pro** plan, so turn off the model-training setting in your claude.ai privacy settings. Then start `claude`:
 
 ```text
-Read everything in private/captures/ (snapshots, screenshots, notes.md, and codegen-raw.py if I used the fallback). Write docs/screen-map.md: one section per SOP screen in order, with each control's role and accessible name, what the agent must read back after each step, the defaults, and the differences between live and test. Use fake values only: no real names, addresses or PO numbers. Add dated entries to docs/decisions.md for checks 3.1–3.6. Don't copy any file from private/ into the repo. Done means: docs/screen-map.md covers rows 01–14 with fake values only, and docs/decisions.md has one dated entry per check 3.1–3.6.
+Read everything in private/captures/ (snapshots, screenshots, notes.md, and codegen-raw.py if I used the fallback). Write docs/screen-map.md: one section per SOP screen in order, with each control's role and accessible name, what the agent must read back after each step, the defaults, and the differences between live and test. Use fake values only: no real names, addresses or PO numbers. Add dated entries to docs/decisions.md for checks 3.1–3.6. Don't copy any file from private/ into the repo. Done means: docs/screen-map.md covers rows 01–18 with fake values only, and docs/decisions.md has one dated entry per check 3.1–3.6.
 ```
 
 Check the diff for real data and credentials. You may copy **test-site** screenshots into `docs/screen-map/` yourself once you've checked they show only your fake data. `/exit`, then commit on a branch and open a PR (Stage 5 steps 1, 8, 9).
@@ -513,7 +524,7 @@ Change the expected result in one seam-1 fixture.
 **6.1 Reset the test site** (after the walkthrough, before M3, after every booking test, and before the M6 demo), with **your own account**, by hand. The agent never cancels anything.
 
 - [ ] On pln_66935, pln_66938 and pln_66940: **cancel** every non-cancelled Compaction Test task with the trial PO numbers (2609017B/048, 2609034B/048, 2610002B/048).
-- [ ] The 3 trial Notes (2609017B, 2609034B, 2610002B) are in the **Agent Pool**, unassigned, with their PDFs. Place fresh copies if earlier ones were resolved.
+- [ ] The 3 trial Notes (2609017B, 2609034B, 2610002B) are in the **Agent Pool**, unassigned, with their PDFs. Place fresh copies if earlier ones were Solved.
 - [ ] Nothing is left assigned to the agent account.
 
 **6.2 Seam 2 from the laptop:** `uv run pytest tests/seam2 -m testsite` (Claude may run it if you ask). ✓ All cases pass; reset again afterwards.

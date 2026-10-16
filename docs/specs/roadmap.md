@@ -11,7 +11,7 @@ Phases run in order, and each has an exit check. 🔴 = blocker from `spec.md` �
 - 🔴 **C3:** can a Note be returned to the Agent Pool through **Assign** (pool as assignee), without Unassign?
 - 🔴 **C8:** does the agent account have MFA or password expiry?
 - Find every screen that shows "Send Email Notification", and how to untick it and read it back (open question 9).
-- Map the SOP screens by accessible role and name: Note Pool filters, Assign, attachment download, Projects search (0/1/many results), Create New Task, Hold, Link to Project, Resolve; and how each result can be read back → `docs/screen-map.md`.
+- Map the SOP screens by accessible role and name: Note Pool filters, Assign, attachment download, Projects search (0/1/many results), Create New Task, Hold, Link to Project, Solved; and how each result can be read back → `docs/screen-map.md`.
 - Create an Anthropic API key for the trial with a spend limit.
 - Collect the 3 fake PO PDFs and their project data as fixtures (committed). Record the full SOP walkthrough on the test site; view-only captures of live and 10–20 real PO PDFs with their project data into `private/` (laptop only, never committed). See `docs/workflow.md` Stage 3.
 
