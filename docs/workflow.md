@@ -1,8 +1,13 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.9 · 16 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.10 · 16 Oct 2026 · **Owner:** Joey Wu
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
+
+**v5.10:** the plan freeze (Stage 4.4, 16 Oct 2026; decisions D1–D7 in `docs/decisions.md`):
+
+- **Stage 3E grows to rows 19–28.** Rows 25–28 (moving between windows, anchors for unlabelled controls, the Note Pool after a filter change, reopening an open project) plus three questions: does `fill` alone run a search, do filters survive a reload or login, and is returning a Note to the pool one Assign or two. Rows 21–23 and 25–28 (M0b.1) are needed **before task 1.8** (the spike), not just before M3; rows 19, 20 and 24 (M0b.2) before M4.
+- **Appendix A:** the check command gains the repo-data step (as in `SPEC.md` → Commands); CI installs Chromium for the guard's browser tests; `guard_bash.py` blocks a few more ways to print the environment and a bare `git push` on `main`; `.gitleaks.toml` allowlists the hook test's fake key.
 
 **v5.9:** after the SPEC check (4.1, done 16 Oct 2026, PR #5):
 - **Type `/agent-skills:plan` and `/agent-skills:review`, not `/plan` and `/review`.** Claude Code has its own built-in `/plan` (it only switches plan mode on: "Already in plan mode. No plan written yet.") and `/review`, and those win over the plugin's short names. Run 4.2 with plan mode **off**, because plan mode stops Claude writing `tasks/plan.md`.
@@ -89,7 +94,7 @@ So Addy's skills stay the workflow, and `improve-codebase-architecture` is used 
 
 | Slice | Pace | Why |
 |---|---|---|
-| M0b screens still to map (Stage 3E) | By hand: you click, Claude observes | No code; before M3 |
+| M0b screens still to map (Stage 3E) | By hand: you click, Claude observes | No code; M0b.1 before task 1.8, M0b.2 before M4 |
 | M1 walking skeleton (guard, secrets, hooks) | `/build`, one task at a time, plan mode first | The guard and the hooks protect everything after |
 | M2 decision seam | `/build auto` once M1's guardrails are merged | Offline, well specified, test-first |
 | M3 decide-only | `/build`, one task at a time | First run that assigns and returns Notes |
@@ -401,20 +406,25 @@ Check the diff for real data and credentials. Don't copy test-site screenshots i
 
 ✓ `docs/screen-map.md` merged; checks 3.1–3.6 have recorded answers; `private/` holds the captures, the real PDFs and `cases.toml`. If 3.1, 3.2 or 3.4 went the wrong way, stop and take it to the CEO first.
 
-### 3E. Slice M0b: the screens still to map (about an hour, before M3)
+### 3E. Slice M0b: the screens still to map (about two hours, in two sittings)
 
-The screen map is missing a few screens the agent needs (`SPEC.md` → Expected slices → M0b). Same set-up as 3A: start `claude`, paste the 3A prompt, log in as the agent account, then give Claude each row. It doesn't block the plan (Stage 4) or M1–M2; rows 21–23 are needed before M3, rows 19, 20 and 24 before M4.
+The screen map is missing a few screens the agent needs (`SPEC.md` → Expected slices → M0b). Same set-up as 3A: start `claude`, paste the 3A prompt, log in as the agent account, then give Claude each row. It doesn't block the plan (Stage 4) or M1 up to task 1.7. **M0b.1** (rows 21–23 and 25–28) is needed before task 1.8, the spike; **M0b.2** (rows 19, 20 and 24) before M4. `tasks/plan.md` → M0b.1 and M0b.2 have the full acceptance criteria.
 
 | Row | Do this | Look for |
 |---|---|---|
-| 19 | Book 2609017B again by hand up to **Submit** (rows 06–10). Then open the new task's **detail screen** (try the project's "-- Select Task --" list, or the task number) | Where the PO number, the PO document and the Note show; how you got there |
-| 20 | Finish Hold (rows 11–12), then on the Note: **Link to Project** → the search box → type `pln_66935` → the result list → select | Each screen of the search and select (row 13 only had the result) |
+| 19 | Book 2609017B again by hand up to **Submit** (rows 06–10), filling **Note** with the Note's body as the agent will. Before Submit, let Claude snapshot each unlabelled field (Creator, Multiple Units, PO Number, PO Contact, Delivery Office, Note, both Choose File inputs). Then open the new task's **detail screen** (try the project's "-- Select Task --" list, or the task number) | Where the PO number, the PO document and the Note show; how you got there; an anchor for every unlabelled field; whether the PO Documents upload was saved before Submit |
+| 20 | Finish Hold (rows 11–12; let Claude snapshot the Hold dialog's own **Hold** button), then on the Note: **Link to Project** → the search box → type `pln_66935` → the result list → select | Each screen of the search and select (row 13 only had the result) |
 | 21 | As B1 Homes, place a Note with **no attachment** in the Agent Pool; open it | What the attachment area shows when it's empty |
 | 22 | Place a Note with **two** PDFs; open it | How two attachments show (two "Download document" links?) |
-| 23 | Open a Note in the Playwright window. In your normal browser, as yourself, assign that Note to someone else. Back in the Playwright window: does its "Assignee:" change by itself? Then Note Pool → Assigned Pool **All Pools** → Search/filter = the Note ID, with a project window still open | Whether the open Note window refreshes; the Note's row and its Assignee cell |
+| 23 | Open a Note in the Playwright window. In your normal browser, as yourself, assign that Note to someone else. Back in the Playwright window: does its "Assignee:" change by itself? Then Note Pool → Assigned Pool **All Pools** → Search/filter = the Note ID, with a project window still open | Whether the open Note window refreshes; the Note's row and its Assignee cell; whether typing the ID by `fill` alone (no Enter) would run the search (watch whether the list changes without a key press) |
 | 24 | On any project: **Create New Task** → tick **- Compaction Test**, before typing anything | Is PO Number empty or prefilled? |
+| 25 | One Note's whole path: Note window → Projects sub-tab → project window → back to the same Note window | Which windows stay open and visible; how to get back to the Note (taskbar, or reopen from the Note Pool by ID) |
+| 26 | The login page, the Note Pool panel, the Projects panel, and the Note window's user and pool lists | An anchor (container or heading) for every control with no name or label, so the agent never needs `nth` |
+| 27 | Note Pool: change a filter; then reload the page; then log out and in again | Does the list reload by itself or need Refresh, and what shows when it's done; do the filters and Search/filter text persist after a reload and after a new login |
+| 28 | Open a project that's already open in a window | One window or two |
+| 15b | Open a Note fresh (the user list pre-selects the agent) and return it to the Agent Pool | One Assign with `--Select User--` + Agent Pool (as SPEC says), or two Assigns (as the walkthrough did)? |
 
-Then reset (6.1): cancel the task from rows 19–20 with your own account, place a fresh 2609017B Note, and put the row 21–23 Notes somewhere other than the Agent Pool (or Solve them yourself). Ask Claude: `Update docs/screen-map.md (rows 19–24, fake values only) and SPEC.md → MySys screen rules from private/captures/test/ rows 19–24, with a dated docs/decisions.md entry. Done means: no M0b item is left in SPEC.md or the screen map's open items.` Commit on a branch and open a PR.
+Then reset (6.1): cancel the task from rows 19–20 with your own account, place a fresh 2609017B Note, and put the row 21–23 Notes somewhere other than the Agent Pool (or Solve them yourself). Ask Claude: `Update docs/screen-map.md (rows 19–28 and 15b, fake values only) and SPEC.md → MySys screen rules from private/captures/test/, with a dated docs/decisions.md entry and the affected tasks in tasks/plan.md. Done means: no M0b item is left in SPEC.md or the screen map's open items (open item 8 closed in full).` Do M0b.1's rows first and in their own PR if M0b.2 has to wait. Commit on a branch and open a PR.
 
 ---
 
@@ -610,8 +620,9 @@ Change the expected result in one seam-1 fixture.
 
 1. `ruff format --check .`
 2. `ruff check .`
-3. `python scripts/guard_check.py` (no browser action calls outside `src/po_agent/mysys/guard.py`)
-4. `pytest tests -m "not live_claude and not testsite and not real_data"`
+3. `python scripts/guard_check.py` (no browser action calls outside `act()` in `src/po_agent/mysys/guard.py`; the full banned list is in `tasks/plan.md` task 1.4)
+4. Repo-data check: no tracked path under `private/`, `logs/`, `state/` or `.playwright-cli/`; no `.pdf` (any case) outside `tests/seam1/fixtures/pdfs/`; no trace or capture file (`trace*.zip`, `*.har`, `*.webm`)
+5. `pytest tests -m "not live_claude and not testsite and not real_data"`
 
 **Secrets:** `src/po_agent/core/secrets.py` reads `PO_AGENT_<NAME>` from the environment, else keyring service `po-agent`. Names: `anthropic_api_key`, `mysys_test_username`, `mysys_test_password`. Never `ANTHROPIC_API_KEY`.
 
@@ -629,6 +640,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
+      - run: uv run playwright install --with-deps chromium   # the guard's tests use a real browser on local HTML
       - run: uv run scripts/check.py
       - uses: gitleaks/gitleaks-action@v2
         env:
@@ -669,9 +681,9 @@ Keep the Playwright CLI `allow` and `deny` entries that are already in the file 
 | Hook | Does |
 |---|---|
 | `protect_paths.py` | **Blocks** edits to `.claude/**`, `config/live*.toml`, `.env*`, `secrets/**`, `state/**` and paths outside the repo. **Asks** before edits to `.github/workflows/**`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, and existing files in `tests/seam1/fixtures/**` or expected results. |
-| `guard_bash.py` | **Blocks** commands mentioning the live site (regex `(?<!test-)prompt\.mysys\.com\.au`); any `playwright-cli` command except `open` (test URL only, no `--persistent`/`--profile`), `snapshot`, `screenshot`, `find`, `generate-locator`, `tab-list`, `list`, `close`; `printenv`, a bare `env`, `/proc/*/environ`, or any text containing `PO_AGENT_`; `git push --force`; any push to `main`; `gh pr merge`; `rm -rf`; `git add`/`commit` of `private/`, `state/`, `logs/`, `.env*`; text matching a real Anthropic key (regex `sk-ant-[A-Za-z0-9_-]{20,}`). |
+| `guard_bash.py` | **Blocks** commands mentioning the live site (regex `(?<!test-)prompt\.mysys\.com\.au`); any `playwright-cli` command except `open` (test URL only, no `--persistent`/`--profile`), `snapshot`, `screenshot`, `find`, `generate-locator`, `tab-list`, `list`, `close`; `printenv`, a bare `env`, `/proc/*/environ`, or any text containing `PO_AGENT_`; `git push --force`; any push to `main`; `gh pr merge`; `rm -rf`; `git add`/`commit` of `private/`, `state/`, `logs/`, `.env*`; text matching a real Anthropic key (regex `sk-ant-[A-Za-z0-9_-]{20,}`); also `export -p`, `declare -x`, a bare `set`, `os.environ`, PowerShell `env:`, and a bare `git push` while the current branch is `main`. The live host appears only in this regex and its test (decision D4). Hooks match text, so they're a backstop; the guard, the repo-data check and gitleaks are the main controls. |
 | `format_python.py` | For `.py` files: `ruff format` then `ruff check --fix` on that file; reports leftover lint errors. |
-| pre-commit + gitleaks | Secret scan on every commit, including Joey's own; also blocks any staged path under `private/` and any `.pdf` outside `tests/seam1/fixtures/pdfs/`. The same path rule runs in `scripts/check.py`, so CI catches it too. |
+| pre-commit + gitleaks | Secret scan on every commit, including Joey's own; also blocks any staged path under `private/` and any `.pdf` outside `tests/seam1/fixtures/pdfs/` (the same repo-data rule as `scripts/check.py --repo-data-only`, so CI catches it too). `.gitleaks.toml` allowlists only `tests/test_hooks.py` for the hook test's fake `sk-ant-` string (decision D4). If the GitHub owner is an organisation, `gitleaks-action` needs a `GITLEAKS_LICENSE` secret: check in task 1.3, or run the gitleaks binary instead. |
 
 Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with stderr saying what was blocked, why, and that Joey does it by hand; to ask, print `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": "..."}}` and exit 0; keep them fast.
 

@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.10 (1.10: the 3 trial POs are **real** B1 POs, kept by Joey with changed real-data rules; SPEC fixed against `docs/screen-map.md` v1.1: new [MySys screen rules](#mysys-screen-rules), project match on the one `/048` result, strict MVP duplicate check, `NOTE_ALREADY_LINKED`, "close" denylisted, fake CI fixtures, slice M0b (16 Oct 2026; the defaults in `docs/decisions.md` accepted by Joey the same day); 1.9: M0 checks answered from the screen map, C1 and C3 pass on the test site; the denylist adds Pending, Undo Cancellation, Un-Hold and Change Project (16 Oct 2026); 1.8: the real-PO decision seam uses the 3 most recent real POs for the MVP, 10–20 before go-live (16 Oct 2026); 1.7: the last write is the Note's **Solved** button, because the test site has no Resolve button (16 Oct 2026); 1.6: CEO decision 3, the trial runs on the office Mac Mini instead of an Anthropic cloud routine: a launchd job as a separate standard user, secrets in its Keychain, the trial waiver replaced by Trial conditions, `docs/macmini-setup.md` replaces `docs/routine-setup.md`; 1.5: the demo must be repeatable at least 3 times, S8 and `docs/demo-runbook.md`; 1.4: approved; the test site is reset by Joey cancelling tasks with his own account, and the test profile's duplicate check ignores cancelled tasks; Pro plan; 1.3: screens mapped with Playwright CLI while Joey clicks; `po-agent capture` dropped; all 3 trial POs named at every stage; 1.2: the 3 trial POs only, test-site reset, skip shown with a duplicate copy; 1.1: real client data allowed, kept on Joey's laptop)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.11 (1.11: the plan freeze, decisions D1–D7 in `docs/decisions.md` (16 Oct 2026): run controls and the assignee check built before booking (M3); the trial PDF briefly on the Mac Mini's disk; real-page refusal tests call `guard.vet()` only; the live host named only in the Bash hook's deny regex; the select rule; the stale-Note stop; the assignee check before W1 and W4 only; one agent at a time; M0b grows to rows 19–28; 1.10: the 3 trial POs are **real** B1 POs, kept by Joey with changed real-data rules; SPEC fixed against `docs/screen-map.md` v1.1: new [MySys screen rules](#mysys-screen-rules), project match on the one `/048` result, strict MVP duplicate check, `NOTE_ALREADY_LINKED`, "close" denylisted, fake CI fixtures, slice M0b (16 Oct 2026; the defaults in `docs/decisions.md` accepted by Joey the same day); 1.9: M0 checks answered from the screen map, C1 and C3 pass on the test site; the denylist adds Pending, Undo Cancellation, Un-Hold and Change Project (16 Oct 2026); 1.8: the real-PO decision seam uses the 3 most recent real POs for the MVP, 10–20 before go-live (16 Oct 2026); 1.7: the last write is the Note's **Solved** button, because the test site has no Resolve button (16 Oct 2026); 1.6: CEO decision 3, the trial runs on the office Mac Mini instead of an Anthropic cloud routine: a launchd job as a separate standard user, secrets in its Keychain, the trial waiver replaced by Trial conditions, `docs/macmini-setup.md` replaces `docs/routine-setup.md`; 1.5: the demo must be repeatable at least 3 times, S8 and `docs/demo-runbook.md`; 1.4: approved; the test site is reset by Joey cancelling tasks with his own account, and the test profile's duplicate check ignores cancelled tasks; Pro plan; 1.3: screens mapped with Playwright CLI while Joey clicks; `po-agent capture` dropped; all 3 trial POs named at every stage; 1.2: the 3 trial POs only, test-site reset, skip shown with a duplicate copy; 1.1: real client data allowed, kept on Joey's laptop)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -55,7 +55,7 @@ The MVP proves that:
 | §5 action guard + build check | All, plus the denylist and allowlist additions in [MySys screen rules](#mysys-screen-rules). It's cheap and it's the main safety control |
 | §6 booker W1–W5 with read-back | All, with the values and read-backs in [MySys screen rules](#mysys-screen-rules). W2's task-detail read-back and W4's search need slice M0b first |
 | §7 Claude reader | All: no tools, structured output validated again by pydantic, temperature 0, pinned model ID, 60 s timeout, one retry |
-| §8 run controls | `enabled` kill switch, Perth window, run cap, fresh login, assignee check before each write, **stop the run on the first unexpected screen or failed write** |
+| §8 run controls | `enabled` kill switch (at start and before every write step), Perth window, run cap, fresh login, assignee check **before W1 and W4** (D7), the **stale-Note stop** at run start (D6), **stop the run on the first unexpected screen or failed write** |
 | Skip → back to pool | Through **Assign** with the pool as assignee (C3 answered yes, 16 Oct 2026); exact steps in [MySys screen rules](#mysys-screen-rules) → Note window |
 | `reader_mode = deterministic-only` | Yes: every PO skips `ADDRESS_UNVERIFIABLE` (approved C4 behaviour); a few lines of code |
 | `--decide-only` | Runs every check, returns each Note to the pool, books nothing. Used before the first booking |
@@ -65,12 +65,12 @@ The MVP proves that:
 | Deferred | MVP behaviour instead | Why it's acceptable on the test site |
 |---|---|---|
 | Skip list and 24 h retry of `PROJECT_NOT_FOUND` | Nothing persisted. A skipped Note is checked again every run | Same answer each time; costs one Claude call per skipped Note per run |
-| Partial-write auto-resume | `ALERT PARTIAL_WRITE`, Note **left assigned to the agent** (so later runs ignore it), run stops (exit 1). Joey finishes it by hand | Duplicate check blocks a second task anyway |
+| Partial-write auto-resume | `ALERT PARTIAL_WRITE`, Note **left assigned to the agent**, run stops (exit 1). Joey finishes it by hand. Until he does, every later run stops at the start (the stale-Note stop, D6), so one systematic bug can't leave a half-booked Note every hour | Duplicate check blocks a second task anyway |
 | `STOP` file written by the agent after an accuracy breach | `ALERT ACCURACY_BREACH`, exit 3. Joey unloads the Mac Mini's launchd job and sets `enabled = false`; restart needs the CEO (approved safeguard) | Joey is told by the GitHub alert issue |
 | Email/Teams alerts | `ALERT` lines; the Mac Mini's run script opens a GitHub issue labelled `po-agent-alert` (GitHub emails Joey) | — |
 | Circuit breaker (3 failures) | Stricter: the first unexpected screen or failed write stops the run | — |
-| Single-run lock, start-of-run sweep | None | Runs take minutes and are hourly; launchd never starts the job while it's still running; don't start a manual run near :07 |
-| Daily log files and 90-day retention | Full detail only in local runs (`logs/`, git-ignored). The Mac Mini appends the short run output to `~/Library/Logs/po-agent/runs.log` | MVP runs only touch the test site |
+| Single-run lock, start-of-run sweep | No lock: by rule, **one agent at a time** (no laptop test-site run while the Mac Mini job is loaded). Instead of the sweep, the stale-Note stop (D6): a Pending Note still assigned to the agent stops the run before any Note is taken | Runs take minutes and are hourly; launchd never starts the job while it's still running; don't start a manual run near :07 |
+| Daily log files and 90-day retention | Full detail only in local runs with `--detailed-log` (`logs/`, git-ignored; the Mac Mini never passes it). The Mac Mini appends the short run output to `~/Library/Logs/po-agent/runs.log` | MVP runs only touch the test site |
 | Live profile, live URL, sender check (C6), go-live flag | Not built (the live title rule exists only inside the decision engine, for offline tests) | — |
 | Duplicate check by PO number | Any non-Cancelled Compaction Test task on the project → `DUPLICATE_TASK` | Only costs coverage on projects with an older compaction task; v1 reads PO numbers from the task detail screen |
 | Note Pool paging | Page 1 of the filtered list only (50 rows by default); an `INFO` line when there are more pages | The test site's Agent Pool holds a handful of Notes |
@@ -104,12 +104,12 @@ Screen mapping (M0): playwright-cli open --headed "<test-site URL>"   Claude ope
 Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses private/fixtures; skipped when absent; never in CI
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
-Laptop extras:       --headed (watch the browser), --slow-mo 500
+Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
 Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only   pull main, sync, run, log, alert
 Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
 ```
 
-`scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check .` → `ruff check .` → `python scripts/guard_check.py` → repo data check (nothing under `private/` tracked; no PDF outside `tests/seam1/fixtures/pdfs/`) → `pytest tests -m "not live_claude and not testsite and not real_data"`.
+`scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check .` → `ruff check .` → `python scripts/guard_check.py` → repo data check (nothing under `private/`, `logs/`, `state/` or `.playwright-cli/` tracked; no PDF, any case, outside `tests/seam1/fixtures/pdfs/`; no trace or capture file) → `pytest tests -m "not live_claude and not testsite and not real_data"`.
 
 **Screen mapping with Playwright CLI** (`@playwright/cli`, M0 and whenever a screen changes; laptop, test site only). Joey opens a headed browser and does every click and every typed value himself, including the login. Claude Code only **observes**: `playwright-cli snapshot` (the accessibility tree, with the role and name of every element, which is what the guard's lookups use), `screenshot`, `find` and `generate-locator`. Claude never runs a command that acts on the page (click, fill, type, press, hover, check, select, upload, drag, drop, eval, run-code, dialog, goto, reload), saves state or cookies, or lists network requests; `.claude/settings.json` denies them and, from M1, the `guard_bash.py` hook allows only the observe commands. `.playwright/cli.config.json` keeps the browser profile in memory, blocks the live origin and writes output to `private/captures/test/`; `.playwright-cli/` (snapshot files) is git-ignored. Fallback if Node.js can't be installed: the classic recorder that ships with Playwright for Python (`playwright codegen`), plus screenshots.
 
@@ -128,10 +128,12 @@ src/po_agent/
     config.py                   load + validate config/<site>.toml; refuse non-test URLs
     secrets.py                  PO_AGENT_* env var, else keyring
     output.py                   the ONLY module that prints (stdout contract below)
-    runlog.py                   detailed JSON-lines log to logs/ (local runs)
-    run.py                      kill switch, Perth window, run cap, Note loop, RUN_SUMMARY
+    runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log)
+    run.py                      Note loop, RUN_SUMMARY
+    controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
+    errors.py                   typed errors and their exit codes
   mysys/                        reusable
-    guard.py                    action guard: the ONLY module that clicks, types, ticks or uploads
+    guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
   b1/                           rules for this automation
     models.py                   Reading, Decision, SkipReason (pydantic)
@@ -184,13 +186,13 @@ Python 3.12, ruff format and ruff check, type hints throughout, pydantic models 
 # src/po_agent/b1/booker.py
 def set_po_number(guard: ActionGuard, task_form: Locator, po_number: str) -> None:
     field = field_by_label(task_form, "PO Number", role="textbox")   # weak: no accessible name (screen map row 09)
-    guard.fill("set_po_number", field, po_number)        # refuses if not allowlisted, denylisted, or not exactly one match
+    guard.act("set_po_number", task_form, field, po_number)   # vet() first: refuses if not allowlisted, denylisted, or not exactly one match
     if field.input_value() != po_number:
         raise WriteNotStarted("PO Number did not read back as expected")
 ```
 
 - Names: `snake_case` functions, `PascalCase` models and errors, skip reasons exactly as in `docs/specs/spec.md` §3.
-- Typed errors (`UnexpectedScreen`, `WriteNotStarted`, `PartialWrite`, `AccuracyBreach`, `GuardRefusal`, `LoginFailed`) mapped to exit codes in `cli.py`.
+- Typed errors (`UnexpectedScreen`, `WriteNotStarted`, `PartialWrite`, `AccuracyBreach`, `GuardRefusal`, `LoginFailed`, `ConfigError`) in `core/errors.py`, mapped to exit codes in `cli.py`. Their messages come from fixed templates plus identifiers only, never page text or a Playwright message (which can quote an address).
 
 **Run output (stdout) contract.** The Mac Mini's run log and alert issues are built from this, so it is short and holds no PDF text, addresses, Note bodies or Claude readings:
 
@@ -205,6 +207,10 @@ RUN_SUMMARY {"run_id": "...", "site": "test", "mode": "run|decide-only|spike", "
        "cost_aud": 0.0, "exit_code": 0}
 ```
 
+- `outcome` values beyond a skip reason: a decide-only Note that would have been booked is `"outcome": "skipped", "reason": "DECIDE_ONLY"`; a Note a person took mid-run is `"outcome": "untouched", "reason": "NOTE_TAKEN"`. These are run-output values only, not skip reasons in the decision engine.
+- `run_id` = UTC start time plus 4 random hex characters (e.g. `20261016T013507Z-3fa2`), made before the config is loaded, so even an exit-2 `RUN_SUMMARY` has one. `RUN_SUMMARY` is always the last line, even after a crash.
+- **Nothing goes to stderr.** An unexpected exception becomes `ALERT UNEXPECTED_SCREEN` with a fixed detail; its traceback goes to `logs/` only with `--detailed-log`, else nowhere, because Playwright's error text can quote page content.
+
 Never print or log a secret, the environment, cookies or browser storage state. PDF and Note text are untrusted data.
 
 ## MySys screen rules
@@ -213,22 +219,27 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 
 **Windows and locators**
 - Every locator is scoped to its floating window, found by its heading: `Note <note id> - …` (a pln appears in it after linking), the project heading starting `<pln> `, `Create New Task`, `Hold Task: <task no>`. Minimised windows stay in the page, so an unscoped locator can match a hidden copy.
-- Inside a window, an element is found by accessible role and name, or, for a field the screen map marks **weak** (open item 8), by its visible label in that window (`field_by_label` in `mysys/driver.py`). Never generated ids (`#project_list_<digits>`, `p_<digits>`, `…_s_po_1_6`) or position-only locators (`nth`, `:nth-child`). Zero or more than one match → guard refusal.
+- Inside a window, an element is found by accessible role and **exact** name (a substring "Hold" would also match "Un-Hold"), or, for a field the screen map marks **weak** (open item 8), by its visible label in that window (`field_by_label` in `mysys/driver.py`). Never generated ids (`#project_list_<digits>`, `p_<digits>`, `…_s_po_1_6`) or position-only locators (`nth`, `:nth-child`). Zero or more than one match → guard refusal. `guard.act()` acts on the element `guard.vet()` resolved, never a second lookup, so a hidden copy is never the one acted on.
 - The agent never clicks a window's Close, Maximize or Minimize. **Between Notes the driver reloads `base_url`** (a navigation, not a click) so no window is left open; if the reload shows the login page, it logs in again. A half-filled form is still abandoned by closing the browser context.
 - No key presses: after Assign, focus lands on **Unlink** (row 04).
 
 **Guard additions** (on top of `docs/specs/spec.md` §5)
 - **Denylist:** any element whose accessible name or own text contains `close` (case-insensitive). This blocks the PO Documents table's "close" cell (removes the PDF), the Task Client "close" (clears the client), and every window Close. The denylist is checked against the acted-on element itself, not the text of the window around it.
-- **Allowlist:** select user / pool in the Note window's lists (including the `--Select User--` placeholder); search the Note Pool by Note ID (assignee check); search for and open a task's detail screen (read-only, mapped in M0b).
+- **Denylist on a `<select>`** (D5): the select's own name plus the label of the option being chosen, never every option's text. So the Note Pool's Discard status option is refused, and a user elsewhere in the list whose name contains a denylisted word doesn't block Assign.
+- **Allowlist:** log in (username, password, "Log in") and the module navigation (Project top tab, Note Pool, Projects sub-tab); select user / pool in the Note window's lists (including the `--Select User--` placeholder); search the Note Pool by Note ID (assignee check); search for and open a task's detail screen (read-only, mapped in M0b).
+- **Refusal tests on the real site** (D3) call `guard.vet()` only, which has no action code, so nothing can be pressed; `guard.act()` refusing is tested offline on local HTML.
 
 **Note Pool (row 01)**
-- Filters: Assigned Pool = `pool_name`, Locked/Unlocked = **Locked** (the captures show the trial Notes listed under Locked). Every other filter stays at its default; Status stays **Pending** and is never set.
-- Eligible (step 0, list only): the Subject/Note cell matches the title rule and the Project cell reads `---`. Everything else is left untouched (outcome `untouched`).
+- Filters: Assigned Pool = `pool_name`, Locked/Unlocked = **Locked** (the captures show the trial Notes listed under Locked). Every other filter stays at its default; Status stays **Pending** and is never set. Each filter is read back, and Search/filter must read empty (a Note ID left there would hide every Note).
+- Eligible (step 0, list only): the Subject/Note cell matches the title rule, the Project cell reads `---` **and** the Assignee cell reads `pool_name` (so a person's Note is never taken, even if the pool filter didn't apply). Everything else is left untouched (outcome `untouched`).
+- The list is read **once per run**; the run works through that fixed list, so a Note it skips and returns isn't taken again in the same run.
+- **Stale-Note stop** (D6): in `run` and `run --decide-only`, after login and before the list is read, the Note Pool is read with Assigned User = `agent_user_name`, Assigned Pool = All Pools, Locked/Unlocked = All. Any Pending Note assigned to the agent was left by an earlier run's partial write or failed return: `ALERT UNEXPECTED_SCREEN` (fixed detail, with its `note_id`), no Note taken, exit 1.
+- **Finding a Note again** (after closing a browser context, for the assignee check, for W5's read-back): Assigned Pool = All Pools and Search/filter = the Note ID, and the row whose ID cell **equals** the Note ID (the search is treated as a substring filter: 123 also matches 1234). Under Assigned Pool = Agent Pool, a Note assigned to the agent is hidden (row 04).
 - Order: oldest first by Note ID, up to `max_notes_per_run`, from page 1 only (deferred table). The Note ID is the row's ID cell, never the download link's `user_note_id` (row 05).
 - **Two Notes for one PO** (row 01: older Notes have the plain title, newer ones the live-style title): the first one processed is booked; any other copy then skips `DUPLICATE_TASK` and goes back to the pool for the admin. The demo runbook keeps exactly one Pending Note per trial PO in the Agent Pool.
 
 **Note window (rows 02–04, 13–15)**
-- **Send Email Notification** is ticked every time a Note window opens (row 02). Before **every write on the Note window** (Assign to agent, Assign to pool, Link to Project, Solved) the agent unticks it and reads it back unticked. The detailed log records each read-back.
+- **Send Email Notification** is ticked every time a Note window opens (row 02). Before **every write on the Note window** (Assign to agent, Assign to pool, Link to Project, Solved) the agent unticks it and reads it back unticked, **after** `before_write` (whose assignee check can reopen the window, ticking the box again) and right before the committing click. The detailed log records each read-back.
 - **Assign to agent** (step 2): user list = `agent_user_name` (it's pre-selected even when the Note is in the pool), pool list reads `--Select Pool--`, Assign. Read back: "Assignee:" reads the agent, and a new log line "User Assigned: … to <agent>".
 - **Assign to pool** (every skip and decide-only): user list = `--Select User--`, pool list = `pool_name`, Assign. Read back: "Assignee:" reads `pool_name`, a new log line "… From <agent> to <pool>", Status Pending. Never Unassign or Unlink.
 - After an Assign both lists reset and Assign is disabled (row 04). That's expected, not an unexpected screen.
@@ -237,10 +248,13 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 
 **Attachment and download (rows 02, 05)**
 - Count the attachment rows ("Download document" links) in the Note window **before** clicking: none → `NO_PDF`; more than one → `MULTIPLE_PDFS`; one whose file name doesn't end `.pdf` → `NO_PDF`. Counting is a read, so two links give a skip, not a guard refusal. M0b maps a Note with no attachment and one with two.
-- Download: the "Download document" click inside `expect_download`; keep the first file, ignore a second download; never use the preview window.
+- Download: the "Download document" click inside `expect_download`; keep the first file, delete a second download unread; never use the preview window.
+- **The PDF on disk** (D2): the browser writes every download to disk, so the browser is launched with `downloads_path` set to a run-scoped temp folder (`po-agent-dl-<run_id>`). The file is read into memory and deleted at once; the folder is removed in a `finally` block, and leftover `po-agent-dl-*` folders are removed at every run start. W1 uploads from the bytes in memory, never from a path.
 
-**Assignee check (§8), before each of W1–W5**
-- A fresh read, not the open Note window's text (it isn't known to refresh): Note Pool with Assigned Pool = All Pools and Search/filter = the Note ID; the row's Assignee cell must read `agent_user_name`. M0b confirms this works with the project window open. Someone else → stop work on the Note without writing (after W2 it's `PARTIAL_WRITE`).
+**Assignee check (§8), before W1 and before W4** (D7)
+- A fresh read, not the open Note window's text (it isn't known to refresh): "Finding a Note again" (above); the row whose ID cell equals the Note ID must have Assignee `agent_user_name`. Zero such rows or more than one → `UNEXPECTED_SCREEN`. M0b confirms this works with the project window open.
+- Only before W1 and W4, because each check leaves the window the booker is in: W1 → W2 → W3 stay in the project window, so a filled Create New Task form never makes the trip. `before_write` still re-reads `enabled` before every step.
+- Someone else at the W1 check → close the browser context and stop work on that Note without any write or reassign (`"outcome": "untouched", "reason": "NOTE_TAKEN"`). Someone else at the W4 check → `PARTIAL_WRITE`.
 
 **Project search (rows 06, 16)**
 - Projects sub-tab, the Projects panel's Search field (label-anchored; the page header has a hidden second "Search..."). Wait up to 15 s until the list shows "No record found." or rows that each contain the internal number; otherwise `UNEXPECTED_SCREEN`.
@@ -261,7 +275,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Everything else stays at its default. Read back before Submit: Creator Perth Scheduling; **- Compaction Test** is the only ticked checkbox in the window (bundles, other services and Multiple Units unticked); Task Client "Same as Project"; Task Name empty; PO Number; PO Documents shows exactly one row, the PDF's file name; Documents shows none; Note = email body; Sale Office "Prompt Engineering Pty Ltd"; PO Contact and Delivery Office "Choose...". Any mismatch → close the browser context, `WRITE_NOT_STARTED`.
 
 **W2 after Submit (row 10)**
-- The Create New Task window closes. The new task is the **one** Compaction Test task number not in the set recorded at step 10 (after a reset, older Cancelled tasks are still there). Its details row: Lodged By `agent_user_name`, Task Creator Perth Scheduling, Status New Project. No new task, or more than one → `PARTIAL_WRITE`.
+- Wait up to 15 s for the Create New Task window to close. The new task is the **one** Compaction Test task number not in the set recorded at step 10 (after a reset, older Cancelled tasks are still there). Its details row: Lodged By `agent_user_name`, Task Creator Perth Scheduling, Status New Project or Inspection Analysis (row 07: it can move on by itself). No new task, more than one, or the form still open after 15 s → `PARTIAL_WRITE`.
 - PO number, document and Note aren't in the project table: the agent opens the task detail screen (M0b) and reads them back. A wrong value → `ACCURACY_BREACH`; a screen not as mapped → `PARTIAL_WRITE`.
 
 **W3 Hold (rows 11–12)**
@@ -285,7 +299,8 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
   - a Note already linked → `NOTE_ALREADY_LINKED`; a Note with no attachment / two attachments → `NO_PDF` / `MULTIPLE_PDFS`
   - a test Note with a live-style title whose PO ≠ the file name's → `PO_MISMATCH`
 - **Seam 1, real POs (`-m real_data`, laptop only, real Claude):** the **3 most recent** real B1 `/048` Notes and the **3 trial POs** with their test-site lookups for the MVP (Joey, 16 Oct 2026); **10–20** (mostly `/048`, plus a few other suffixes and any odd ones) before go-live. For each, `private/fixtures/cases.toml` holds the Note title and body, the PDF file name, the MySys lookup Joey copied by hand and the expected result (PROCEED with values, or SKIP with reason). The lookup is **what MySys shows**, so the parsing is tested too: every Projects search row (pln, Client Ref No., Company), the project's Address string as shown, and the existing Compaction Test tasks with their status. Hand-split lot/street/suburb fields are kept only as the expected values. The test reports agreement per field, coverage (PROCEED ÷ clean POs) and cost per PO, and fails on any false PROCEED. Skipped automatically when `private/` is absent (CI, Mac Mini).
-- **Seam 2 (`-m testsite`, from the laptop; reset the test site first):** the 3 trial POs booked; a fresh copy of a booked trial Note → skipped `DUPLICATE_TASK` and returned to the Agent Pool (the skip case, using only trial POs); any non-`/048` Note in the pool untouched; immediate rerun changes nothing (as defined in [MySys screen rules](#mysys-screen-rules) → Reruns); Send Email Notification read back unticked before every Note-window write (from the detailed log); `enabled = false` → exits before login; outside the window → no MySys contact; a denylisted action (Discard, a Hold-dialog checkbox) refused before any page interaction; a person taking the Note mid-run → agent stops on that Note without writing. Address and other mutations are covered offline in seam 1.
+- **Seam 2 (`-m testsite`, from the laptop; reset the test site first):** the 3 trial POs booked; a fresh copy of a booked trial Note → skipped `DUPLICATE_TASK` and returned to the Agent Pool (the skip case, using only trial POs); any non-`/048` Note in the pool untouched; immediate rerun changes nothing (as defined in [MySys screen rules](#mysys-screen-rules) → Reruns); Send Email Notification read back unticked before every Note-window write, after the latest assignee check (from the detailed log); a denylisted action (Discard, a Hold-dialog checkbox) refused by `guard.vet()` without touching the page (D3). The W-step tests book only as far as their step (`stop_after`, test-only) and run one at a time with a reset between them; "seam 2 green" means the fixed sequence of runs in `tests/seam2/README.md`. Moved out of seam 2 (D1): `enabled = false` and the Perth window are tested offline with a fake driver and an injectable clock, then shown on the Mac Mini in S6; a person taking the Note mid-run is a by-hand check (`--headed --slow-mo 500`). Address and other mutations are covered offline in seam 1.
+- **No real data in test output.** Test-site and real-PO tests assert on booleans, counts, enum values and the trial identifiers only. A conftest hook cuts every `testsite` and `real_data` failure report to the test name and exception type, so Playwright call logs and pydantic errors can't print an address. Selecting `-m testsite` or `-m real_data` explicitly makes a missing secret or precondition an error, not a skip.
 - **Test first** on every task: failing test, shown failing for the right reason, stop for Joey, then code.
 - CI (`.github/workflows/check.yml`) runs the check command and gitleaks on every push and PR, with no secrets.
 
@@ -295,6 +310,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Show `uv run scripts/check.py` output before calling a task done.
 - Finish every check before opening Create New Task; read back every write.
 - Return a skipped Note through **Assign**, never Unassign. Untick Send Email Notification before every write on the Note window and read it back.
+- **One agent at a time:** no laptop run against the test site (seam-2 tests, `run`, `spike`) while the Mac Mini job is loaded, and no manual Mac Mini run while a laptop run is going. Both log in as the same agent account.
 - Keep real client data (PDFs, live screenshots, captures, addresses) in `private/` only. Test-site screenshots and captures count as real data, because the trial POs are real. Anything committed (fixtures, `docs/screen-map.md`) is fake or redacted and holds no credentials; the only exception is the 3 trial POs' internal numbers, PO numbers and test-site plns (assumption 2).
 
 **Ask Joey first**
@@ -310,7 +326,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Run a Playwright CLI command that acts on the page, saves state or cookies, or lists network requests; or point Playwright CLI at anything but the test site.
 - Send, reply to, forward or delete email; touch Outlook.
 - Put a secret anywhere but keyring (the laptop's Credential Manager, `poagent`'s Keychain on the Mac Mini) or a `PO_AGENT_*` environment variable.
-- Commit anything from `private/`, or copy real client data into a committed file, a PR, an issue, run output or the Mac Mini (exceptions: the trial POs' identifiers, assumption 2, and the Mac Mini reading the trial POs from the test site, Trial conditions).
+- Commit anything from `private/`, or copy real client data into a committed file, a PR, an issue, run output or the Mac Mini (exceptions: the trial POs' identifiers, assumption 2, and the Mac Mini reading the trial POs from the test site, with each PDF on disk only from its download until it's read, Trial conditions).
 - Push to `main`, force-push or merge. Joey merges.
 
 ## Trial conditions
@@ -321,7 +337,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - The MySys credentials are the **test-site** agent account's. The Anthropic key is dedicated, named `po-agent-trial`, with a low monthly spend limit. Both, and the Mac Mini's GitHub token (this repo only: contents read, issues write), live only in `poagent`'s Keychain.
 - No Claude Code or other AI tool is installed for `poagent`; nothing on the Mac Mini runs a Claude session apart from the reader's API calls.
 - Run output follows the stdout contract (no PO content beyond PO number and pln).
-- No real client data is copied to the Mac Mini during the MVP. The one exception is the **3 trial POs, which are real** (Joey, 16 Oct 2026): runs read their PDFs and Notes from the test site, keep them in memory only and send them to Claude, as on live. Nothing from them is written to the Mac Mini's disk apart from the run output (PO number and pln). **The CEO must confirm decision 2 before the first Mac Mini run that downloads a trial PO** (M3). Other real data stays on the laptop (see below).
+- No real client data is copied to the Mac Mini during the MVP. The one exception is the **3 trial POs, which are real** (Joey, 16 Oct 2026): runs read their PDFs and Notes from the test site, keep them in memory and send them to Claude, as on live. The browser writes every download to disk, so a trial PDF is on the Mac Mini's disk only from its download until it's read into memory, a moment later; leftovers are removed at the next run start (D2, 16 Oct 2026). Nothing else from them is written to the Mac Mini's disk apart from the run output (PO number and pln). **The CEO must confirm decision 2, on these terms, before the first Mac Mini run that downloads a trial PO** (M3). Other real data stays on the laptop (see below).
 - At the end of the trial, Joey unloads the job, revokes the key, has the test password changed and deletes the test items from the Keychain. Live credentials go onto the Mac Mini only after the CEO's go-live sign-off.
 
 ## Real client data
@@ -330,11 +346,11 @@ Joey decided on 14 Oct 2026 that the agent may read real client data (CEO to con
 
 | Allowed | Where it lives | Not allowed |
 |---|---|---|
-| The Claude reader reads real PO PDFs and Note text (Anthropic API, commercial terms) | Only in memory during a run | Anything except the PDF and Note text going to Claude |
+| The Claude reader reads real PO PDFs and Note text (Anthropic API, commercial terms) | In memory during a run; the PDF is on disk only from its download until it's read (D2) | Anything except the PDF and Note text going to Claude |
 | Claude Code on the laptop reads real PDFs, live screenshots and captures to understand the pages and write the screen map | `private/` (git-ignored) | Committing them; putting them in GitHub, an issue, a PR or on the Mac Mini |
 | Joey views live screens with the agent's account by hand: the PO Allocation Pool, real Notes, real PDFs | Screenshots and saved PDFs in `private/` | Any change on live during capture (no Assign, no edits, no bookings) |
 | Real POs as seam-1 test cases, including the 3 trial POs | `private/pdfs/`, `private/fixtures/cases.toml` | Real POs in CI or on the Mac Mini |
-| The 3 trial POs (real) as the test site's trial Notes, booked by the agent | MySys test site; in memory during runs (laptop and Mac Mini); their internal numbers, PO numbers and test plns in docs and run output | Their PDFs, addresses or client names in a committed file, an issue, a PR or run output; their PDFs on the Mac Mini's disk |
+| The 3 trial POs (real) as the test site's trial Notes, booked by the agent | MySys test site; in memory during runs (laptop and Mac Mini); their internal numbers, PO numbers and test plns in docs and run output | Their PDFs, addresses or client names in a committed file, an issue, a PR or run output; their PDFs on the Mac Mini's disk beyond the moment of download (D2) |
 
 - **Bookings still happen only on the test site.** The MVP's code never logs into live; go-live needs the CEO's sign-off after the trial (decision 1).
 - **Turn off model training first:** Joey is on a **Pro** plan, so before Claude Code reads any real data, the model-training setting in claude.ai privacy settings must be off. (The reader's API key is under commercial terms and isn't used for training by default.)
@@ -345,12 +361,12 @@ Joey decided on 14 Oct 2026 that the agent may read real client data (CEO to con
 | Slice | Delivers | Needs |
 |---|---|---|
 | **M0** (by hand, Claude observing) | Test site, with Playwright CLI (Joey clicks, Claude snapshots): the full SOP for 2609017B, and the read-only screens (Note, PDF, project search, project page) for 2609034B and 2610002B; then reset. Checks C1, C3, Send Email Notification screens, MFA/password expiry, how a cancelled task shows. Live, view-only by hand: pool and Note screenshots, the 3 most recent real PO PDFs and their project data into `private/`. Claude writes `docs/screen-map.md` (redacted) | — |
-| **M0b** (by hand, Claude observing; test site) | The screens the screen map is missing: a Compaction Test task's **detail screen** (PO number, documents, Note) and how to open it from the project; **Link to Project**'s search and select screens; a Note with **no attachment** and one with **two**; whether an open Note window refreshes its Assignee, and the Note Pool search by Note ID with the project window open; whether PO Number is prefilled. Claude updates `docs/screen-map.md` and [MySys screen rules](#mysys-screen-rules) | M0 |
-| **M1** Walking skeleton + Mac Mini spike | uv project, config, secrets, output, guard + `guard_check.py`, check command, hooks (incl. the `private/` block and the Playwright CLI allowlist), CI; `po-agent spike`; `scripts/macmini-run.sh` and the launchd plist; Mac Mini set up (`docs/macmini-setup.md`, starting with a test-site login by hand from it); spike passes **on the Mac Mini as `poagent`** | M0 (MFA answer) |
+| **M0b** (by hand, Claude observing; test site) | The screens the screen map is missing: a Compaction Test task's **detail screen** (PO number, documents, Note) and how to open it from the project; **Link to Project**'s search and select screens; a Note with **no attachment** and one with **two**; whether an open Note window refreshes its Assignee, and the Note Pool search by Note ID with the project window open; whether PO Number is prefilled; moving between the Note and project windows, an anchor for every unlabelled control, the Note Pool after a filter change, reload or login, reopening an open project (rows 25–28); whether `fill` alone runs a search; returning a Note to the pool in one Assign or two; whether the upload is saved before Submit. **M0b.1** (rows 21–23, 25–28) comes before M1's spike; **M0b.2** (rows 19, 20, 24) before M4. Claude updates `docs/screen-map.md` and [MySys screen rules](#mysys-screen-rules) | M0 |
+| **M1** Walking skeleton + Mac Mini spike | uv project, config, secrets, output, guard + `guard_check.py`, check command, hooks (incl. the `private/` block and the Playwright CLI allowlist), CI; `po-agent spike`; `scripts/macmini-run.sh` and the launchd plist; Mac Mini set up (`docs/macmini-setup.md`, starting with a test-site login by hand from it); spike passes **on the Mac Mini as `poagent`**, then the job is unloaded until the first bookings (D1) | M0 (MFA answer); M0b.1 before the spike |
 | **M2** Decision seam | `reader_mode` switch (hybrid + deterministic-only), both title rules, both readers, address verify (with the project-address parse), project match rule, agreement, skip reasons; the 3 **fake** fixture POs generated and their mutations; stubbed in CI; live-Claude ×3; **real-PO run** (`-m real_data`, incl. the 3 trial POs); model pinned | M1 |
-| **M3** Decide-only | `run --decide-only`: assign → download → decide → back to pool; NOTE lines; on the laptop, then on the Mac Mini (`scripts/macmini-run.sh decide-only`) | M2, C3, M0b (attachments, assignee check); **CEO decision 2 confirmed** before the Mac Mini run |
+| **M3** Decide-only + run controls | `run --decide-only`: assign → download → decide → back to pool; NOTE lines; on the laptop, then on the Mac Mini (`scripts/macmini-run.sh decide-only`). Before any booking code (D1): `enabled` kill switch, Perth window, run cap, `before_write`, assignee check, stale-Note stop. Plain `run` refuses until M4 | M2, C3, M0b.1; **CEO decision 2 confirmed** before the Mac Mini run |
 | **M4** First booking | Booker W1–W5 with read-back; 2609017B booked from a manual run on the Mac Mini (`launchctl kickstart`); then 2609034B and 2610002B the same way; then the test site reset | M3, C1, M0b (task detail, Link to Project) |
-| **M5** MVP safety | `enabled` kill switch, Perth window, run cap (10 Notes, 12 minutes), assignee check, stop on first failure, `ALERT`s and exit codes, guard-refusal and other seam-2 cases | M4 |
+| **M5** MVP safety | `ALERT`s and exit codes end to end, stop on first failure, guard-refusal and other seam-2 cases (the run controls moved to M3, D1) | M4 |
 | **M6** MVP demo | Test site reset; `/ship` go/no-go; launchd job loaded on the Mac Mini; the 3 trial POs, then a fresh copy of 2609034B as the skip case; reset and repeat (3 demos in a row, S8); cost per PO; one-page demo note for the CEO | M5 |
 
 ## Success Criteria
@@ -371,7 +387,7 @@ Joey decided on 14 Oct 2026 that the agent may read real client data (CEO to con
 1. ~~C1 and C3~~ **Answered on the test site (16 Oct 2026, `docs/decisions.md`):** no Hold-dialog related-task checkbox was pre-ticked (C1), and a Note goes back to the Agent Pool through Assign (C3). Neither blocks M3 or M4. The agent still reads every Hold-dialog checkbox before confirming.
 2. **Does MySys accept a login from the Mac Mini?** It connects from the office internet address. A login by hand in Safari on the Mac Mini answers it first (`docs/macmini-setup.md` section 2), then S1. If blocked or challenged: stop, record it in `docs/decisions.md` and tell the CEO.
 3. **MFA or password expiry** on the test agent account? Unattended runs need neither. **Partly answered (16 Oct 2026):** no MFA step seen at login; password expiry still to confirm with the MySys admin.
-4. **CEO/IT OK** for a private GitHub repo (no real client data; the Mac Mini pulls from it). **CEO to confirm** that Claude may read real client data (decision 2).
+4. **CEO/IT OK** for a private GitHub repo (no real client data; the Mac Mini pulls from it). **CEO to confirm** that Claude may read real client data (decision 2), on the terms in Trial conditions (the trial PDF briefly on disk, D2).
 5. ~~Your Claude plan~~ **Answered:** Pro. The model-training setting must be off before real data is read. (Mac Mini runs don't use the plan; only the reader's API key is billed.)
 6. **Reader model:** pin an exact Sonnet-class model ID in M2; try a Haiku-class model only after it passes seam 1.
 7. ~~Playwright download hosts for the routine's allowlist~~ **No longer needed:** the Mac Mini has no network allowlist (CEO decision 3).

@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 16 Oct 2026)
+# PO Agent — decision log (updated 16 Oct 2026, plan freeze)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -9,6 +9,39 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
+
+## 16 Oct 2026 — MVP plan frozen: decisions D1–D7 (Joey; proposed by Claude after two doubt-driven reviews of `tasks/plan.md`)
+
+`tasks/plan.md` and `tasks/todo.md` are approved. This is the freeze point: from now on a behaviour change needs a dated entry here plus `SPEC.md` and `tasks/plan.md`, in the same commit. `SPEC.md` v1.11, `docs/specs/spec.md` v1.7, `docs/workflow.md` v5.10 and `docs/macmini-setup.md` v1.2 carry the changes.
+
+- **D1 — run controls before booking.** The kill switch, Perth window, run cap and assignee check are built in M3, before any booking code; M5 keeps the alerts and the safety cases. After the S1 spike the Mac Mini job is unloaded, and it is loaded only for the first bookings (plan task 4.6) and from M6. Until then, plain `run` refuses (exit 2). Why: the wrapper pulls `main` every run, so a merge would otherwise deploy booking code to a loaded job with no controls.
+- **D2 — the trial PDF briefly on disk.** Chromium writes every download to disk, so "in memory only" isn't possible. The browser is launched with `downloads_path` set to a run-scoped temp folder. The file is read into memory and deleted at once, the folder is removed in a `finally` block, and leftovers are removed at every run start. W1 uploads from the bytes. FileVault is on. **CEO decision 2 was asked on "in memory only", so Joey tells the CEO before it's confirmed.** `CLAUDE.md` Must never #6 needs Joey's wording change.
+- **D3 — real-page refusal tests can't press anything.** The guard is split into `vet()` (resolve, allow or refuse; no action code) and `act()` (calls `vet()`, then acts on the element `vet()` resolved). Tests on the real site that prove a refusal (Discard, a Hold-dialog checkbox) call only `vet()`; `act()` refusing is tested on local HTML. Recorded as not "targeting" under Must never #2 (Joey adds the wording to `CLAUDE.md`).
+- **D4 — where forbidden strings may appear.** The live host only in `guard_bash.py`'s deny regex (`(?<!test-)prompt\.mysys\.com\.au`) and its test; `ANTHROPIC_API_KEY` only in the secrets test that proves it's ignored; a fake `sk-ant-` string only in the hook test, allowlisted for gitleaks by path. `CLAUDE.md` Must never #3 and Secrets need Joey's wording, #3 before plan task 1.2.
+- **D5 — the denylist on a `<select>`** checks the select's own name plus the label of the option being chosen, never every option's text.
+- **D6 — the stale-Note stop.** At the start of `run` and `run --decide-only`, after login, a Pending Note still assigned to the agent (left by an earlier partial write or failed return) stops the run with an `ALERT` before any Note is taken. This **reverses** SPEC v1.10's "Note left assigned to the agent (so later runs ignore it)": with no state between runs, one systematic bug could otherwise leave a half-booked Note every hour. MySys is the state, so nothing is stored.
+- **D7 — assignee check before W1 and W4 only** (`SPEC.md` §8 and `docs/specs/spec.md` §8 said before every write). Each check leaves the current window for the Note Pool; before W2 that meant leaving a filled, unsubmitted Create New Task form that no screen-map row covers, and then submitting it unchecked. W1 → W2 → W3 now stay in the project window, and `enabled` is still re-read before every step. Cost: a person taking the Note during W1–W3 is caught at W4 as `PARTIAL_WRITE`, which is what the every-write rule gave from W3 on anyway. Option B (keep every write, map the form's round trip, repeat W1's read-back before Submit) was rejected.
+- **One agent at a time** (follows from D7 and the shared agent account): no laptop test-site run while the Mac Mini job is loaded, and no manual Mac Mini run while a laptop run is going.
+- **Plan open questions answered as recommended:**
+  - (2) The dependencies are `playwright`, `pdfplumber`, `anthropic`, `pydantic` and `keyring`; the dev dependencies are `pytest`, `ruff`, `pre-commit`, plus `reportlab` for the fake-PDF generator. Anything else still gets asked.
+  - (3) The allowlist adds login (username, password, "Log in") and the module navigation (Project top tab, Note Pool, Projects sub-tab).
+  - (4) Two new NOTE values for run output only: `"outcome": "skipped", "reason": "DECIDE_ONLY"` and `"outcome": "untouched", "reason": "NOTE_TAKEN"`.
+  - (5) CI installs Chromium for the guard's tests.
+  - (6) `enabled` is re-read before every write step.
+  - (7) The run cap is checked before each new Note, and a Note in progress is finished. Kill-switch and window exits are code 0.
+  - (8) The booker has a test-only `stop_after` parameter; `run` never passes it.
+- **Also fixed in the plan:**
+  - **Guard:** the build check bans the `request` attribute rather than HTTP verb names (which would have caught `download.delete()`). Locator names are matched exactly.
+  - **`Proceed`:** it's frozen and names its `note_id`, internal number and pln.
+  - **Email box:** Send Email Notification is unticked after `before_write`, right before the committing click.
+  - **Test output:** seam-2 and real-PO failure reports are cut to the exception type, so no real data reaches test output. Selecting `-m testsite` explicitly turns a missing secret into an error.
+  - **Spike:** it needs M0b.1 (panel anchors) first.
+  - **Accepted for the MVP:** a short list in `tasks/plan.md` → Risks.
+- **M0b grows:**
+  - M0b.1 adds rows 25–28 (moving between windows, anchors for unlabelled controls, the Note Pool after a filter change, reload or login, and reopening an open project).
+  - M0b.1 also asks whether `fill` alone runs a search, and whether returning a Note to the pool takes one Assign or two.
+  - M0b.2 closes screen-map open item 8 in full and checks whether the upload is saved before Submit.
+  - M0b.1 is now needed before plan task 1.8, the spike.
 
 ## 16 Oct 2026 — The 3 trial POs are real; SPEC fixed against the screen map (Joey; defaults proposed by Claude, accepted by Joey)
 

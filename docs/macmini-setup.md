@@ -1,6 +1,6 @@
 # Mac Mini setup — PO Agent (office Mac Mini, test site first)
 
-**Version:** 1.1 · 16 Oct 2026 (1.1: "This Mac Mini" check for the office's model A3238) · **Owner:** Joey Wu · **Spec:** `SPEC.md` → Trial conditions, Commands · **Decision:** CEO decision 3 (`docs/decisions.md`, 15 Oct 2026; `docs/specs/ADR-002-po-agent-hosting.md`)
+**Version:** 1.2 · 16 Oct 2026 (1.2: plan freeze, decisions D1, D6 and D7: wrapper mode mapping, no run after a failed pull, process-group kill, stderr dropped; job unloaded after the S1 spike and loaded only for the first bookings and from M6; one agent at a time; the stale-Note stop. 1.1: "This Mac Mini" check for the office's model A3238) · **Owner:** Joey Wu · **Spec:** `SPEC.md` → Trial conditions, Commands · **Decision:** CEO decision 3 (`docs/decisions.md`, 15 Oct 2026; `docs/specs/ADR-002-po-agent-hosting.md`)
 Do this in slice **M1**, once `pyproject.toml`, `uv.lock`, `po-agent spike`, `scripts/macmini-run.sh` and `scripts/au.com.prompteng.po-agent.plist` exist on `main`. Section 2 (the test login) can be done today.
 
 The Mac Mini runs the agent for the MVP trial and, after go-live sign-off, for production. During the MVP it holds **test-site credentials only** and no real client data on disk. The one exception: the 3 trial POs are real, and runs read them from the test site in memory (`SPEC.md` → Trial conditions; the CEO confirms decision 2 before the first such run).
@@ -134,11 +134,12 @@ They go into `poagent`'s login Keychain (keyring service `po-agent`; names as `S
 
 1. `git pull --ff-only` on `main` in `~/po-agent`, so `enabled = false` on `main` still stops the next run.
 2. `uv sync --locked`, then `uv run playwright install chromium` (a no-op unless Playwright moved in `uv.lock`).
-3. `uv run po-agent <mode> --site test`, with a 20-minute hard limit.
-4. Appends the run's stdout (the stdout contract only: no PDF text, addresses or Note bodies) to `~/Library/Logs/po-agent/runs.log`, with a timestamp line per run.
+   **If step 1 or 2 fails, the agent doesn't run** (stale code would ignore `enabled = false` on `main`): the wrapper writes a fixed line to `runs.log` and opens the alert issue (exit code 2).
+3. Runs the agent with `--site test` and never `--detailed-log`: mode `run` → `uv run po-agent run`, `spike` → `uv run po-agent spike`, `decide-only` → `uv run po-agent run --decide-only`. It has a 20-minute hard limit. macOS has no GNU `timeout`, so the wrapper implements it, starting the agent in its own process group and killing the whole group (Python and Chromium) at the limit, so nothing is left to overlap the next run.
+4. Appends the run's stdout (the stdout contract only: no PDF text, addresses or Note bodies) to `~/Library/Logs/po-agent/runs.log`, with a timestamp line per run. The agent's stderr goes to `/dev/null`: the agent writes nothing there by design, and a crash's text could quote page content.
 5. If the run printed an `ALERT` line or exited non-zero: `gh issue create --label po-agent-alert`, titled `po-agent alert <run_id, or "no run_id">`, whose body is only the `ALERT` lines and the exit code. GitHub emails Joey.
 
-It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`) because launchd starts jobs with a minimal environment.
+It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`) because launchd starts jobs with a minimal environment, with an optional `MACMINI_RUN_PATH_PREFIX` in front so the wrapper's tests can use stub commands.
 
 **The job** is a LaunchAgent in `poagent`'s own session (not a LaunchDaemon: keyring needs the login Keychain, which is only unlocked while `poagent` is logged in). Label `au.com.prompteng.po-agent`; the plist is in the repo as `scripts/au.com.prompteng.po-agent.plist`:
 
@@ -162,7 +163,9 @@ launchctl print gui/$(id -u)/au.com.prompteng.po-agent | head -30    # state, la
 
 **Spike (M1) and decide-only (M3):** as `poagent` in Terminal, `~/po-agent/scripts/macmini-run.sh spike` (or `decide-only`). Don't start a manual run within a few minutes of :07.
 
-Until M6, load the job only when you want it (use `launchctl bootout` between tests, section 9); leave it loaded from the M6 demo on.
+**When the job is loaded (decision D1, 16 Oct 2026):** after the S1 spike (M1), unload it (`launchctl bootout gui/$(id -u)/au.com.prompteng.po-agent`) and check `launchctl print` no longer finds it. Load it again only for the first bookings (plan task 4.6, unloaded again afterwards) and from M6 on. Until then a merge to `main` can't start a booking run, because nothing is scheduled.
+
+**One agent at a time:** the laptop and the Mac Mini log in as the same agent account, so their checks can't see each other. While the job is loaded, run nothing against the test site from the laptop (seam-2 tests, `run`, `spike`); for a laptop demo, unload the job first and load it again afterwards.
 
 ## 9. Check it worked
 
@@ -191,10 +194,10 @@ Missed runs only delay POs: the Notes stay in the pool, where the admin can hand
 
 Any one of these stops the agent:
 
-1. Set `enabled = false` in `config/test.toml` on `main` (through a PR). The next run pulls it and exits before login. Works from anywhere.
+1. Set `enabled = false` in `config/test.toml` on `main` (through a PR). The next run pulls it and exits before login. Works from anywhere, once the kill switch is built (plan task 3.5); until then, use 2.
 2. On the Mac (or over Remote Login), as an admin: `sudo launchctl bootout gui/$(id -u poagent)/au.com.prompteng.po-agent`, or as `poagent`: `launchctl bootout gui/$(id -u)/au.com.prompteng.po-agent`. No more runs until it's bootstrapped again.
 
-After an `ALERT ACCURACY_BREACH`, do both, and restart only with the CEO's agreement (approved safeguard). After an `ALERT PARTIAL_WRITE`, the Note stays assigned to the agent: finish Hold, Link and Solved by hand on the test site, then reassign nothing (the agent ignores Notes not in the pool).
+After an `ALERT ACCURACY_BREACH`, do both, and restart only with the CEO's agreement (approved safeguard). After an `ALERT PARTIAL_WRITE`, the Note stays assigned to the agent: finish Hold, Link and Solved by hand on the test site, then reassign nothing. While a Pending Note is still assigned to the agent, **every run stops at the start** with an `ALERT` and takes no Note (the stale-Note stop, decision D6), so one bug can't leave a half-booked Note every hour. Once the Note is Solved (or moved off the agent), runs resume.
 
 ## 12. At the end of the trial
 
