@@ -1,8 +1,10 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.10 · 16 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.11 · 17 Oct 2026 · **Owner:** Joey Wu
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
+
+**v5.11:** the agent-skills commands need their full names (`/agent-skills:build`, `/agent-skills:test`, `/agent-skills:spec`, `/agent-skills:ship`, `/agent-skills:code-simplify`): a bare `/build` is "Unknown command". Stage 5 step 3 now has the exact prompts per slice, naming each task by number ("the next unchecked task" would pick a by-hand one), and the M1 task order. Appendix B: the `Unknown command` fix and `claude doctor`.
 
 **v5.10:** the plan freeze (Stage 4.4, 16 Oct 2026; decisions D1–D7 in `docs/decisions.md`):
 
@@ -47,17 +49,17 @@
 
 ## The skills plan
 
-**Why Addy's skills as the base:** they cover the whole lifecycle with a human checkpoint at each phase, the spec is already in their format (`SPEC.md`), and `/build` works test-first in small committed slices, which is what a safety-critical booking agent needs. Matt Pocock's set is strongest on requirements and TDD, which Addy's already covers, so installing both in full would give two skills for the same job competing to run. Only Pocock's architecture review adds something Addy's set doesn't have.
+**Why Addy's skills as the base:** they cover the whole lifecycle with a human checkpoint at each phase, the spec is already in their format (`SPEC.md`), and `/agent-skills:build` works test-first in small committed slices, which is what a safety-critical booking agent needs. Matt Pocock's set is strongest on requirements and TDD, which Addy's already covers, so installing both in full would give two skills for the same job competing to run. Only Pocock's architecture review adds something Addy's set doesn't have.
 
 | Phase | Skill (command) | Use in this project | When |
 |---|---|---|---|
 | Meta | `using-agent-skills` | **Yes**, automatic | Routes each request to the right skill |
-| Define | `spec-driven-development` (`/spec`) | **Done** (`SPEC.md`); again for every later change | Stage 4; Stage 8 |
+| Define | `spec-driven-development` (`/agent-skills:spec`) | **Done** (`SPEC.md`); again for every later change | Stage 4; Stage 8 |
 | Define | `interview-me` | **Yes**, for open questions you're unsure about | Stage 4 |
 | Define | `idea-refine` | Skip | The idea is settled |
 | Plan | `planning-and-task-breakdown` (`/agent-skills:plan`; plain `/plan` is Claude Code's plan-mode command) | **Yes** | Stage 4 |
-| Build | `incremental-implementation` (`/build`) | **Yes**, every task | Stage 5 |
-| Build | `test-driven-development` (`/test`) | **Yes**, every task (test first) | Stage 5 |
+| Build | `incremental-implementation` (`/agent-skills:build`) | **Yes**, every task | Stage 5 |
+| Build | `test-driven-development` (`/agent-skills:test`) | **Yes**, every task (test first) | Stage 5 |
 | Build | `context-engineering` | **Yes**: keeps `CLAUDE.md` true to the code | After M1; whenever CLAUDE.md drifts |
 | Build | `source-driven-development` | **Yes**: Playwright, Anthropic SDK (structured output, model IDs) and pdfplumber change between versions; build from their docs, with citations | M1, M2, M4 |
 | Build | `doubt-driven-development` | **Yes**: a fresh-context challenge of the risky decisions | The plan (Stage 4); before the first write (M4) |
@@ -68,13 +70,13 @@
 | Verify | `debugging-and-error-recovery` | **Yes** | Any failure that isn't obvious |
 | Review | `code-review-and-quality` (`/agent-skills:review`; plain `/review` is Claude Code's built-in) | **Yes**, every PR | Stage 5 |
 | Review | `security-and-hardening` | **Yes** | M1 (secrets, hooks), M4 (first write), before M6, before production |
-| Review | `code-simplification` (`/code-simplify`) | **Yes**, once | After M6 |
+| Review | `code-simplification` (`/agent-skills:code-simplify`) | **Yes**, once | After M6 |
 | Review | `performance-optimization` (`/webperf`) | Skip | Web-page performance; not relevant |
 | Ship | `git-workflow-and-versioning` | **Yes**, automatic | Branch per task, small commits |
 | Ship | `ci-cd-and-automation` | **Yes** | M1 (CI) |
 | Ship | `documentation-and-adrs` | **Yes** | Decision entries; a new ADR for any later hosting or design change (ADR-002 is Accepted: the Mac Mini) |
 | Ship | `observability-and-instrumentation` | Light | M5 (run output, alerts); v1 alerts |
-| Ship | `shipping-and-launch` (`/ship`) | **Yes** | Before the MVP demo (M6); before production |
+| Ship | `shipping-and-launch` (`/agent-skills:ship`) | **Yes** | Before the MVP demo (M6); before production |
 | Ship | `deprecation-and-migration` | Later | Moving off the Mac Mini, if that's ever needed |
 | Tutorial | Loop engineering (nightly self-fixing job) | **Skip** | An autonomous job changing booking code is too risky here |
 | **Matt Pocock** | `improve-codebase-architecture` | **Yes, after the MVP** | Stage 8: before v1 and before automation #2, to shape the shared MySys package |
@@ -90,17 +92,17 @@
 
 So Addy's skills stay the workflow, and `improve-codebase-architecture` is used where it's the better tool: once after the MVP works, and again before automation #2 (Stage 8).
 
-**Build pace (`/build` vs `/build auto`):**
+**Build pace (`/agent-skills:build` vs `/agent-skills:build auto`):**
 
 | Slice | Pace | Why |
 |---|---|---|
 | M0b screens still to map (Stage 3E) | By hand: you click, Claude observes | No code; M0b.1 before task 1.8, M0b.2 before M4 |
-| M1 walking skeleton (guard, secrets, hooks) | `/build`, one task at a time, plan mode first | The guard and the hooks protect everything after |
-| M2 decision seam | `/build auto` once M1's guardrails are merged | Offline, well specified, test-first |
-| M3 decide-only | `/build`, one task at a time | First run that assigns and returns Notes |
-| M4 first booking | `/build`, one task at a time, plan mode first, plus `doubt-driven-development` | First write to MySys |
-| M5 MVP safety | `/build`, one task at a time | Stops, alerts, exit codes |
-| M6 demo | By hand, with `/ship` | Your go/no-go |
+| M1 walking skeleton (guard, secrets, hooks) | `/agent-skills:build`, one task at a time, plan mode first | The guard and the hooks protect everything after |
+| M2 decision seam | `/agent-skills:build auto` once M1's guardrails are merged | Offline, well specified, test-first |
+| M3 decide-only | `/agent-skills:build`, one task at a time | First run that assigns and returns Notes |
+| M4 first booking | `/agent-skills:build`, one task at a time, plan mode first, plus `doubt-driven-development` | First write to MySys |
+| M5 MVP safety | `/agent-skills:build`, one task at a time | Stops, alerts, exit codes |
+| M6 demo | By hand, with `/agent-skills:ship` | Your go/no-go |
 
 ---
 
@@ -109,7 +111,7 @@ So Addy's skills stay the workflow, and `improve-codebase-architecture` is used 
 | Question | Answer | Why |
 |---|---|---|
 | GitHub or local? | **Private GitHub repo.** Required: the Mac Mini pulls `main` from GitHub and opens alert issues there. Get the OK from CEO/IT (no credentials, PDFs or addresses in it; only the 3 trial POs' internal numbers, PO numbers and test plns, 16 Oct 2026). | The Mac Mini, CI on every push, PRs for review. |
-| Where's the plan? | `tasks/plan.md` and `tasks/todo.md`, written by `/agent-skills:plan`. | The skills' default; `/build` reads them. |
+| Where's the plan? | `tasks/plan.md` and `tasks/todo.md`, written by `/agent-skills:plan`. | The skills' default; `/agent-skills:build` reads them. |
 | Parallel agents / worktrees? | **No.** Tasks run in order. | Serial chain; easier to trust the guard. |
 | Hooks? | **Yes, created in M1**, then changed only by Joey. | Must-never rules enforced in code, not advice. |
 | Evals? | **The seam 1 fixture set is the eval suite**, plus the real-PO set on the laptop. Every bug adds a fixture. | Proves "zero false PROCEED". |
@@ -245,7 +247,7 @@ playwright-cli --help
 What are the must-never rules, what's the check command, and what's the active spec? Which agent-skills commands are available?
 ```
 
-✓ All 9 rules, `uv run scripts/check.py`, `SPEC.md`, and `/spec`, `/agent-skills:plan`, `/build`, `/test`, `/agent-skills:review`, `/code-simplify`, `/ship`. (`/plan` and `/review` on their own are Claude Code's built-ins.) Then `/exit`.
+✓ All 9 rules, `uv run scripts/check.py`, `SPEC.md`, and `/agent-skills:spec`, `/agent-skills:plan`, `/agent-skills:build`, `/agent-skills:test`, `/agent-skills:review`, `/agent-skills:code-simplify`, `/agent-skills:ship`. Type them with the `agent-skills:` prefix: the bare names are "Unknown command" or Claude Code's built-ins (`/plan`, `/review`). Then `/exit`.
 
 ---
 
@@ -473,22 +475,43 @@ Fix what it finds and repeat until the answer is "nothing".
    git switch -c m1-walking-skeleton
    ```
 
-2. **Fresh session:** `claude`. One task per session (or one `/build auto` run for an "auto" group).
+2. **Fresh session:** `claude`. One task per session (or one `/agent-skills:build auto` run for an "auto" group).
 3. **Build.**
-   - **"step" tasks** (M1, M3, M4, M5): press **Shift+Tab** to **plan mode on**, ask Claude to plan the task (files, tests, risks, which must-never rule is at stake), approve, then:
+   Type the plugin's full name, `/agent-skills:build` (a bare `/build` is "Unknown command"). Name the task by its number: "the next unchecked task" would pick F.3, F.5 or M0b, which are by hand. By-hand tasks (M0b, 1.10, 3.4, 4.6, M6) are never built with `/agent-skills:build`.
+
+   - **"step" tasks** (M1, M3, M4, M5): press **Shift+Tab** to **plan mode on**, then:
 
      ```text
-     /build the next unchecked task in tasks/todo.md
-     Done means: the task's acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed". Stop at the test-first pause, as CLAUDE.md says.
+     Plan task <N> from tasks/plan.md: the files, the failing test you'll write first, the risks, and which CLAUDE.md must-never rule is at stake. Don't write anything yet.
      ```
 
-   - **"auto" tasks** (M2, after M1 is merged): `/build auto` for the M2 tasks only. It still works test-first and commits each task, and pauses on failures or risky steps.
-   - **M1:** add `Follow "Appendix A — M1 build notes" in docs/workflow.md.`
-   - **M2:** the 3 seam-1 fixture PDFs are **generated fakes**, never the trial PDFs (they're real). The generator needs a new dependency: Claude asks you first.
-   - **M1, M2, M4** (Playwright, Anthropic SDK, pdfplumber): add `Use the source-driven-development skill: build from the current official docs for each library call and cite them.`
-   - **M4** (first write to MySys): before building, in a fresh session, `Use the doubt-driven-development skill on the booker design in tasks/plan.md against docs/screen-map.md.`
+     Approve the plan (that turns plan mode off), then:
+
+     ```text
+     /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md).
+     <the extra lines for this slice, from the table below>
+     Done means: task <N>'s acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed". Stop at the test-first pause, as CLAUDE.md says.
+     ```
+
+     | Slice | Tasks, in this order | Extra lines | Before you start |
+     |---|---|---|---|
+     | M1 | 1.1, 1.2, 1.3, 1.5, 1.4, 1.6, 1.7, 1.8, 1.9 | `Follow "Appendix A — M1 build notes" in docs/workflow.md.` and `Use the source-driven-development skill: build from the current official docs for each library call and cite them.` | 1.2: F.3 done (CLAUDE.md #3 merged). 1.8: M0b.1 merged |
+     | M3 | 3.1, 3.2, 3.3, 3.5, 3.6 | none | M2 merged; M0b.1 merged; test site reset (6.1) |
+     | M4 | 4.1, 4.2, 4.3, 4.4, 4.5 | `Use the source-driven-development skill: build from the current official docs for each library call and cite them.` | M0b.2 merged; the doubt review below; 4.1: PO Documents confirmed with the PO admin (SPEC open question 11); test site reset |
+     | M5 | 5.1, 5.2 | none | M4 merged |
+
+   - **"auto" tasks** (M2, after M1 is merged): no plan mode, one session for the whole slice:
+
+     ```text
+     /agent-skills:build auto tasks 2.1 to 2.6 in tasks/todo.md, in order, and stop after 2.6.
+     Use the source-driven-development skill: build from the current official docs for each library call and cite them.
+     The seam-1 fixture PDFs are generated fakes, never the trial PDFs in private/.
+     Done means: each task's acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed" after each one. Stop at every failing test and at the ask-first points in tasks/plan.md: the generator dependency (2.1), the address rules (2.4), the Claude prompt and model ID (2.5), the prices (2.6).
+     ```
+
+   - **M4 doubt review** (first write to MySys): before task 4.1, in a fresh session: `Use the doubt-driven-development skill on the booker design in tasks/plan.md against docs/screen-map.md.`
 4. **Test-first pause.** Claude shows a failing test and stops. If it tests what the task and spec say: `Test looks right. Commit it and continue.`
-5. **Verify.** `/test` to run the suite. ✓ `check: all passed`. If readers, prompt or model changed: `false PROCEED: 0` from the live-Claude seam (and the real-PO seam on the laptop). If `mysys/` or the booker changed: seam 2 result on the test site (reset first, Stage 6.1).
+5. **Verify.** `/agent-skills:test` to run the suite. ✓ `check: all passed`. If readers, prompt or model changed: `false PROCEED: 0` from the live-Claude seam (and the real-PO seam on the laptop). If `mysys/` or the booker changed: seam 2 result on the test site (reset first, Stage 6.1).
 6. **Debug** anything not obvious: `Use the debugging-and-error-recovery skill on this: <paste the error>`.
 7. **Review:**
 
@@ -558,7 +581,7 @@ Change the expected result in one seam-1 fixture.
 | After 4.4 (freeze), before the first build | The planning chat is long and no longer needed |
 | The session is getting long, or two fixes in a row have failed | Ask for a handoff in the PR description first, then clear |
 
-**Don't clear:** mid-task, including at the test-first pause (you approve, Claude carries on with the test in mind); during a `/build auto` run; or while a debugging session is still making progress. If Claude Code starts summarising older turns on its own, finish the current task and clear at the next task boundary.
+**Don't clear:** mid-task, including at the test-first pause (you approve, Claude carries on with the test in mind); during a `/agent-skills:build auto` run; or while a debugging session is still making progress. If Claude Code starts summarising older turns on its own, finish the current task and clear at the next task boundary.
 
 ### When something goes sideways
 
@@ -584,7 +607,7 @@ Change the expected result in one seam-1 fixture.
 
 ## Stage 7 — MVP demo (M6)
 
-1. **Go/no-go checklist:** in Claude Code, `/ship` — `Prepare the go/no-go for the MVP demo on the test site: checklist against SPEC.md S1–S8, the rollback (launchctl bootout; enabled = false), and what to watch in the first run.` You decide go or no-go.
+1. **Go/no-go checklist:** in Claude Code, `/agent-skills:ship` — `Prepare the go/no-go for the MVP demo on the test site: checklist against SPEC.md S1–S8, the rollback (launchctl bootout; enabled = false), and what to watch in the first run.` You decide go or no-go.
 2. **Rehearse stopping:** set `enabled = false` in `config/test.toml` (PR, merge), start a run with `launchctl kickstart` and check it exits before login; set it back to `true`. Check `launchctl bootout` stops the job, then bootstrap it again.
 3. **Reset** the test site (6.1). As B1 Homes, place the 3 trial Notes in the Agent Pool. Only the 3 trial POs are used; leave any non-`/048` Note that's already in the pool where it is.
 4. **Load the launchd job** (`docs/macmini-setup.md` section 8). Don't touch anything until the next run has finished.
@@ -598,7 +621,7 @@ Change the expected result in one seam-1 fixture.
 
 ## Stage 8 — After the MVP
 
-1. **Simplify:** `/code-simplify` on the MVP code, one PR, behaviour unchanged (check, seam 1 and seam 2 must pass).
+1. **Simplify:** `/agent-skills:code-simplify` on the MVP code, one PR, behaviour unchanged (check, seam 1 and seam 2 must pass).
 2. **Architecture review with Matt Pocock's `improve-codebase-architecture`** — once now (before v1 hardening), and again before automation #2, when the driver, guard, run controller and output contract become the shared MySys package (roadmap phase 6).
    - **Install only what it needs**, picking these four in the installer's list (choose Claude Code as the agent if it asks): `improve-codebase-architecture`, `codebase-design`, `grilling`, `domain-modeling`.
 
@@ -607,10 +630,10 @@ Change the expected result in one seam-1 fixture.
      ```
 
    - **Run it** in a fresh session: `/improve-codebase-architecture`. Tell it: *ADRs live in `docs/specs/` as `ADR-NNN-<name>.md`; the glossary is in `docs/specs/README.md`; the must-never rules in CLAUDE.md and the action guard are fixed.* It writes an HTML report of "deepening" candidates (shallow modules to merge into deeper ones), then grills you on the one you pick.
-   - Turn the chosen change into work the Addy way: `/spec` (a short change spec) → `/agent-skills:plan` → `/build`.
+   - Turn the chosen change into work the Addy way: `/agent-skills:spec` (a short change spec) → `/agent-skills:plan` → `/agent-skills:build`.
    - **Remove the four skills afterwards** (the installer's remove command, or delete their folders from your user skills folder) so `grilling` and `domain-modeling` don't compete with Addy's skills day to day.
-3. **v1 hardening** (roadmap phase 2): for each change, `/spec` on a new `intent/<change>/` folder, then Stages 4–5. Use `observability-and-instrumentation` for the v1 alerts and logs.
-4. **Production on the Mac Mini** (roadmap phase 4; CEO decision 3 made): live credentials into `poagent`'s Keychain after the go-live sign-off, `/ship` plus `engineering:deploy-checklist` in Cowork.
+3. **v1 hardening** (roadmap phase 2): for each change, `/agent-skills:spec` on a new `intent/<change>/` folder, then Stages 4–5. Use `observability-and-instrumentation` for the v1 alerts and logs.
+4. **Production on the Mac Mini** (roadmap phase 4; CEO decision 3 made): live credentials into `poagent`'s Keychain after the go-live sign-off, `/agent-skills:ship` plus `engineering:deploy-checklist` in Cowork.
 
 ---
 
@@ -699,7 +722,8 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 | Push refused with `GH007` (private email) | GitHub is hiding your email. Use the noreply address from GitHub → Settings → Emails: `git config --global user.email "<id>+PromptEngineeringAI01@users.noreply.github.com"`, then `git commit --amend --reset-author --no-edit` and push again. |
 | `&&` "is not a valid statement separator" | Run the commands on separate lines. |
 | `/plan` says "Already in plan mode" or "Enabled plan mode", and writes no plan | That's Claude Code's built-in `/plan`. Turn plan mode off (Shift+Tab) and type `/agent-skills:plan …`. Same for `/review` → `/agent-skills:review`. |
-| `/agent-skills:plan`, `/build` not listed | `/reload-plugins`, or `/exit` and start `claude` again. Check `claude plugin list`. |
+| `Unknown command: /build` (or `/test`, `/spec`, `/ship`, `/code-simplify`) | Type the full name: `/agent-skills:build` and so on. If the full name is unknown too: `/reload-plugins`, or `/exit` and start `claude` again; check `claude plugin list`. |
+| Claude Code itself misbehaves (won't start or update, a plugin or `.claude/settings.json` doesn't load) | In PowerShell, outside Claude Code: `claude doctor`. It checks the install, the updater and the settings files. |
 | Every skill appears twice | You installed agent-skills both as a plugin and with `npx skills`. Remove one. |
 | `playwright-cli` "not recognized" | Close and reopen the terminal after installing Node.js; check `npm install -g @playwright/cli@latest` finished. |
 | `playwright-cli open` says the browser is missing | Follow the install command it prints, then open again. |
@@ -718,19 +742,19 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 |---|---|
 | Not sure which skill | `Use the using-agent-skills skill to pick one.` |
 | An open question you can't answer yet | `Use the interview-me skill on …` |
-| A change to what the agent does | `/spec` (new `intent/<change>/` folder) |
+| A change to what the agent does | `/agent-skills:spec` (new `intent/<change>/` folder) |
 | Spec → plan and tasks | `/agent-skills:plan` (plan mode off) |
 | Challenge a plan or a risky design in a fresh session | `Use the doubt-driven-development skill on …` |
-| Build the next task (test-first, small commits) | `/build` (or `/build auto` for "auto" tasks) |
+| Build a task (test-first, small commits) | `/agent-skills:build task <N>` (or `/agent-skills:build auto` for the M2 tasks); Stage 5 step 3 |
 | Library calls (Playwright, Anthropic SDK, pdfplumber) | `Use the source-driven-development skill …` |
 | Map or re-check a MySys screen | Playwright CLI: you click, Claude runs `snapshot` / `screenshot` (Stage 3A; the M0b screens in 3E) |
-| Run and prove it | `/test` |
+| Run and prove it | `/agent-skills:test` |
 | Something fails and it isn't obvious | `Use the debugging-and-error-recovery skill on …` |
 | Before every PR | `/agent-skills:review` (+ `security-and-hardening` for M1, M4, M5) |
 | CLAUDE.md out of date | `Use the context-engineering skill …` |
-| After the MVP works | `/code-simplify` |
+| After the MVP works | `/agent-skills:code-simplify` |
 | Before automation #2 / before v1 | Matt Pocock's `/improve-codebase-architecture` (Stage 8) |
-| Before the MVP demo and before production | `/ship` (+ `engineering:deploy-checklist` in Cowork for production) |
+| Before the MVP demo and before production | `/agent-skills:ship` (+ `engineering:deploy-checklist` in Cowork for production) |
 | A hosting or design decision to record | `Use the documentation-and-adrs skill` (ADRs in `docs/specs/`) |
 | Skip | `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`, `idea-refine`, loop engineering, parallel worktrees |
 

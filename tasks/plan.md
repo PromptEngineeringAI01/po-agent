@@ -39,7 +39,7 @@ Each needs a dated `docs/decisions.md` entry and the SPEC change, in the freeze 
 
 ## Cross-cutting rules (apply to every task)
 
-- **TDD (CLAUDE.md):** write the failing test, run it, show it fails for the expected reason, then stop for Joey. The test goes in its own `test:` commit, then the code. CLAUDE.md wins over `/build auto`: in M2, auto still stops at each failing test (Open question 9).
+- **TDD (CLAUDE.md):** write the failing test, run it, show it fails for the expected reason, then stop for Joey. The test goes in its own `test:` commit, then the code. CLAUDE.md wins over `/agent-skills:build auto`: in M2, auto still stops at each failing test (Open question 9).
 - **Done means:** `uv run scripts/check.py` ends with `check: all passed`, and its output is shown. If a task touches readers, prompt, model or address rules: ask Joey first, then run the live-Claude seam and show `false PROCEED: 0`. The live seam exists only from 2.5, so 2.2–2.4 are done on the stubbed seam, and 2.5's first live run covers them (say so in each PR). If a task touches `mysys/` or the booker: run seam 2 on the test site, or ask Joey to run it (reset first, workflow 6.1).
 - **References.** "workflow 6.1" means `docs/workflow.md` section 6.1 (the test-site reset). A bare number such as 4.3 is a task in this plan.
 - **No real data in output.** Test-site and real-PO tests must never print an address, client name, PDF text or Note body: not in assertion messages, not in reports, not in run output. Assert on booleans, counts, enum values and the trial identifiers only, because pytest's assertion rewriting prints compared values. Test-site captures count as real data.
@@ -79,12 +79,12 @@ Serial, one task per session, no parallel agents (`docs/workflow.md` → Decisio
 | Slice | Pace |
 |---|---|
 | M0b | **by hand**: Joey clicks, Claude observes, no code |
-| M1 | **step**: `/build`, one task at a time, plan mode first; follow Appendix A; source-driven-development for library calls |
-| M2 | **auto**: `/build auto` once M1 is merged. It pauses at each failing test (TDD) and at the ask-first points: generator dependency (2.1), address rules (2.4), Claude prompt and model ID (2.5), prices (2.6) |
+| M1 | **step**: `/agent-skills:build`, one task at a time, plan mode first; follow Appendix A; source-driven-development for library calls |
+| M2 | **auto**: `/agent-skills:build auto` once M1 is merged. It pauses at each failing test (TDD) and at the ask-first points: generator dependency (2.1), address rules (2.4), Claude prompt and model ID (2.5), prices (2.6) |
 | M3 | **step** |
 | M4 | **step**, plan mode first; `doubt-driven-development` on the booker design (fresh session) before 4.1 |
 | M5 | **step** |
-| M6 | **by hand**, with `/ship` |
+| M6 | **by hand**, with `/agent-skills:ship` |
 
 Tasks inside a code slice that Joey does himself (1.10, 3.4, 4.6) are marked **by hand**. M3 (3.5, 3.6) and M5 are step pace.
 
@@ -582,7 +582,7 @@ The run controls and the assignee check moved to M3 (3.5, 3.6) under D1. M5 now 
 ## Phase M6: MVP demo (by hand)
 
 ### 6.1 Go/no-go and stop rehearsal · by hand
-**Acceptance:** `/ship` checklist against S1–S8 with the rollback (`launchctl bootout`; `enabled = false`) is written and Joey decides go. The job is loaded again (`launchctl bootstrap`; it was unloaded after 4.6, D1). `enabled = false` merged → `launchctl kickstart` exits before login (S6). Set back to `true`. `bootout` stops the job and `bootstrap` restores it.
+**Acceptance:** `/agent-skills:ship` checklist against S1–S8 with the rollback (`launchctl bootout`; `enabled = false`) is written and Joey decides go. The job is loaded again (`launchctl bootstrap`; it was unloaded after 4.6, D1). `enabled = false` merged → `launchctl kickstart` exits before login (S6). Set back to `true`. `bootout` stops the job and `bootstrap` restores it.
 **Verify:** `runs.log` shows the exit-before-login run. **Files:** `config/test.toml` (two PRs, by Joey's choice).
 
 ### 6.2 Demo 1: scheduled run, then the skip · by hand
@@ -599,7 +599,7 @@ The run controls and the assignee check moved to M3 (3.5, 3.6) under D1. M5 now 
 
 ### Checkpoint: Complete
 - [ ] S1–S8 met; three demos in a row; CEO note sent.
-- [ ] Next: `docs/workflow.md` Stage 8 (`/code-simplify`, architecture review).
+- [ ] Next: `docs/workflow.md` Stage 8 (`/agent-skills:code-simplify`, architecture review).
 
 ---
 
@@ -649,7 +649,7 @@ Found in the 16 Oct 2026 reviews and accepted for a 3-PO trial on the test site.
 6. ~~**Kill switch mid-run:**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** re-read `enabled` from `config/test.toml` before each write step (`controls.before_write`, 3.5), as §8 says (it only matters for laptop runs; the Mac Mini reads `main` once per run). Recommended: yes.
 7. ~~**Run cap:**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** checked before each new Note; a Note in progress is finished. Kill switch and window exits are exit code 0. Recommended: yes.
 8. ~~**Booker `stop_after`**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** (test-only parameter) so seam-2 can test W1, W2 and W3 one at a time. Recommended: yes. Without it, every booker test is a full booking, and a failure is harder to pin to a step. `run` never passes it (a test asserts that).
-9. ~~**TDD stop vs `/build auto` in M2.**~~ **Answered (Joey, 16 Oct 2026):** keep the stop (CLAUDE.md wins); auto only chains the M2 tasks.
+9. ~~**TDD stop vs `/agent-skills:build auto` in M2.**~~ **Answered (Joey, 16 Oct 2026):** keep the stop (CLAUDE.md wins); auto only chains the M2 tasks.
 10. ~~**Proposed D7: run the assignee check before W1 and W4 only, not before each of W1–W5.**~~ **Answered (Joey, 16 Oct 2026): option A**, applied as D7 (Decisions table, 3.5, 3.6, 4.5, 5.2). The write-up below is kept for the decisions entry.
     - **Context.** SPEC → §8 run controls, SPEC → MySys screen rules ("Assignee check (§8), before each of W1–W5") and `docs/specs/spec.md` §8 ("before each write") all ask for a fresh Note Pool read before every write. Each read leaves the window the booker is in, goes to the Note Pool, and comes back (row 25).
       - **Before W2**, the check leaves a filled, unsubmitted Create New Task form with the PDF already uploaded. No screen-map row records whether the form survives that trip. Submit then fires without a fresh read-back. This is the riskiest step in the plan, and the first write only Joey can undo.
