@@ -2,6 +2,7 @@
 
 import importlib.util
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -22,6 +23,20 @@ def check_script():
     return module
 
 
+@pytest.fixture(autouse=True)
+def no_outer_git_env(monkeypatch):
+    # Inside a git hook, git sets these for the outer repo. Without this, the
+    # temp repos' `git add` would stage fake files into this repo's index.
+    for name in (
+        "GIT_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_WORK_TREE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_COMMON_DIR",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
 def make_repo(root: Path, staged: list[str], unstaged: tuple[str, ...] = ()) -> Path:
     """A temp git repo with `staged` files in the index (no commit needed)."""
     subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -37,6 +52,11 @@ def make_repo(root: Path, staged: list[str], unstaged: tuple[str, ...] = ()) -> 
 CLEAN = [
     "README.md",
     "src/x.py",
+    "src/po_agent/core/secrets.py",
+    "config/test.toml",
+    ".github/workflows/check.yml",
+    ".pre-commit-config.yaml",
+    "docs/screen-map/row02.yml",
     "tests/seam1/fixtures/pdfs/a.pdf",
     "tests/seam1/fixtures/pdfs/sub/B.PDF",
 ]
@@ -50,7 +70,11 @@ def test_clean_repo_has_no_violations(tmp_path, check_script):
 @pytest.mark.parametrize(
     "bad",
     [
+        # banned folders, at any depth, any case
         "private/notes.txt",
+        "Private/notes.txt",
+        "LOGS/run.jsonl",
+        "src/Traces/x.py",
         "logs/run.jsonl",
         "state/s.json",
         ".playwright-cli/snap.yml",
@@ -59,13 +83,33 @@ def test_clean_repo_has_no_violations(tmp_path, check_script):
         "src/state/x.py",
         "src/.state/x.py",
         "src/traces/x.py",
+        # PDFs outside the fixtures folder
         "po.pdf",
         "docs/PO.Pdf",
         "tests/seam1/fixtures/a.pdf",
+        # traces and captures, any case
         "trace.zip",
+        "TRACE.ZIP",
         "out/run.trace.zip",
         "net.har",
         "rec.webm",
+        "net.HAR",
+        # secret files, at any depth, any case; no .env.example exception
+        ".env",
+        ".env.local",
+        ".env.example",
+        "config/.ENV",
+        "secrets/key.txt",
+        "src/Secrets/key.txt",
+        "config/live.toml",
+        "config/Live-prod.TOML",
+        # images anywhere (screen captures are real data)
+        "docs/screen-map/row02.png",
+        "shot.PNG",
+        "a.jpg",
+        "b.JPEG",
+        "c.webp",
+        "d.gif",
     ],
 )
 def test_each_bad_path_is_named(tmp_path, check_script, bad):
@@ -119,6 +163,58 @@ def test_steps_are_in_spec_order(check_script):
         "repo data",
         f'pytest tests -m "{PYTEST_MARKERS}"',
     ]
+
+
+def test_steps_run_the_spec_commands(monkeypatch, check_script):
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs.get("cwd")))
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(check_script.subprocess, "run", fake_run)
+    command_steps = [run for name, run in check_script.STEPS if name != "repo data"]
+    for run in command_steps:
+        assert run() is True
+
+    python_m = [sys.executable, "-m"]
+    assert calls == [
+        ([*python_m, "ruff", "format", "--check", "."], check_script.ROOT),
+        ([*python_m, "ruff", "check", "."], check_script.ROOT),
+        ([*python_m, "pytest", "tests", "-m", PYTEST_MARKERS], check_script.ROOT),
+    ]
+
+
+def test_command_step_fails_on_nonzero_exit(monkeypatch, check_script):
+    monkeypatch.setattr(
+        check_script.subprocess,
+        "run",
+        lambda args, **kwargs: subprocess.CompletedProcess(args, 1),
+    )
+    _, ruff_format = check_script.STEPS[0]
+    assert ruff_format() is False
+
+
+def test_repo_data_step_fails_and_names_the_path(
+    tmp_path, monkeypatch, capsys, check_script
+):
+    repo = make_repo(tmp_path, [*CLEAN, "private/notes.txt"])
+    monkeypatch.setattr(check_script, "ROOT", repo)
+    repo_data = dict(check_script.STEPS)["repo data"]
+
+    assert repo_data() is False
+    assert "repo-data: private/notes.txt: " in capsys.readouterr().out
+
+
+def test_repo_data_step_passes_on_a_clean_repo(
+    tmp_path, monkeypatch, capsys, check_script
+):
+    repo = make_repo(tmp_path, CLEAN)
+    monkeypatch.setattr(check_script, "ROOT", repo)
+    repo_data = dict(check_script.STEPS)["repo data"]
+
+    assert repo_data() is True
+    assert "repo-data:" not in capsys.readouterr().out
 
 
 def test_project_config():
