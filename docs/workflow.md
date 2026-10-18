@@ -1,8 +1,10 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.10 · 16 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.11 · 19 Oct 2026 · **Owner:** Joey Wu
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
+
+**v5.11:** Appendix A's repo-data check also bans `.state/` and `traces/`, matches the banned folders at any depth, and catches `*trace*.zip` (decisions, 19 Oct 2026).
 
 **v5.10:** the plan freeze (Stage 4.4, 16 Oct 2026; decisions D1–D7 in `docs/decisions.md`):
 
@@ -621,7 +623,7 @@ Change the expected result in one seam-1 fixture.
 1. `ruff format --check .`
 2. `ruff check .`
 3. `python scripts/guard_check.py` (no browser action calls outside `act()` in `src/po_agent/mysys/guard.py`; the full banned list is in `tasks/plan.md` task 1.4)
-4. Repo-data check: no tracked path under `private/`, `logs/`, `state/` or `.playwright-cli/`; no `.pdf` (any case) outside `tests/seam1/fixtures/pdfs/`; no trace or capture file (`trace*.zip`, `*.har`, `*.webm`)
+4. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/` or `.playwright-cli/`, at any depth; no `.pdf` (any case) outside `tests/seam1/fixtures/pdfs/`; no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`)
 5. `pytest tests -m "not live_claude and not testsite and not real_data"`
 
 **Secrets:** `src/po_agent/core/secrets.py` reads `PO_AGENT_<NAME>` from the environment, else keyring service `po-agent`. Names: `anthropic_api_key`, `mysys_test_username`, `mysys_test_password`. Never `ANTHROPIC_API_KEY`.

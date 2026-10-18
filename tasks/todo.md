@@ -25,7 +25,7 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 ## M1 — walking skeleton + Mac Mini spike
 
-- [ ] **1.1** uv project and `scripts/check.py` (ruff, repo-data rule incl. `logs/`, `state/`, traces, any-case `.pdf`; pytest markers) · step
+- [x] **1.1** uv project and `scripts/check.py` (ruff, repo-data rule incl. `logs/`, `state/`, traces, any-case `.pdf`; pytest markers) · step
 - [ ] **1.2** Claude Code hooks + tests (live-host regex anchored so the test host passes); `.claude/settings.json` as the last edit · step · needs F.3 (#3)
 - [ ] **1.3** Pre-commit (gitleaks + repo-data rule; `.gitleaks.toml` for the hook test's fake key) and CI `check.yml` (+ Chromium) · step
 - [ ] **1.5** Config (`config/test.toml`, test host only), secrets (env → keyring), typed errors · step

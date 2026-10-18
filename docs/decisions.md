@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 16 Oct 2026, plan freeze)
+# PO Agent — decision log (updated 19 Oct 2026)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -9,6 +9,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
+
+## 19 Oct 2026 — The repo-data check is stricter (Joey; plan task 1.1)
+
+- The banned folders match **at any depth**, as `.gitignore` does, and the list adds `.state/` and `traces/`, both already git-ignored: `private/`, `logs/`, `state/`, `.state/`, `traces/`, `.playwright-cli/`.
+- Trace files match `*trace*.zip` (was `trace*.zip`), so `.gitignore`'s `*.trace.zip` is caught too.
+- ruff skips `*.md`: ruff 0.17 also formats Python blocks in Markdown, and the docs' snippets are illustrative, not code.
+- `SPEC.md` v1.12 (Commands), `tasks/plan.md` 1.1 and `docs/workflow.md` v5.11 (Appendix A) carry the change.
 
 ## 16 Oct 2026 — MVP plan frozen: decisions D1–D7 (Joey; proposed by Claude after two doubt-driven reviews of `tasks/plan.md`)
 

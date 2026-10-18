@@ -143,7 +143,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Acceptance:**
 - `uv sync --locked` works on Python 3.12 (pinned in `.python-version`, which also avoids the Mac Keychain trap). `[project.scripts] po-agent = "po_agent.cli:main"` is set, and the pytest markers `live_claude`, `testsite` and `real_data` are registered.
 - `uv run scripts/check.py` runs `ruff format --check .` → `ruff check .` → repo-data check → `pytest tests -m "not live_claude and not testsite and not real_data"`. It stops on the first failure and prints `check: all passed` on success. Task 1.4 inserts `guard_check.py` before the repo-data check, giving SPEC → Commands' order.
-- The repo-data check fails, naming the path, on any tracked path under `private/`, `logs/`, `state/` or `.playwright-cli/`; any `.pdf` (any case) outside `tests/seam1/fixtures/pdfs/`; and any trace or capture file (`trace*.zip`, `*.har`, `*.webm`). The test exercises this with a temporary git repo.
+- The repo-data check fails, naming the path, on any tracked path in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/` or `.playwright-cli/`, at any depth (decisions, 19 Oct 2026); any `.pdf` (any case) outside `tests/seam1/fixtures/pdfs/`; and any trace or capture file (`*trace*.zip`, `*.har`, `*.webm`). The test exercises this with a temporary git repo.
 
 **Verify:** `uv run scripts/check.py` → `check: all passed`.
 **Files:** `pyproject.toml`, `.python-version`, `src/po_agent/__init__.py`, `scripts/check.py`, `tests/test_check.py`. **Scope:** M.
