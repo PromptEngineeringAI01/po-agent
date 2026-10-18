@@ -15,7 +15,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - The banned folders match **at any depth**, as `.gitignore` does, and the list adds `.state/` and `traces/`, both already git-ignored: `private/`, `logs/`, `state/`, `.state/`, `traces/`, `.playwright-cli/`.
 - Trace files match `*trace*.zip` (was `trace*.zip`), so `.gitignore`'s `*.trace.zip` is caught too.
 - ruff skips `*.md`: ruff 0.17 also formats Python blocks in Markdown, and the docs' snippets are illustrative, not code.
-- `SPEC.md` v1.12 (Commands), `tasks/plan.md` 1.1 and `docs/workflow.md` v5.11 (Appendix A) carry the change.
+- `SPEC.md` v1.12 (Commands), `tasks/plan.md` 1.1 and `docs/workflow.md` v5.12 (Appendix A) carry the change.
 
 ## 16 Oct 2026 — MVP plan frozen: decisions D1–D7 (Joey; proposed by Claude after two doubt-driven reviews of `tasks/plan.md`)
 

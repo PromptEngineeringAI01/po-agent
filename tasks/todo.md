@@ -1,6 +1,6 @@
 # PO Agent MVP — task list
 
-Full acceptance criteria, verify steps and files: `tasks/plan.md`. One task per session; branch per task from up-to-date `main`. Pace: **step** = `/build` one task, plan mode first · **auto** = `/build auto` (M2 only, after M1 merged) · **by hand** = Joey does it (Claude observes or writes docs only).
+Full acceptance criteria, verify steps and files: `tasks/plan.md`. One task per session; branch per task from up-to-date `main`. Pace: **step** = `/agent-skills:build task <N>`, plan mode first · **auto** = `/agent-skills:build auto` (M2 only, after M1 merged) · **by hand** = Joey does it (Claude observes or writes docs only).
 
 Every code task: failing test first → stop for Joey → `test:` commit → code → `uv run scripts/check.py` shows `check: all passed`.
 
@@ -82,7 +82,7 @@ Listed in build order: 3.5 and 3.6 need only 3.3, so they come before 3.4, whose
 
 ## M6 — MVP demo
 
-- [ ] **6.1** `/ship` go/no-go; load the job again, then rehearse `enabled = false` and `launchctl bootout` (S6) · by hand
+- [ ] **6.1** `/agent-skills:ship` go/no-go; load the job again, then rehearse `enabled = false` and `launchctl bootout` (S6) · by hand
 - [ ] **6.2** Demo 1: scheduled run (S4), fresh 2609034B copy (S5), controls (S6), evidence (S7) · by hand
 - [ ] **6.3** Demos 2 and 3 with no change between (S8); one from the laptop headed, with the Mac Mini job unloaded for it · by hand
 - [ ] **6.4** One-page demo note for the CEO (cost per PO, S3 result, trial conditions, concerns) · by hand
