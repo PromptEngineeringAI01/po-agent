@@ -13,27 +13,51 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PYTEST_MARKERS = "not live_claude and not testsite and not real_data"
 
+# Everything below is matched lowercased, so any case is caught.
 # Folder names that must never be tracked, at any depth (as in .gitignore).
-BANNED_DIRS = {"private", "logs", "state", ".state", "traces", ".playwright-cli"}
+BANNED_DIRS = {
+    "private",
+    "logs",
+    "state",
+    ".state",
+    "traces",
+    ".playwright-cli",
+    "secrets",
+}
 PDF_FIXTURES = "tests/seam1/fixtures/pdfs/"
-CAPTURE_PATTERNS = ("*trace*.zip", "*.har", "*.webm")
+# File-name patterns banned in any folder.
+BANNED_NAMES = {
+    "secret file": (".env", ".env.*"),
+    "trace or capture file": ("*trace*.zip", "*.har", "*.webm"),
+    "image (screen captures are real data)": (
+        "*.png",
+        "*.jpg",
+        "*.jpeg",
+        "*.webp",
+        "*.gif",
+    ),
+}
+LIVE_CONFIG = "config/live*.toml"
 
 Step = tuple[str, Callable[[], bool]]
 
 
 def classify(path: str) -> str | None:
     """Why a tracked path breaks the repo-data rule, or None if it's allowed."""
-    parts = path.split("/")
+    lower = path.lower()
+    parts = lower.split("/")
     for part in parts[:-1]:
         if part in BANNED_DIRS:
             return f"under {part}/"
-    lower = path.lower()
     if lower.endswith(".pdf") and not lower.startswith(PDF_FIXTURES):
         return f"PDF outside {PDF_FIXTURES}"
-    name = parts[-1].lower()
-    for pattern in CAPTURE_PATTERNS:
-        if fnmatch.fnmatchcase(name, pattern):
-            return f"trace or capture file ({pattern})"
+    name = parts[-1]
+    for reason, patterns in BANNED_NAMES.items():
+        for pattern in patterns:
+            if fnmatch.fnmatchcase(name, pattern):
+                return f"{reason} ({pattern})"
+    if fnmatch.fnmatchcase("/".join(parts[-2:]), LIVE_CONFIG):
+        return f"live config ({LIVE_CONFIG})"
     return None
 
 
