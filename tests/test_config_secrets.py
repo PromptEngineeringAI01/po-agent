@@ -13,6 +13,8 @@ import keyring
 import pytest
 from keyring.backend import KeyringBackend
 from keyring.errors import KeyringError, NoKeyringError
+from pydantic import ValidationError
+
 from po_agent.core import secrets
 from po_agent.core.config import Config, load_config, parse_config
 from po_agent.core.errors import (
@@ -26,7 +28,6 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
-from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parent.parent
 TEST_TOML = ROOT / "config" / "test.toml"
