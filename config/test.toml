@@ -1,0 +1,16 @@
+# Test-site profile (SPEC.md -> Project Structure). No secrets here: they come
+# from PO_AGENT_* env vars or keyring at run time.
+site = "test"
+base_url = "https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=management&tmpl=component"
+pool_name = "Agent Pool"
+agent_user_name = "Agent 1 (MySys Only)"
+title_rule = "test-body-filename"
+reader_mode = "hybrid"            # hybrid | deterministic-only
+enabled = true                    # kill switch: false on main -> next run exits before login
+claude_model_id = "unpinned"      # placeholder: pinned in M2 (task 2.5)
+duplicate_ignores_cancelled = true   # test only: Joey resets the test site by cancelling tasks; never true on live
+max_notes_per_run = 10            # MVP values; v1 defaults are 25 Notes / 12 minutes
+max_run_minutes = 12
+run_window = { days = "Mon-Fri", start = "07:00", end = "18:00", tz = "Australia/Perth" }
+aud_per_usd = 1.433
+claude_price_usd_per_mtok = { input = 0.0, output = 0.0 }   # placeholder: filled from the pricing page in M2 (task 2.6)
