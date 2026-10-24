@@ -1,10 +1,12 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.13 · 24 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.14 · 24 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.14:** a lighter process (decisions, 24 Oct 2026): the test-first review stop only on 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2; the freeze rule covers the agent's behaviour and anything that loosens a safety control, not dev-tooling tweaks; no extra work (mutation probes, second review rounds).
 
 **v5.13:** trimmed for the MVP. Stages 0–4 are done, so they're now a short summary (their full steps are in git history, v5.12). Stage 5: a branch per task, "update from `main`" before the PR, a review guide in every PR, and **Create a merge commit** (not squash) so the `test:` commit stays visible on `main`. Security review only on the PRs that need it (1.2, 1.3, 1.4, M4). Fewer clear-context rules. The skills plan and the cheat sheet are merged into one short table. Earlier versions: see git history of this file.
 
@@ -57,7 +59,7 @@ Not used: `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`
 |---|---|
 | Code | Private GitHub repo (`PromptEngineeringAI01/po-agent`). The Mac Mini pulls `main` before every run, so **merging is deploying**. |
 | Plan and tasks | `tasks/plan.md`, `tasks/todo.md`. Tasks run in order, one per branch and session. |
-| Changes after the freeze | A behaviour change needs a dated `docs/decisions.md` entry plus `SPEC.md` and `tasks/plan.md`, in the same commit. |
+| Changes after the freeze | A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control, needs a dated `docs/decisions.md` entry plus `SPEC.md` and `tasks/plan.md`, in the same commit. Tightening a dev-tooling rule needs only a clear commit message. |
 | Hooks | Created in M1 (task 1.2), then changed only by Joey, by hand. |
 | Evals | The seam 1 fixture set, plus the real-PO set on the laptop. Every bug adds a fixture. |
 | Real client data | `private/` on the laptop only (git-ignored). The 3 trial POs also live on the test site; the Mac Mini reads them from there, in memory. |
@@ -155,7 +157,7 @@ Update docs/screen-map.md (the rows I just mapped, fake values only) and SPEC.md
      ```text
      /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md).
      <the extra lines for this slice, from the table below>
-     Done means: task <N>'s acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed". Stop at the test-first pause, as CLAUDE.md says.
+     Done means: task <N>'s acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed". Follow CLAUDE.md's TDD rule (it says which tasks stop for review).
      ```
 
      | Slice | Tasks, in this order | Extra lines | Before you start |
@@ -176,7 +178,7 @@ Update docs/screen-map.md (the rows I just mapped, fake values only) and SPEC.md
 
    - **M4 doubt review** (first write to MySys): before task 4.1, in a fresh session: `Use the doubt-driven-development skill on the booker design in tasks/plan.md against docs/screen-map.md.`
 
-4. **Test-first pause.** Claude shows a failing test and stops. ✓ It fails because the code doesn't exist or doesn't handle the case yet, not because of a typo or an import error. Then: `Test looks right. Commit it and continue.`
+4. **Test first.** Claude writes the failing test and shows it failing. ✓ It fails because the code doesn't exist or doesn't handle the case yet, not because of a typo or an import error. On 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2 it stops for you: reply `Test looks right. Commit it and continue.` On the other tasks it commits the test and carries on; check the failure in its summary.
 5. **Verify.** ✓ `check: all passed`. If readers, prompt or model changed: `false PROCEED: 0` from the live-Claude seam (and the real-PO seam on the laptop). If `mysys/` or the booker changed: the seam 2 result on the test site (reset first, 6.1).
 6. **Debug** anything not obvious: `Use the debugging-and-error-recovery skill on this: <paste the error>`.
 7. **Review**, once:

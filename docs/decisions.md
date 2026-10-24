@@ -1,14 +1,25 @@
-# PO Agent — decision log (updated 24 Oct 2026)
+# PO Agent — decision log (updated 24 Oct 2026, lean process)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
-After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every behaviour change, in the same commit as the `SPEC.md` and `tasks/plan.md` changes.
+After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` and `tasks/plan.md` changes. Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
 
 ## Status
 
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
+
+## 24 Oct 2026 — A lighter process for the MVP (Joey)
+
+The MVP's goal is to show the agent runs by itself on the office Mac Mini against the test site. Task 1.1, a check script, took several days: three review rounds, mutation probes, and the same four documents re-edited for each small rule change. The safety core stays as it is; the process around it gets lighter.
+
+- **Review stop only where it matters.** Every task still writes its failing test first and shows it failing. Claude stops for Joey's review before writing code only on 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2: the guard, the hooks, the decision engine and readers, and anything that acts in MySys. On the other tasks it commits the test and carries on. Test changes still go in their own `test:` commit.
+- **The freeze rule covers the agent, not the tooling.** A dated entry here plus `SPEC.md` and `tasks/plan.md` is needed for a change to what the agent does in MySys or prints in its run output, or for anything that loosens a safety control (the guard, the hooks, the repo-data check, CI, a Must-never rule). Tightening a dev-tooling rule needs only a clear commit message.
+- **No extra work.** No mutation probes, no second review round unless the fixes were large, and no doc edits a task doesn't need.
+- **Also in `CLAUDE.md`:** new text uses a plain dash, not the em dash; `uv.lock` and other generated files are changed only through their tool; an unrelated failure is reported, not fixed in the current task; the agent-skills commands are listed by their full names.
+- Unchanged: the guard, the two readers and their agreement rule, skip on doubt, test site only, the Must-never rules, check + CI, Joey merges.
+- Carried in: `CLAUDE.md`, `SPEC.md` v1.13 (Code style), `tasks/plan.md` (Cross-cutting rules), `docs/workflow.md` v5.14 (Stage 5 step 4, ground rules).
 
 ## 19 Oct 2026 — The repo-data check is stricter (Joey; plan task 1.1; widened 21 Oct 2026 after the task's code review and security review)
 
