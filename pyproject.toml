@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Books B1 Homes /048 compaction POs in MySys (test site MVP)"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "playwright>=1.64.1",
+]
 
 [project.scripts]
 po-agent = "po_agent.cli:main"
@@ -31,6 +33,7 @@ markers = [
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
 ]
