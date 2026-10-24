@@ -1,10 +1,12 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.13 · 24 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.14 · 24 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.14:** Appendix A: outside the repo, `protect_paths.py` allows only `~/.claude/plans/`, this project's memory folder and `<temp>/claude/`, matched on resolved paths by whole folders (decisions, 24 Oct 2026).
 
 **v5.13:** trimmed for the MVP. Stages 0–4 are done, so they're now a short summary (their full steps are in git history, v5.12). Stage 5: a branch per task, "update from `main`" before the PR, a review guide in every PR, and **Create a merge commit** (not squash) so the `test:` commit stays visible on `main`. Security review only on the PRs that need it (1.2, 1.3, 1.4, M4). Fewer clear-context rules. The skills plan and the cheat sheet are merged into one short table. Earlier versions: see git history of this file.
 
@@ -353,7 +355,7 @@ Keep the Playwright CLI `allow` and `deny` entries that are already in the file 
 
 | Hook | Does |
 |---|---|
-| `protect_paths.py` | **Blocks** edits to `.claude/**`, `config/live*.toml`, `.env*`, `secrets/**`, `state/**` and paths outside the repo. **Asks** before edits to `.github/workflows/**`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, and existing files in `tests/seam1/fixtures/**` or expected results. |
+| `protect_paths.py` | **Blocks** edits to `.claude/**`, `config/live*.toml`, `.env*`, `secrets/**`, `state/**` and paths outside the repo, except three folders: `~/.claude/plans/` (plan mode), this project's memory folder `~/.claude/projects/<project path, non-alphanumerics as "-">/memory/` and `<temp>/claude/` (the scratchpad). Paths are resolved first (absolute, `..` collapsed, symlinks followed) and matched by whole folders, so `plans-evil/` doesn't match and `~/.claude/settings.json`, `settings.local.json` and `hooks/` stay blocked. **Asks** before edits to `.github/workflows/**`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, and existing files in `tests/seam1/fixtures/**` or expected results. |
 | `guard_bash.py` | **Blocks** commands mentioning the live site (regex `(?<!test-)prompt\.mysys\.com\.au`); any `playwright-cli` command except `open` (test URL only, no `--persistent`/`--profile`), `snapshot`, `screenshot`, `find`, `generate-locator`, `tab-list`, `list`, `close`; `printenv`, a bare `env`, `/proc/*/environ`, or any text containing `PO_AGENT_`; `git push --force`; any push to `main`; `gh pr merge`; `rm -rf`; `git add`/`commit` of `private/`, `state/`, `logs/`, `.env*`; text matching a real Anthropic key (regex `sk-ant-[A-Za-z0-9_-]{20,}`); also `export -p`, `declare -x`, a bare `set`, `os.environ`, PowerShell `env:`, and a bare `git push` while the current branch is `main`. The live host appears only in this regex and its test (decision D4). Hooks match text, so they're a backstop; the guard, the repo-data check and gitleaks are the main controls. |
 | `format_python.py` | For `.py` files: `ruff format` then `ruff check --fix` on that file; reports leftover lint errors. |
 | pre-commit + gitleaks | Secret scan on every commit, including Joey's own; also blocks any staged path under `private/` and any `.pdf` outside `tests/seam1/fixtures/pdfs/` (the same repo-data rule as `scripts/check.py --repo-data-only`, so CI catches it too). `.gitleaks.toml` allowlists only `tests/test_hooks.py` for the hook test's fake `sk-ant-` string (decision D4). If the GitHub owner is an organisation, `gitleaks-action` needs a `GITLEAKS_LICENSE` secret: check in task 1.3, or run the gitleaks binary instead. |
