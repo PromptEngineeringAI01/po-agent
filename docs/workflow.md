@@ -6,7 +6,7 @@
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
 
-**v5.14:** Appendix A: outside the repo, `protect_paths.py` allows only `~/.claude/plans/`, this project's memory folder and `<temp>/claude/`, matched on resolved paths by whole folders (decisions, 24 Oct 2026).
+**v5.14:** Appendix A: outside the repo, `protect_paths.py` allows only `~/.claude/plans/`, this project's memory folder and `<temp>/claude/`, matched on resolved paths by whole folders (decisions, 24 Oct 2026). Every hook in the settings shape has `"onFailure": "block"`, so a hook that fails to run blocks instead of letting the action through.
 
 **v5.13:** trimmed for the MVP. Stages 0–4 are done, so they're now a short summary (their full steps are in git history, v5.12). Stage 5: a branch per task, "update from `main`" before the PR, a review guide in every PR, and **Create a merge commit** (not squash) so the `test:` commit stays visible on `main`. Security review only on the PRs that need it (1.2, 1.3, 1.4, M4). Fewer clear-context rules. The skills plan and the cheat sheet are merged into one short table. Earlier versions: see git history of this file.
 
@@ -339,19 +339,19 @@ jobs:
   "hooks": {
     "PreToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_paths.py\"" }] },
+        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_paths.py\"", "onFailure": "block" }] },
       { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"" }] }
+        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"", "onFailure": "block" }] }
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\"" }] }
+        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\"", "onFailure": "block" }] }
     ]
   }
 }
 ```
 
-Keep the Playwright CLI `allow` and `deny` entries that are already in the file alongside the ones above.
+Keep the Playwright CLI `allow` and `deny` entries that are already in the file alongside the ones above. `"onFailure": "block"` (Claude Code v2.1.295 or later) makes a hook that can't start, times out or exits with anything but 0 or 2 block the action, as exit 2 does, instead of letting it through (https://code.claude.com/docs/en/hooks, "Block the action when a hook fails").
 
 | Hook | Does |
 |---|---|

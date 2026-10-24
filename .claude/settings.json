@@ -9,7 +9,17 @@
       "Bash(playwright-cli generate-locator *)",
       "Bash(playwright-cli tab-list)",
       "Bash(playwright-cli list)",
-      "Bash(playwright-cli close)"
+      "Bash(playwright-cli close)",
+      "Bash(uv run scripts/check.py)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(uv sync --locked)",
+      "Bash(uv run po-agent *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ],
     "deny": [
       "Bash(playwright-cli click*)",
@@ -59,7 +69,44 @@
       "Bash(npx @playwright/cli*)",
       "Read(./.env*)",
       "Read(./secrets/**)",
-      "Read(./config/live*.toml)"
+      "Read(./config/live*.toml)",
+      "Read(./state/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_paths.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"",
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\"",
+            "onFailure": "block"
+          }
+        ]
+      }
     ]
   }
 }
