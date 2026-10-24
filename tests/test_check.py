@@ -99,10 +99,13 @@ def test_clean_repo_has_no_violations(tmp_path, check_script):
         ".env.local",
         ".env.example",
         "config/.ENV",
+        ".env/key.txt",
+        "src/.ENV/key.txt",
         "secrets/key.txt",
         "src/Secrets/key.txt",
         "config/live.toml",
         "config/Live-prod.TOML",
+        "deploy/config/live.toml",
         # images anywhere (screen captures are real data)
         "docs/screen-map/row02.png",
         "shot.PNG",
