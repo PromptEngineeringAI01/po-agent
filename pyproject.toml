@@ -1,0 +1,36 @@
+[project]
+name = "po-agent"
+version = "0.1.0"
+description = "Books B1 Homes /048 compaction POs in MySys (test site MVP)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.scripts]
+po-agent = "po_agent.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["*.md"]  # docs hold illustrative snippets, not code
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "live_claude: calls the real Claude API (needs PO_AGENT_ANTHROPIC_API_KEY)",
+    "testsite: drives the MySys test site (needs the test-site secrets)",
+    "real_data: reads real POs from private/ (laptop only, never in CI)",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]

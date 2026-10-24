@@ -143,7 +143,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Acceptance:**
 - `uv sync --locked` works on Python 3.12 (pinned in `.python-version`, which also avoids the Mac Keychain trap). `[project.scripts] po-agent = "po_agent.cli:main"` is set, and the pytest markers `live_claude`, `testsite` and `real_data` are registered.
 - `uv run scripts/check.py` runs `ruff format --check .` → `ruff check .` → repo-data check → `pytest tests -m "not live_claude and not testsite and not real_data"`. It stops on the first failure and prints `check: all passed` on success. Task 1.4 inserts `guard_check.py` before the repo-data check, giving SPEC → Commands' order.
-- The repo-data check fails, naming the path, on any tracked path under `private/`, `logs/`, `state/` or `.playwright-cli/`; any `.pdf` (any case) outside `tests/seam1/fixtures/pdfs/`; and any trace or capture file (`trace*.zip`, `*.har`, `*.webm`). The test exercises this with a temporary git repo.
+- The repo-data check fails, naming the path, on any tracked path in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; any `.env` or `.env.*` file and any `config/live*.toml`, at any depth; any `.pdf` outside `tests/seam1/fixtures/pdfs/`; any image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); and any trace or capture file (`*trace*.zip`, `*.har`, `*.webm`). Folder names and extensions match in any case (decisions, 19 Oct 2026, widened 21 and 24 Oct). The test exercises this with a temporary git repo.
 
 **Verify:** `uv run scripts/check.py` → `check: all passed`.
 **Files:** `pyproject.toml`, `.python-version`, `src/po_agent/__init__.py`, `scripts/check.py`, `tests/test_check.py`. **Scope:** M.
@@ -298,6 +298,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - `scripts/make_fixture_pdfs.py` writes deterministic PDFs (same bytes on every run) with a text layer in the B1 layout: issuer `B1 Homes Pty Ltd`, `COMPACTION`, Purchase Order No, and a Job Address block. Values are fake: `2600001B`–`2600003B`, `pln_10001`–`pln_10003`, `Sample Lane`-style addresses. Claude learns the layout from `private/pdfs/` and copies no real value into it.
 - Mutations cover every row of the seam-1 table in `docs/specs/spec.md` plus SPEC → Testing Strategy's extra cases. Each case in `tests/seam1/fixtures/cases.toml` lists its Note snapshot, lookup, stub Claude reading and expected result.
 - A local check (not committed) confirms that no string from `private/` PDFs appears in the fixtures.
+- A committed test regenerates the fixture PDFs into a temp folder and requires every PDF under `tests/seam1/fixtures/pdfs/` to match a generated one byte for byte, so a real PDF copied there fails the check (the repo-data rule allows any PDF in that folder; decisions, 19 Oct 2026, widened 21 Oct).
 
 **Verify:** `uv run scripts/check.py` (the repo-data rule allows these PDFs); fixtures go in their own `test:` commit.
 **Files:** `src/po_agent/b1/models.py`, `scripts/make_fixture_pdfs.py`, `tests/seam1/fixtures/pdfs/*` (generated), `tests/seam1/fixtures/cases.toml`, `tests/seam1/conftest.py`. **Scope:** M.
@@ -634,7 +635,7 @@ Found in the 16 Oct 2026 reviews and accepted for a 3-PO trial on the test site.
 - **gitleaks** is allowlisted by path (`tests/test_hooks.py`), so a real key pasted into that file would pass; allowlisting the exact fake string is the stricter option.
 - **Branch protection on `main`** isn't set; `guard_bash.py` patterns are a backstop only (Joey's call).
 - **Disk leftovers on the Mac Mini:** Chromium's HTTP cache and temp profile may hold the PDF or pages until the OS cleans `$TMPDIR`; a SIGKILL at the 20-minute limit skips the `finally` cleanup until the next run. FileVault is on.
-- **Fixture PDFs aren't byte-checked** against the generator, so a real PDF copied into `tests/seam1/fixtures/pdfs/` would pass the repo-data rule; the "no `private/` strings" check is local only.
+- **Fixture PDFs are byte-checked only from 2.1:** until the generator exists, a real PDF copied into `tests/seam1/fixtures/pdfs/` would pass the repo-data rule. The "no `private/` strings" check stays local only.
 - **Page 1 only:** with more than 50 Pending Notes in the pool, older eligible Notes wait. Not an issue at trial volume.
 - **Process-group kill** is tested only under Git Bash and CI, not macOS `/bin/bash` 3.2, until the first hung run on the Mac Mini.
 - **CI gitleaks action** needs a `GITLEAKS_LICENSE` secret if the GitHub owner is an organisation; check in 1.3, or use the gitleaks binary directly.
