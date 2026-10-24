@@ -22,6 +22,7 @@
       "Bash(git commit *)"
     ],
     "deny": [
+      "PowerShell",
       "Bash(playwright-cli click*)",
       "Bash(playwright-cli dblclick*)",
       "Bash(playwright-cli fill*)",
