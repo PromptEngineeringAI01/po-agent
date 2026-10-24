@@ -23,6 +23,7 @@ BANNED_DIRS = {
     "traces",
     ".playwright-cli",
     "secrets",
+    ".env",
 }
 PDF_FIXTURES = "tests/seam1/fixtures/pdfs/"
 # File-name patterns banned in any folder.

@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 21 Oct 2026)
+# PO Agent — decision log (updated 24 Oct 2026)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -16,7 +16,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - Trace files match `*trace*.zip` (was `trace*.zip`), so `.gitignore`'s `*.trace.zip` is caught too.
 - **Widened 21 Oct 2026:**
   - **Any case.** Folder names and extensions match in any case (`Private/`, `shot.PNG`); this laptop's file system ignores case.
-  - **Secret files.** `.env` and `.env.*` (no `.env.example` exception), `secrets/` and `config/live*.toml` are banned at any depth. They were only git-ignored, which `git add -f` gets past, and gitleaks can't recognise a MySys password by its pattern.
+  - **Secret files.** `.env` and `.env.*` files (no `.env.example` exception), `.env/` and `secrets/` folders, and `config/live*.toml` are banned at any depth (`.env/` folders added 24 Oct, after the second code review: `.gitignore`'s `.env` matches a folder too). They were only git-ignored, which `git add -f` gets past, and gitleaks can't recognise a MySys password by its pattern.
   - **Images.** `*.png`, `*.jpg`, `*.jpeg`, `*.webp` and `*.gif` are banned anywhere, because test-site screen captures are real data (Must never #6). `.yml` stays allowed (CI and pre-commit need it), so a copied-out accessibility snapshot isn't caught by the rule; review still has to.
   - **Fixture PDFs.** The rule can't tell a real PDF in `tests/seam1/fixtures/pdfs/` from a fake, so plan task 2.1 now requires every committed fixture PDF to match the generator's output byte for byte.
 - ruff skips `*.md`: ruff 0.17 also formats Python blocks in Markdown, and the docs' snippets are illustrative, not code.

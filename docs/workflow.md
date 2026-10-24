@@ -4,7 +4,7 @@
 
 **Approach:** Addy Osmani's agent-skills as the main workflow, phase by phase as in its greenfield tutorial (Define → Plan → Build → Verify → Review → Ship), plus one Matt Pocock skill, `improve-codebase-architecture`, used after the MVP. CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. The MVP runs on the office Mac Mini against the test site (`SPEC.md`; CEO decision 3).
 
-**v5.12:** Appendix A's repo-data check also bans `.state/`, `traces/` and `secrets/`, matches the banned folders at any depth and in any case, catches `*trace*.zip`, and bans `.env*` files, `config/live*.toml` and images (decisions, 19 Oct 2026, widened 21 Oct).
+**v5.12:** Appendix A's repo-data check also bans `.state/`, `traces/`, `secrets/` and `.env/`, matches the banned folders at any depth and in any case, catches `*trace*.zip`, and bans `.env*` files, `config/live*.toml` and images (decisions, 19 Oct 2026, widened 21 and 24 Oct).
 
 **v5.11:** the agent-skills commands need their full names (`/agent-skills:build`, `/agent-skills:test`, `/agent-skills:spec`, `/agent-skills:ship`, `/agent-skills:code-simplify`): a bare `/build` is "Unknown command". Stage 5 step 3 now has the exact prompts per slice, naming each task by number ("the next unchecked task" would pick a by-hand one), and the M1 task order. Appendix B: the `Unknown command` fix and `claude doctor`.
 
@@ -646,7 +646,7 @@ Change the expected result in one seam-1 fixture.
 1. `ruff format --check .`
 2. `ruff check .`
 3. `python scripts/guard_check.py` (no browser action calls outside `act()` in `src/po_agent/mysys/guard.py`; the full banned list is in `tasks/plan.md` task 1.4)
-4. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case
+4. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case
 5. `pytest tests -m "not live_claude and not testsite and not real_data"`
 
 **Secrets:** `src/po_agent/core/secrets.py` reads `PO_AGENT_<NAME>` from the environment, else keyring service `po-agent`. Names: `anthropic_api_key`, `mysys_test_username`, `mysys_test_password`. Never `ANTHROPIC_API_KEY`.
