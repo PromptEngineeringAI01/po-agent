@@ -12,7 +12,7 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 - [x] **F.1** Joey approves `tasks/plan.md` (workflow Stage 4.4); Open questions 2–8 answered as recommended (16 Oct 2026) · by hand
 - [x] **F.2** (done: PR #6, 16 Oct 2026) Freeze commit on `plan-mvp`: `tasks/`, the dated D1–D7 entry in `docs/decisions.md`, and the SPEC / `docs/specs/spec.md` / `docs/workflow.md` / `docs/macmini-setup.md` changes in plan → Doc drift; PR; Joey merges · Claude writes, Joey merges
-- [ ] **F.3** Joey's CLAUDE.md edits by hand (plan → Doc drift: Must never #2, #3, #6 and Secrets); #3 must be merged before 1.2 · by hand
+- [x] **F.3** (done: PR #7, 16 Oct 2026) Joey's CLAUDE.md edits by hand (plan → Doc drift: Must never #2, #3, #6 and Secrets); #3 must be merged before 1.2 · by hand
 - [x] **F.4** (done, 16 Oct 2026) Local git: fast-forward `main` to `origin/main`; delete or reset the stale `m1-walking-skeleton` branch · by hand
 - [ ] **F.5** Tell the CEO that D2 puts the trial PDF briefly on the Mac Mini's disk (decision 2 was asked as "in memory only") · by hand
 
@@ -26,7 +26,7 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 ## M1 — walking skeleton + Mac Mini spike
 
 - [x] **1.1** uv project and `scripts/check.py` (ruff, repo-data rule incl. `logs/`, `state/`, traces, any-case `.pdf`; pytest markers) · step
-- [ ] **1.2** Claude Code hooks + tests (live-host regex anchored so the test host passes); `.claude/settings.json` as the last edit · step · needs F.3 (#3)
+- [x] **1.2** Claude Code hooks + tests (live-host regex anchored so the test host passes); `.claude/settings.json` as the last edit · step · needs F.3 (#3)
 - [ ] **1.3** Pre-commit (gitleaks + repo-data rule; `.gitleaks.toml` for the hook test's fake key) and CI `check.yml` (+ Chromium) · step
 - [ ] **1.5** Config (`config/test.toml`, test host only), secrets (env → keyring), typed errors · step
 - [ ] **1.4** Action guard (`vet()` / `act()` with `value`; `act()` on the element `vet()` resolved; `exact=True`; allowlist, scope, exactly-one, denylist on element, select = chosen option) + widened `guard_check.py` (bans the `request` attribute, not verb names) · step

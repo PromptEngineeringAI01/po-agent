@@ -10,6 +10,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
 
+## 24 Oct 2026 - protect_paths allows three folders outside the repo (Joey; plan task 1.2)
+
+- Plan task 1.2 said `protect_paths.py` blocks every path outside the repo. That would also block plan mode's plan file, Claude Code's memory and Claude's scratchpad, and "plan mode first" is how every step task starts.
+- So exactly three folders outside the repo may be written: `~/.claude/plans/`, this project's memory folder (`~/.claude/projects/<project path, every non-alphanumeric as "-">/memory/`) and `<temp>/claude/`. Everything else outside the repo stays blocked, including `~/.claude/settings.json`, `~/.claude/settings.local.json` and `~/.claude/hooks/`.
+- Paths are resolved first (absolute, `..` collapsed, symlinks followed) and matched by whole folders, never as a string prefix, so `~/.claude/plans-evil/` doesn't match and `plans/../settings.json` is blocked. The tests cover both sides.
+- `tasks/plan.md` 1.2 and `docs/workflow.md` v5.15 (Appendix A) and `SPEC.md` v1.14 (Project Structure) carry the change.
+
 ## 24 Oct 2026 — A lighter process for the MVP (Joey)
 
 The MVP's goal is to show the agent runs by itself on the office Mac Mini against the test site. Task 1.1, a check script, took several days: three review rounds, mutation probes, and the same four documents re-edited for each small rule change. The safety core stays as it is; the process around it gets lighter.

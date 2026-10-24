@@ -1,10 +1,12 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.14 · 24 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.15 · 24 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.15:** Appendix A: outside the repo, `protect_paths.py` allows only `~/.claude/plans/`, this project's memory folder and `<temp>/claude/`, matched on resolved paths by whole folders (decisions, 24 Oct 2026). Every hook in the settings shape has `"onFailure": "block"`, so a hook that fails to run blocks instead of letting the action through.
 
 **v5.14:** a lighter process (decisions, 24 Oct 2026): the test-first review stop only on 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2; the freeze rule covers the agent's behaviour and anything that loosens a safety control, not dev-tooling tweaks; no extra work (mutation probes, second review rounds).
 
@@ -339,23 +341,23 @@ jobs:
   "hooks": {
     "PreToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_paths.py\"" }] },
+        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_paths.py\"", "onFailure": "block" }] },
       { "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"" }] }
+        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"", "onFailure": "block" }] }
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\"" }] }
+        "hooks": [{ "type": "command", "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format_python.py\"", "onFailure": "block" }] }
     ]
   }
 }
 ```
 
-Keep the Playwright CLI `allow` and `deny` entries that are already in the file alongside the ones above.
+Keep the Playwright CLI `allow` and `deny` entries that are already in the file alongside the ones above. `"onFailure": "block"` (Claude Code v2.1.295 or later) makes a hook that can't start, times out or exits with anything but 0 or 2 block the action, as exit 2 does, instead of letting it through (https://code.claude.com/docs/en/hooks, "Block the action when a hook fails").
 
 | Hook | Does |
 |---|---|
-| `protect_paths.py` | **Blocks** edits to `.claude/**`, `config/live*.toml`, `.env*`, `secrets/**`, `state/**` and paths outside the repo. **Asks** before edits to `.github/workflows/**`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, and existing files in `tests/seam1/fixtures/**` or expected results. |
+| `protect_paths.py` | **Blocks** edits to `.claude/**`, `config/live*.toml`, `.env*`, `secrets/**`, `state/**` and paths outside the repo, except three folders: `~/.claude/plans/` (plan mode), this project's memory folder `~/.claude/projects/<project path, non-alphanumerics as "-">/memory/` and `<temp>/claude/` (the scratchpad). Paths are resolved first (absolute, `..` collapsed, symlinks followed) and matched by whole folders, so `plans-evil/` doesn't match and `~/.claude/settings.json`, `settings.local.json` and `hooks/` stay blocked. **Asks** before edits to `.github/workflows/**`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, and existing files in `tests/seam1/fixtures/**` or expected results. |
 | `guard_bash.py` | **Blocks** commands mentioning the live site (regex `(?<!test-)prompt\.mysys\.com\.au`); any `playwright-cli` command except `open` (test URL only, no `--persistent`/`--profile`), `snapshot`, `screenshot`, `find`, `generate-locator`, `tab-list`, `list`, `close`; `printenv`, a bare `env`, `/proc/*/environ`, or any text containing `PO_AGENT_`; `git push --force`; any push to `main`; `gh pr merge`; `rm -rf`; `git add`/`commit` of `private/`, `state/`, `logs/`, `.env*`; text matching a real Anthropic key (regex `sk-ant-[A-Za-z0-9_-]{20,}`); also `export -p`, `declare -x`, a bare `set`, `os.environ`, PowerShell `env:`, and a bare `git push` while the current branch is `main`. The live host appears only in this regex and its test (decision D4). Hooks match text, so they're a backstop; the guard, the repo-data check and gitleaks are the main controls. |
 | `format_python.py` | For `.py` files: `ruff format` then `ruff check --fix` on that file; reports leftover lint errors. |
 | pre-commit + gitleaks | Secret scan on every commit, including Joey's own; also blocks any staged path under `private/` and any `.pdf` outside `tests/seam1/fixtures/pdfs/` (the same repo-data rule as `scripts/check.py --repo-data-only`, so CI catches it too). `.gitleaks.toml` allowlists only `tests/test_hooks.py` for the hook test's fake `sk-ant-` string (decision D4). If the GitHub owner is an organisation, `gitleaks-action` needs a `GITLEAKS_LICENSE` secret: check in task 1.3, or run the gitleaks binary instead. |
