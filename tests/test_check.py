@@ -229,3 +229,45 @@ def test_project_config():
     assert registered == {"live_claude", "testsite", "real_data"}
     python_version = (ROOT / ".python-version").read_text(encoding="utf-8")
     assert python_version.strip().startswith("3.12")
+
+
+@pytest.mark.parametrize("bad", ["private/notes.txt", "stray.pdf"])
+def test_repo_data_only_rejects_a_staged_path(
+    tmp_path, monkeypatch, capsys, check_script, bad
+):
+    # The pre-commit hook runs `scripts/check.py --repo-data-only`.
+    repo = make_repo(tmp_path, [*CLEAN, bad])
+    monkeypatch.setattr(check_script, "ROOT", repo)
+
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--repo-data-only"])
+
+    out = capsys.readouterr().out
+    assert exit_info.value.code != 0
+    assert f"repo-data: {bad}: " in out
+    assert "check: failed at repo data" in out
+
+
+def test_repo_data_only_runs_no_other_step(tmp_path, monkeypatch, capsys, check_script):
+    repo = make_repo(tmp_path, CLEAN)
+    monkeypatch.setattr(check_script, "ROOT", repo)
+    monkeypatch.setattr(
+        check_script,
+        "STEPS",
+        [("other", lambda: pytest.fail("--repo-data-only ran another step"))],
+    )
+
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--repo-data-only"])
+
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "check: repo data",
+        "check: all passed",
+    ]
+
+
+def test_unknown_argument_is_refused(check_script):
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--everything"])
+    assert exit_info.value.code != 0

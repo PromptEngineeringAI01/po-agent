@@ -1,9 +1,11 @@
 """The one check command (= CI): `uv run scripts/check.py`.
 
 Runs each step in order, stops on the first failure, and prints
-"check: all passed" when every step passes.
+"check: all passed" when every step passes. `--repo-data-only` runs just the
+repo-data rule (the pre-commit hook).
 """
 
+import argparse
 import fnmatch
 import subprocess
 import sys
@@ -117,8 +119,16 @@ def run_checks(steps: list[Step]) -> int:
     return 0
 
 
-def main() -> None:
-    sys.exit(run_checks(STEPS))
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="The one check command (= CI).")
+    parser.add_argument(
+        "--repo-data-only",
+        action="store_true",
+        help="run only the repo-data rule on the index (the pre-commit hook)",
+    )
+    args = parser.parse_args(argv)
+    steps = [("repo data", repo_data)] if args.repo_data_only else STEPS
+    sys.exit(run_checks(steps))
 
 
 if __name__ == "__main__":

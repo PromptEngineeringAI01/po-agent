@@ -1,0 +1,20 @@
+# Runs on every commit, including Joey's own. Install once per clone:
+#   uv run pre-commit install
+# Docs: https://pre-commit.com/ and https://github.com/gitleaks/gitleaks#pre-commit
+repos:
+  # Secret scan of the staged changes, with .gitleaks.toml (found in the repo root).
+  # pre-commit downloads Go to build it the first time if Go isn't installed.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  # The repo-data rule from scripts/check.py, on the whole index: no private/,
+  # logs/, state/, traces, images or stray PDFs (CI runs the same rule).
+  - repo: local
+    hooks:
+      - id: repo-data
+        name: repo-data rule (scripts/check.py --repo-data-only)
+        entry: uv run scripts/check.py --repo-data-only
+        language: unsupported
+        pass_filenames: false
+        always_run: true
