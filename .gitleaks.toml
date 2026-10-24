@@ -1,0 +1,21 @@
+# gitleaks config for pre-commit and CI (gitleaks-action).
+# Docs: https://github.com/gitleaks/gitleaks#configuration
+
+# Keep every default rule.
+[extend]
+useDefault = true
+
+# The default Anthropic rules only match a full-length key, so this one
+# catches any `sk-ant-` key, with the same regex as .claude/hooks/guard_bash.py.
+[[rules]]
+id = "anthropic-key-any-length"
+description = "Anthropic API key (sk-ant-), any length"
+regex = '''sk-ant-[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-ant-"]
+
+    # Only the hook test's fake key, only in the hook test (decision D4).
+    [[rules.allowlists]]
+    description = "the fake key in tests/test_hooks.py"
+    condition = "AND"
+    paths = ['''^tests/test_hooks\.py$''']
+    regexes = ['''^sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKEFAKE$''']
