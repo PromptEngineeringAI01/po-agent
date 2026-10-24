@@ -163,6 +163,13 @@ BASH_BLOCKED = {
     "rm -rf inside cmd /c": 'cmd /c "rm -rf build"',
     "push to main inside bash -c": "bash -c 'git push origin main'",
     "playwright-cli click inside sh -c": 'sh -c "playwright-cli click e3"',
+    # the parser: each line, git options and program paths
+    "rm -rf on a second line": "git status\nrm -rf build",
+    "push to main with git -C": "git -C . push origin main",
+    "push to main with git.exe": "git.exe push origin main",
+    "push --all": "git push --all origin",
+    "push --mirror": "git push --mirror origin",
+    "env to a file": "env > env.txt",
     # an Anthropic key in a command
     "anthropic key": f"curl -H 'x-api-key: {FAKE_KEY}' https://example.com",
 }
@@ -193,6 +200,13 @@ BASH_ALLOWED = {
     "playwright-cli tab-list": "playwright-cli tab-list",
     "playwright-cli list": "playwright-cli list",
     "playwright-cli close": "playwright-cli close",
+    # the screen-mapping command from workflow 3A, `&` inside the quoted URL
+    "playwright-cli open the full mapping URL": (
+        'playwright-cli open --headed "https://test-prompt.mysys.com.au/index.php'
+        '?option=com_cweb&view=management&tmpl=component"'
+    ),
+    # a commit message isn't a path to stage
+    "commit message naming private/": 'git commit -m "docs: private/ stays ignored"',
 }
 
 
@@ -219,6 +233,15 @@ def test_bare_push_on_main_blocks(tmp_path):
 def test_bare_push_on_a_feature_branch_is_allowed(tmp_path):
     repo = git_repo_on("m1-1.2-hooks", tmp_path / "repo")
     assert_allowed(run_hook("guard_bash", bash("git push", cwd=repo)))
+
+
+def test_bare_push_blocks_when_the_branch_is_unknown(tmp_path):
+    # Not a git repo, so the branch can't be read: fail closed.
+    folder = tmp_path / "not-a-repo"
+    folder.mkdir()
+    env = {"GIT_CEILING_DIRECTORIES": str(tmp_path)}
+    result = run_hook("guard_bash", bash("git push", cwd=folder), env)
+    assert_blocked(result, "guard_bash")
 
 
 # --- protect_paths ---------------------------------------------------------
