@@ -63,10 +63,20 @@ PLAYWRIGHT_OBSERVE = {
     "generate-locator",
     "tab-list",
     "list",
-    "close",
+    "close",  # closes the CLI's own browser, not a MySys control
+    "--version",
+    "--help",
 }
 REAL_DATA_DIRS = {"private", "state", ".state", "logs"}
-MAX_DEPTH = 3  # how deep quoted commands inside commands are checked
+TOOLS = {"Bash", "PowerShell"}
+# Programs that run the command after them: `npx playwright-cli ...`.
+WRAPPERS = {"npx", "uvx", "env", "sudo", "xargs", "command", "exec", "time", "nohup"}
+SHELLS = {"bash", "sh", "zsh", "dash"}
+ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=")
+CONTINUATION = re.compile(r"\\\r?\n")
+HEREDOC = re.compile(r"<<-?\s*['\"]?([A-Za-z_]\w*)['\"]?")
+SHELL_WORD = re.compile(r"\b(bash|sh|zsh|dash|pwsh|powershell)\b", re.IGNORECASE)
+MAX_DEPTH = 3  # how deep `bash -c "..."` inside `bash -c "..."` is checked
 
 
 class Blocked(Exception):
@@ -89,9 +99,21 @@ def line_tokens(line: str) -> list[str]:
 
 
 def simple_commands(command: str) -> list[list[str]]:
-    """The command's simple commands, one list of words each."""
+    """The command's simple commands, one list of words each.
+
+    A backslash-newline continues the line. A heredoc's body is text (a
+    commit message, say) and is skipped, unless a shell on that line reads it.
+    """
     found: list[list[str]] = []
-    for line in command.splitlines():
+    heredoc_end = None
+    for line in CONTINUATION.sub(" ", command).splitlines():
+        if heredoc_end is not None:
+            if line.strip() == heredoc_end:
+                heredoc_end = None
+            continue
+        start = HEREDOC.search(line)
+        if start and not SHELL_WORD.search(line):
+            heredoc_end = start.group(1)
         words: list[str] = []
         for token in line_tokens(line):
             if set(token) <= SEPARATOR_CHARS:
@@ -114,21 +136,52 @@ def is_bare(words: list[str], name: str) -> bool:
     return program(words[0]) == name and (len(words) == 1 or words[1][0] in "<>")
 
 
+def unwrap(words: list[str]) -> list[str]:
+    """Drop leading `VAR=value`s and wrappers (`npx`, `sudo`, `uv run`), with
+    their options, so the program that really runs comes first."""
+    while words:
+        first = program(words[0])
+        if ASSIGNMENT.match(words[0]) or first in WRAPPERS:
+            words = words[1:]
+        elif first == "uv" and words[1:2] == ["run"]:
+            words = words[2:]
+        else:
+            return words
+        while words and words[0].startswith("-"):
+            words = words[1:]
+    return words
+
+
+def nested_command(words: list[str]) -> str | None:
+    """The command a shell is given as text: `bash -c "..."`, `cmd /c ...`,
+    `powershell -Command ...`, `eval ...`."""
+    first, rest = program(words[0]), words[1:]
+    for i, word in enumerate(rest):
+        lower = word.lower()
+        if first in SHELLS and re.fullmatch(r"-[a-z]*c[a-z]*", word):
+            return " ".join(rest[i + 1 : i + 2])
+        if first == "cmd" and lower in ("/c", "/k"):
+            return " ".join(rest[i + 1 :])
+        if first in ("powershell", "pwsh") and lower in ("-c", "-command"):
+            return " ".join(rest[i + 1 :])
+    if first == "eval":
+        return " ".join(rest)
+    return None
+
+
 def check_playwright(words: list[str]) -> None:
-    for i, word in enumerate(words):
-        if program(word) != "playwright-cli":
-            continue
-        rest = words[i + 1 :]
-        sub = rest[0] if rest else ""
-        if sub in PLAYWRIGHT_OBSERVE:
-            continue
-        if sub == "open":
-            check_playwright_open(rest[1:])
-            continue
-        raise Blocked(
-            f"playwright-cli {sub}".strip(),
-            "only observe commands are allowed (Must never #1)",
-        )
+    if program(words[0]) != "playwright-cli":
+        return
+    sub = words[1] if len(words) > 1 else ""
+    if sub in PLAYWRIGHT_OBSERVE:
+        return
+    if sub == "open":
+        check_playwright_open(words[2:])
+        return
+    raise Blocked(
+        f"playwright-cli {sub}".strip(),
+        "only observe commands are allowed (Must never #1)",
+    )
 
 
 def check_playwright_open(args: list[str]) -> None:
@@ -176,7 +229,15 @@ def check_push(args: list[str], cwd: str | None) -> None:
     for refspec in positional[1:]:
         if refspec.startswith("+"):
             raise Blocked("force push", "a + refspec forces (Must never #9)")
-        if refspec.split(":")[-1] in ("main", "refs/heads/main"):
+        source, _, dest = refspec.partition(":")
+        target = dest or source
+        if target in ("HEAD", "@"):
+            target = current_branch(cwd)
+            if target is None:
+                raise Blocked(
+                    "push to main", "HEAD on an unknown branch (Must never #9)"
+                )
+        if target in ("main", "refs/heads/main"):
             raise Blocked("push to main", "never push to main (Must never #9)")
     if len(positional) <= 1:
         branch = current_branch(cwd)
@@ -221,16 +282,19 @@ def check(command: str, cwd: str | None, depth: int = 0) -> None:
         if pattern.search(command):
             raise Blocked(rule, why)
     for words in simple_commands(command):
-        # A quoted word with spaces may be a command (`bash -c "..."`,
-        # `cmd /c "..."`), so check it as one; commit messages get checked too.
-        if depth < MAX_DEPTH:
-            for word in words:
-                if any(c.isspace() for c in word):
-                    check(word, cwd, depth + 1)
         if is_bare(words, "env") or is_bare(words, "set"):
             raise Blocked(
                 f"bare {words[0]}", "it prints every variable (Must never #5)"
             )
+        words = unwrap(words)
+        if not words:
+            continue
+        inner = nested_command(words)
+        if inner is not None:
+            if depth >= MAX_DEPTH:
+                raise Blocked("nested command", "too deeply nested to check")
+            check(inner, cwd, depth + 1)
+            continue
         check_playwright(words)
         check_rm(words)
         push = git_args(words, ("push",))
@@ -251,8 +315,9 @@ def block(message: str) -> None:
 def main() -> None:
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
-        if payload.get("tool_name") != "Bash":
-            return
+        tool = payload.get("tool_name")
+        if tool not in TOOLS:
+            raise Blocked("unexpected tool", f"{tool!r} isn't Bash or PowerShell")
         command = payload["tool_input"]["command"]
         if not isinstance(command, str):
             raise TypeError("tool_input.command is not text")
