@@ -66,6 +66,7 @@ PLAYWRIGHT_OBSERVE = {
     "close",
 }
 REAL_DATA_DIRS = {"private", "state", ".state", "logs"}
+MAX_DEPTH = 3  # how deep quoted commands inside commands are checked
 
 
 class Blocked(Exception):
@@ -215,11 +216,17 @@ def check_stage(args: list[str]) -> None:
             )
 
 
-def check(command: str, cwd: str | None) -> None:
+def check(command: str, cwd: str | None, depth: int = 0) -> None:
     for rule, why, pattern in TEXT_RULES:
         if pattern.search(command):
             raise Blocked(rule, why)
     for words in simple_commands(command):
+        # A quoted word with spaces may be a command (`bash -c "..."`,
+        # `cmd /c "..."`), so check it as one; commit messages get checked too.
+        if depth < MAX_DEPTH:
+            for word in words:
+                if any(c.isspace() for c in word):
+                    check(word, cwd, depth + 1)
         if is_bare(words, "env") or is_bare(words, "set"):
             raise Blocked(
                 f"bare {words[0]}", "it prints every variable (Must never #5)"
