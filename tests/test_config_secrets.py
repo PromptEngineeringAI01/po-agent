@@ -354,3 +354,17 @@ def test_po_number_identifier_is_kept():
     error = AccuracyBreach("task value mismatch", step="W2", note_id="2609034B/048")
 
     assert "note_id=2609034B/048" in str(error)
+
+
+def test_reason_identifier_is_kept_or_redacted():
+    kept = GuardRefusal(
+        "guard refused the action", action="assign_note", reason="DENYLISTED"
+    )
+    redacted = GuardRefusal("guard refused the action", reason="12 Smith Close")
+
+    assert kept.reason == "DENYLISTED"
+    assert str(kept) == (
+        "guard refused the action (action=assign_note, reason=DENYLISTED)"
+    )
+    assert redacted.reason == "<redacted>"
+    assert "Smith" not in str(redacted)

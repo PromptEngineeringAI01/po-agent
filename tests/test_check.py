@@ -163,6 +163,7 @@ def test_steps_are_in_spec_order(check_script):
     assert names == [
         "ruff format --check .",
         "ruff check .",
+        "guard check",
         "repo data",
         f'pytest tests -m "{PYTEST_MARKERS}"',
     ]
@@ -184,6 +185,7 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
     assert calls == [
         ([*python_m, "ruff", "format", "--check", "."], check_script.ROOT),
         ([*python_m, "ruff", "check", "."], check_script.ROOT),
+        ([sys.executable, "scripts/guard_check.py"], check_script.ROOT),
         ([*python_m, "pytest", "tests", "-m", PYTEST_MARKERS], check_script.ROOT),
     ]
 
