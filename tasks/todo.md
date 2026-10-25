@@ -14,7 +14,7 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 - [x] **F.2** (done: PR #6, 16 Oct 2026) Freeze commit on `plan-mvp`: `tasks/`, the dated D1–D7 entry in `docs/decisions.md`, and the SPEC / `docs/specs/spec.md` / `docs/workflow.md` / `docs/macmini-setup.md` changes in plan → Doc drift; PR; Joey merges · Claude writes, Joey merges
 - [x] **F.3** (done: PR #7, 16 Oct 2026) Joey's CLAUDE.md edits by hand (plan → Doc drift: Must never #2, #3, #6 and Secrets); #3 must be merged before 1.2 · by hand
 - [x] **F.4** (done, 16 Oct 2026) Local git: fast-forward `main` to `origin/main`; delete or reset the stale `m1-walking-skeleton` branch · by hand
-- [ ] **F.5** Tell the CEO that D2 puts the trial PDF briefly on the Mac Mini's disk (decision 2 was asked as "in memory only") · by hand
+- [x] **F.5** (done, 25 Oct 2026: the CEO approved D2 and delegated decision 2 to Joey, who decided yes) Tell the CEO that D2 puts the trial PDF briefly on the Mac Mini's disk · by hand
 
 ## M0b — screens still to map (Stage 3E)
 
@@ -51,16 +51,16 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 ## M3 — decide-only + run controls
 
-Listed in build order: 3.5 and 3.6 need only 3.3, so they come before 3.4, whose Mac Mini part waits for the CEO.
+**Milestone A** (decisions, 25 Oct 2026): 1.4, 1.6, 1.7, M0b.1, 1.8, 1.9, 1.10; M2 (2.1–2.6); M3's 3.1, 3.2, 3.3, 3.5, then 3.4, then the decide-only demo to the CEO. 3.6 comes after the demo, before M4.
 
 - [ ] **3.1** Take a Note and hand it back (untick + read back, assign to agent, step 2a, assign to pool; anchored lists; runlog format incl. `assignee_check`) · step
 - [ ] **3.2** Attachment count, download (`downloads_path` at launch; file read into memory and deleted at once), project search via `match_project()`, project reads → `MySysLookup` · step
 - [ ] **3.3** `run --decide-only` loop with NOTE lines; offline loop test + seam-2 `decide_only` · step
 - [ ] **3.5** Kill switch (start + `before_write` every step), Perth window, run cap · step
-- [ ] **3.6** Assignee check (All Pools + exact Note ID) before W1 and W4 only (D7); stale-Note stop at run start (D6) · step
-- [ ] **3.4** Decide-only on the laptop (headed), then on the Mac Mini after **CEO decision 2** on D2's terms (F.5) · by hand
+- [ ] **3.6** Assignee check (All Pools + exact Note ID) before W1 and W4 only (D7); stale-Note stop at run start (D6) · step · after the Milestone A demo, before M4
+- [ ] **3.4** Decide-only on the laptop (headed), then on the Mac Mini (decision 2: yes, 25 Oct 2026); for the Milestone A demo, the job may be loaded in decide-only mode · by hand
 
-**Checkpoint M3:** check green; seam-2 decide-only and assignee green; Mac Mini decide-only green; review. **Gate for M4:** M0b.2 merged; doubt-driven review of the booker design (fresh session); reset.
+**Checkpoint Milestone A:** check green; seam-2 decide-only green; Mac Mini decide-only green; demo to the CEO. **Checkpoint M3:** 3.6 merged; seam-2 assignee green; Mac Mini decide-only green; review. **Gate for M4:** M0b.2 merged; doubt-driven review of the booker design (fresh session); reset.
 
 ## M4 — first booking
 
