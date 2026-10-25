@@ -17,7 +17,7 @@ _IDENTIFIER = re.compile(r"[A-Za-z0-9_./-]{1,64}")
 _IDENTIFIER_NAMES = ("action", "step", "note_id", "pln", "field", "secret", "reason")
 
 
-def _identifier(value: str | None) -> str | None:
+def identifier(value: str | None) -> str | None:
     if value is None:
         return None
     return value if _IDENTIFIER.fullmatch(value) else REDACTED
@@ -39,13 +39,13 @@ class PoAgentError(Exception):
         reason: str | None = None,
     ) -> None:
         self.detail = detail
-        self.action = _identifier(action)
-        self.step = _identifier(step)
-        self.note_id = _identifier(note_id)
-        self.pln = _identifier(pln)
-        self.field = _identifier(field)
-        self.secret = _identifier(secret)
-        self.reason = _identifier(reason)
+        self.action = identifier(action)
+        self.step = identifier(step)
+        self.note_id = identifier(note_id)
+        self.pln = identifier(pln)
+        self.field = identifier(field)
+        self.secret = identifier(secret)
+        self.reason = identifier(reason)
         ids = ", ".join(
             f"{name}={getattr(self, name)}"
             for name in _IDENTIFIER_NAMES

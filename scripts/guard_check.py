@@ -13,6 +13,8 @@ per finding, on:
 - in src/, a typed error (a PoAgentError subclass in core/errors.py) whose
   detail isn't a plain string constant: details are fixed strings, never page
   text (1.5 review).
+- in src/, `print` (a call or a reference, bare or as an attribute) outside
+  src/po_agent/core/output.py, the only printer of the stdout contract (1.6).
 
 Known gaps (code review is the control): operator.methodcaller, page JS via
 wait_for_function, record_har_path= keyword arguments, force=True in act().
@@ -26,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCANNED = ("src", "scripts", "tests")
 ERRORS = "src/po_agent/core/errors.py"
 BASE_ERROR = "PoAgentError"
+OUTPUT = "src/po_agent/core/output.py"
 
 BANNED = frozenset(
     {
@@ -136,11 +139,17 @@ def scan_file(rel: str, source: str, errors: frozenset[str]) -> list[str]:
         return [f"{rel}:{exc.lineno}: cannot parse"]
     found: list[str] = []
     check_errors = rel.startswith("src/")
+    check_print = check_errors and rel != OUTPUT
 
     def visit(node: ast.AST, allowed: frozenset[str]) -> None:
         line = getattr(node, "lineno", 0)
         if isinstance(node, ast.Attribute) and node.attr in BANNED - allowed:
             found.append(f"{rel}:{line}: {node.attr}: page action outside the guard")
+        if check_print and (
+            (isinstance(node, ast.Name) and node.id == "print")
+            or (isinstance(node, ast.Attribute) and node.attr == "print")
+        ):
+            found.append(f"{rel}:{line}: print: only core/output.py prints")
         if isinstance(node, ast.Call):
             if (
                 isinstance(node.func, ast.Name)

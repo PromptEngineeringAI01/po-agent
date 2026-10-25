@@ -269,3 +269,32 @@ def test_main_exits_0_on_the_repo():
     )
 
     assert result.returncode == 0
+
+
+# --- print only in core/output.py (task 1.6) ---------------------------------
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "print('x')\n",
+        "show = print\n",  # a reference, not only a call
+        "import builtins\nbuiltins.print('x')\n",
+    ],
+)
+def test_print_in_src_outside_output_py_fails(tmp_path, guard_check, source):
+    found = scan(guard_check, tmp_path, "src/po_agent/cli.py", source)
+
+    assert len(found) == 1
+    assert "print" in found[0]
+
+
+def test_print_in_output_py_passes(tmp_path, guard_check):
+    source = "print('x')\n"
+
+    assert scan(guard_check, tmp_path, "src/po_agent/core/output.py", source) == []
+
+
+@pytest.mark.parametrize("rel", ["scripts/tool.py", "tests/test_x.py"])
+def test_print_outside_src_passes(tmp_path, guard_check, rel):
+    assert scan(guard_check, tmp_path, rel, "print('x')\n") == []
