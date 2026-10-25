@@ -12,7 +12,9 @@ fails the build on a page action anywhere but in `act()`.
 
 Refusal reasons and error details are fixed strings, never page text: a
 denylisted name can be an address ("... Close"). Typed values (the password)
-are never stored or logged.
+are never stored or logged. A Playwright error becomes a fixed
+`UnexpectedScreen` without its message, which quotes the call (`fill("<the
+password>")`) and the locator (a heading can hold an address).
 """
 
 import re
@@ -20,8 +22,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from playwright.sync_api import ElementHandle, FilePayload, Locator
+from playwright.sync_api import Error as PlaywrightError
 
-from po_agent.core.errors import GuardRefusal
+from po_agent.core.errors import GuardRefusal, UnexpectedScreen
 
 
 class Kind(StrEnum):
@@ -151,7 +154,7 @@ def _count_refusal(count: int, none: Refusal, many: Refusal) -> Refusal | None:
 
 class ActionGuard:
     def __init__(self) -> None:
-        # (action name, "done" or the refusal reason); never a typed value.
+        # (action name, "done", "failed" or the refusal reason); never a value.
         self.history: list[tuple[str, str]] = []
 
     def vet(
@@ -166,6 +169,16 @@ class ActionGuard:
         denylist; it isn't the Pending button; it isn't a checkbox while a
         Hold Task window is open.
         """
+        try:
+            return self._vet(action, scope, target, value)
+        except PlaywrightError:
+            raise UnexpectedScreen(
+                "guard could not read the page", action=action
+            ) from None
+
+    def _vet(
+        self, action: str, scope: Locator, target: Locator, value: Value
+    ) -> Allowed | Refused:
         kind = ALLOWLIST.get(action)
         if kind is None:
             return Refused(Refusal.UNKNOWN_ACTION)
@@ -230,11 +243,18 @@ class ActionGuard:
     def act(
         self, action: str, scope: Locator, target: Locator, value: Value = None
     ) -> None:
-        """vet(), then act on the element vet() resolved, or raise GuardRefusal.
+        """vet(), then act on the element vet() resolved.
+
+        Raises GuardRefusal on a refusal, before any page interaction, and
+        UnexpectedScreen (fixed detail) if Playwright fails.
 
         The only place a page action is called (scripts/guard_check.py).
         """
-        verdict = self.vet(action, scope, target, value)
+        try:
+            verdict = self.vet(action, scope, target, value)
+        except UnexpectedScreen:
+            self.history.append((action, "failed"))
+            raise
         if isinstance(verdict, Refused):
             self.history.append((action, verdict.reason))
             raise GuardRefusal(
@@ -244,20 +264,24 @@ class ActionGuard:
         # ElementHandle actions on the pinned element; Playwright prefers
         # Locators, but a Locator would look the element up again (spec §5).
         # https://playwright.dev/python/docs/api/class-elementhandle
-        match ALLOWLIST[action]:
-            case Kind.CLICK:
-                element.click()
-            case Kind.FILL:
-                element.fill(value)
-            case Kind.CHECK:
-                element.check()
-            case Kind.UNCHECK:
-                element.uncheck()
-            case Kind.SELECT:
-                element.select_option(label=value)
-            case Kind.UPLOAD:
-                # A FilePayload uploads from memory, never from a path (D2).
-                element.set_input_files(value)
+        try:
+            match ALLOWLIST[action]:
+                case Kind.CLICK:
+                    element.click()
+                case Kind.FILL:
+                    element.fill(value)
+                case Kind.CHECK:
+                    element.check()
+                case Kind.UNCHECK:
+                    element.uncheck()
+                case Kind.SELECT:
+                    element.select_option(label=value)
+                case Kind.UPLOAD:
+                    # A FilePayload uploads from memory, never from a path (D2).
+                    element.set_input_files(value)
+        except PlaywrightError:
+            self.history.append((action, "failed"))
+            raise UnexpectedScreen("guard action failed", action=action) from None
         self.history.append((action, "done"))
 
     @staticmethod
