@@ -1,10 +1,11 @@
 """Typed errors and their exit codes (SPEC.md -> Code style, Exit codes).
 
 A message is a fixed detail written in the code plus identifiers only (action
-name, step, note_id, trial pln, config field, secret name). Never pass an
-element's text, a page string or a Playwright message: they can hold an
-address (a "... Close" street behind a guard refusal). An identifier that
-doesn't look like one is replaced by "<redacted>".
+name, step, note_id, trial pln, config field, secret name, guard refusal
+reason). Never pass an element's text, a page string or a Playwright message:
+they can hold an address (a "... Close" street behind a guard refusal).
+scripts/guard_check.py fails on a detail that isn't a string constant. An
+identifier that doesn't look like one is replaced by "<redacted>".
 """
 
 import re
@@ -13,7 +14,7 @@ from typing import ClassVar
 REDACTED = "<redacted>"
 # Note IDs, steps, action names, plns, PO numbers (2609034B/048), field paths.
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_./-]{1,64}")
-_IDENTIFIER_NAMES = ("action", "step", "note_id", "pln", "field", "secret")
+_IDENTIFIER_NAMES = ("action", "step", "note_id", "pln", "field", "secret", "reason")
 
 
 def _identifier(value: str | None) -> str | None:
@@ -35,6 +36,7 @@ class PoAgentError(Exception):
         pln: str | None = None,
         field: str | None = None,
         secret: str | None = None,
+        reason: str | None = None,
     ) -> None:
         self.detail = detail
         self.action = _identifier(action)
@@ -43,6 +45,7 @@ class PoAgentError(Exception):
         self.pln = _identifier(pln)
         self.field = _identifier(field)
         self.secret = _identifier(secret)
+        self.reason = _identifier(reason)
         ids = ", ".join(
             f"{name}={getattr(self, name)}"
             for name in _IDENTIFIER_NAMES

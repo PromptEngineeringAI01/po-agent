@@ -98,9 +98,17 @@ def command(*args: str) -> Callable[[], bool]:
     return run
 
 
+def script(path: str) -> Callable[[], bool]:
+    def run() -> bool:
+        return subprocess.run([sys.executable, path], cwd=ROOT).returncode == 0
+
+    return run
+
+
 STEPS: list[Step] = [
     ("ruff format --check .", command("ruff", "format", "--check", ".")),
     ("ruff check .", command("ruff", "check", ".")),
+    ("guard check", script("scripts/guard_check.py")),
     ("repo data", repo_data),
     (
         f'pytest tests -m "{PYTEST_MARKERS}"',
