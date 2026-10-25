@@ -30,7 +30,7 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 - [x] **1.3** Pre-commit (gitleaks + repo-data rule; `.gitleaks.toml` for the hook test's fake key) and CI `check.yml` (+ Chromium) · step
 - [x] **1.5** Config (`config/test.toml`, test host only), secrets (env → keyring), typed errors · step
 - [x] **1.4** Action guard (`vet()` / `act()` with `value`; `act()` on the element `vet()` resolved; `exact=True`; allowlist, scope, exactly-one, denylist on element, select = chosen option) + widened `guard_check.py` (bans the `request` attribute, not verb names) · step
-- [ ] **1.6** Output contract, `run_id`, `po-agent` CLI (exit 2 on config/secrets; plain `run` refuses until 4.5; catch-all; nothing on stderr; download-dir sweep) · step
+- [x] **1.6** Output contract, `run_id`, `po-agent` CLI (exit 2 on config/secrets; plain `run` refuses until 4.5; catch-all; nothing on stderr; download-dir sweep) · step
 - [ ] **1.7** Eligibility, step 0 (test + live title rules, Project `---`, Assignee = pool) · step
 - [ ] **1.8** Spike: guarded login, Note Pool filters read back (Search empty), list read once, RUN_SUMMARY (seam-2 `spike`); seam-2 failure reports scrubbed to the exception type; explicit `-m testsite` errors on missing secrets · step · needs M0b.1 merged
 - [ ] **1.9** `scripts/macmini-run.sh` (mode mapping, stop on failed pull, process-group kill, stderr dropped) + launchd plist, with stub-command tests · step
