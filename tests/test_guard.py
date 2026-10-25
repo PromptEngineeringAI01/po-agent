@@ -6,10 +6,13 @@ is seen through an inline onclick that sets data-clicked, read back with
 get_attribute; tests never act on the page themselves (guard_check.py).
 """
 
+import traceback
 from collections.abc import Iterator
 
 import pytest
 from playwright.sync_api import Browser, Locator, Page, sync_playwright
+
+from po_agent.core.errors import GuardRefusal, UnexpectedScreen
 from po_agent.mysys.guard import (
     ALLOWLIST,
     DENYLIST,
@@ -18,8 +21,6 @@ from po_agent.mysys.guard import (
     Refusal,
     Refused,
 )
-
-from po_agent.core.errors import GuardRefusal
 
 FAKE_PDF = {
     "name": "fake_po.pdf",
@@ -598,3 +599,97 @@ def test_typed_value_never_appears_in_history_verdict_or_error(page, guard):
     for text in (repr(verdict), repr(guard.history), str(caught.value)):
         assert PASSWORD not in text
     assert PASSWORD not in repr(caught.value.args)
+
+
+# --- review fixes: untested refusals and Playwright error text --------------
+
+
+def test_element_with_no_readable_name_is_refused(page, guard):
+    page.set_content(window("Note 300001", button("Assign", 'aria-hidden="true"')))
+    scope = win(page, "Note 300001")
+    target = scope.locator("button")
+
+    assert refusal(guard, "assign_note", scope, target) == Refusal.NAME_UNREADABLE
+    assert not clicked(target)
+
+
+@pytest.mark.parametrize(
+    "action, value, locate",
+    [
+        ("set_pool_filter", "Pending", lambda s: s.locator("input")),
+        ("search_note_pool", "300001", lambda s: s.locator("select")),
+    ],
+)
+def test_select_kind_and_select_element_must_go_together(
+    page, guard, action, value, locate
+):
+    page.set_content(
+        window("Note Pool", '<input aria-label="Search" type="text">' + STATUS_SELECT)
+    )
+    scope = win(page, "Note Pool")
+
+    assert refusal(guard, action, scope, locate(scope), value) == Refusal.WRONG_ELEMENT
+    assert scope.locator("input").input_value() == ""
+    assert scope.locator("select").input_value() == "Pending"
+
+
+@pytest.mark.parametrize(
+    "locate",
+    [
+        lambda s: s.locator("label", has_text="Job 1"),
+        lambda s: s.locator("div.row"),
+    ],
+    ids=["label", "row"],
+)
+def test_click_on_a_label_or_row_holding_a_hold_checkbox_is_refused(
+    page, guard, locate
+):
+    page.set_content(
+        window(
+            "Hold Task: tsk_200001",
+            '<div class="row"><label><input type="checkbox"> Job 1</label></div>'
+            + button("Hold"),
+        )
+    )
+    scope = win(page, "Hold Task: tsk_200001")
+
+    refused = refusal(guard, "confirm_hold", scope, locate(scope))
+
+    assert refused == Refusal.HOLD_CHECKBOX
+    assert not scope.get_by_role("checkbox", name="Job 1", exact=True).is_checked()
+
+
+def test_failed_action_is_a_fixed_error_without_the_typed_value(page, guard):
+    # Playwright's own message quotes the call: fill("<the password>").
+    page.set_content(
+        window(
+            "Login",
+            '<label for="p">Password</label><input id="p" type="password" disabled>',
+        )
+    )
+    page.set_default_timeout(300)
+    login = win(page, "Login")
+    password = login.get_by_label("Password", exact=True)
+
+    with pytest.raises(UnexpectedScreen) as caught:
+        guard.act("login_password", login, password, PASSWORD)
+
+    shown = "".join(traceback.format_exception(caught.value))
+    assert PASSWORD not in shown
+    assert caught.value.action == "login_password"
+    assert guard.history == [("login_password", "failed")]
+
+
+def test_page_error_while_vetting_is_a_fixed_error_without_page_text(browser, guard):
+    # A scope found by a heading can quote an address; Playwright's message
+    # quotes the locator.
+    page = browser.new_page()
+    scope = win(page, "pln_10001 B1 Homes 12 Sample Close")
+    target = scope.get_by_role("button", name="Create New Task", exact=True)
+    page.close()
+
+    with pytest.raises(UnexpectedScreen) as caught:
+        guard.vet("open_create_new_task", scope, target)
+
+    assert "Sample" not in "".join(traceback.format_exception(caught.value))
+    assert caught.value.action == "open_create_new_task"
