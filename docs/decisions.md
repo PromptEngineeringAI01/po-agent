@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 24 Oct 2026, lean process)
+# PO Agent — decision log (updated 25 Oct 2026, Milestone A)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -8,7 +8,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
-- **Pending (blocks go-live only):** decision 2 (Claude reading real client POs). Joey has decided it as "yes" for now, **CEO to confirm** (entry below).
+- **25 Oct 2026: decision 2 made.** The CEO delegated decision 2 (Claude reading real client POs) to Joey, and approved the trial PDF sitting briefly on the Mac Mini's disk (D2). Joey: yes, on the Trial conditions terms (entry below).
+
+## 25 Oct 2026 - Decision 2, Milestone A first, the repo is public (Joey)
+
+- **Decision 2:** the CEO delegated it to Joey; Joey decides yes, on the terms in `SPEC.md` → Trial conditions. The CEO approved D2 (the trial PDF on the Mac Mini's disk from its download until it's read into memory). Task F.5 is done. 3.4's Mac Mini run is no longer waiting on the CEO.
+- **Milestone A comes first:** a decide-only demo to the CEO. The Mac Mini runs the agent by itself against the test site: it logs in, takes each eligible Note, downloads and reads the PDF, decides PROCEED or SKIP, and returns the Note to the pool, writing nothing. Scope: 1.4, 1.6, 1.7, M0b.1, 1.8, 1.9, 1.10; M2 (2.1–2.6); M3's 3.1, 3.2, 3.3, 3.5, then 3.4. For the demo the launchd job may be loaded in decide-only mode (hourly, no writes); plain `run` still refuses until 4.5.
+- **3.6 moves after the Milestone A demo.** The assignee check and the stale-Note stop guard writes, and Milestone A has none. 3.6 is still built and merged before any booking code (D1 holds): it joins the gate for M4. M0b.2, M4, M5 and M6 are unchanged and follow Milestone A.
+- **The repo is public** (Joey, 24 Oct 2026), so the CEO can read it in a browser. It holds no credentials, PDFs, addresses or client names (the repo-data check, pre-commit and gitleaks in CI guard that), only the 3 trial POs' identifiers, which Must never #6 already allows in committed files. This replaces "private GitHub repo" in `SPEC.md`.
+- Carried in: `SPEC.md` v1.15 (assumption 8, open question 4, Expected slices), `tasks/plan.md` (3.6, gate for M4), `tasks/todo.md`, `docs/workflow.md` v5.16.
 
 ## 24 Oct 2026 - protect_paths allows three folders outside the repo (Joey; plan task 1.2)
 

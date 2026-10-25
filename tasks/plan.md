@@ -442,7 +442,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 ### 3.6 Assignee check · step
 
 **Description:** A fresh Note Pool read before W1 and before W4 (D7), so the agent stops if a person has taken the Note, plus the stale-Note stop at run start (D6). Built and tested before any booking code (D1).
-**Needs:** 3.5, M0b.1 (rows 23, 25).
+**Needs:** 3.5, M0b.1 (rows 23, 25). **Order:** after the Milestone A demo, before M4 (decisions, 25 Oct 2026).
 **Acceptance:**
 - Note Pool with Assigned Pool = All Pools and Search/filter = the Note ID, as mapped in row 23, then back to the window the booker was in, as mapped in row 25. The row whose ID cell **equals** the Note ID must have Assignee `agent_user_name`. Zero such rows, or more than one → `UnexpectedScreen`.
 - Someone else at the W1 check (nothing written) → close the browser context and stop work on that Note without any write or reassign: `"outcome": "untouched"`, `"reason": "NOTE_TAKEN"` (Open question 4). Someone else at the W4 check (the task exists and is on hold) → `PartialWrite`. `before_write` for W2, W3 and W5 doesn't leave the window it's in (D7).
@@ -455,7 +455,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 ### Checkpoint: M3
 - [ ] `check: all passed`; seam-2 decide-only and assignee green after a reset.
 - [ ] Mac Mini decide-only green (only after CEO decision 2).
-- [ ] `/agent-skills:review`. **Gate for M4:** M0b.2 merged; `doubt-driven-development` on the booker design (4.1–4.5) against `docs/screen-map.md`, in a fresh session; test site reset.
+- [ ] `/agent-skills:review`. **Gate for M4:** 3.6 merged; M0b.2 merged; `doubt-driven-development` on the booker design (4.1–4.5) against `docs/screen-map.md`, in a fresh session; test site reset.
 
 ---
 

@@ -1,10 +1,12 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.15 · 24 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.16 · 25 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.16:** Milestone A first: a decide-only demo on the Mac Mini, then 3.6 and M4 (decisions, 25 Oct 2026). Plan mode only on the review-stop tasks; other tasks are one prompt, and the advisor chat can start each task in a Terminal tab. The repo is public. Appendix A's CI matches the real `check.yml` (gitleaks-action v3).
 
 **v5.15:** Appendix A: outside the repo, `protect_paths.py` allows only `~/.claude/plans/`, this project's memory folder and `<temp>/claude/`, matched on resolved paths by whole folders (decisions, 24 Oct 2026). Every hook in the settings shape has `"onFailure": "block"`, so a hook that fails to run blocks instead of letting the action through.
 
@@ -22,7 +24,8 @@
 | 3 | M0: SOP walkthrough on the test site, screen map, the six checks, 3 real PDFs and `cases.toml` in `private/` | **Done** (16 Oct 2026, PRs #3–#5) |
 | 3E | M0b: the screens still to map | **To do, by hand.** M0b.1 before task 1.8; M0b.2 before M4 |
 | 4 | SPEC check, plan, doubt review, freeze | **Done** (16 Oct 2026, PRs #5–#7) |
-| 5 | Build M1–M5, one task at a time | **In progress.** 1.1 done (PR #9); next 1.2 |
+| 5 | Build, one task at a time | **In progress.** 1.1, 1.2, 1.3, 1.5 done (PRs #9, #12–#14); next 1.4 |
+| **A** | **Milestone A:** decide-only on the Mac Mini, demo to the CEO | After 1.4, 1.6–1.10, M0b.1, M2, 3.1–3.3, 3.5, 3.4 |
 | 6 | Verify on the test site and the Mac Mini | After M3 and M4 |
 | 7 | MVP demo (M6) | After M5 |
 | 8 | After the MVP | Later |
@@ -59,7 +62,7 @@ Not used: `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`
 
 | Thing | Rule |
 |---|---|
-| Code | Private GitHub repo (`PromptEngineeringAI01/po-agent`). The Mac Mini pulls `main` before every run, so **merging is deploying**. |
+| Code | GitHub repo `PromptEngineeringAI01/po-agent`, **public** so the CEO can read it: never put anything in it you wouldn't publish. The Mac Mini pulls `main` before every run, so **merging is deploying**. |
 | Plan and tasks | `tasks/plan.md`, `tasks/todo.md`. Tasks run in order, one per branch and session. |
 | Changes after the freeze | A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control, needs a dated `docs/decisions.md` entry plus `SPEC.md` and `tasks/plan.md`, in the same commit. Tightening a dev-tooling rule needs only a clear commit message. |
 | Hooks | Created in M1 (task 1.2), then changed only by Joey, by hand. |
@@ -148,7 +151,14 @@ Update docs/screen-map.md (the rows I just mapped, fake values only) and SPEC.md
 2. **Fresh session:** `claude`. One task per session (M2: one `/agent-skills:build auto` run for the whole slice).
 3. **Build.** Name the task by its number ("the next unchecked task" would pick a by-hand one). By-hand tasks (M0b, 1.10, 3.4, 4.6, M6) are never built with `/agent-skills:build`.
 
-   - **"step" tasks** (M1, M3, M4, M5): press **Shift+Tab** to turn plan mode on, then:
+   - **Easiest:** in the advisor chat, say "merged, start the next one": it pulls `main`, creates the branch and opens a Terminal tab with Claude already running the right prompt.
+   - **Normal tasks** (1.6, 1.7, 1.8, 1.9, 5.1, M2's 2.1 and 2.6): no plan mode, one prompt that runs through to the PR:
+
+     ```text
+     /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md). When check passes, run the code-review-and-quality skill once, fix Important findings, tick <N>, push and open the PR with the Review guide. Then stop; don't merge.
+     ```
+
+   - **Review-stop tasks** (1.4, M3: 3.1–3.6, M4: 4.1–4.5, 5.2; M2's 2.2–2.5 stop inside the auto run): press **Shift+Tab** to turn plan mode on, then:
 
      ```text
      Plan task <N> from tasks/plan.md: the files, the failing test you'll write first, the risks, and which CLAUDE.md must-never rule is at stake. Don't write anything yet.
@@ -305,24 +315,7 @@ Not part of the MVP. In short: `/agent-skills:code-simplify` once; Matt Pocock's
 
 **CI:** `.github/workflows/check.yml`, no secrets:
 
-```yaml
-name: check
-on:
-  push:
-  pull_request:
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --locked
-      - run: uv run playwright install --with-deps chromium   # the guard's tests use a real browser on local HTML
-      - run: uv run scripts/check.py
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+The real file is `.github/workflows/check.yml` (task 1.3): checkout, setup-uv, `uv sync --locked`, `uv run playwright install --with-deps chromium`, `uv run scripts/check.py`, then `gitleaks/gitleaks-action` **v3** (v2 ran on Node 20, which GitHub removed) with `.gitleaks.toml`. Actions are pinned by commit SHA; no secrets but the automatic `GITHUB_TOKEN`; the owner is a user account, so no `GITLEAKS_LICENSE`.
 
 **`.claude/settings.json`** already exists from M0 with the Playwright CLI rules. Write the hook scripts first, then **extend** this file last (keep its existing allow and deny rules; once the hooks are in, they stop Claude editing `.claude/**`). Merged shape:
 
