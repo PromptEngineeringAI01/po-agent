@@ -5,9 +5,10 @@ docs/screen-map.md), never a trial PO's.
 """
 
 import pytest
+from pydantic import ValidationError
+
 from po_agent.b1.decision import eligible_internal_no
 from po_agent.b1.models import NotePoolRow
-from pydantic import ValidationError
 
 POOL = "Agent Pool"
 BODY = "Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf"
