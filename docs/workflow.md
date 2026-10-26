@@ -1,6 +1,6 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.16 · 25 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.17 · 25 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
@@ -22,9 +22,9 @@
 |---|---|---|
 | 0–2 | Tools, GitHub repo, skills | **Done** (14–15 Oct 2026) |
 | 3 | M0: SOP walkthrough on the test site, screen map, the six checks, 3 real PDFs and `cases.toml` in `private/` | **Done** (16 Oct 2026, PRs #3–#5) |
-| 3E | M0b: the screens still to map | **To do, by hand.** M0b.1 before task 1.8; M0b.2 before M4 |
+| 3E | M0b: the screens still to map | M0b.1 **done** (25 Oct 2026; rows 21–22 dropped, row 23 moved to M0b.2). M0b.2 **to do, by hand**, before M4 (row 23 before 3.6) |
 | 4 | SPEC check, plan, doubt review, freeze | **Done** (16 Oct 2026, PRs #5–#7) |
-| 5 | Build, one task at a time | **In progress.** 1.1, 1.2, 1.3, 1.5 done (PRs #9, #12–#14); next 1.4 |
+| 5 | Build, one task at a time | **In progress.** 1.1–1.7 done (PRs #9, #12–#14, #16–#18); next 1.8 |
 | **A** | **Milestone A:** decide-only on the Mac Mini, demo to the CEO | After 1.4, 1.6–1.10, M0b.1, M2, 3.1–3.3, 3.5, 3.4 |
 | 6 | Verify on the test site and the Mac Mini | After M3 and M4 |
 | 7 | MVP demo (M6) | After M5 |
@@ -106,7 +106,7 @@ Look only, in your normal browser, with the agent's account; never Playwright CL
 
 ### 3E. Slice M0b: the screens still to map (about two hours, in two sittings)
 
-**M0b.1** (rows 21–23, 25–28, 15b) is needed **before task 1.8** (the spike); **M0b.2** (rows 19, 20, 24) **before M4**. Full acceptance criteria: `tasks/plan.md` → M0b.1, M0b.2. Set up as in 3A.
+**M0b.1** (rows 25–28, 15b) was done on 25 Oct 2026; rows 21–22 were dropped and row 23 moved to M0b.2 (decisions, 25 Oct 2026). **M0b.2** (rows 19, 20, 24, and 23 before task 3.6) comes **before M4**. Full acceptance criteria: `tasks/plan.md` → M0b.1, M0b.2. Set up as in 3A.
 
 | Row | Do this | Look for |
 |---|---|---|
