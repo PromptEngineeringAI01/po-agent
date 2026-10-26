@@ -18,8 +18,8 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 ## M0b — screens still to map (Stage 3E)
 
-- [ ] **M0b.1** Note attachments (0 / 2), assignee read (rows 21–23), moving between windows, anchors for unlabelled controls and panels, Note Pool filter reload, reopening an open project (rows 25–28); does `fill` alone run the searches; one Assign or two to return a Note; Claude writes them up · by hand · **blocks 1.8** and M3
-- [ ] **M0b.2** Task detail, Link to Project search/select (and its target's name), PO Number prefill, empty Documents area (rows 19, 20, 24); anchors for every remaining weak locator (open item 8 closed); upload saved before Submit?; reset; Claude writes them up · by hand · blocks M4
+- [x] **M0b.1** (done, 25 Oct 2026; rows 21–22 dropped, row 23 moved to M0b.2) Moving between windows, anchors for unlabelled controls and panels, Note Pool filter reload and search (`fill` + Refresh), reopening an open project (rows 25–28); one Assign returns a Note (15b); Claude writes them up · by hand · **blocks 1.8** and M3
+- [ ] **M0b.2** Task detail, Link to Project search/select (and its target's name), PO Number prefill, empty Documents area (rows 19, 20, 24); does an open Note window refresh its Assignee (row 23, needed before 3.6); anchors for every remaining weak locator (open item 8 closed); upload saved before Submit?; reset; Claude writes them up · by hand · blocks M4
 
 **Checkpoint M0b:** rows 19–28 captured; no M0b item left in SPEC or the screen map; both PRs merged; test site reset.
 

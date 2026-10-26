@@ -52,8 +52,8 @@ Each needs a dated `docs/decisions.md` entry and the SPEC change, in the freeze 
 ## Dependency graph
 
 ```
-M0b.1 (rows 21–23, 25–28) + its write-up ───────────────┐   blocks 1.8 and M3
-M0b.2 (rows 19, 20, 24) + its write-up ───────────────┐ │   blocks M4
+M0b.1 (rows 25–28, 15b) + its write-up ─────────────────┐   blocks 1.8 and M3 (done, 25 Oct 2026)
+M0b.2 (rows 19, 20, 23, 24) + its write-up ───────────┐ │   blocks M4 (row 23: 3.6)
                                                       │ │
 M1: 1.1 uv+check ─► 1.2 hooks ─► 1.3 pre-commit+CI ─► 1.5 config/secrets/errors ─► 1.4 guard+guard_check
         ─► 1.6 output+CLI ─► 1.7 eligibility ─► 1.8 spike (needs M0b.1) ─► 1.9 wrapper+plist ─► 1.10 Mac Mini spike (S1), then bootout
@@ -94,6 +94,8 @@ Tasks inside a code slice that Joey does himself (1.10, 3.4, 4.6) are marked **b
 
 ### M0b.1: Note attachments, assignee read and moving between screens (rows 21–23, 25–28), then write-up · by hand
 
+**Done, 25 Oct 2026, with a smaller scope (decisions, 25 Oct 2026):** rows 15b and 25–28 mapped and written into `docs/screen-map.md` v1.2 and `SPEC.md` v1.16. Rows 21–22 were dropped (no Notes were made; SPEC's attachment rule stands without them). Row 23 (a)–(c), whether an open Note window refreshes its Assignee, moved to M0b.2, before 3.6; its Note Pool search by Note ID is covered by row 27. Answers: `fill` alone doesn't run the Note Pool search (the agent fills, then clicks Refresh); whether it runs the Projects search is checked first in 3.2; one Assign returns a Note.
+
 **Description:** Joey clicks and Claude snapshots, as in Stage 3A. Nothing here writes to a task.
 - Row 21: a Note with no attachment. Row 22: a Note with two PDFs.
 - Row 23: whether an open Note window refreshes its Assignee after someone else reassigns the Note, and the Note Pool search by Note ID (Assigned Pool = All Pools) with a project window open.
@@ -116,6 +118,8 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Files:** `private/captures/test/*` (git-ignored), `docs/screen-map.md`, `SPEC.md`, `docs/decisions.md`, `tasks/plan.md` (only if frozen).
 
 ### M0b.2: Task detail, Link to Project, PO Number prefill (rows 19, 20, 24), then write-up · by hand
+
+**Also row 23 (moved from M0b.1, decisions, 25 Oct 2026), needed before 3.6:** open a Note in the Playwright window; in his normal browser, as himself, Joey assigns it to someone else; back in the Playwright window, does "Assignee:" change by itself? The write-up records the answer in the screen map and SPEC → Assignee check (which never relies on it).
 
 **Description:** Joey books 2609017B again by hand up to Submit, filling Note with the Note's body (as the agent will), and opens the new task's detail screen (row 19), noting the empty **Documents** upload area before Submit. Before Submit, Claude also snapshots the anchor for each remaining weak locator in open item 8 (Creator, Multiple Units, PO Number, PO Contact, Delivery Office, the Note textarea, both Choose File inputs) and records whether the PO Documents upload is already saved before Submit (e.g. it shows in the project's Documents after the form is abandoned in a second, throwaway attempt; Joey judges whether that attempt is worth it). He finishes Hold, and Claude snapshots the Hold confirm button's anchor inside the `Hold Task: …` window, then maps Link to Project's search and select screens (row 20), and checks whether PO Number is prefilled (row 24). Then he resets (workflow 6.1). Claude then updates the screen map and SPEC from the captures for rows 19, 20 and 24.
 **Needs:** M0 (done). **Blocks:** M4.
@@ -240,7 +244,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Needs:** 1.6, 1.7, M0b.1 written up and merged (row 26: login page and Note Pool panel anchors; row 27: how the list reloads after a filter change).
 **Acceptance:**
 - A fresh login through guarded actions (username, password, Log in), with no storage state saved. A failed login → `ALERT LOGIN_FAILED`, exit 2.
-- Project tab → Note Pool → Assigned Pool = `pool_name` and Locked/Unlocked = Locked (label-anchored inside the row-26 panel anchor, guarded). Each filter is read back as set, and the driver waits for the list to finish reloading as mapped in row 27; otherwise `UnexpectedScreen`. Status and every other filter stay at their defaults, and are read back as defaults, with Search/filter empty (a Note ID left there by an earlier assignee check would silently hide every Note; row 27 says whether it can persist). Rows are read from page 1 only (ID cell, Assignee, Project, Subject/Note), with an `INFO` line if there are more pages. No Note is opened.
+- Project tab → Note Pool → Assigned Pool = `pool_name` and Locked/Unlocked = Locked (each select by its fixed `name`, inside the Note Pool panel anchor from row 26, guarded). Each filter is read back as set. A filter change reloads the list by itself (row 27): the driver waits up to 15 s for the footer "Page 1 of 1(N Items)" or "No record could be found.", and the number of rows must equal N (else one more Refresh, then `UnexpectedScreen`), as SPEC → Note Pool says. Status and every other filter stay at their defaults, and are read back as defaults, with Search/filter empty (a Note ID left there by an earlier assignee check would silently hide every Note; row 27 says whether it can persist). Rows are read from page 1 only (ID cell, Assignee, Project, Subject/Note), with an `INFO` line if there are more pages. No Note is opened.
 - The list is read **once per run**. The run works through that fixed list of Note IDs, so a Note it skips and returns to the pool is not picked up again in the same run.
 - Output: `INFO` lines with counts only, then `RUN_SUMMARY` with `"mode": "spike"`, `seen`, `eligible` and `exit_code` 0.
 - `tests/seam2/conftest.py` gives the `testsite` fixtures and the reset-state precondition helper (Note Pool part only; 3.2 adds the project part). In a default run (`-m "not testsite …"`) they're deselected; when `-m testsite` is selected explicitly, a missing secret or a failed precondition is an **error**, not a skip, so "green with nothing run" can't count as Done.
@@ -369,7 +373,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - [ ] `check: all passed`; live-Claude ×3 `false PROCEED: 0`; deterministic-only 0; real-PO 0 with the report shown.
 - [ ] Skips of clean real POs reviewed with Joey.
 - [ ] `/agent-skills:review` on the M2 PRs.
-- [ ] **Gate for M3:** M0b.1 written up (attachments, assignee read, panels and list anchors, moving between windows) and merged; test site reset.
+- [ ] **Gate for M3:** M0b.1 written up (panels and list anchors, Note Pool search and reload, moving between windows, one-Assign return; rows 21–23 dropped or moved, decisions 25 Oct 2026) and merged; test site reset.
 
 ---
 
@@ -384,7 +388,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - `core/runlog.py` (written only with `--detailed-log`): JSON lines in `logs/<run_id>.jsonl`, one object per event, `{"ts", "run_id", "note_id", "step", "event", "ok"}`. Events: `guard_action` (from `guard.history`, action name only), `assignee_check`, `email_notification_unticked`, `read_back` (field name only), `skip`, `error` (type name only; the traceback is a separate `traceback` event). No values except the trial identifiers. 5.2 asserts on these events.
 - Assign to agent: user list = `agent_user_name`, pool list = `--Select Pool--`, Assign. Both lists are found by their row-26 anchors, never by position. Read back "Assignee:" and the new "User Assigned" log line. Then step 2a: **Link to Project** shown → continue; project button or Change Project → `NOTE_ALREADY_LINKED`.
 - Assign to pool: `--Select User--` + `pool_name`, Assign. Read back Assignee = pool, a new log line, Status Pending. The reset lists and disabled Assign afterwards are expected. No key presses.
-- Navigation: the driver reloads `base_url` between Notes (`driver.go_home()`), logging in again if the login page shows. To reach a Note it already assigned to itself, it follows "Finding a Note again" (Cross-cutting rules) and row 25.
+- Navigation: the driver reloads `base_url` between Notes (`driver.go_home()`), logging in again if the login page shows; after a reload it clicks Project before the Note Pool or Projects tab (row 27). It never clicks Minimize or a taskbar entry. To reach a Note it already assigned to itself, it reloads and follows "Finding a Note again" (Cross-cutting rules), searching with fill → Refresh (row 27); the reopened window has Send Email ticked again, so the untick rule above covers it. Assign to pool is **one** Assign (row 15b).
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k note_window` on one trial Note → it ends in the Agent Pool, Pending, with only two new log lines.
 **Files:** `src/po_agent/mysys/driver.py`, `src/po_agent/core/runlog.py`, `src/po_agent/cli.py` (`--detailed-log`), `tests/seam2/test_note_window.py`, `tests/test_runlog.py`. **Scope:** M.
@@ -394,8 +398,8 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Description:** The read-only lookups the decision engine needs from MySys.
 **Needs:** 3.1.
 **Acceptance:**
-- "Download document" links are counted in the Note window **before** any click (0 or 2 → `NO_PDF`/`MULTIPLE_PDFS`, as mapped in M0b rows 21–22). Download inside `expect_download` into the run's `po-agent-dl-<run_id>` directory; read the first file into memory and delete it at once (D2). A second download is deleted unread. The preview window is never used.
-- Projects sub-tab, Search label-anchored inside the Projects panel (row 26). Wait up to 15 s for "No record found." or rows that each contain the internal number, else `UnexpectedScreen`. Parse every row (pln, Client Ref No., Company, Address) and whether there is a second page. Choose the row with `match_project()` (2.3) and open it by its `pln_…` link. Read Client Internal No., Address, and every "(tsk_…) | Compaction Test" header row with the Status from its details row, into `MySysLookup`.
+- "Download document" links are counted in the Note window **before** any click, by SPEC → Attachment and download (decisions, 25 Oct 2026; rows 21–22 not mapped): exactly one whose URL `file_name` ends `.pdf` (any case) goes on; 0 → `NO_PDF`, more than 1 → `MULTIPLE_PDFS`, anything else → `NO_PDF`. Offline tests cover 0, 1, 2 links, an upper-case `.PDF`, a non-PDF and a link with no `file_name`. Download inside `expect_download` into the run's `po-agent-dl-<run_id>` directory; read the first file into memory and delete it at once (D2). A second download is deleted unread. The preview window is never used.
+- After the download, reload `base_url` (the Note window would cover the Projects results, row 25), then Project → Projects sub-tab, Search anchored inside the Projects panel (row 26). **First, on the test site:** does `fill` alone run this search (not mapped in M0b.1)? If not, click the panel's "Search" label to move focus (add it to the allowlist in this task, with a dated decisions entry); if that fails too, stop and ask Joey. Wait up to 15 s for "No record found." or rows that each contain the internal number, else `UnexpectedScreen`. Parse every row (pln, Client Ref No., Company, Address) and whether there is a second page. Choose the row with `match_project()` (2.3) and open it by its `pln_…` link. Read Client Internal No., Address, and every "(tsk_…) | Compaction Test" header row with the Status from its details row, into `MySysLookup`.
 - The seam-2 precondition helper gains its project part: no non-Cancelled Compaction Test task on a trial pln where the test needs none.
 - Tests assert structure and the trial identifiers only, never an address. An offline test checks the download directory is empty after a Note, and after an exception mid-Note.
 
@@ -442,9 +446,9 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 ### 3.6 Assignee check · step
 
 **Description:** A fresh Note Pool read before W1 and before W4 (D7), so the agent stops if a person has taken the Note, plus the stale-Note stop at run start (D6). Built and tested before any booking code (D1).
-**Needs:** 3.5, M0b.1 (rows 23, 25). **Order:** after the Milestone A demo, before M4 (decisions, 25 Oct 2026).
+**Needs:** 3.5, M0b.1 (rows 25, 27), M0b.2 (row 23). **Order:** after the Milestone A demo, before M4 (decisions, 25 Oct 2026).
 **Acceptance:**
-- Note Pool with Assigned Pool = All Pools and Search/filter = the Note ID, as mapped in row 23, then back to the window the booker was in, as mapped in row 25. The row whose ID cell **equals** the Note ID must have Assignee `agent_user_name`. Zero such rows, or more than one → `UnexpectedScreen`.
+- Reload `base_url`, then the Note Pool with Assigned Pool = All Pools and Search/filter = the Note ID, searched with fill → Refresh as mapped in row 27, then reopen the window the booker needs, as SPEC → Moving between windows says (row 25). The row whose ID cell **equals** the Note ID must have Assignee `agent_user_name`. Zero such rows, or more than one → `UnexpectedScreen`.
 - Someone else at the W1 check (nothing written) → close the browser context and stop work on that Note without any write or reassign: `"outcome": "untouched"`, `"reason": "NOTE_TAKEN"` (Open question 4). Someone else at the W4 check (the task exists and is on hold) → `PartialWrite`. `before_write` for W2, W3 and W5 doesn't leave the window it's in (D7).
 - **Stale-Note stop (D6).** In `run` and `run --decide-only`, after login and before the eligible list is read (1.8), the Note Pool is read with Assigned User = `agent_user_name`, Assigned Pool = All Pools, Locked/Unlocked = All, Search/filter empty and Status left at Pending (the filters anchored as mapped in row 26). Any row whose Assignee is `agent_user_name` → `ALERT UNEXPECTED_SCREEN` with the fixed detail "a Note is still assigned to the agent from an earlier run" and that `note_id`; no Note is taken; exit 1. `spike` skips this read (it takes no Note). Seam-2 teardowns and the reset (workflow 6.1) leave no Pending Note with the agent, so the stop doesn't fire in the tests that follow.
 - The testsite test proves the read returns the agent for an assigned trial Note (then the teardown returns it to the pool). An offline fake-driver test proves the stop logic, including a Note ID that is a prefix of another, and the stale-Note stop: one Pending Note with the agent → exit 1, no Note opened.

@@ -10,6 +10,19 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **25 Oct 2026: decision 2 made.** The CEO delegated decision 2 (Claude reading real client POs) to Joey, and approved the trial PDF sitting briefly on the Mac Mini's disk (D2). Joey: yes, on the Trial conditions terms (entry below).
 
+## 25 Oct 2026 - M0b.1 maps only what 1.8 and 3.1-3.3 need; its findings (Joey; mapped with Claude observing)
+
+- **Scope (Joey):** for the MVP, M0b.1 maps only the cases task 1.8 and tasks 3.1-3.3 need. No new Notes were made for it.
+- **Rows 21-22 dropped.** The attachment rule stands without them: the Note window must have exactly one "Download document" link whose URL `file_name` ends `.pdf` (any case). None → `NO_PDF`, more than one → `MULTIPLE_PDFS`, anything not recognised → `NO_PDF`. Every one is a skip back to the pool. The link's name is only "Download document"; the file name is in its URL (row 26).
+- **Row 23 (a)-(c) moved to M0b.2**, before 3.6 (which comes after the Milestone A demo): does an open Note window refresh its Assignee after someone else reassigns it. The assignee check never relies on it (a fresh Note Pool read). Row 23 (d), the Note Pool search by Note ID under All Pools, is mapped in row 27.
+- **Anchors (row 26):** the Note Pool filters by their fixed `name` attributes; the Note window's user and pool lists as the selects containing `--Select User--` / `--Select Pool--`; the Note Pool and Projects panels by the controls they hold (neither has a heading, and their container ids are generated). The login page's controls all have names.
+- **Searching the Note Pool (row 27):** `fill` alone doesn't run the search; it runs when focus leaves the box. The agent fills, then clicks the panel's **Refresh** (added to the allowlist, a new guarded click). Refresh plus the focus change once showed the same Note twice while the footer said 1 item, so the row count must equal the footer's count, after one more Refresh at most, else `UNEXPECTED_SCREEN`. A filter-select change reloads the list by itself.
+- **What persists (row 27):** a reload keeps every filter and the Search/filter text, closes every window, lands on Dashboard and hides the module tabs until Project is clicked. A fresh login resets every filter. So the run-start list read sees defaults; within a run the driver sets and reads back what it needs.
+- **Moving between windows (rows 25, 28):** an open Note window stays on top of the Projects panel and covers its results. The agent doesn't minimise it or use the taskbar: it reloads after the Note-window steps, searches and reads the project, then reloads and reopens the Note from the Note Pool. A project that is already open doesn't open twice.
+- **Returning a Note (row 15b):** one Assign with `--Select User--` + the pool works from a freshly opened Note window. The walkthrough's two Assigns aren't needed.
+- **Not mapped:** whether `fill` alone runs the **Projects** search. Task 3.2 checks it first; if not, it clicks the panel's "Search" label to move focus (with its own decisions entry); if that fails, Joey decides (the guard bans key presses).
+- Carried in: `docs/screen-map.md` v1.2, `SPEC.md` v1.16 (MySys screen rules, Expected slices), `tasks/plan.md` (M0b.1, M0b.2, 1.8, 3.1, 3.2, 3.6, gate for M3), `tasks/todo.md`, `docs/workflow.md`.
+
 ## 25 Oct 2026 - Decision 2, Milestone A first, the repo is public (Joey)
 
 - **Decision 2:** the CEO delegated it to Joey; Joey decides yes, on the terms in `SPEC.md` → Trial conditions. The CEO approved D2 (the trial PDF on the Mac Mini's disk from its download until it's read into memory). Task F.5 is done. 3.4's Mac Mini run is no longer waiting on the CEO.
