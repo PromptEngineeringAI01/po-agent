@@ -4,7 +4,8 @@
 Headless Chromium on local fakes of the test site's windows (page.set_content),
 offline: no site is touched. The fakes follow the 16 Oct captures as written
 up in docs/screen-map.md rows 02-04, 08-14 and 15b: each window holds its
-heading and its own Close control. Values are fake. Tests never act on the
+heading and its own Close control; the Note body is a <pre> and the file
+name beside the link a <span> (as on the site, 27 Oct). Values are fake. Tests never act on the
 page themselves (guard_check.py): a click shows up through inline JS.
 """
 
@@ -80,8 +81,8 @@ def note_page(
     <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"> Send Email Notification</span>
     <button>Link to Project</button>
     <ul><li><strong>Status:</strong> <span id="status">Pending</span></li></ul>
-    <table><tbody><tr><td></td><td>{link * links}</td></tr></tbody></table>
-    <div>{BODY}</div>
+    <table><tbody><tr><td><span>{FILE}</span></td><td>{link * links}</td></tr></tbody></table>
+    <pre>{BODY}</pre>
   </div>
 </div>{CLOSE}</div>
 <script>
