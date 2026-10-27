@@ -1,0 +1,295 @@
+# ruff: noqa: E501 - the fake page HTML and JS read better unwrapped
+"""Tests for mysys/booking.py: the demo's Note, task and Hold screens.
+
+Headless Chromium on local fakes of the test site's windows (page.set_content),
+offline: no site is touched. The fakes follow the 16 Oct captures as written
+up in docs/screen-map.md rows 02-04, 08-14 and 15b: each window holds its
+heading and its own Close control. Values are fake. Tests never act on the
+page themselves (guard_check.py): a click shows up through inline JS.
+"""
+
+from collections.abc import Iterator
+
+import pytest
+from playwright.sync_api import Browser, Page, sync_playwright
+
+from po_agent.core.errors import (
+    GuardRefusal,
+    PartialWrite,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
+from po_agent.mysys import booking
+from po_agent.mysys.guard import ActionGuard
+
+AGENT = "Agent 1 (MySys Only)"
+POOL = "Agent Pool"
+NOTE_ID = "300001"
+FILE = "2600001B_048_1.pdf"
+BODY = f"Please find attached Purchase Order / Quotation file {FILE}"
+CLOSE = '<div><span title="Close">close</span></div>'
+PDF = b"%PDF-1.4 fake"
+
+
+@pytest.fixture(scope="module")
+def browser() -> Iterator[Browser]:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        yield browser
+        browser.close()
+
+
+@pytest.fixture
+def page(browser: Browser) -> Iterator[Page]:
+    page = browser.new_page()
+    page.set_default_timeout(2000)
+    yield page
+    page.close()
+
+
+@pytest.fixture
+def guard() -> ActionGuard:
+    return ActionGuard()
+
+
+def actions(guard: ActionGuard) -> list[str]:
+    return [action for action, _ in guard.history]
+
+
+def note_page(
+    *,
+    title: str = f"[B1 Homes] Order 2600001B/048 {BODY}",
+    assignee: str = POOL,
+    links: int = 1,
+    assign_works: bool = True,
+) -> str:
+    link = f'<a href="index.php?option=com_cweb&download=1&user_note_id=95&file_name={FILE}">Download document</a>'
+    works = "true" if assign_works else "false"
+    return f"""
+<div><div>
+  <h3>Note {NOTE_ID} - created on 12 Oct 2026</h3>
+  <div>
+    <h3>{title}</h3>
+    <div><strong>Assignee:</strong> <span id="assignee">{assignee}</span> <button>Unlink</button></div>
+    <div role="group" aria-label="Status buttons">
+      <button disabled id="pending">Pending</button><button id="solved" onclick="solve()">Solved</button><button>Discard</button>
+    </div>
+    <select id="user"><option>--Select User--</option><option selected>{AGENT}</option><option>Fake Person</option></select>
+    <select id="pool"><option selected>--Select Pool--</option><option>{POOL}</option></select>
+    <button onclick="assign()">Assign</button>
+    <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"> Send Email Notification</span>
+    <button>Link to Project</button>
+    <ul><li><strong>Status:</strong> <span id="status">Pending</span></li></ul>
+    <table><tbody><tr><td></td><td>{link * links}</td></tr></tbody></table>
+    <div>{BODY}</div>
+  </div>
+</div>{CLOSE}</div>
+<script>
+function emailed() {{ if (document.getElementById('email').checked) document.body.dataset.emailed = 'yes'; }}
+function assign() {{
+  emailed();
+  if (!{works}) return;
+  const user = document.getElementById('user'), pool = document.getElementById('pool');
+  const who = user.value !== '--Select User--' ? user.value : pool.value;
+  document.getElementById('assignee').textContent = who;
+  user.selectedIndex = 0; pool.selectedIndex = 0;
+}}
+function solve() {{
+  emailed();
+  document.getElementById('status').textContent = 'Solved by {AGENT}';
+  document.getElementById('solved').disabled = true;
+  document.getElementById('pending').disabled = false;
+}}
+</script>"""
+
+
+# Note window (rows 02-04, 14, 15b)
+
+
+def test_note_window_is_found_by_its_heading(page):
+    page.set_content(note_page())
+    window = booking.note_window(page, NOTE_ID)
+    assert window.count() == 1
+    assert booking.read_assignee(window) == POOL
+    assert booking.read_status(window) == "Pending"
+    assert booking.has_link_to_project(window)
+
+
+def test_take_note_unticks_email_and_reads_back_the_agent(page, guard):
+    page.set_content(note_page())
+    window = booking.note_window(page, NOTE_ID)
+    booking.take_note(guard, window, AGENT)
+    assert booking.read_assignee(window) == AGENT
+    assert page.locator("body").get_attribute("data-emailed") is None
+    assert actions(guard) == [
+        "untick_send_email_notification",
+        "select_note_user",
+        "assign_note",
+    ]
+
+
+def test_take_note_that_does_not_read_back_stops(page, guard):
+    page.set_content(note_page(assign_works=False))
+    with pytest.raises(UnexpectedScreen):
+        booking.take_note(guard, booking.note_window(page, NOTE_ID), AGENT)
+
+
+def test_return_note_is_one_assign_to_the_pool(page, guard):
+    page.set_content(note_page(assignee=AGENT))
+    window = booking.note_window(page, NOTE_ID)
+    booking.return_note(guard, window, POOL)
+    assert booking.read_assignee(window) == POOL
+    assert page.locator("body").get_attribute("data-emailed") is None
+    assert actions(guard).count("assign_note") == 1
+
+
+def test_download_links_are_read_from_the_note_window(page):
+    page.set_content(note_page(links=2))
+    hrefs = booking.download_hrefs(booking.note_window(page, NOTE_ID))
+    assert len(hrefs) == 2 and all(h.endswith(FILE) for h in hrefs)
+
+
+def test_note_body_is_the_body_line_not_a_title_with_the_same_text(page):
+    page.set_content(note_page(title=BODY))
+    assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
+
+
+def test_mark_solved_unticks_email_and_reads_back(page, guard):
+    page.set_content(note_page(assignee=AGENT))
+    window = booking.note_window(page, NOTE_ID)
+    booking.mark_solved(guard, window, AGENT)
+    assert booking.read_status(window) == f"Solved by {AGENT}"
+    assert page.locator("body").get_attribute("data-emailed") is None
+
+
+# Create New Task (rows 08-09)
+
+
+def task_form_page(*, multiple: str = "") -> str:
+    return f"""
+<div><div>
+  <h3>Create New Task</h3>
+  <div><div>Multiple Units</div><input type="checkbox" aria-label="multiple" {multiple}></div>
+  <div><div>Creator</div><select><option>Choose...</option><option selected>&lt;project creator&gt;</option><option>Perth Scheduling</option></select></div>
+  <div><input type="checkbox" aria-label="- 1.Single Storey Engineering Bundle"> - 1.Single Storey Engineering Bundle</div>
+  <div>
+    <div><input type="checkbox" aria-label="- Compaction Test"> - Compaction Test</div>
+    <div><div>Task Client</div><div>Same as Project <button>Select Client</button> <span>close</span></div></div>
+    <div><div>Task Name</div><input aria-label="Task Name"></div>
+    <div><div>PO Number</div><input></div>
+    <div><div>PO Contact</div><select><option selected>Choose...</option><option>&lt;user&gt;</option></select></div>
+    <div><div>PO Documents</div><div><span>Upload <input type="file" onchange="addDoc(this, 'po_rows')"></span>
+      <table><tbody id="po_rows"></tbody></table></div></div>
+    <div><div>Documents</div><div><span>Upload <input type="file" onchange="addDoc(this, 'doc_rows')"></span>
+      <table><tbody id="doc_rows"></tbody></table></div></div>
+    <div><div>Sale Office</div><select><option>... Use Default Office ...</option><option selected>Prompt Engineering Pty Ltd</option></select></div>
+    <div><div>Delivery Office</div><select><option selected>Choose...</option><option>Prompt Engineering Pty Ltd</option></select></div>
+    <div><div>Note</div><textarea></textarea></div>
+  </div>
+  <button onclick="document.body.dataset.submitted='yes'">Submit</button>
+</div>{CLOSE}</div>
+<script>
+function addDoc(input, rows) {{
+  document.getElementById(rows).innerHTML += '<tr><td>' + input.files[0].name + '</td><td>close</td></tr>';
+}}
+</script>"""
+
+
+def test_task_form_is_filled_and_read_back(page, guard):
+    page.set_content(task_form_page())
+    form = booking.task_form(page)
+    booking.fill_task_form(guard, form, "2600001B/048", BODY, FILE, PDF)
+    assert page.locator("body").get_attribute("data-submitted") is None
+    assert "upload_document" in actions(guard)
+    booking.submit_task(guard, form)
+    assert page.locator("body").get_attribute("data-submitted") == "yes"
+
+
+def test_task_form_with_another_box_ticked_does_not_submit(page, guard):
+    page.set_content(task_form_page(multiple="checked"))
+    with pytest.raises(WriteNotStarted):
+        booking.fill_task_form(
+            guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+        )
+    assert "submit_task" not in actions(guard)
+
+
+# Project window and Hold (rows 07, 10-12)
+
+
+def project_page(*, related: str = "") -> str:
+    return f"""
+<div><div>
+  <h3>pln_10001 B1 Homes Sample Lane, Sampleville WA 6000</h3>
+  <ul><li><strong>Client Internal No.:</strong> <span>2600001B</span></li></ul>
+  <button>Create New Task</button>
+  <table><tbody>
+    <tr><td><div><span>(tsk_200001) | Compaction Test</span><button>Undo Cancellation</button></div></td></tr>
+    <tr><td>{AGENT}</td><td>Perth Scheduling</td><td>Cancelled</td></tr>
+    <tr><td><div><span>(tsk_200002) | Compaction Test</span><div><button>Cancel</button><button id="hold_btn" onclick="openHold()">Hold</button></div></div></td></tr>
+    <tr><td>{AGENT}</td><td>Perth Scheduling</td><td id="status">New Project</td></tr>
+  </tbody></table>
+</div>{CLOSE}</div>
+<div id="hold" hidden><div>
+  <h3>Hold Task</h3>
+  <div>
+    <div><button onclick="confirmHold()">Hold</button><h3>Hold Task: tsk_200002</h3></div>
+    <div><div>Reminder Email Setting</div>
+      <input type="checkbox" checked aria-label="Send me a reminder email every days"> Send me a reminder email every <input type="number" value="0"> days
+      <input type="checkbox" aria-label="Send me a reminder email at this date:"> Send me a reminder email at this date:</div>
+    <div><div>Reset turn around time</div><input type="checkbox" aria-label="reset"></div>
+    <div><div>Note</div><input aria-label="Note"></div>
+    <div><div>Related Tasks</div><table><tbody><tr><td><input type="checkbox" aria-label="related" {related}></td><td>tsk_100001 Compaction Test</td></tr></tbody></table></div>
+  </div>
+</div>{CLOSE}</div>
+<script>
+function openHold() {{ document.getElementById('hold').hidden = false; }}
+function confirmHold() {{
+  document.getElementById('hold').hidden = true;
+  document.getElementById('status').textContent = 'On-hold Notes: ' + document.querySelector('[aria-label=Note]').value;
+  document.getElementById('hold_btn').textContent = 'Un-Hold';
+}}
+</script>"""
+
+
+def test_project_window_reads_internal_no_and_tasks(page):
+    page.set_content(project_page())
+    window = booking.project_window(page, "pln_10001")
+    assert booking.client_internal_no(window) == "2600001B"
+    rows = booking.task_rows(window)
+    assert rows[0][0].startswith("(tsk_200001) | Compaction Test")
+    assert rows[3][-1] == "New Project"
+
+
+def test_hold_fills_the_note_and_confirms_with_the_dialogs_own_button(page, guard):
+    page.set_content(project_page())
+    project = booking.project_window(page, "pln_10001")
+    dialog = booking.open_hold(guard, page, project, "tsk_200002")
+    booking.fill_hold(guard, dialog)
+    booking.confirm_hold(guard, page, dialog)
+    assert booking.task_rows(project)[3][-1] == "On-hold Notes: ON HOLD UNTIL CALL UP"
+    booking.check_on_hold(project, "tsk_200002")
+
+
+def test_hold_with_a_related_task_ticked_does_not_confirm(page, guard):
+    page.set_content(project_page(related="checked"))
+    project = booking.project_window(page, "pln_10001")
+    dialog = booking.open_hold(guard, page, project, "tsk_200002")
+    with pytest.raises(PartialWrite):
+        booking.fill_hold(guard, dialog)
+    assert "confirm_hold" not in actions(guard)
+
+
+def test_task_not_on_hold_is_a_partial_write(page):
+    page.set_content(project_page())
+    with pytest.raises(PartialWrite):
+        booking.check_on_hold(booking.project_window(page, "pln_10001"), "tsk_200002")
+
+
+def test_the_guard_still_refuses_a_hold_dialog_checkbox(page, guard):
+    page.set_content(project_page())
+    project = booking.project_window(page, "pln_10001")
+    dialog = booking.open_hold(guard, page, project, "tsk_200002")
+    box = dialog.get_by_role("checkbox", name="Send me a reminder email every days")
+    with pytest.raises(GuardRefusal):
+        guard.act("untick_send_email_notification", dialog, box)
