@@ -48,8 +48,10 @@ class FakeDriver:
     @contextmanager
     def open_browser(self, *, headed: bool, slow_mo: int):
         self.calls.append(f"open_browser headed={headed} slow_mo={slow_mo}")
-        yield "page"
-        self.calls.append("closed")
+        try:
+            yield "page"
+        finally:
+            self.calls.append("closed")
 
     def go_home(self, page, base_url):
         self.calls.append("go_home")
