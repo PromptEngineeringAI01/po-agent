@@ -104,6 +104,7 @@ Screen mapping (M0): playwright-cli open --headed "<test-site URL>"   Claude ope
 Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses private/fixtures; skipped when absent; never in CI
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
+Supervised demo:     uv run po-agent demo --site test --headed [--until-check]   one PO, Enter before every write (decisions, 27 Oct 2026)
 Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
 Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only   pull main, sync, run, log, alert
 Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
@@ -228,7 +229,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 **Guard additions** (on top of `docs/specs/spec.md` §5)
 - **Denylist:** any element whose accessible name or own text contains `close` (case-insensitive). This blocks the PO Documents table's "close" cell (removes the PDF), the Task Client "close" (clears the client), and every window Close. The denylist is checked against the acted-on element itself, not the text of the window around it.
 - **Denylist on a `<select>`** (D5): the select's own name plus the label of the option being chosen, never every option's text. So the Note Pool's Discard status option is refused, and a user elsewhere in the list whose name contains a denylisted word doesn't block Assign.
-- **Allowlist:** log in (username, password, "Log in") and the module navigation (Project top tab, Note Pool, Projects sub-tab); select user / pool in the Note window's lists (including the `--Select User--` placeholder); search the Note Pool by Note ID and press its **Refresh** button (row 27); search for and open a task's detail screen (read-only, mapped in M0b.2).
+- **Allowlist:** log in (username, password, "Log in") and the module navigation (Project top tab, Note Pool, Projects sub-tab); select user / pool in the Note window's lists (including the `--Select User--` placeholder); search the Note Pool by Note ID and press its **Refresh** button (row 27); search for and open a task's detail screen (read-only, mapped in M0b.2). Demo only (decisions, 27 Oct 2026): `leave_project_menu` (click the inert header text "Welcome Agent" to close the Project hover menu) and `run_project_search` (click the Projects panel's "Search" label).
 - **Refusal tests on the real site** (D3) call `guard.vet()` only, which has no action code, so nothing can be pressed; `guard.act()` refusing is tested offline on local HTML.
 
 **Note Pool (row 01)**
