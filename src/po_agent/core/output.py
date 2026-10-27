@@ -6,9 +6,10 @@ that prints; scripts/guard_check.py fails on `print` anywhere else in src/.
     ALERT <KIND> {"note_id": ..., "step": ..., "detail": ...}
     RUN_SUMMARY {"run_id": ..., ...}
 
-INFO messages are fixed templates. NOTE, ALERT and RUN_SUMMARY are pydantic
-models with exactly the contract fields; identifier fields that don't look
-like an identifier are replaced by "<redacted>". An ALERT detail is a typed
+INFO messages are fixed templates whose only fill-ins are counts. NOTE,
+ALERT and RUN_SUMMARY are pydantic models with exactly the contract fields;
+identifier fields that don't look like an identifier are replaced by
+"<redacted>". An ALERT detail is a typed
 error's message (a fixed detail plus identifiers, core/errors.py) or a fixed
 detail in cli.py. So PDF text, addresses and Note bodies can't reach stdout.
 """
@@ -22,8 +23,11 @@ from po_agent.core.errors import identifier
 
 InfoMessage = Literal[
     "config loaded",
-    "spike not built yet",
     "decide-only not built yet",
+    "logged in",
+    "note pool filters set",
+    "note pool read: {rows} rows, {eligible} eligible",
+    "note pool has more pages: only page 1 of {pages} read",
 ]
 AlertKind = Literal[
     "PARTIAL_WRITE",
@@ -93,10 +97,13 @@ def _json(model: BaseModel) -> str:
     return json.dumps(model.model_dump(mode="json"))
 
 
-def info(message: InfoMessage) -> None:
+def info(message: InfoMessage, **counts: int) -> None:
+    """A fixed template; `counts` fill its {placeholders} and must be ints."""
     if message not in get_args(InfoMessage):
         raise ValueError("INFO message is not a fixed template")
-    _emit(f"INFO  {message}")
+    if any(type(n) is not int or n < 0 for n in counts.values()):
+        raise ValueError("INFO fill-ins must be counts")
+    _emit(f"INFO  {message.format(**counts)}")
 
 
 def note(line: Note) -> None:

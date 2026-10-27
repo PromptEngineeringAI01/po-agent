@@ -50,6 +50,7 @@ ALLOWLIST: dict[str, Kind] = {
     "set_pool_filter": Kind.SELECT,
     "set_locked_filter": Kind.SELECT,
     "search_note_pool": Kind.FILL,
+    "refresh_note_pool": Kind.CLICK,  # row 27 (decisions, 25 Oct 2026)
     "open_note": Kind.CLICK,
     # Note window
     "select_note_user": Kind.SELECT,

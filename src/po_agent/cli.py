@@ -25,7 +25,7 @@ import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
-from po_agent.core import output, secrets
+from po_agent.core import output, run, secrets
 from po_agent.core.config import CONFIG_DIR, Config, load_config
 from po_agent.core.errors import (
     AccuracyBreach,
@@ -124,23 +124,26 @@ def start(
     config: Config,
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
+    summary: output.RunSummary,
 ) -> int:
-    """The mode's entry point and its exit code; 1.8 builds spike, M3
-    decide-only."""
-    output.info(
-        "spike not built yet" if mode == "spike" else "decide-only not built yet"
-    )
+    """The mode's entry point and its exit code; it fills the summary's
+    counts. M3 builds decide-only."""
+    if mode == "spike":
+        return run.spike(config, credentials, options, summary)
+    output.info("decide-only not built yet")
     return 0
 
 
-def _run(mode: output.Mode, options: argparse.Namespace) -> int:
+def _run(
+    mode: output.Mode, options: argparse.Namespace, summary: output.RunSummary
+) -> int:
     sweep_download_dirs()
     if mode == "run":
         raise ConfigError("run mode not built yet")
     config = load_config(options.site, CONFIG_DIR)
     credentials = {name: secrets.get(name) for name in SECRETS_FOR[mode]}
     output.info("config loaded")
-    return start(mode, config, credentials, options)
+    return start(mode, config, credentials, options, summary)
 
 
 def _alert_kind(error: PoAgentError) -> output.AlertKind:
@@ -197,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         summary.mode = mode
         summary.site = "test" if options.site == "test" else None
-        exit_code = _run(mode, options)
+        exit_code = _run(mode, options, summary)
     except BaseException as error:  # the catch-all: nothing reaches stderr
         exit_code = _report(error, summary.run_id, detailed_log)
     summary.duration_s = round(time.monotonic() - started)
