@@ -688,3 +688,49 @@ def test_search_projects_keeps_a_duplicated_row_for_the_matcher(page, guard):
         guard, page, booking.projects_panel(page), "2600001B"
     )
     assert plns(rows).count("pln_10001") == 2
+
+
+# Live S5, 28 Oct 2026 14:06: "Projects filters not readable" with every
+# filter at its default. The labels and controls share one container (the
+# snapshot is flat), so "the innermost element holding a label and a select"
+# held all three selects. The left-over search text must not count.
+
+
+def flat_projects_page(*, date_from: str = "", status: str = "All Projects") -> str:
+    page = projects_page(status=status)
+    old_start = page.index("  <div><div>Search</div>")
+    old_end = page.index("  <table>")
+    statuses = "".join(
+        f"<option{' selected' if s == status else ''}>{s}</option>"
+        for s in ("All Projects", "On-hold")
+    )
+    flat = f"""  <div>
+    <span>Search</span><input aria-label="Search..." value="2600999B"
+      onkeydown="if (event.key === 'Enter') go(this.value)">
+    <span>Company</span><input placeholder="Select..."><button>close</button>
+    <span>Date From</span><input value="{date_from}"><span>To</span><input>
+    <span>Status</span><select>{statuses}</select>
+    <span>Eng Type</span><select><option selected>All Eng Types</option></select>
+    <span>Sales Type</span><select><option selected>All Sales Types</option></select>
+  </div>
+"""
+    return page[:old_start] + flat + page[old_end:]
+
+
+def test_search_projects_reads_flat_filters(page, guard):
+    page.set_content(flat_projects_page())
+    rows = booking.search_projects(
+        guard, page, booking.projects_panel(page), "2600001B"
+    )
+    assert "pln_10001" in plns(rows)
+
+
+@pytest.mark.parametrize(
+    ("date_from", "status"), [("01/10/2026", "All Projects"), ("", "On-hold")]
+)
+def test_search_projects_refuses_a_flat_filter_left_set(page, guard, date_from, status):
+    page.set_content(flat_projects_page(date_from=date_from, status=status))
+    with pytest.raises(UnexpectedScreen) as error:
+        booking.search_projects(guard, page, booking.projects_panel(page), "2600001B")
+    assert "not readable" not in str(error.value)
+    assert actions(guard) == []
