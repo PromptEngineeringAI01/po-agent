@@ -7,7 +7,9 @@ per finding, on:
 - an attribute (a call or a reference) named like a page action, script,
   dialog, network, navigation or disk call, or keyboard/mouse/touchscreen
   (tasks/plan.md task 1.4), or `getattr(x, "<that name>")`. Exceptions: the
-  six action methods inside `act()` in src/po_agent/mysys/guard.py, and
+  eight action methods inside `act()` in src/po_agent/mysys/guard.py
+  (click, fill, check, uncheck, select_option, set_input_files, press,
+  hover), and
   `goto`/`reload` inside `go_home()` in src/po_agent/mysys/driver.py. A name
   that clashes with other code is fixed by renaming that code, never a waiver.
 - in src/, a typed error (a PoAgentError subclass in core/errors.py) whose

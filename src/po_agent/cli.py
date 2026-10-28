@@ -150,12 +150,19 @@ def start(
     return 0
 
 
+def _demo_read_only(options: argparse.Namespace) -> bool:
+    return options.until_check or options.probe_link
+
+
 def _run(
     mode: output.Mode, options: argparse.Namespace, summary: output.RunSummary
 ) -> int:
     sweep_download_dirs()
     if mode == "run":
         raise ConfigError("run mode not built yet")
+    if mode == "demo" and not _demo_read_only(options) and not options.headed:
+        # Joey approves each write at a prompt: he must see the page.
+        raise ConfigError("a demo that writes needs --headed")
     config = load_config(options.site, CONFIG_DIR)
     credentials = {name: secrets.get(name) for name in SECRETS_FOR[mode]}
     output.info("config loaded")

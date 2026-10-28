@@ -1,8 +1,9 @@
 """The action guard: the only code that acts on a MySys page (task 1.4).
 
-Every click, fill, tick, select or upload is a named action on the allowlist,
-on exactly one visible element inside one visible window (the scope), and is
-refused if the element's own name or text hits the denylist
+Every click, fill, tick, select, upload, key press (Enter on two search
+boxes) or pointer move (onto a list status line) is a named action on the
+allowlist, on exactly one visible element inside one visible window (the
+scope), and is refused if the element's own name or text hits the denylist
 (docs/specs/spec.md §5; SPEC.md -> MySys screen rules -> Guard additions).
 
 `vet()` resolves the element and decides; it only reads the page. `act()`
@@ -252,6 +253,9 @@ class ActionGuard:
             or not MOVE_TARGET.fullmatch(
                 " ".join((element.text_content() or "").split())
             )
+            # Plain text only: no control inside it either.
+            or resolved.get_by_role("link").count() > 0
+            or resolved.get_by_role("button").count() > 0
         ):
             return Refused(Refusal.WRONG_ELEMENT)
         texts = [name, *(element.get_attribute(a) or "" for a in NAME_ATTRIBUTES)]
