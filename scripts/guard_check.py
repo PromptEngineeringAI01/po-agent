@@ -94,6 +94,7 @@ EXEMPT = {
             "select_option",
             "set_input_files",
             "press",  # Enter on two search boxes only (28 Oct 2026)
+            "hover",  # the pointer onto a list status line (28 Oct 2026)
         }
     ),
     ("src/po_agent/mysys/driver.py", "go_home"): frozenset({"goto", "reload"}),

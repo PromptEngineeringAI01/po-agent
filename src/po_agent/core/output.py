@@ -45,7 +45,7 @@ InfoMessage = Literal[
     "demo: note not returned to the pool",
     "demo: page snapshot saved",
     "demo: link probe done",
-    "demo: page blocked - move the mouse over the browser window",
+    "demo: page blocked, retrying",
 ]
 # The supervised demo's prompts (decisions, 27 Oct 2026): one per write.
 AskStep = Literal[

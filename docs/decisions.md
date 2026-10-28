@@ -10,6 +10,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **25 Oct 2026: decision 2 made.** The CEO delegated decision 2 (Claude reading real client POs) to Joey, and approved the trial PDF sitting briefly on the Mac Mini's disk (D2). Joey: yes, on the Trial conditions terms (entry below).
 
+## 28 Oct 2026 - A guarded pointer move ends "page blocked" (Joey)
+
+- **Root cause, reproduced offline:** after a guarded click in the header's Project menu, Playwright's pointer stays in the header. While the header is hovered, MySys covers the body, so no click below the header lands ("<body> intercepts pointer events"). Clicking "Welcome Agent" (the old `leave_project_menu`) kept the pointer in the header, so the block stayed until a real mouse moved. `tests/test_booking.py` reproduces both with CSS only.
+- **Decision (Joey, in the demo session):** the guard may move the pointer. A new kind `move` has one action, `move_pointer_off_menu`, which moves the pointer onto a list's status line below the header (the footer "Page N of N (N Items)" or "No record (could be) found."). Its role must be plain text (generic, listitem, paragraph, text), and it must be found exactly once and visible. No click, no key, no value. It uses `hover(force=True)`, because a plain hover runs the same "receives events" check the cover fails (https://playwright.dev/python/docs/actionability#forcing-actions). `scripts/guard_check.py` allows `hover` inside `guard.act()` only.
+- **Removed:** `leave_project_menu`. `leave_menu` now uses the move. The opening clicks keep their retries, and the message is now "page blocked, retrying"; no human mouse is asked for.
+- **To prove live** (plan step 3, Joey, hands off the mouse): 5 headed and 5 headless `--until-check` runs, all reaching `demo: read-only checks done` without "page blocked". If any blocks, revert this and keep the human mouse.
+
 ## 28 Oct 2026 - Enter runs the two project searches; the guard may press Enter there only (Joey)
 
 - **Decision (Joey, in the demo session):** after filling the project number, the demo runs the search by pressing **Enter** in the search box, in the Projects panel (step 5) and in Choose Project (step 8). This loosens the guard, which pressed no key until now.
