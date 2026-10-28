@@ -45,6 +45,9 @@ ALLOWLIST: dict[str, Kind] = {
     "open_project_tab": Kind.CLICK,
     "open_note_pool": Kind.CLICK,
     "open_projects_subtab": Kind.CLICK,
+    # Moves the mouse off the Project hover menu so it closes: while open,
+    # the page takes no clicks (decisions, 27 Oct 2026).
+    "leave_project_menu": Kind.CLICK,
     # Note Pool
     "open_pool": Kind.CLICK,
     "set_pool_filter": Kind.SELECT,
@@ -64,6 +67,9 @@ ALLOWLIST: dict[str, Kind] = {
     "mark_solved": Kind.CLICK,
     # Projects and Create New Task
     "search_project": Kind.FILL,
+    # fill alone may not run it: click the plain "Search" label to move focus
+    # (SPEC.md -> Project search; decisions, 27 Oct 2026).
+    "run_project_search": Kind.CLICK,
     "open_project": Kind.CLICK,
     "open_create_new_task": Kind.CLICK,
     "set_creator": Kind.SELECT,

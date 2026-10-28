@@ -87,6 +87,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "open_project_tab": "click",
         "open_note_pool": "click",
         "open_projects_subtab": "click",
+        "leave_project_menu": "click",  # demo, 27 Oct 2026
         "open_pool": "click",
         "set_pool_filter": "select",
         "set_locked_filter": "select",
@@ -98,6 +99,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "assign_note": "click",
         "download_attachment": "click",
         "search_project": "fill",
+        "run_project_search": "click",  # demo, 27 Oct 2026
         "open_project": "click",
         "open_create_new_task": "click",
         "set_creator": "select",

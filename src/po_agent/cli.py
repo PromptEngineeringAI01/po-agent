@@ -2,6 +2,12 @@
 
     po-agent spike|run --site test [--decide-only] [--headed] [--slow-mo N]
              [--detailed-log]
+    po-agent demo --site test [--headed] [--slow-mo N] [--until-check]
+             [--detailed-log]
+
+`demo` books the one trial PO 2609017B, supervised: it waits for Joey's
+Enter before every write; --until-check stops after the read-only checks
+(steps 1-5) and writes nothing (decisions, 27 Oct 2026).
 
 Every run ends with RUN_SUMMARY as its last stdout line, whatever happened.
 A typed error becomes its ALERT and exit code; anything else is caught here
@@ -25,7 +31,7 @@ import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
-from po_agent.core import output, run, secrets
+from po_agent.core import demo, output, run, secrets
 from po_agent.core.config import CONFIG_DIR, Config, load_config
 from po_agent.core.errors import (
     AccuracyBreach,
@@ -59,6 +65,7 @@ _MYSYS: tuple[SecretName, ...] = ("mysys_test_username", "mysys_test_password")
 SECRETS_FOR: dict[output.Mode, tuple[SecretName, ...]] = {
     "spike": _MYSYS,
     "decide-only": (*_MYSYS, "anthropic_api_key"),
+    "demo": _MYSYS,
 }
 
 
@@ -87,7 +94,7 @@ def _parser() -> _Parser:
     # allow_abbrev=False: only the exact option names.
     parser = _Parser(prog="po-agent", add_help=False, allow_abbrev=False)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("spike", "run"):
+    for name in ("spike", "run", "demo"):
         command = commands.add_parser(name, add_help=False, allow_abbrev=False)
         command.add_argument("--site", required=True)
         command.add_argument("--headed", action="store_true")
@@ -95,6 +102,8 @@ def _parser() -> _Parser:
         command.add_argument("--detailed-log", action="store_true")
         if name == "run":
             command.add_argument("--decide-only", action="store_true")
+        if name == "demo":
+            command.add_argument("--until-check", action="store_true")
     return parser
 
 
@@ -130,6 +139,9 @@ def start(
     counts. M3 builds decide-only."""
     if mode == "spike":
         return run.spike(config, credentials, options, summary)
+    if mode == "demo":
+        downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
+        return demo.run(config, credentials, options, summary, downloads)
     output.info("decide-only not built yet")
     return 0
 

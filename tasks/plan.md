@@ -9,6 +9,8 @@
 
 Build the MVP PO Agent so that it books the 3 trial POs (2609017B → pln_66935, 2609034B → pln_66938, 2610002B → pln_66940) on the MySys test site, unattended, from a launchd job on the office Mac Mini. Every check runs before any write. Every write goes through the action guard and is read back. Anything uncertain goes back to the Agent Pool. The slices run in order: M0b (screens still to map, by hand) → M1 walking skeleton and Mac Mini spike → M2 decision seam (offline) → M3 decide-only → M4 first booking → M5 safety → M6 demo. M0b is done by hand alongside M1–M2. M0b.1 must be written up before 1.8 (the spike needs its panel anchors and reload behaviour, rows 26–27), and M0b.2 before M4.
 
+**Supervised demo (27 Oct 2026, decisions):** `po-agent demo` books the one trial PO 2609017B by hand-supervised steps for the CEO demo on 28 Oct. It sits beside the plan: it doesn't replace 3.x or 4.x, and `run` still refuses until 4.5.
+
 ## Architecture decisions (from the spec; restated so each task can lean on them)
 
 - **ADR-001 hybrid.** The script does every click. Claude (the reader) has no tools and only returns the reading schema. The decision engine (`b1/decision.py`) has no browser code: it is seam 1.

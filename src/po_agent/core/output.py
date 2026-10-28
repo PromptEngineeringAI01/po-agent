@@ -5,6 +5,7 @@ that prints; scripts/guard_check.py fails on `print` anywhere else in src/.
     NOTE  {"note_id": ..., "outcome": ..., ...}
     ALERT <KIND> {"note_id": ..., "step": ..., "detail": ...}
     RUN_SUMMARY {"run_id": ..., ...}
+    NEXT  <fixed step> [Enter / n]      (demo only: waits for Joey's Enter)
 
 INFO messages are fixed templates whose only fill-ins are counts. NOTE,
 ALERT and RUN_SUMMARY are pydantic models with exactly the contract fields;
@@ -15,6 +16,7 @@ detail in cli.py. So PDF text, addresses and Note bodies can't reach stdout.
 """
 
 import json
+import sys
 from typing import Annotated, Literal, get_args
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
@@ -28,6 +30,31 @@ InfoMessage = Literal[
     "note pool filters set",
     "note pool read: {rows} rows, {eligible} eligible",
     "note pool has more pages: only page 1 of {pages} read",
+    "demo: note found",
+    "demo: note taken",
+    "demo: attachment downloaded",
+    "demo: pdf checks passed",
+    "demo: project checked",
+    "demo: read-only checks done",
+    "demo: task form filled",
+    "demo: task created",
+    "demo: task on hold",
+    "demo: note linked",
+    "demo: note solved",
+    "demo: note returned to the pool",
+    "demo: note not returned to the pool",
+    "demo: page snapshot saved",
+    "demo: page blocked - move the mouse over the browser window",
+]
+# The supervised demo's prompts (decisions, 27 Oct 2026): one per write.
+AskStep = Literal[
+    "take the Note",
+    "create the Compaction Test task",
+    "submit the task",
+    "put the task On Hold",
+    "link the Note to the project",
+    "mark the Note Solved",
+    "return the Note to the pool",
 ]
 AlertKind = Literal[
     "PARTIAL_WRITE",
@@ -37,7 +64,7 @@ AlertKind = Literal[
     "LOGIN_FAILED",
     "CONFIG",
 ]
-Mode = Literal["run", "decide-only", "spike"]
+Mode = Literal["run", "decide-only", "spike", "demo"]
 
 # Runs after the str check, so `identifier` only ever sees a str or None
 # (https://docs.pydantic.dev/latest/concepts/validators/#field-after-validator).
@@ -119,3 +146,12 @@ def alert(kind: AlertKind, line: Alert) -> None:
 def run_summary(line: RunSummary) -> None:
     """Always the run's last line (cli.main)."""
     _emit(f"RUN_SUMMARY {_json(line)}")
+
+
+def ask(step: AskStep) -> bool:
+    """The demo's prompt: True only for a bare Enter. "n", anything else and
+    end of input (stdin closed or piped empty) all stop."""
+    if step not in get_args(AskStep):
+        raise ValueError("prompt step is not a fixed template")
+    print(f"NEXT  {step} [Enter / n] ", end="", flush=True)
+    return sys.stdin.readline() in ("\n", "\r\n")
