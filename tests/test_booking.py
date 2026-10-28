@@ -14,6 +14,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, sync_playwright
 
+from po_agent.b1 import reader_rules as rules
 from po_agent.core.errors import (
     GuardRefusal,
     PartialWrite,
@@ -799,3 +800,62 @@ def test_leave_menu_moves_the_pointer_off_the_header_and_clears_the_block(page, 
     refresh = page.get_by_role("button", name="Refresh", exact=True)
     assert refresh.get_attribute("data-clicked") == "yes"
     assert "move_pointer_off_menu" in actions(guard)
+
+
+# Live S6, 28 Oct 2026 17:15: "task row not recognised (TASK_ROW)" right
+# after Submit, with 7 Cancelled Compaction Test tasks on the project. The
+# table was fine once settled: MySys adds the new task's header row before
+# its details row, and the read landed in between.
+
+
+def submit_page(*, details_after_ms: int, status_after_ms: int) -> str:
+    cancelled = "".join(
+        f"<tr><td><div><span>(tsk_20000{n}) | Compaction Test</span>"
+        "<button>Undo Cancellation</button></div></td></tr>"
+        f"<tr><td>{AGENT}</td><td>Perth Scheduling</td><td>Cancelled</td></tr>"
+        "<tr><td></td></tr>"
+        for n in range(1, 8)
+    )
+    return f"""
+<div><div>
+  <h3>pln_10001 B1 Homes Sample Lane, Sampleville WA 6000</h3>
+  <button>Create New Task</button>
+  <table><tbody id="tasks">{cancelled}</tbody></table>
+</div>{CLOSE}</div>
+<div id="form"><div>
+  <h3>Create New Task</h3>
+  <button onclick="submitTask()">Submit</button>
+</div>{CLOSE}</div>
+<script>
+function submitTask() {{
+  document.getElementById('form').remove();
+  const tasks = document.getElementById('tasks');
+  tasks.insertAdjacentHTML('beforeend',
+    '<tr><td><div><span>(tsk_200009) | Compaction Test</span>' +
+    '<button>Cancel</button><button>Hold</button></div></td></tr>');
+  setTimeout(() => {{
+    tasks.insertAdjacentHTML('beforeend',
+      '<tr><td>{AGENT}</td><td>Perth Scheduling</td><td id="new_status"></td></tr>');
+  }}, {details_after_ms});
+  setTimeout(() => {{
+    document.getElementById('new_status').textContent = 'New Project';
+  }}, {status_after_ms});
+}}
+</script>"""
+
+
+@pytest.mark.parametrize(
+    ("details_after_ms", "status_after_ms"), [(600, 650), (100, 900)]
+)
+def test_wait_new_task_reads_past_a_half_added_row(
+    page, guard, details_after_ms, status_after_ms
+):
+    page.set_content(
+        submit_page(details_after_ms=details_after_ms, status_after_ms=status_after_ms)
+    )
+    project = booking.project_window(page, "pln_10001")
+    before = set(rules.compaction_tasks(booking.task_rows(project)))
+    assert len(before) == 7
+    form = booking.task_form(page)
+    booking.submit_task(guard, form)
+    assert booking.wait_new_task(form, project, before) == "tsk_200009"
