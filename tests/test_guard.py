@@ -780,7 +780,7 @@ MOVE_PAGE = """
   <a href="#">Page 1 of 1(3 Items) link</a>
   <button>Refresh</button>
 </main>
-<div id="cover"></div>
+<div id="cover" onmouseover="this.dataset.hovered = 'yes'"></div>
 """
 
 
@@ -788,7 +788,9 @@ def test_move_lands_on_the_footer_under_a_cover_and_never_clicks(page, guard):
     page.set_content(MOVE_PAGE)
     footer = page.get_by_text(re.compile(r"^Page 1 of 1\(3 Items\)$"))
     guard.act("move_pointer_off_menu", page.locator("body"), footer)
-    assert footer.get_attribute("data-hovered") == "yes"
+    # The pointer reached the footer's spot: the cover on top of it, the
+    # topmost element there, got the mouseover. Nothing was clicked.
+    assert page.locator("#cover").get_attribute("data-hovered") == "yes"
     assert not clicked(footer)
 
 
