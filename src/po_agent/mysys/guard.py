@@ -34,6 +34,9 @@ class Kind(StrEnum):
     UNCHECK = "uncheck"
     SELECT = "select"
     UPLOAD = "upload"
+    # Only the key Enter, only on the search boxes in PRESS_TARGETS
+    # (Joey, decisions 28 Oct 2026).
+    PRESS = "press"
 
 
 # docs/specs/spec.md §5, SPEC -> Guard additions, tasks/plan.md Open question 3.
@@ -63,16 +66,12 @@ ALLOWLIST: dict[str, Kind] = {
     "untick_send_email_notification": Kind.UNCHECK,
     "link_to_project": Kind.CLICK,
     "link_search_project": Kind.FILL,
-    # Click the Choose Project heading so focus leaves the search box and
-    # the search runs (decisions, 28 Oct 2026).
-    "link_run_search": Kind.CLICK,
+    "submit_link_search": Kind.PRESS,  # Enter runs it (28 Oct 2026)
     "link_select_project": Kind.CLICK,
     "mark_solved": Kind.CLICK,
     # Projects and Create New Task
     "search_project": Kind.FILL,
-    # fill alone may not run it: click the plain "Search" label to move focus
-    # (SPEC.md -> Project search; decisions, 27 Oct 2026).
-    "run_project_search": Kind.CLICK,
+    "submit_project_search": Kind.PRESS,  # Enter runs it (28 Oct 2026)
     "open_project": Kind.CLICK,
     "open_create_new_task": Kind.CLICK,
     "set_creator": Kind.SELECT,
@@ -142,7 +141,17 @@ class Refused:
 Value = str | FilePayload | None
 
 
+# A PRESS action's one target: a textbox with exactly this accessible name.
+PRESS_TARGETS = {
+    "submit_project_search": "Search...",  # the Projects panel's search
+    "submit_link_search": "Search/filter",  # Choose Project's search
+}
+PRESS_KEY = "Enter"
+
+
 def _value_fits(kind: Kind, value: Value) -> bool:
+    if kind == Kind.PRESS:
+        return value == PRESS_KEY
     if kind in (Kind.CLICK, Kind.CHECK, Kind.UNCHECK):
         return value is None
     if kind in (Kind.FILL, Kind.SELECT):
@@ -228,6 +237,8 @@ class ActionGuard:
         if head is None:
             return Refused(Refusal.NAME_UNREADABLE)
         role, name = head.group(1), head.group(2) or ""
+        if kind == Kind.PRESS and (role != "textbox" or name != PRESS_TARGETS[action]):
+            return Refused(Refusal.WRONG_ELEMENT)
         texts = [name, *(element.get_attribute(a) or "" for a in NAME_ATTRIBUTES)]
         if is_select:
             texts.append(str(value))  # the chosen option, never the others
@@ -289,6 +300,8 @@ class ActionGuard:
                 case Kind.UPLOAD:
                     # A FilePayload uploads from memory, never from a path (D2).
                     element.set_input_files(value)
+                case Kind.PRESS:
+                    element.press(value)  # only Enter (_value_fits)
         except PlaywrightError:
             self.history.append((action, "failed"))
             raise UnexpectedScreen("guard action failed", action=action) from None

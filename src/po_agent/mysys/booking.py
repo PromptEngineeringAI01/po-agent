@@ -35,6 +35,8 @@ POLL_MS = 500
 # Live 28 Oct 2026: the Choose Project window's content showed only
 # after a 15 s wait had given up.
 LINK_TIMEOUT_MS = 60_000
+# The Projects search: Joey saw pauses of about 10 s (28 Oct 2026).
+SEARCH_TIMEOUT_MS = 60_000
 OPEN_TRIES = 4  # x 15 s
 CREATOR = "Perth Scheduling"
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
@@ -452,8 +454,7 @@ def _search_choose_project(
     search = picker.get_by_role("textbox", name="Search/filter", exact=True)
     guard.act("link_search_project", picker, search, pln)
     _still_open(picker, page, "2-filled", snapshots)
-    heading = picker.get_by_role("heading", name=CHOOSE_PROJECT, exact=True)
-    _open(guard, "link_run_search", picker, heading)
+    guard.act("submit_link_search", picker, search, "Enter")  # Joey, 28 Oct
     _still_open(picker, page, "3-searched", snapshots)
     return picker
 
@@ -534,42 +535,98 @@ def _table(container: Locator) -> list[dict[str, str]]:
     return rows
 
 
+PROJECT_FILTERS = {
+    "Status": "All Projects",
+    "Eng Type": "All Eng Types",
+    "Sales Type": "All Sales Types",
+}
+
+
+def _check_project_filters(panel: Locator) -> None:
+    """Every Projects filter at its default, so none hides the project (a
+    Status other than All Projects could hide a Cancelled one). Read only:
+    the agent never changes them."""
+    try:
+        for label, default in PROJECT_FILTERS.items():
+            if _chosen(_field(panel, label, "select")) != default:
+                raise UnexpectedScreen(
+                    "Projects filter not at its default", field=label
+                )
+        for label in ("Company", "Date From"):
+            for box in _container(panel, label, "input").locator("input").all():
+                if box.input_value():
+                    raise UnexpectedScreen("Projects filter not empty", field=label)
+    except PlaywrightError:
+        raise UnexpectedScreen("Projects filters not readable") from None
+
+
+def _project_list(panel: Locator) -> tuple | None:
+    """The list as a hashable state: ("none",) for "No record found.",
+    ("rows", rows, pages) for rows under a recognised footer, None while it
+    reloads (a loading row, no footer, a re-render under the read)."""
+    try:
+        if panel.get_by_text(PROJECTS_NO_RECORD, exact=True).visible.count():
+            return ("none",) if panel.locator("tbody tr").count() == 0 else None
+        footer = panel.get_by_text(driver.FOOTER).visible
+        if footer.count() != 1:
+            return None
+        match = driver.FOOTER.match((footer.text_content() or "").strip())
+        if match is None:
+            return None
+        rows = tuple(tuple(row.items()) for row in _table(panel))
+    except (PlaywrightError, UnexpectedScreen):
+        return None
+    return ("rows", rows, int(match.group(2)))
+
+
 def search_projects(
     guard: ActionGuard, page: Page, panel: Locator, internal_no: str
 ) -> list[dict[str, str]]:
-    """Step 5: fill Search... with the internal number, then wait up to 15 s
-    for "No record found." or rows that each contain it (SPEC.md). More than
-    one results page counts as ambiguous."""
+    """Step 5: fill Search... with the internal number, press Enter (Joey,
+    28 Oct 2026), then wait up to 60 s for the list to settle on its result.
+
+    Ways the search could miss a project that exists, and what this does:
+    the old list (or a stale "No record found.") is still showing -> only a
+    list that differs from it, or whose rows all hold the number, counts; a
+    loading row or a re-render mid-read -> read again; a slow load -> 60 s,
+    not 15; a hit on a field not shown -> any settled list counts, and
+    match_project picks the row; the same row twice -> match_project counts
+    projects, not rows; a filter left set -> refused before searching. A
+    settled list is the same in two reads in a row. More than one results
+    page counts as ambiguous."""
+    _check_project_filters(panel)
+    before = _project_list(panel)
     search = panel.get_by_role("textbox", name="Search...", exact=True)
     guard.act("search_project", panel, search, internal_no)
-    # Row 27 left open whether fill alone runs this search; on 27 Oct it
-    # didn't. Clicking the field's plain "Search" label moves focus, which
-    # runs it (SPEC.md -> Project search).
-    label = panel.get_by_text("Search", exact=True)
-    _open(guard, "run_project_search", panel, label)
-    no_record = panel.get_by_text(PROJECTS_NO_RECORD, exact=True).visible
-    footer = panel.get_by_text(driver.FOOTER).visible
+    guard.act("submit_project_search", panel, search, "Enter")
     wanted = internal_no.lower()
-    waited = 0
-    try:
-        while waited <= LOAD_TIMEOUT_MS:
-            if no_record.count():
-                return []
-            rows = _table(panel)
-            if rows and all(wanted in " ".join(r.values()).lower() for r in rows):
-                match = driver.FOOTER.match((footer.text_content() or "").strip())
-                if match is None:
-                    raise UnexpectedScreen("Projects footer not recognised")
-                if int(match.group(2)) > 1:
+    deadline = time.monotonic() + SEARCH_TIMEOUT_MS / 1000
+    last = None
+    while True:
+        state = _project_list(panel)
+        holds_it = (
+            state is not None
+            and state[0] == "rows"
+            and all(
+                wanted in " ".join(value for _, value in row).lower()
+                for row in state[1]
+            )
+        )
+        if state is not None and (state != before or holds_it):
+            if state == last:
+                if state[0] == "none":
+                    return []
+                if state[2] > 1:
                     raise WriteNotStarted(
                         "project ambiguous", reason="PROJECT_AMBIGUOUS"
                     )
-                return rows
-            page.wait_for_timeout(POLL_MS)
-            waited += POLL_MS
-    except PlaywrightError:
-        raise UnexpectedScreen("Projects list not readable") from None
-    raise UnexpectedScreen("project search did not finish")
+                return [dict(row) for row in state[1]]
+            last = state
+        else:
+            last = None
+        if time.monotonic() >= deadline:
+            raise UnexpectedScreen("project search did not finish")
+        page.wait_for_timeout(POLL_MS)
 
 
 def project_window(page: Page, pln: str) -> Locator:

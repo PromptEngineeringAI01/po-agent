@@ -86,7 +86,15 @@ BANNED = frozenset(
 # (file, enclosing function) -> the banned names allowed there.
 EXEMPT = {
     ("src/po_agent/mysys/guard.py", "act"): frozenset(
-        {"click", "fill", "check", "uncheck", "select_option", "set_input_files"}
+        {
+            "click",
+            "fill",
+            "check",
+            "uncheck",
+            "select_option",
+            "set_input_files",
+            "press",  # Enter on two search boxes only (28 Oct 2026)
+        }
     ),
     ("src/po_agent/mysys/driver.py", "go_home"): frozenset({"goto", "reload"}),
 }
