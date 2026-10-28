@@ -88,17 +88,18 @@ def same_internal_no(value: str, internal_no: str) -> bool:
 
 def match_project(rows: Sequence[Mapping[str, str]], internal_no: str) -> str:
     """Step 5: the pln of the one B1 Homes row whose Client Ref No. matches."""
-    plns = [
+    # A set: a list can show the same row twice (row 27).
+    plns = {
         row["Project No."].strip()
         for row in rows
         if row["Company"].strip() == COMPANY
         and same_internal_no(row["Client Ref No."], internal_no)
-    ]
+    }
     if not plns:
         raise WriteNotStarted("project not found", reason="PROJECT_NOT_FOUND")
     if len(plns) > 1:
         raise WriteNotStarted("project ambiguous", reason="PROJECT_AMBIGUOUS")
-    return plns[0]
+    return plns.pop()
 
 
 def compaction_tasks(rows: Sequence[Sequence[str]]) -> dict[str, str]:
