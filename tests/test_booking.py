@@ -425,7 +425,8 @@ function openPicker() {{
   setTimeout(() => {{
     document.getElementById('picker').innerHTML = `<div><div>
       <h3>Choose Project</h3>
-      <input aria-label="Search/filter" onblur="search(this.value)">
+      <input aria-label="Search/filter"
+        onkeydown="if (event.key === 'Enter') search(this.value)">
       <input aria-label="After..."><input aria-label="Before...">
       <table><tbody id="results"></tbody></table>
     </div>{CLOSE}</div>`;
@@ -453,7 +454,7 @@ def test_link_project_searches_the_choose_project_window_and_reads_back(page, gu
     assert actions(guard)[-4:] == [
         "link_to_project",
         "link_search_project",
-        "link_run_search",
+        "submit_link_search",
         "link_select_project",
     ]
 
@@ -488,7 +489,7 @@ def test_probe_link_searches_and_selects_nothing(page, guard, tmp_path, monkeypa
     assert actions(guard)[-3:] == [
         "link_to_project",
         "link_search_project",
-        "link_run_search",
+        "submit_link_search",
     ]
     assert window.get_by_role("button", name="Link to Project").count() == 1
     results = (tmp_path / "demo-probe-link-results.yml").read_text(encoding="utf-8")
@@ -512,10 +513,14 @@ def test_snapshot_includes_child_frames(page, tmp_path, monkeypatch):
 # the Note Pool's own Search/filter. The probe must fail loudly instead.
 
 
-def heading_first_link_page(*, closes_on_heading_click: bool = False) -> str:
+def heading_first_link_page(*, closes_on_search: bool = False) -> str:
     """Choose Project's heading shows at once, its boxes 400 ms later."""
-    closes = "true" if closes_on_heading_click else "false"
-    page = link_page()
+    closes = "true" if closes_on_search else "false"
+    page = link_page().replace(
+        "function search(text) {",
+        "function search(text) {\n"
+        f"  if ({closes}) {{ document.getElementById('cp').remove(); return; }}",
+    )
     old = """  setTimeout(() => {
     document.getElementById('picker').innerHTML = `<div><div>
       <h3>Choose Project</h3>"""
@@ -567,6 +572,119 @@ def test_probe_link_fails_when_choose_project_closes(
     page, guard, tmp_path, monkeypatch
 ):
     monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
-    page.set_content(heading_first_link_page(closes_on_heading_click=True))
+    page.set_content(heading_first_link_page(closes_on_search=True))
     with pytest.raises(UnexpectedScreen):
         booking.probe_link(guard, page, booking.note_window(page, NOTE_ID), "pln_10001")
+
+
+# Step 5 reliability, 28 Oct 2026: every way the Projects search could miss a
+# project that exists. The fake runs its search on Enter only, shows a loading
+# row first, and can start from a stale "No record found."
+
+PROJECT_ROWS = {
+    "pln_10001": ("2600001B", "Cancelled"),
+    "pln_10009": ("2600009B", "New Project"),  # a hit on a field not shown
+}
+
+
+def projects_page(
+    *,
+    stale_none: bool = False,
+    delay: int = 400,
+    status: str = "All Projects",
+    duplicate: bool = False,
+) -> str:
+    rows = "".join(
+        f"<tr><td><a href='#'>{pln}</a></td><td>{ref}</td><td>{state}</td>"
+        "<td>B1 Homes</td></tr>"
+        for pln, (ref, state) in PROJECT_ROWS.items()
+    )
+    if duplicate:
+        rows += (
+            "<tr><td><a href='#'>pln_10001</a></td><td>2600001B</td>"
+            "<td>Cancelled</td><td>B1 Homes</td></tr>"
+        )
+    count = len(PROJECT_ROWS) + duplicate
+    statuses = "".join(
+        f"<option{' selected' if s == status else ''}>{s}</option>"
+        for s in ("All Projects", "On-hold")
+    )
+    old = (
+        ""
+        if stale_none
+        else (
+            "<tr><td><a href='#'>pln_10500</a></td><td>2600500B</td><td>Draft</td>"
+            "<td>Other Homes</td></tr>"
+        )
+    )
+    return f"""
+<div>
+  <button>Reset Filter</button>
+  <div><div>Search</div><input aria-label="Search..."
+    onkeydown="if (event.key === 'Enter') go(this.value)"></div>
+  <div><div>Status</div><select>{statuses}</select></div>
+  <div><div>Eng Type</div><select><option selected>All Eng Types</option></select></div>
+  <div><div>Sales Type</div><select><option selected>All Sales Types</option></select></div>
+  <table><thead><tr><th>Project No.</th><th>Client Ref No.</th><th>Status</th>
+    <th>Company</th></tr></thead><tbody id="rows">{old}</tbody></table>
+  <div id="none" {"" if stale_none else "hidden"}>No record found.</div>
+  <div id="footer">{"" if stale_none else "Page 1 of 1(1 Items)"}</div>
+</div>
+<script>
+function go(text) {{
+  if (text !== '2600001B') return;
+  setTimeout(() => {{
+    document.getElementById('none').hidden = true;
+    document.getElementById('rows').innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+    document.getElementById('footer').textContent = '';
+  }}, 100);
+  setTimeout(() => {{
+    document.getElementById('rows').innerHTML = `{rows}`;
+    document.getElementById('footer').textContent = 'Page 1 of 1({count} Items)';
+  }}, {delay});
+}}
+</script>"""
+
+
+def plns(rows: list[dict[str, str]]) -> list[str]:
+    return [row["Project No."] for row in rows]
+
+
+def test_search_projects_presses_enter_and_reads_past_a_loading_row(page, guard):
+    page.set_content(projects_page())
+    panel = booking.projects_panel(page)
+    rows = booking.search_projects(guard, page, panel, "2600001B")
+    assert plns(rows) == ["pln_10001", "pln_10009"]
+    assert actions(guard) == ["search_project", "submit_project_search"]
+
+
+def test_search_projects_waits_out_a_stale_no_record(page, guard):
+    page.set_content(projects_page(stale_none=True))
+    rows = booking.search_projects(
+        guard, page, booking.projects_panel(page), "2600001B"
+    )
+    assert "pln_10001" in plns(rows)
+
+
+def test_search_projects_waits_longer_than_a_page_load(page, guard, monkeypatch):
+    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 300)
+    page.set_content(projects_page(delay=1500))
+    rows = booking.search_projects(
+        guard, page, booking.projects_panel(page), "2600001B"
+    )
+    assert "pln_10001" in plns(rows)
+
+
+def test_search_projects_refuses_a_status_filter_that_hides_projects(page, guard):
+    page.set_content(projects_page(status="On-hold"))
+    with pytest.raises(UnexpectedScreen):
+        booking.search_projects(guard, page, booking.projects_panel(page), "2600001B")
+    assert actions(guard) == []
+
+
+def test_search_projects_keeps_a_duplicated_row_for_the_matcher(page, guard):
+    page.set_content(projects_page(duplicate=True))
+    rows = booking.search_projects(
+        guard, page, booking.projects_panel(page), "2600001B"
+    )
+    assert plns(rows).count("pln_10001") == 2

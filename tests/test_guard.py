@@ -99,7 +99,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "assign_note": "click",
         "download_attachment": "click",
         "search_project": "fill",
-        "run_project_search": "click",  # demo, 27 Oct 2026
+        "submit_project_search": "press",  # Enter, Joey 28 Oct 2026
         "open_project": "click",
         "open_create_new_task": "click",
         "set_creator": "select",
@@ -114,7 +114,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "confirm_hold": "click",
         "link_to_project": "click",
         "link_search_project": "fill",
-        "link_run_search": "click",  # demo, 28 Oct 2026
+        "submit_link_search": "press",  # Enter, Joey 28 Oct 2026
         "link_select_project": "click",
         "mark_solved": "click",
         "search_task": "fill",
@@ -697,3 +697,68 @@ def test_page_error_while_vetting_is_a_fixed_error_without_page_text(browser, gu
 
     assert "Sample" not in "".join(traceback.format_exception(caught.value))
     assert caught.value.action == "open_create_new_task"
+
+
+# Joey, 28 Oct 2026: Enter runs the two project searches. PRESS allows only
+# the key "Enter", only on those search boxes; everything else is refused.
+
+PRESS_PAGE = (
+    "<section><h2>Projects</h2>"
+    "<input aria-label='Search...' "
+    "onkeydown=\"if (event.key === 'Enter') this.dataset.entered = 'yes'\">"
+    "<input aria-label='Search/filter'>"
+    "<input aria-label='Note'><button>Search</button></section>"
+)
+
+
+@pytest.mark.parametrize(
+    ("action", "name"),
+    [("submit_project_search", "Search..."), ("submit_link_search", "Search/filter")],
+)
+def test_enter_is_allowed_on_its_search_box(page, guard, action, name):
+    page.set_content(PRESS_PAGE)
+    box = page.get_by_role("textbox", name=name, exact=True)
+    guard.act(action, page.locator("section"), box, "Enter")
+    if name == "Search...":
+        assert box.get_attribute("data-entered") == "yes"
+
+
+@pytest.mark.parametrize("key", ["Tab", "a", "Control+Enter", "enter", "", None])
+def test_any_other_key_is_refused(page, guard, key):
+    page.set_content(PRESS_PAGE)
+    box = page.get_by_role("textbox", name="Search...", exact=True)
+    assert refusal(
+        guard, "submit_project_search", page.locator("section"), box, key
+    ) == (Refusal.VALUE_MISMATCH)
+    assert box.get_attribute("data-entered") is None
+
+
+@pytest.mark.parametrize(
+    ("action", "locate"),
+    [
+        ("submit_project_search", lambda p: p.get_by_role("textbox", name="Note")),
+        (
+            "submit_project_search",
+            lambda p: p.get_by_role("textbox", name="Search/filter"),
+        ),
+        ("submit_project_search", lambda p: p.get_by_role("button", name="Search")),
+        ("submit_link_search", lambda p: p.get_by_role("textbox", name="Search...")),
+    ],
+)
+def test_enter_on_any_other_target_is_refused(page, guard, action, locate):
+    page.set_content(PRESS_PAGE)
+    target = locate(page)
+    assert refusal(guard, action, page.locator("section"), target, "Enter") == (
+        Refusal.WRONG_ELEMENT
+    )
+
+
+def test_enter_is_only_for_the_press_actions(page, guard):
+    page.set_content(PRESS_PAGE)
+    box = page.get_by_role("textbox", name="Search...", exact=True)
+    assert (
+        refusal(guard, "search_project", page.locator("section"), box, "Enter") is None
+    )
+    assert refusal(guard, "open_note", page.locator("section"), box, "Enter") == (
+        Refusal.VALUE_MISMATCH
+    )

@@ -189,3 +189,8 @@ def test_new_task_is_the_one_id_not_seen_before():
 def test_no_new_task_or_two_is_a_partial_write(after):
     with pytest.raises(PartialWrite):
         rules.new_task({"tsk_200001"}, after)
+
+
+def test_a_duplicated_row_counts_as_one_project():
+    rows = [project("pln_10001", "2600001B"), project("pln_10001", "2600001B")]
+    assert rules.match_project(rows, "2600001B") == "pln_10001"

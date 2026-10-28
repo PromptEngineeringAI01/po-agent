@@ -113,6 +113,7 @@ class ActionGuard:
         "uncheck()",
         "select_option(label=value)",
         "set_input_files(value)",
+        "press(value)",
     ],
 )
 def test_action_methods_are_allowed_inside_guard_act(tmp_path, guard_check, call):
@@ -120,7 +121,7 @@ def test_action_methods_are_allowed_inside_guard_act(tmp_path, guard_check, call
 
 
 @pytest.mark.parametrize(
-    "call", ["evaluate('1')", "press('Enter')", "dispatch_event('click')", "hover()"]
+    "call", ["evaluate('1')", "type('x')", "dispatch_event('click')", "hover()"]
 )
 def test_other_banned_names_fail_even_inside_guard_act(tmp_path, guard_check, call):
     found = scan(guard_check, tmp_path, GUARD, ACT.format(call=call))
