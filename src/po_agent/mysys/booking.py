@@ -766,20 +766,28 @@ def submit_task(guard: ActionGuard, form: Locator) -> None:
 
 def wait_new_task(form: Locator, project: Locator, before: set[str]) -> str:
     """Row 10: the form closes, then exactly one new Compaction Test task
-    shows, with Status New Project or Inspection Analysis."""
+    shows, with Status New Project or Inspection Analysis.
+
+    Live S6 (28 Oct 2026, 17:15): MySys adds the new task's header row before
+    its details row, and the Status cell can fill in later still. A read in
+    between is not an answer: the table is read again until the new task is
+    whole or 15 s have passed; only then does the last problem stop the run."""
     if not _gone(form):
         raise PartialWrite("Create New Task did not close")
-    waited = 0
+    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
     while True:
-        tasks = rules.compaction_tasks(task_rows(project))
-        if len(set(tasks) - before) == 1 or waited >= LOAD_TIMEOUT_MS:
-            break
+        try:
+            tasks = rules.compaction_tasks(task_rows(project))
+            task_id = rules.new_task(before, tasks)
+            if tasks[task_id] not in NEW_TASK_STATUSES:
+                raise PartialWrite(
+                    "new task status not as expected", reason="TASK_STATUS"
+                )
+            return task_id
+        except (PartialWrite, UnexpectedScreen):
+            if time.monotonic() >= deadline:
+                raise
         project.page.wait_for_timeout(POLL_MS)
-        waited += POLL_MS
-    task_id = rules.new_task(before, tasks)
-    if tasks[task_id] not in NEW_TASK_STATUSES:
-        raise PartialWrite("new task status not as expected", reason="TASK_STATUS")
-    return task_id
 
 
 # Hold (rows 11-12)
