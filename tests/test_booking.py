@@ -363,3 +363,36 @@ def test_take_note_reads_back_after_assign_re_renders_the_window(page, guard):
     booking.read_assignee(window)  # rendered before the take, as live
     booking.take_note(guard, window, AGENT)
     assert booking.read_assignee(window) == AGENT
+
+
+# Live S5, 28 Oct 2026 (laptop snapshot): one visible "Client Internal No.:"
+# between the window heading and Create New Task, still "not found once".
+# The label's spaces may be non-breaking: the snapshot shows plain spaces.
+
+
+def project_page_as_live(space: str) -> str:
+    label = space.join(["Client", "Internal", "No.:"])
+    return f"""
+<div><div>
+  <h3>pln_10001 B1 Homes Lot 123 (#45) Sample Lane Sampleville 6000 WA</h3>
+  <a href="#">pln_10001</a>
+  <select aria-label="-- Select Task --"><option selected>-- Select Task --</option>
+    <option>(tsk_200001) [Compaction Test]</option></select>
+  <h3>New Project</h3>
+  <div><h3>pln_10001</h3>
+    <ul>
+      <li><strong>Lodged{space}By:</strong> {AGENT}</li>
+      <li><strong>{label}</strong> 2600001B</li>
+    </ul>
+    <ul hidden><li><strong>{label}</strong> 2600009B</li></ul>
+  </div>
+  <button>Create New Task</button>
+  <table><tbody></tbody></table>
+</div>{CLOSE}</div>"""
+
+
+@pytest.mark.parametrize("space", [" ", "&nbsp;", " \n  "])
+def test_client_internal_no_reads_whatever_the_spaces_in_its_label(page, space):
+    page.set_content(project_page_as_live(space))
+    project = booking.project_window(page, "pln_10001")
+    assert booking.client_internal_no(project) == "2600001B"
