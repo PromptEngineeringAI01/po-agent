@@ -62,6 +62,15 @@ def _exact(text: str) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(text)}$")
 
 
+def _label_pattern(label: str) -> re.Pattern[str]:
+    """The label's words with any whitespace between them: live S5 (28 Oct
+    2026) failed on "Client Internal No.:" whose spaces aren't plain spaces
+    in the page (ARIA snapshots show them as plain). JavaScript's \\s, which
+    Playwright uses for the match, includes the non-breaking space."""
+    words = (re.escape(word) for word in label.split())
+    return re.compile(r"^\s*" + r"\s+".join(words) + r"\s*$")
+
+
 def _container(window: Locator, label: str, control: str) -> Locator:
     """The innermost element in `window` holding the label text and a
     `control` (CSS), e.g. the "PO Number" row and its input. Built from the
@@ -90,7 +99,7 @@ def _labelled(window: Locator, label: str) -> str:
     Waits up to 15 s for exactly one visible label: live (28 Oct 2026) the
     project window's details render after the window shows, and Assign
     re-renders the Note window. Two visible labels fail at once (strict)."""
-    strong = window.locator("strong").filter(has_text=_exact(label)).visible
+    strong = window.locator("strong").filter(has_text=_label_pattern(label)).visible
     try:
         strong.wait_for(state="visible", timeout=LOAD_TIMEOUT_MS)
     except PlaywrightError:
@@ -99,7 +108,8 @@ def _labelled(window: Locator, label: str) -> str:
         text = strong.locator("xpath=..").inner_text()
     except PlaywrightError:
         raise UnexpectedScreen("label not readable") from None
-    value = text.strip().removeprefix(label).strip()
+    # str.split() splits on any Unicode whitespace, the non-breaking space too.
+    value = " ".join(text.split()).removeprefix(" ".join(label.split())).strip()
     return value.removesuffix("Unlink").strip()
 
 
