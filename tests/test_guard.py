@@ -6,6 +6,7 @@ is seen through an inline onclick that sets data-clicked, read back with
 get_attribute; tests never act on the page themselves (guard_check.py).
 """
 
+import re
 import traceback
 from collections.abc import Iterator
 
@@ -87,7 +88,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "open_project_tab": "click",
         "open_note_pool": "click",
         "open_projects_subtab": "click",
-        "leave_project_menu": "click",  # demo, 27 Oct 2026
+        "move_pointer_off_menu": "move",  # Joey, 28 Oct 2026
         "open_pool": "click",
         "set_pool_filter": "select",
         "set_locked_filter": "select",
@@ -763,3 +764,59 @@ def test_enter_is_only_for_the_press_actions(page, guard):
     assert refusal(guard, "open_note", page.locator("section"), box, "Enter") == (
         Refusal.VALUE_MISMATCH
     )
+
+
+# Joey, 28 Oct 2026: move_pointer_off_menu moves the pointer (hover with
+# force, so the cover layer can't stop it) onto the list's status line below
+# the header, and does nothing else: no click, no key, no value.
+
+MOVE_PAGE = """
+<style>#cover { position: fixed; inset: 0; z-index: 10; }</style>
+<header><span>Welcome Agent</span></header>
+<main>
+  <ul><li onmouseover="this.dataset.hovered = 'yes'"
+          onclick="this.dataset.clicked = 'yes'">Page 1 of 1(3 Items)</li></ul>
+  <p>No record could be found.</p>
+  <a href="#">Page 1 of 1(3 Items) link</a>
+  <button>Refresh</button>
+</main>
+<div id="cover"></div>
+"""
+
+
+def test_move_lands_on_the_footer_under_a_cover_and_never_clicks(page, guard):
+    page.set_content(MOVE_PAGE)
+    footer = page.get_by_text(re.compile(r"^Page 1 of 1\(3 Items\)$"))
+    guard.act("move_pointer_off_menu", page.locator("body"), footer)
+    assert footer.get_attribute("data-hovered") == "yes"
+    assert not clicked(footer)
+
+
+def test_move_may_land_on_an_empty_lists_status_line(page, guard):
+    page.set_content(MOVE_PAGE)
+    status = page.get_by_text("No record could be found.", exact=True)
+    verdict = guard.vet("move_pointer_off_menu", page.locator("body"), status)
+    assert isinstance(verdict, Allowed)
+
+
+def test_move_takes_no_value(page, guard):
+    page.set_content(MOVE_PAGE)
+    footer = page.get_by_text(re.compile(r"^Page 1 of 1\(3 Items\)$"))
+    assert refusal(
+        guard, "move_pointer_off_menu", page.locator("body"), footer, "x"
+    ) == (Refusal.VALUE_MISMATCH)
+
+
+@pytest.mark.parametrize(
+    "locate",
+    [
+        lambda p: p.get_by_text("Welcome Agent", exact=True),
+        lambda p: p.get_by_role("button", name="Refresh"),
+        lambda p: p.get_by_role("link"),
+    ],
+)
+def test_move_onto_anything_but_a_status_line_is_refused(page, guard, locate):
+    page.set_content(MOVE_PAGE)
+    assert refusal(
+        guard, "move_pointer_off_menu", page.locator("body"), locate(page)
+    ) == (Refusal.WRONG_ELEMENT)

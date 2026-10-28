@@ -781,10 +781,12 @@ def test_a_pointer_parked_in_the_header_blocks_body_clicks(page, guard):
 
 
 def test_a_click_on_header_text_leaves_the_block(page, guard):
-    # What leave_menu did until now: the pointer is still in the header.
+    # leave_menu used to click the inert header text "Welcome Agent": any
+    # click in the header leaves the pointer there, so the block stays.
     park_pointer_in_header(page, guard)
-    welcome = page.get_by_text("Welcome Agent", exact=True)
-    guard.act("leave_project_menu", page.locator("body"), welcome)
+    guard.act(
+        "open_project_tab", driver._project_menu(page), driver._project_title(page)
+    )
     with pytest.raises(UnexpectedScreen):
         refresh_click(page, guard)
 
