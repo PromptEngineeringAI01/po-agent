@@ -94,3 +94,46 @@ def test_demo_takes_probe_link(env, capsys):
     env.setattr(cli, "start", fake_start)
     assert cli.main(["demo", "--site", "test", "--probe-link"]) == 0
     assert calls == [("demo", True, False)]
+
+
+# 28 Oct 2026: with the pointer move (move_pointer_off_menu) the page no
+# longer needs a visible window, so the demo honours --headed again.
+
+
+class _FakePlaywright:
+    def __init__(self, launched: list[dict]) -> None:
+        self.launched = launched
+        self.chromium = self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> None:
+        return None
+
+    def launch(self, **kwargs):
+        self.launched.append(kwargs)
+        return self
+
+    def new_context(self, **kwargs):
+        return self
+
+    def new_page(self):
+        return self
+
+    def set_default_timeout(self, ms: int) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+@pytest.mark.parametrize(("headed", "headless"), [(True, False), (False, True)])
+def test_demo_browser_honours_headed(monkeypatch, tmp_path, headed, headless):
+    from po_agent.core import demo
+
+    launched: list[dict] = []
+    monkeypatch.setattr(demo, "sync_playwright", lambda: _FakePlaywright(launched))
+    with demo._browser(headed=headed, slow_mo=0, downloads=tmp_path):
+        pass
+    assert launched[0]["headless"] is headless
