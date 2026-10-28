@@ -1,8 +1,9 @@
 """The action guard: the only code that acts on a MySys page (task 1.4).
 
-Every click, fill, tick, select or upload is a named action on the allowlist,
-on exactly one visible element inside one visible window (the scope), and is
-refused if the element's own name or text hits the denylist
+Every click, fill, tick, select, upload, key press (Enter on two search
+boxes) or pointer move (onto a list status line) is a named action on the
+allowlist, on exactly one visible element inside one visible window (the
+scope), and is refused if the element's own name or text hits the denylist
 (docs/specs/spec.md §5; SPEC.md -> MySys screen rules -> Guard additions).
 
 `vet()` resolves the element and decides; it only reads the page. `act()`
@@ -37,6 +38,9 @@ class Kind(StrEnum):
     # Only the key Enter, only on the search boxes in PRESS_TARGETS
     # (Joey, decisions 28 Oct 2026).
     PRESS = "press"
+    # Moves the pointer onto one list status line; no click, no key
+    # (Joey, decisions 28 Oct 2026).
+    MOVE = "move"
 
 
 # docs/specs/spec.md §5, SPEC -> Guard additions, tasks/plan.md Open question 3.
@@ -48,9 +52,9 @@ ALLOWLIST: dict[str, Kind] = {
     "open_project_tab": Kind.CLICK,
     "open_note_pool": Kind.CLICK,
     "open_projects_subtab": Kind.CLICK,
-    # Moves the mouse off the Project hover menu so it closes: while open,
-    # the page takes no clicks (decisions, 27 Oct 2026).
-    "leave_project_menu": Kind.CLICK,
+    # The pointer off the header after a Project menu choice: while it stays
+    # there, the page takes no click below the header (decisions, 28 Oct).
+    "move_pointer_off_menu": Kind.MOVE,
     # Note Pool
     "open_pool": Kind.CLICK,
     "set_pool_filter": Kind.SELECT,
@@ -147,12 +151,17 @@ PRESS_TARGETS = {
     "submit_link_search": "Search/filter",  # Choose Project's search
 }
 PRESS_KEY = "Enter"
+# A MOVE's only target: a list's status line, its footer or its empty text.
+MOVE_TARGET = re.compile(
+    r"Page \d+ of \d+\s*\(\d+ Items?\)|No record (?:could be )?found\."
+)
+MOVE_ROLES = frozenset({"generic", "listitem", "paragraph", "text"})
 
 
 def _value_fits(kind: Kind, value: Value) -> bool:
     if kind == Kind.PRESS:
         return value == PRESS_KEY
-    if kind in (Kind.CLICK, Kind.CHECK, Kind.UNCHECK):
+    if kind in (Kind.CLICK, Kind.CHECK, Kind.UNCHECK, Kind.MOVE):
         return value is None
     if kind in (Kind.FILL, Kind.SELECT):
         return isinstance(value, str)
@@ -239,6 +248,16 @@ class ActionGuard:
         role, name = head.group(1), head.group(2) or ""
         if kind == Kind.PRESS and (role != "textbox" or name != PRESS_TARGETS[action]):
             return Refused(Refusal.WRONG_ELEMENT)
+        if kind == Kind.MOVE and (
+            role not in MOVE_ROLES
+            or not MOVE_TARGET.fullmatch(
+                " ".join((element.text_content() or "").split())
+            )
+            # Plain text only: no control inside it either.
+            or resolved.get_by_role("link").count() > 0
+            or resolved.get_by_role("button").count() > 0
+        ):
+            return Refused(Refusal.WRONG_ELEMENT)
         texts = [name, *(element.get_attribute(a) or "" for a in NAME_ATTRIBUTES)]
         if is_select:
             texts.append(str(value))  # the chosen option, never the others
@@ -302,6 +321,13 @@ class ActionGuard:
                     element.set_input_files(value)
                 case Kind.PRESS:
                     element.press(value)  # only Enter (_value_fits)
+                case Kind.MOVE:
+                    # force: skip the actionability checks, whose
+                    # "receives events" check is what the cover fails;
+                    # hover only moves page.mouse to the element's centre.
+                    # https://playwright.dev/python/docs/actionability#forcing-actions
+                    # https://playwright.dev/python/docs/api/class-elementhandle#element-handle-hover
+                    element.hover(force=True)
         except PlaywrightError:
             self.history.append((action, "failed"))
             raise UnexpectedScreen("guard action failed", action=action) from None

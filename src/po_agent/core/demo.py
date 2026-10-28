@@ -56,14 +56,15 @@ class _Progress:
 
 
 @contextmanager
-def _browser(*, slow_mo: int, downloads: Path) -> Iterator[Page]:
+def _browser(*, headed: bool, slow_mo: int, downloads: Path) -> Iterator[Page]:
     """As driver.open_browser, with downloads in the run's own folder (D2).
 
-    Always headed: in headless Chromium the test site's content area takes no
-    clicks (the body intercepts them; found 27 Oct 2026), and Joey watches."""
+    Headed only with --headed: the clicks a headless run lost below the
+    header were the parked pointer, now moved off by leave_menu (decisions,
+    28 Oct 2026)."""
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
-            headless=False, slow_mo=slow_mo, downloads_path=downloads
+            headless=not headed, slow_mo=slow_mo, downloads_path=downloads
         )
         try:
             page = browser.new_context(accept_downloads=True).new_page()
@@ -91,7 +92,9 @@ def run(
     guard = ActionGuard()
     progress = _Progress()
     try:
-        with _browser(slow_mo=options.slow_mo, downloads=downloads) as page:
+        with _browser(
+            headed=options.headed, slow_mo=options.slow_mo, downloads=downloads
+        ) as page:
             try:
                 _steps(guard, page, config, credentials, options, summary, progress)
             except Exception as error:

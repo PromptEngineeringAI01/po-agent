@@ -163,15 +163,23 @@ def note_window(page: Page, note_id: str) -> Locator:
 
 
 def leave_menu(guard: ActionGuard, page: Page) -> None:
-    """Closes the Project hover menu after choosing Note Pool or Projects.
+    """Moves the pointer off the header after a Project menu choice.
 
-    Found 27 Oct 2026: Playwright's mouse stays on the chosen menu item, the
-    menu stays open, and the page then takes no click below the header
-    ("body intercepts pointer events"). A click on the inert header text
-    "Welcome Agent" closes the menu, but the page stays blocked until the
-    mouse leaves the header, which only a real mouse move does: see _open."""
-    welcome = page.get_by_text("Welcome Agent", exact=True)
-    guard.act("leave_project_menu", page.locator("body"), welcome)
+    Root cause of "page blocked" (27-28 Oct 2026): Playwright's pointer stays
+    where its last click left it, in the header; while the header is hovered
+    the page covers the body and takes no click below it ("<body> intercepts
+    pointer events"). A click elsewhere in the header keeps it there. So the
+    guard moves the pointer, with no click, onto the list's status line below
+    the header (move_pointer_off_menu; decisions, 28 Oct 2026)."""
+    status = (
+        page.get_by_text(driver.FOOTER)
+        .or_(page.get_by_text(driver.NO_RECORD, exact=True))
+        .or_(page.get_by_text(PROJECTS_NO_RECORD, exact=True))
+        .visible
+    )
+    if not _shows(status, LOAD_TIMEOUT_MS):
+        raise UnexpectedScreen("list status line not shown")
+    guard.act("move_pointer_off_menu", page.locator("body"), status)
     item = driver._project_menu(page).get_by_text("Note Pool", exact=True)
     try:
         item.wait_for(state="hidden", timeout=LOAD_TIMEOUT_MS)
@@ -181,10 +189,9 @@ def leave_menu(guard: ActionGuard, page: Page) -> None:
 
 def _open(guard: ActionGuard, action: str, scope: Locator, target: Locator) -> None:
     """An opening, searching or refreshing click (it changes nothing in
-    MySys), tried OPEN_TRIES times. After a menu choice the page stays blocked
-    until a real mouse moves over the browser window (leave_menu), so the demo
-    asks for that and waits. Playwright never clicks while the target is
-    covered, so a retry can't act twice. A guard refusal is never retried."""
+    MySys), tried OPEN_TRIES times in case the page is still covered (see
+    leave_menu). Playwright never clicks while the target is covered, so a
+    retry can't act twice. A guard refusal is never retried."""
     for attempt in range(OPEN_TRIES):
         try:
             guard.act(action, scope, target)
@@ -192,7 +199,7 @@ def _open(guard: ActionGuard, action: str, scope: Locator, target: Locator) -> N
         except UnexpectedScreen:
             if attempt == OPEN_TRIES - 1:
                 raise
-            output.info("demo: page blocked - move the mouse over the browser window")
+            output.info("demo: page blocked, retrying")
 
 
 def open_note(guard: ActionGuard, page: Page, panel: Locator, note_id: str) -> Locator:

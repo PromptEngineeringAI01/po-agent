@@ -20,7 +20,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
-from po_agent.mysys import booking
+from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard
 
 AGENT = "Agent 1 (MySys Only)"
@@ -734,3 +734,68 @@ def test_search_projects_refuses_a_flat_filter_left_set(page, guard, date_from, 
         booking.search_projects(guard, page, booking.projects_panel(page), "2600001B")
     assert "not readable" not in str(error.value)
     assert actions(guard) == []
+
+
+# "page blocked" (live 27-28 Oct): after a click in the header's Project
+# menu, MySys took no click below the header ("<body> intercepts pointer
+# events") until a real mouse moved. Hypothesis: Playwright's pointer stays
+# parked in the header, and while the header is hovered a layer covers the
+# body. The fake does exactly that with CSS only.
+
+PARKED_POINTER_PAGE = """
+<style>
+  header { position: relative; z-index: 20; height: 40px; }
+  header .drop { display: none; position: absolute; }
+  header li:hover .drop { display: block; }
+  body:has(header:hover)::before {
+    content: ""; position: fixed; inset: 0; z-index: 10;
+  }
+</style>
+<header>
+  <ul><li><span>Project</span><ul class="drop"><li>Note Pool</li></ul></li></ul>
+  <span>Welcome Agent</span>
+</header>
+<main style="margin-top: 80px">
+  <button onclick="this.dataset.clicked = 'yes'">Refresh</button>
+  <div><span>Page 1 of 1(3 Items)</span></div>
+</main>
+"""
+
+
+def park_pointer_in_header(page: Page, guard: ActionGuard) -> None:
+    page.set_content(PARKED_POINTER_PAGE)
+    menu = driver._project_menu(page)
+    guard.act("open_project_tab", menu, driver._project_title(page))
+
+
+def refresh_click(page: Page, guard: ActionGuard) -> None:
+    body = page.locator("body")
+    refresh = page.get_by_role("button", name="Refresh", exact=True)
+    guard.act("refresh_note_pool", body, refresh)
+
+
+def test_a_pointer_parked_in_the_header_blocks_body_clicks(page, guard):
+    park_pointer_in_header(page, guard)
+    with pytest.raises(UnexpectedScreen):
+        refresh_click(page, guard)
+
+
+def test_a_second_click_in_the_header_leaves_the_block(page, guard):
+    # leave_menu used to click the header text "Welcome Agent" (an action
+    # since removed). Any click in the header leaves the pointer there, so
+    # the block stays: shown here with the allowlisted Project title click.
+    park_pointer_in_header(page, guard)
+    guard.act(
+        "open_project_tab", driver._project_menu(page), driver._project_title(page)
+    )
+    with pytest.raises(UnexpectedScreen):
+        refresh_click(page, guard)
+
+
+def test_leave_menu_moves_the_pointer_off_the_header_and_clears_the_block(page, guard):
+    park_pointer_in_header(page, guard)
+    booking.leave_menu(guard, page)
+    refresh_click(page, guard)
+    refresh = page.get_by_role("button", name="Refresh", exact=True)
+    assert refresh.get_attribute("data-clicked") == "yes"
+    assert "move_pointer_off_menu" in actions(guard)
