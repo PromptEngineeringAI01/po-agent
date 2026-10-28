@@ -18,6 +18,7 @@ Reads that fail become a fixed `UnexpectedScreen` (or `WriteNotStarted` /
 """
 
 import re
+import time
 from pathlib import Path
 
 from playwright.sync_api import Error as PlaywrightError
@@ -84,11 +85,17 @@ def _chosen(select: Locator) -> str:
 
 def _labelled(window: Locator, label: str) -> str:
     """The text after a bold label: "Assignee: Agent Pool" -> "Agent Pool".
-    The label's parent also holds an Unlink button on the Note window."""
-    strong = window.locator("strong").filter(has_text=_exact(label))
+    The label's parent also holds an Unlink button on the Note window.
+
+    Waits up to 15 s for exactly one visible label: live (28 Oct 2026) the
+    project window's details render after the window shows, and Assign
+    re-renders the Note window. Two visible labels fail at once (strict)."""
+    strong = window.locator("strong").filter(has_text=_exact(label)).visible
     try:
-        if strong.count() != 1:
-            raise UnexpectedScreen("label not found once")
+        strong.wait_for(state="visible", timeout=LOAD_TIMEOUT_MS)
+    except PlaywrightError:
+        raise UnexpectedScreen("label not found once") from None
+    try:
         text = strong.locator("xpath=..").inner_text()
     except PlaywrightError:
         raise UnexpectedScreen("label not readable") from None
@@ -229,18 +236,29 @@ def _list(window: Locator, placeholder: str) -> Locator:
     return window.locator("select").filter(has=option)
 
 
+def _reads(window: Locator, label: str, wanted: str) -> bool:
+    """Polls a label until it reads `wanted`, for up to 15 s; a label that
+    is gone for a moment (the window re-rendering) is read again."""
+    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
+    while True:
+        try:
+            if _labelled(window, label) == wanted:
+                return True
+        except UnexpectedScreen:
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        window.page.wait_for_timeout(POLL_MS)
+
+
 def _assign(guard: ActionGuard, window: Locator, assignee: str) -> None:
     """Assign, then wait for "Assignee:" to read `assignee`."""
     _email_unticked(window)  # right before the committing click
     guard.act(
         "assign_note", window, window.get_by_role("button", name="Assign", exact=True)
     )
-    deadline = LOAD_TIMEOUT_MS
-    while read_assignee(window) != assignee:
-        if deadline <= 0:
-            raise UnexpectedScreen("assignee did not read back")
-        window.page.wait_for_timeout(POLL_MS)
-        deadline -= POLL_MS
+    if not _reads(window, "Assignee:", assignee):
+        raise UnexpectedScreen("assignee did not read back")
     _email_unticked(window)
 
 
@@ -313,13 +331,8 @@ def mark_solved(guard: ActionGuard, window: Locator, agent: str) -> None:
     _email_unticked(window)
     solved = window.get_by_role("button", name="Solved", exact=True)
     guard.act("mark_solved", window, solved)
-    wanted = f"Solved by {agent}"
-    deadline = LOAD_TIMEOUT_MS
-    while read_status(window) != wanted:
-        if deadline <= 0:
-            raise PartialWrite("Solved did not read back")
-        window.page.wait_for_timeout(POLL_MS)
-        deadline -= POLL_MS
+    if not _reads(window, "Status:", f"Solved by {agent}"):
+        raise PartialWrite("Solved did not read back")
     try:
         if solved.is_enabled():
             raise PartialWrite("Solved did not read back")

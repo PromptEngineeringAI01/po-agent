@@ -294,3 +294,72 @@ def test_the_guard_still_refuses_a_hold_dialog_checkbox(page, guard):
     box = dialog.get_by_role("checkbox", name="Send me a reminder email every days")
     with pytest.raises(GuardRefusal):
         guard.act("untick_send_email_notification", dialog, box)
+
+
+# Live, 28 Oct 2026: "label not found once" right after the project window
+# opened (S5) and right after Assign (S2). The labels render after the window
+# shows, Assign re-renders the Note window, and other windows can be open.
+
+LATE = 400  # ms
+
+
+def two_windows(*, assign_rerenders: bool = False) -> str:
+    rerender = "true" if assign_rerenders else "false"
+    return f"""
+<div><div>
+  <h3>pln_10001 B1 Homes Sample Lane, Sampleville WA 6000</h3>
+  <ul id="details"></ul>
+  <button>Create New Task</button>
+</div>{CLOSE}</div>
+<div><div>
+  <h3>Note {NOTE_ID} - created on 12 Oct 2026</h3>
+  <div id="note_body">
+    <div id="who"></div>
+    <div role="group" aria-label="Status buttons"><button disabled>Pending</button><button>Solved</button></div>
+    <select id="user"><option>--Select User--</option><option selected>{AGENT}</option></select>
+    <select id="pool"><option selected>--Select Pool--</option><option>{POOL}</option></select>
+    <button onclick="assign()">Assign</button>
+    <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"> Send Email Notification</span>
+  </div>
+</div>{CLOSE}</div>
+<script>
+function showWho(name) {{
+  document.getElementById('who').innerHTML =
+    '<strong>Assignee:</strong> ' + name + ' <button>Unlink</button>';
+}}
+setTimeout(() => {{
+  document.getElementById('details').innerHTML =
+    '<li><strong>Client Internal No.:</strong> <span>2600001B</span></li>';
+  showWho('{POOL}');
+}}, {LATE});
+function assign() {{
+  const user = document.getElementById('user');
+  const who = user.value;
+  user.selectedIndex = 0;
+  if ({rerender}) {{
+    document.getElementById('who').innerHTML = '';
+    setTimeout(() => showWho(who), {LATE});
+  }} else {{
+    showWho(who);
+  }}
+}}
+</script>"""
+
+
+def test_client_internal_no_waits_for_the_details_to_render(page):
+    page.set_content(two_windows())
+    project = booking.project_window(page, "pln_10001")
+    assert booking.client_internal_no(project) == "2600001B"
+
+
+def test_assignee_waits_for_the_note_window_to_render(page):
+    page.set_content(two_windows())
+    assert booking.read_assignee(booking.note_window(page, NOTE_ID)) == POOL
+
+
+def test_take_note_reads_back_after_assign_re_renders_the_window(page, guard):
+    page.set_content(two_windows(assign_rerenders=True))
+    window = booking.note_window(page, NOTE_ID)
+    booking.read_assignee(window)  # rendered before the take, as live
+    booking.take_note(guard, window, AGENT)
+    assert booking.read_assignee(window) == AGENT
