@@ -504,3 +504,69 @@ def test_snapshot_includes_child_frames(page, tmp_path, monkeypatch):
     page.frames[-1].wait_for_load_state()
     path = booking.save_snapshot(page, "frames")
     assert "Inside frame" in path.read_text(encoding="utf-8")
+
+
+# Live probe, 28 Oct 2026 12:28: "link probe done", yet the results snapshot
+# held no Choose Project window. While its content loads, the window is only
+# a heading, and "heading + a Search/filter box" matched an ancestor holding
+# the Note Pool's own Search/filter. The probe must fail loudly instead.
+
+
+def heading_first_link_page(*, closes_on_heading_click: bool = False) -> str:
+    """Choose Project's heading shows at once, its boxes 400 ms later."""
+    closes = "true" if closes_on_heading_click else "false"
+    page = link_page()
+    old = """  setTimeout(() => {
+    document.getElementById('picker').innerHTML = `<div><div>
+      <h3>Choose Project</h3>"""
+    assert page.count(old) == 1
+    return page.replace(
+        old,
+        f"""  document.getElementById('picker').innerHTML =
+    `<div id="cp"><div><h3 onclick="if ({closes}) this.closest('#cp').remove()">Choose Project</h3></div></div>`;
+  setTimeout(() => {{
+    document.getElementById('picker').innerHTML = `<div id="cp"><div>
+      <h3 onclick="if ({closes}) this.closest('#cp').remove()">Choose Project</h3>""",
+    )
+
+
+def test_link_project_fills_the_pickers_box_not_the_note_pools(page, guard):
+    page.set_content(heading_first_link_page())
+    window = booking.note_window(page, NOTE_ID)
+    booking.link_project(guard, page, window, "pln_10001")
+    pool_search = page.get_by_role("textbox", name="Search/filter").first
+    assert pool_search.input_value() == ""
+    assert window.get_by_role("button", name="pln_10001", exact=True).count() == 1
+
+
+def test_probe_link_snapshots_each_sub_step(page, guard, tmp_path, monkeypatch):
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
+    page.set_content(heading_first_link_page())
+    booking.probe_link(guard, page, booking.note_window(page, NOTE_ID), "pln_10001")
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert names == [
+        "demo-probe-link-1-opened.yml",
+        "demo-probe-link-2-filled.yml",
+        "demo-probe-link-3-searched.yml",
+        "demo-probe-link-results.yml",
+    ]
+    assert "Choose Project" in (tmp_path / names[0]).read_text(encoding="utf-8")
+
+
+def test_probe_link_fails_when_the_pln_is_not_listed(
+    page, guard, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
+    monkeypatch.setattr(booking, "LINK_TIMEOUT_MS", 1500)
+    page.set_content(heading_first_link_page())
+    with pytest.raises(UnexpectedScreen):
+        booking.probe_link(guard, page, booking.note_window(page, NOTE_ID), "pln_99999")
+
+
+def test_probe_link_fails_when_choose_project_closes(
+    page, guard, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
+    page.set_content(heading_first_link_page(closes_on_heading_click=True))
+    with pytest.raises(UnexpectedScreen):
+        booking.probe_link(guard, page, booking.note_window(page, NOTE_ID), "pln_10001")
