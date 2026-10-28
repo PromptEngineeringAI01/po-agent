@@ -105,6 +105,7 @@ Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses private/fix
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
 Supervised demo:     uv run po-agent demo --site test --headed [--until-check]   one PO, Enter before every write (decisions, 27 Oct 2026)
+Link probe:          uv run po-agent demo --site test --probe-link   opens Choose Project, searches, snapshots, selects nothing (decisions, 28 Oct 2026)
 Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
 Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only   pull main, sync, run, log, alert
 Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent

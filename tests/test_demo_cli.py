@@ -80,3 +80,17 @@ def test_demo_needs_only_the_mysys_secrets(env, capsys):
     assert cli.main(["demo", "--site", "test", "--until-check"]) == 0
     assert calls == [("demo", ["mysys_test_password", "mysys_test_username"], True)]
     assert summary_of(capsys.readouterr().out)["mode"] == "demo"
+
+
+def test_demo_takes_probe_link(env, capsys):
+    for name in ("mysys_test_username", "mysys_test_password"):
+        env.setenv(f"PO_AGENT_{name.upper()}", f"fake-{name}")
+    calls = []
+
+    def fake_start(mode, config, credentials, options, summary):
+        calls.append((mode, options.probe_link, options.until_check))
+        return 0
+
+    env.setattr(cli, "start", fake_start)
+    assert cli.main(["demo", "--site", "test", "--probe-link"]) == 0
+    assert calls == [("demo", True, False)]

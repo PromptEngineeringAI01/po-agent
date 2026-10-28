@@ -32,6 +32,9 @@ from po_agent.mysys.guard import ActionGuard
 
 LOAD_TIMEOUT_MS = driver.LOAD_TIMEOUT_MS
 POLL_MS = 500
+# Live 28 Oct 2026: the Choose Project window's content showed only
+# after a 15 s wait had given up.
+LINK_TIMEOUT_MS = 60_000
 OPEN_TRIES = 4  # x 15 s
 CREATOR = "Perth Scheduling"
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
@@ -135,6 +138,10 @@ def save_snapshot(page: Page, step: str) -> Path | None:
     (real data: laptop only, never committed). Best effort: None on failure."""
     try:
         snapshot = page.locator("body").aria_snapshot()
+        # A page's snapshot shows a child frame only as "- iframe".
+        for frame in page.frames[1:]:
+            inner = frame.locator("body").aria_snapshot()
+            snapshot += f"\n# frame {frame.name or '(no name)'}\n{inner}"
         SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
         path = SNAPSHOT_DIR / f"demo-{step}.yml"
         path.write_text(snapshot, encoding="utf-8")
@@ -404,7 +411,7 @@ def _link_choice(picker: Locator, pln: str) -> Locator:
         picker.get_by_role("cell", name=pln, exact=True),
         picker.get_by_text(pln, exact=True),
     )
-    if not _shows(candidates[-1].first, LOAD_TIMEOUT_MS):
+    if not _shows(candidates[-1].first, LINK_TIMEOUT_MS):
         raise UnexpectedScreen("project not listed in Choose Project")
     save_snapshot(picker.page, "S8-link-results")
     for choice in candidates:
@@ -413,23 +420,42 @@ def _link_choice(picker: Locator, pln: str) -> Locator:
     raise UnexpectedScreen("project not listed once in Choose Project")
 
 
-def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
-    """Step 8: Link to Project -> Choose Project: search the pln, run the
-    search (a click on the window's heading moves focus, as the Note Pool's
-    search runs when focus leaves the box), select the pln; read back the
-    Note's project button and a Status that still starts "Pending" (live it
-    reads "Pending by <agent>")."""
+def _search_choose_project(
+    guard: ActionGuard, page: Page, window: Locator, pln: str
+) -> Locator:
+    """Send Email unticked, Link to Project, then in Choose Project (up to
+    60 s to load): fill Search/filter with the pln and run the search. Only
+    reads and opens: nothing is linked until a result is selected."""
     untick_send_email(guard, window)
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
-    if not _shows(picker, LOAD_TIMEOUT_MS):
+    if not _shows(picker, LINK_TIMEOUT_MS):
         save_snapshot(page, "S8-link-opened")
         raise UnexpectedScreen("Link to Project search did not show")
     search = picker.get_by_role("textbox", name="Search/filter", exact=True)
     guard.act("link_search_project", picker, search, pln)
     heading = picker.get_by_role("heading", name=CHOOSE_PROJECT, exact=True)
     _open(guard, "link_run_search", picker, heading)
+    return picker
+
+
+def probe_link(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
+    """--probe-link: open Choose Project, search the pln, snapshot the window
+    and its results (demo-probe-link-results.yml), select nothing. The demo
+    then abandons the window by closing the browser."""
+    picker = _search_choose_project(guard, page, window, pln)
+    _shows(picker.get_by_text(pln, exact=True).first, LINK_TIMEOUT_MS)
+    save_snapshot(page, "probe-link-results")
+
+
+def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
+    """Step 8: Link to Project -> Choose Project: search the pln, run the
+    search (a click on the window's heading moves focus, as the Note Pool's
+    search runs when focus leaves the box), select the pln; read back the
+    Note's project button and a Status that still starts "Pending" (live it
+    reads "Pending by <agent>")."""
+    picker = _search_choose_project(guard, page, window, pln)
     choice = _link_choice(picker, pln)
     _email_unticked(window)
     guard.act("link_select_project", picker, choice)

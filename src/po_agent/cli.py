@@ -3,11 +3,14 @@
     po-agent spike|run --site test [--decide-only] [--headed] [--slow-mo N]
              [--detailed-log]
     po-agent demo --site test [--headed] [--slow-mo N] [--until-check]
+             [--probe-link]
              [--detailed-log]
 
 `demo` books the one trial PO 2609017B, supervised: it waits for Joey's
 Enter before every write; --until-check stops after the read-only checks
-(steps 1-5) and writes nothing (decisions, 27 Oct 2026).
+(steps 1-5) and writes nothing (decisions, 27 Oct 2026); --probe-link
+opens Choose Project on the untaken Note, searches the pln, snapshots
+and stops without selecting (28 Oct 2026).
 
 Every run ends with RUN_SUMMARY as its last stdout line, whatever happened.
 A typed error becomes its ALERT and exit code; anything else is caught here
@@ -104,6 +107,7 @@ def _parser() -> _Parser:
             command.add_argument("--decide-only", action="store_true")
         if name == "demo":
             command.add_argument("--until-check", action="store_true")
+            command.add_argument("--probe-link", action="store_true")
     return parser
 
 

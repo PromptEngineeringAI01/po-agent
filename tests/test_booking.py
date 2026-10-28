@@ -456,3 +456,51 @@ def test_link_project_searches_the_choose_project_window_and_reads_back(page, gu
         "link_run_search",
         "link_select_project",
     ]
+
+
+# Live S8 again, 28 Oct 2026 12:09: the Choose Project heading showed at once
+# but its Search/filter only after the 15 s page wait had given up. The
+# picker gets its own, longer wait. --probe-link searches without selecting.
+
+
+def slow_link_page(delay_ms: int) -> str:
+    page = link_page()
+    assert page.count("}, 300);") == 1
+    return page.replace("}, 300);", f"}}, {delay_ms});")
+
+
+def test_link_project_waits_longer_than_a_page_load_for_the_picker(
+    page, guard, monkeypatch
+):
+    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 500)
+    page.set_content(slow_link_page(1500))
+    window = booking.note_window(page, NOTE_ID)
+    booking.link_project(guard, page, window, "pln_10001")
+    assert window.get_by_role("button", name="pln_10001", exact=True).count() == 1
+
+
+def test_probe_link_searches_and_selects_nothing(page, guard, tmp_path, monkeypatch):
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
+    page.set_content(link_page())
+    window = booking.note_window(page, NOTE_ID)
+    booking.probe_link(guard, page, window, "pln_10001")
+    assert "link_select_project" not in actions(guard)
+    assert actions(guard)[-3:] == [
+        "link_to_project",
+        "link_search_project",
+        "link_run_search",
+    ]
+    assert window.get_by_role("button", name="Link to Project").count() == 1
+    results = (tmp_path / "demo-probe-link-results.yml").read_text(encoding="utf-8")
+    assert "pln_10001" in results
+
+
+def test_snapshot_includes_child_frames(page, tmp_path, monkeypatch):
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
+    page.set_content(
+        "<h3>Choose Project</h3>"
+        "<iframe srcdoc=\"<input aria-label='Inside frame'>\"></iframe>"
+    )
+    page.frames[-1].wait_for_load_state()
+    path = booking.save_snapshot(page, "frames")
+    assert "Inside frame" in path.read_text(encoding="utf-8")
