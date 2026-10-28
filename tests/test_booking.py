@@ -396,3 +396,63 @@ def test_client_internal_no_reads_whatever_the_spaces_in_its_label(page, space):
     page.set_content(project_page_as_live(space))
     project = booking.project_window(page, "pln_10001")
     assert booking.client_internal_no(project) == "2600001B"
+
+
+# Live S8, 28 Oct 2026: Link to Project opens a floating window "Choose
+# Project" holding textboxes "Search/filter", "After..." and "Before..." and
+# no results until a search runs (here: when focus leaves the box, as in the
+# Note Pool). The Note Pool panel's own "Search/filter" is on the page too.
+# The Note's Status reads "Pending by <agent>" once it is assigned.
+
+
+def link_page() -> str:
+    return f"""
+<div><input aria-label="Search/filter"><button>New Note</button></div>
+<div><div>
+  <h3>Note {NOTE_ID} - created on 12 Oct 2026</h3>
+  <div>
+    <div><strong>Assignee:</strong> {AGENT} <button>Unlink</button></div>
+    <div role="group" aria-label="Status buttons"><button disabled>Pending</button></div>
+    <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"></span>
+    <span id="link"><button onclick="openPicker()">Link to Project</button></span>
+    <ul><li><strong>Status:</strong> Pending by {AGENT}</li></ul>
+  </div>
+</div>{CLOSE}</div>
+<div id="picker"></div>
+<script>
+function openPicker() {{
+  if (document.getElementById('email').checked) document.body.dataset.emailed = 'yes';
+  setTimeout(() => {{
+    document.getElementById('picker').innerHTML = `<div><div>
+      <h3>Choose Project</h3>
+      <input aria-label="Search/filter" onblur="search(this.value)">
+      <input aria-label="After..."><input aria-label="Before...">
+      <table><tbody id="results"></tbody></table>
+    </div>{CLOSE}</div>`;
+  }}, 300);
+}}
+function search(text) {{
+  if (text !== 'pln_10001') return;
+  document.getElementById('results').innerHTML =
+    '<tr><td><a href="#" onclick="pick()">pln_10001</a></td><td>B1 Homes</td></tr>';
+}}
+function pick() {{
+  document.getElementById('picker').innerHTML = '';
+  document.getElementById('link').innerHTML =
+    '<button>pln_10001</button><button>Change Project</button><button>Unlink</button>';
+}}
+</script>"""
+
+
+def test_link_project_searches_the_choose_project_window_and_reads_back(page, guard):
+    page.set_content(link_page())
+    window = booking.note_window(page, NOTE_ID)
+    booking.link_project(guard, page, window, "pln_10001")
+    assert window.get_by_role("button", name="pln_10001", exact=True).count() == 1
+    assert page.locator("body").get_attribute("data-emailed") is None
+    assert actions(guard)[-4:] == [
+        "link_to_project",
+        "link_search_project",
+        "link_run_search",
+        "link_select_project",
+    ]
