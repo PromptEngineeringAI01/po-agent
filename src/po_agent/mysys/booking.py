@@ -378,60 +378,64 @@ def find_note_again(
     return open_note(guard, page, panel, note_id)
 
 
-# Link to Project (row 13; its search screens were never captured)
+# Link to Project (row 13; its window seen live on 28 Oct 2026)
+
+CHOOSE_PROJECT = "Choose Project"
 
 
-def _link_picker(page: Page, window: Locator) -> tuple[Locator, Locator]:
-    """(scope, search box) after "Link to Project": a search box that shows
-    in the Note window, or a new window whose heading names a project link."""
-    in_note = window.get_by_role(
-        "textbox", name=re.compile(r"(?i)search|select|project")
+def choose_project_window(page: Page) -> Locator:
+    """Live S8 (28 Oct 2026): "Link to Project" opens a floating window with
+    heading "Choose Project" and textboxes "Search/filter", "After..." and
+    "Before..."; its results show only after a search. The Note Pool panel
+    has a "Search/filter" too, so the window is found by its heading."""
+    return _innermost(
+        page,
+        page.get_by_role("heading", name=CHOOSE_PROJECT, exact=True),
+        page.get_by_role("textbox", name="Search/filter", exact=True),
     )
-    heading = page.get_by_role(
-        "heading", name=re.compile(r"(?i)^(?!note |pln_).*\b(link|select|projects?)\b")
-    )
-    picker = _innermost(page, heading, page.get_by_role("textbox"))
-    try:
-        in_note.or_(picker).first.wait_for(state="visible", timeout=LOAD_TIMEOUT_MS)
-        if in_note.visible.count() == 1:
-            return window, in_note
-    except PlaywrightError:
-        raise UnexpectedScreen("Link to Project search did not show") from None
-    return picker, picker.get_by_role("textbox")
 
 
 def _link_choice(picker: Locator, pln: str) -> Locator:
-    """The one result naming the pln: a link, button, option, cell or text."""
+    """The one result naming the pln: a link, button, cell or text. The
+    results were not seen live yet: the demo snapshots them (S8-link-results)."""
     candidates = (
         picker.get_by_role("link", name=pln, exact=True),
         picker.get_by_role("button", name=pln, exact=True),
-        picker.get_by_role("option", name=pln, exact=True),
         picker.get_by_role("cell", name=pln, exact=True),
         picker.get_by_text(pln, exact=True),
     )
     if not _shows(candidates[-1].first, LOAD_TIMEOUT_MS):
-        raise UnexpectedScreen("project not listed in Link to Project")
+        raise UnexpectedScreen("project not listed in Choose Project")
+    save_snapshot(picker.page, "S8-link-results")
     for choice in candidates:
         if choice.visible.count() == 1:
             return choice
-    raise UnexpectedScreen("project not listed once in Link to Project")
+    raise UnexpectedScreen("project not listed once in Choose Project")
 
 
 def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
-    """Step 8: Link to Project -> search the pln -> select it; read back the
-    Note's project button and Status Pending."""
+    """Step 8: Link to Project -> Choose Project: search the pln, run the
+    search (a click on the window's heading moves focus, as the Note Pool's
+    search runs when focus leaves the box), select the pln; read back the
+    Note's project button and a Status that still starts "Pending" (live it
+    reads "Pending by <agent>")."""
     untick_send_email(guard, window)
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
-    save_snapshot(page, "S8-link-opened")  # the unmapped screen, for mapping
-    picker, search = _link_picker(page, window)
+    picker = choose_project_window(page)
+    if not _shows(picker, LOAD_TIMEOUT_MS):
+        save_snapshot(page, "S8-link-opened")
+        raise UnexpectedScreen("Link to Project search did not show")
+    search = picker.get_by_role("textbox", name="Search/filter", exact=True)
     guard.act("link_search_project", picker, search, pln)
+    heading = picker.get_by_role("heading", name=CHOOSE_PROJECT, exact=True)
+    _open(guard, "link_run_search", picker, heading)
     choice = _link_choice(picker, pln)
     _email_unticked(window)
     guard.act("link_select_project", picker, choice)
     if not _shows(window.get_by_role("button", name=pln, exact=True), LOAD_TIMEOUT_MS):
         raise PartialWrite("project link did not read back")
-    if read_status(window) != "Pending":
+    if not read_status(window).startswith("Pending"):
         raise PartialWrite("Note status not Pending after linking")
 
 
