@@ -535,27 +535,39 @@ def _table(container: Locator) -> list[dict[str, str]]:
     return rows
 
 
+# Each Projects filter select, by the default option only it holds (row 26:
+# they have no name), and its field identifier.
 PROJECT_FILTERS = {
-    "Status": "All Projects",
-    "Eng Type": "All Eng Types",
-    "Sales Type": "All Sales Types",
+    "All Projects": "status",
+    "All Eng Types": "eng_type",
+    "All Sales Types": "sales_type",
 }
 
 
 def _check_project_filters(panel: Locator) -> None:
     """Every Projects filter at its default, so none hides the project (a
     Status other than All Projects could hide a Cancelled one). Read only:
-    the agent never changes them."""
+    the agent never changes them.
+
+    Live S5 (28 Oct 2026, 14:06): the labels and controls share one block,
+    so a label can't scope its control. Each select is found by its default
+    option; every textbox but the search box (Company "Select...", the two
+    dates) must be empty."""
+    page = panel.page
     try:
-        for label, default in PROJECT_FILTERS.items():
-            if _chosen(_field(panel, label, "select")) != default:
+        for default, field in PROJECT_FILTERS.items():
+            option = page.locator("option").filter(has_text=_exact(default))
+            select = panel.locator("select").filter(has=option)
+            if select.count() != 1:
+                raise UnexpectedScreen("Projects filter not found once", field=field)
+            if _chosen(select) != default:
                 raise UnexpectedScreen(
-                    "Projects filter not at its default", field=label
+                    "Projects filter not at its default", field=field
                 )
-        for label in ("Company", "Date From"):
-            for box in _container(panel, label, "input").locator("input").all():
-                if box.input_value():
-                    raise UnexpectedScreen("Projects filter not empty", field=label)
+        search = panel.get_by_role("textbox", name="Search...", exact=True)
+        for box in panel.get_by_role("textbox").all():
+            if box.and_(search).count() == 0 and box.input_value():
+                raise UnexpectedScreen("Projects text filter not empty")
     except PlaywrightError:
         raise UnexpectedScreen("Projects filters not readable") from None
 
