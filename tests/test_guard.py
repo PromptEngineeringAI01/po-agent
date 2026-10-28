@@ -91,6 +91,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "set_pool_filter": "select",
         "set_locked_filter": "select",
         "search_note_pool": "fill",
+        "refresh_note_pool": "click",
         "open_note": "click",
         "select_note_user": "select",
         "select_note_pool": "select",

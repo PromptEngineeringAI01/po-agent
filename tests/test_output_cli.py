@@ -324,13 +324,14 @@ def test_options_reach_the_mode_and_summary_is_last(env, started, capsys):
 
     captured = capsys.readouterr()
     assert code == 0
-    (mode, config, credentials, options), *_ = started
+    (mode, config, credentials, options, summary), *_ = started
     assert mode == "decide-only"
     assert config.site == "test"
     assert set(credentials) == set(SECRET_NAMES)
     assert options.headed is True
     assert options.slow_mo == 500
     assert options.detailed_log is False
+    assert summary.mode == "decide-only"
     summary = summary_of(captured)
     assert summary["exit_code"] == 0
     assert summary["mode"] == "decide-only"
@@ -338,17 +339,11 @@ def test_options_reach_the_mode_and_summary_is_last(env, started, capsys):
         assert f"fake-{name}" not in captured.out
 
 
-@pytest.mark.parametrize(
-    "argv, message",
-    [
-        (["spike", "--site", "test"], "INFO  spike not built yet"),
-        (["run", "--site", "test", "--decide-only"], "INFO  decide-only not built yet"),
-    ],
-)
-def test_modes_not_built_yet_say_so_and_exit_0(env, capsys, argv, message):
+def test_decide_only_not_built_yet_says_so_and_exits_0(env, capsys):
     set_secrets(env)
+    message = "INFO  decide-only not built yet"
 
-    code = cli.main(argv)
+    code = cli.main(["run", "--site", "test", "--decide-only"])
 
     captured = capsys.readouterr()
     assert code == 0
