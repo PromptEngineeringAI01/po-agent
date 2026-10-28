@@ -63,6 +63,9 @@ ALLOWLIST: dict[str, Kind] = {
     "untick_send_email_notification": Kind.UNCHECK,
     "link_to_project": Kind.CLICK,
     "link_search_project": Kind.FILL,
+    # Click the Choose Project heading so focus leaves the search box and
+    # the search runs (decisions, 28 Oct 2026).
+    "link_run_search": Kind.CLICK,
     "link_select_project": Kind.CLICK,
     "mark_solved": Kind.CLICK,
     # Projects and Create New Task

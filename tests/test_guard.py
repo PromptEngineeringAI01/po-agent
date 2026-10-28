@@ -114,6 +114,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "confirm_hold": "click",
         "link_to_project": "click",
         "link_search_project": "fill",
+        "link_run_search": "click",  # demo, 28 Oct 2026
         "link_select_project": "click",
         "mark_solved": "click",
         "search_task": "fill",
