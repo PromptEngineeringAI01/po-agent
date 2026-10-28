@@ -393,13 +393,28 @@ CHOOSE_PROJECT = "Choose Project"
 def choose_project_window(page: Page) -> Locator:
     """Live S8 (28 Oct 2026): "Link to Project" opens a floating window with
     heading "Choose Project" and textboxes "Search/filter", "After..." and
-    "Before..."; its results show only after a search. The Note Pool panel
-    has a "Search/filter" too, so the window is found by its heading."""
+    "Before..."; its results show only after a search. The heading shows
+    before the boxes, and the Note Pool panel has a "Search/filter" too, so
+    the window is anchored on "After...", which only it has (live probe,
+    12:28: heading + any Search/filter matched an ancestor of both)."""
     return _innermost(
         page,
         page.get_by_role("heading", name=CHOOSE_PROJECT, exact=True),
-        page.get_by_role("textbox", name="Search/filter", exact=True),
+        page.get_by_role("textbox", name="After...", exact=True),
     )
+
+
+def _still_open(picker: Locator, page: Page, step: str, snapshots: bool) -> None:
+    """After each sub-step: Choose Project is still there (else stop), and,
+    in the probe, a snapshot named for the sub-step."""
+    if snapshots:
+        save_snapshot(page, f"probe-link-{step}")
+    try:
+        open_now = picker.count() == 1
+    except PlaywrightError:
+        open_now = False
+    if not open_now:
+        raise UnexpectedScreen("Choose Project not open")
 
 
 def _link_choice(picker: Locator, pln: str) -> Locator:
@@ -421,11 +436,11 @@ def _link_choice(picker: Locator, pln: str) -> Locator:
 
 
 def _search_choose_project(
-    guard: ActionGuard, page: Page, window: Locator, pln: str
+    guard: ActionGuard, page: Page, window: Locator, pln: str, snapshots: bool
 ) -> Locator:
     """Send Email unticked, Link to Project, then in Choose Project (up to
-    60 s to load): fill Search/filter with the pln and run the search. Only
-    reads and opens: nothing is linked until a result is selected."""
+    60 s to load): fill its own Search/filter with the pln and run the search.
+    Only reads and opens: nothing is linked until a result is selected."""
     untick_send_email(guard, window)
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
@@ -433,20 +448,26 @@ def _search_choose_project(
     if not _shows(picker, LINK_TIMEOUT_MS):
         save_snapshot(page, "S8-link-opened")
         raise UnexpectedScreen("Link to Project search did not show")
+    _still_open(picker, page, "1-opened", snapshots)
     search = picker.get_by_role("textbox", name="Search/filter", exact=True)
     guard.act("link_search_project", picker, search, pln)
+    _still_open(picker, page, "2-filled", snapshots)
     heading = picker.get_by_role("heading", name=CHOOSE_PROJECT, exact=True)
     _open(guard, "link_run_search", picker, heading)
+    _still_open(picker, page, "3-searched", snapshots)
     return picker
 
 
 def probe_link(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
-    """--probe-link: open Choose Project, search the pln, snapshot the window
-    and its results (demo-probe-link-results.yml), select nothing. The demo
-    then abandons the window by closing the browser."""
-    picker = _search_choose_project(guard, page, window, pln)
-    _shows(picker.get_by_text(pln, exact=True).first, LINK_TIMEOUT_MS)
+    """--probe-link: open Choose Project, search the pln, snapshot each
+    sub-step and the results (demo-probe-link-*.yml), select nothing; stops
+    with UnexpectedScreen if the window closes or the pln isn't listed. The
+    demo then abandons the window by closing the browser."""
+    picker = _search_choose_project(guard, page, window, pln, snapshots=True)
+    listed = _shows(picker.get_by_text(pln, exact=True).first, LINK_TIMEOUT_MS)
     save_snapshot(page, "probe-link-results")
+    if not listed:
+        raise UnexpectedScreen("project not listed in Choose Project")
 
 
 def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
@@ -455,7 +476,7 @@ def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> N
     search runs when focus leaves the box), select the pln; read back the
     Note's project button and a Status that still starts "Pending" (live it
     reads "Pending by <agent>")."""
-    picker = _search_choose_project(guard, page, window, pln)
+    picker = _search_choose_project(guard, page, window, pln, snapshots=False)
     choice = _link_choice(picker, pln)
     _email_unticked(window)
     guard.act("link_select_project", picker, choice)
