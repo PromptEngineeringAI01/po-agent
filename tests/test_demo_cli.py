@@ -137,3 +137,26 @@ def test_demo_browser_honours_headed(monkeypatch, tmp_path, headed, headless):
     with demo._browser(headed=headed, slow_mo=0, downloads=tmp_path):
         pass
     assert launched[0]["headless"] is headless
+
+
+def _with_mysys_secrets(env) -> list:
+    for name in ("mysys_test_username", "mysys_test_password"):
+        env.setenv(f"PO_AGENT_{name.upper()}", f"fake-{name}")
+    calls: list = []
+    env.setattr(cli, "start", lambda *args: calls.append(args) or 0)
+    return calls
+
+
+def test_a_demo_that_asks_for_writes_needs_headed(env, capsys):
+    calls = _with_mysys_secrets(env)
+    assert cli.main(["demo", "--site", "test"]) == 2
+    out = capsys.readouterr().out
+    assert "ALERT CONFIG" in out and "needs --headed" in out
+    assert calls == []
+
+
+@pytest.mark.parametrize("flags", [["--until-check"], ["--probe-link"], ["--headed"]])
+def test_read_only_demos_may_be_headless_and_headed_ones_may_write(env, capsys, flags):
+    calls = _with_mysys_secrets(env)
+    assert cli.main(["demo", "--site", "test", *flags]) == 0
+    assert len(calls) == 1

@@ -780,9 +780,10 @@ def test_a_pointer_parked_in_the_header_blocks_body_clicks(page, guard):
         refresh_click(page, guard)
 
 
-def test_a_click_on_header_text_leaves_the_block(page, guard):
-    # leave_menu used to click the inert header text "Welcome Agent": any
-    # click in the header leaves the pointer there, so the block stays.
+def test_a_second_click_in_the_header_leaves_the_block(page, guard):
+    # leave_menu used to click the header text "Welcome Agent" (an action
+    # since removed). Any click in the header leaves the pointer there, so
+    # the block stays: shown here with the allowlisted Project title click.
     park_pointer_in_header(page, guard)
     guard.act(
         "open_project_tab", driver._project_menu(page), driver._project_title(page)

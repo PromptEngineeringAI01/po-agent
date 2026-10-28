@@ -822,3 +822,24 @@ def test_move_onto_anything_but_a_status_line_is_refused(page, guard, locate):
     assert refusal(
         guard, "move_pointer_off_menu", page.locator("body"), locate(page)
     ) == (Refusal.WRONG_ELEMENT)
+
+
+def test_move_onto_a_status_line_holding_a_control_is_refused(page, guard):
+    page.set_content(
+        "<main><div>No record found.<button aria-label='x'></button></div>"
+        "<div>Page 1 of 1(3 Items)<a href='#' aria-label='y'></a></div></main>"
+    )
+    for target in (
+        page.get_by_text("No record found.", exact=True),
+        page.get_by_text(re.compile(r"^Page 1 of 1\(3 Items\)$")),
+    ):
+        assert refusal(
+            guard, "move_pointer_off_menu", page.locator("body"), target
+        ) == (Refusal.WRONG_ELEMENT)
+
+
+def test_move_may_land_on_the_projects_empty_list_line(page, guard):
+    page.set_content("<main><p>No record found.</p></main>")
+    status = page.get_by_text("No record found.", exact=True)
+    verdict = guard.vet("move_pointer_off_menu", page.locator("body"), status)
+    assert isinstance(verdict, Allowed)
