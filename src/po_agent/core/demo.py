@@ -170,6 +170,11 @@ def _steps(
     # 2. Open the Note; [Enter] take it.
     progress.step = "S2"
     window = booking.open_note(guard, page, panel, note_id)
+    if options.probe_link:
+        # Link to Project's search on the untaken Note; nothing selected.
+        booking.probe_link(guard, page, window, PLN)
+        output.info("demo: link probe done")
+        return
     if not options.until_check:
         _ask("take the Note", progress)
         progress.taken = True
