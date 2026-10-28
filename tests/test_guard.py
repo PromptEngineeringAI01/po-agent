@@ -756,9 +756,10 @@ def test_enter_on_any_other_target_is_refused(page, guard, action, locate):
 def test_enter_is_only_for_the_press_actions(page, guard):
     page.set_content(PRESS_PAGE)
     box = page.get_by_role("textbox", name="Search...", exact=True)
-    assert (
-        refusal(guard, "search_project", page.locator("section"), box, "Enter") is None
-    )
+    # A fill may type the text "Enter" (it presses no key): allowed, as before.
+    verdict = guard.vet("search_project", page.locator("section"), box, "Enter")
+    assert isinstance(verdict, Allowed)
+    # Any non-press action given "Enter" as a key is refused.
     assert refusal(guard, "open_note", page.locator("section"), box, "Enter") == (
         Refusal.VALUE_MISMATCH
     )
