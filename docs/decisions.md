@@ -13,6 +13,12 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **29 Oct 2026: production started** (entry below).
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
 
+## 29 Oct 2026 - Task 2.2: one reader, SkipReason names in the demo (Joey)
+
+- **What:** the deterministic reader (`b1/reader_rules.read_pdf`) is shared by the decision engine and `po-agent demo`. The issuer is the PDF's first non-empty line and must read exactly `B1 Homes Pty Ltd` (before: "B1 Homes" anywhere in the text); checked on the 3 trial PDFs, booleans only. A `.pdf` not named `<internal no>_048[_n].pdf` skips `PO_MISMATCH`; any second attachment skips `MULTIPLE_PDFS`; a live-style title's PO number is read on both title rules; a PO for another internal number than step 0's skips `PO_MISMATCH`.
+- **Run output:** the demo's reason names follow `SkipReason` (`docs/specs/spec.md` §3): `NOT_B1_HOMES` becomes `NOT_B1`, and `PO_NUMBER_MISMATCH` and `INTERNAL_NO_MISMATCH` become `PO_MISMATCH`. The demo prints a different reason only when a PDF check fails. Nothing is loosened: the issuer rule is stricter.
+- Carried in: no `SPEC.md` or `tasks/plan.md` line names the old reasons, so neither changes.
+
 ## 29 Oct 2026 - Go-live gate 1: MySys allows automation, no API (Joey)
 
 - **What:** Alltraders (the MySys vendor) allows the agent to automate the PO workflow on the MySys website. We won't use an API: Alltraders would charge for one. The agent keeps working through the website, as built (ADR-001).
