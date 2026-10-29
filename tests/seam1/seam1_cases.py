@@ -170,3 +170,44 @@ def load_cases(path: Path = CASES_FILE) -> list[Seam1Case]:
 
 
 CASES = load_cases()
+
+
+def _image_only_pdf() -> bytes:
+    """One page showing a 1x1 grey image and no text: no text layer."""
+    pixel = b"\x80"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200]"
+        b" /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1"
+        b" /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n"
+        + pixel
+        + b"\nendstream",
+    ]
+    content = b"q 100 0 0 100 50 50 cm /Im1 Do Q"
+    objects.append(
+        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream"
+    )
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\n" % (len(objects) + 1)
+    out += b"startxref\n%d\n%%%%EOF\n" % xref
+    return bytes(out)
+
+
+def pdf_bytes(kind: str) -> bytes:
+    """PDF bytes for the two cases that need them (Joey, 29 Oct 2026: no
+    generator, standard library only, no committed .pdf files). Text cases
+    use their pdf_text."""
+    if kind == "corrupt":
+        return b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R\ntruncated"
+    if kind == "image-only":
+        return _image_only_pdf()
+    raise ValueError(f"no PDF bytes for kind {kind!r}")
