@@ -4,12 +4,17 @@ The decision engine runs these cases from task 2.2 on; here they are checked
 against the spec's table, the fake-value rule and step 0, which exists.
 """
 
+import io
 import re
 
-from seam1_cases import CASES, CASES_FILE, COVERAGE, POOL, Seam1Case
+import pdfplumber
+import pytest
+from seam1_cases import CASES, CASES_FILE, COVERAGE, POOL, Seam1Case, pdf_bytes
 
+from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import eligible_internal_no
 from po_agent.b1.models import Proceed, SkipReason
+from po_agent.core.errors import WriteNotStarted
 
 FAKE_INTERNAL_NO = re.compile(r"26000[0-9]{2}[A-Z]")
 TRIAL_VALUES = ("2609017B", "2609034B", "2610002B", "pln_669")
@@ -109,3 +114,29 @@ def test_proceed_cases_have_a_text_pdf_and_one_attachment(
     if seam1_case.expect.result == "proceed":
         assert seam1_case.pdf == "text"
         assert len(seam1_case.note.attachment_names) == 1
+
+
+# --- the two cases that need PDF bytes (Joey, 29 Oct 2026: no generator) ---
+
+
+def test_corrupt_pdf_bytes_are_unreadable() -> None:
+    with pytest.raises(WriteNotStarted) as raised:
+        rules.pdf_text(pdf_bytes("corrupt"))
+    assert raised.value.reason == "PDF_UNREADABLE"
+
+
+def test_image_only_pdf_has_an_image_and_no_text() -> None:
+    data = pdf_bytes("image-only")
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        assert len(pdf.pages) == 1
+        assert len(pdf.pages[0].images) == 1
+    assert rules.pdf_text(data).strip() == ""
+
+
+def test_pdf_bytes_are_the_same_on_every_call() -> None:
+    assert pdf_bytes("image-only") == pdf_bytes("image-only")
+
+
+def test_text_cases_have_no_pdf_bytes() -> None:
+    with pytest.raises(ValueError):
+        pdf_bytes("text")
