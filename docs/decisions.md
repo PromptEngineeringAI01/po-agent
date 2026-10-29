@@ -1,4 +1,4 @@
-# PO Agent — decision log (updated 25 Oct 2026, Milestone A)
+# PO Agent - decision log (updated 29 Oct 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -9,6 +9,17 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **13 Oct 2026: the CEO approved decision 1** of the CEO decision brief: the two-reader design, its safeguards, and a trial on the test site with 3 fake POs. The build can start.
 - **15 Oct 2026: the CEO made decision 3:** the agent runs on the **office Mac Mini** (already purchased), for the MVP trial and for production (entry below).
 - **25 Oct 2026: decision 2 made.** The CEO delegated decision 2 (Claude reading real client POs) to Joey, and approved the trial PDF sitting briefly on the Mac Mini's disk (D2). Joey: yes, on the Trial conditions terms (entry below).
+- **28 Oct 2026: MVP demo shown** on the test site: the supervised `po-agent demo` booked 2609017B from the laptop and the Mac Mini (PRs #19-#30).
+- **29 Oct 2026: production started** (entry below).
+
+## 29 Oct 2026 - Switch to production (Joey)
+
+- **What:** the MVP demo was shown on 28 Oct 2026. From 29 Oct Joey builds production: the agent runs by itself, hourly, on the office Mac Mini (CEO decision 3), with no Enter prompts; first unattended on the test site, then on live MySys once the go-live gates pass. `SPEC.md` -> Production and `tasks/plan.md` -> Phase P carry it.
+- **Order (code):** docs catch-up; decide (2.1-2.6); run controls and decide-only (3.1-3.6); real booker (4.1-4.5), built from the demo's proven steps in `src/po_agent/mysys/booking.py`, taking only a `Proceed` and reading back after every write, after a doubt-driven design review; unattended on the test site (1.9, 1.10, 4.6, 5.1, 5.2); then go-live tasks, written once the answers are in. Task numbers and acceptance criteria are unchanged. M6 as written (the unattended demo) is superseded; its checks (S1-S8) move to the unattended-on-test step.
+- **Out:** no schedule change (Monday-Friday, hourly 07:07-17:07 Australia/Perth); no Grok Bot; no fake-PDF generator unless a 2.1 case needs one (decided at 2.1). `po-agent demo` stays for supervised demos and isn't extended.
+- **Go-live gates** (all before any contact with live, read-only included): (1) MySys confirms automation is allowed (and whether there's an API), else production stops; (2) the PO admin's live answers (PO Documents or Documents, Resolve or Solved, live's Client Ref No. column, agent password expiry); (3) the CEO's go-live sign-off and the backlog cut-off date; (4) accounts: the Anthropic `po-agent-trial` key, a named backup admin for the Mac Mini, the Mac Mini's GitHub token and the `po-agent-alert` label; (5) a week of hourly test-site runs on the Mac Mini with zero wrong bookings. Then live: read-only `spike`, then `run --decide-only`, then `run` booking one PO per run, watched, then full hourly runs, each step with its own dated entry here.
+- **Nothing loosened now:** the code stays test site only and CLAUDE.md Must never #3 is unchanged. Joey changes it by hand, with the CEO's sign-off, as the first go-live task; that change gets its own entry. This entry changes no agent behaviour and no run output.
+- Carried in: `SPEC.md` v1.17 (Production; the Projects search line now says Enter, PRs #26/#27), `tasks/plan.md` (Phase P; demo notes on the Overview, M0b.2, M4 and M6), `tasks/todo.md`, `docs/workflow.md` v5.18, `README.md`.
 
 ## 28 Oct 2026 - A guarded pointer move ends "page blocked" (Joey)
 

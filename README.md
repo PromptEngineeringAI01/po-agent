@@ -2,7 +2,9 @@
 
 Automates the PO admin's B1 Homes `/048` compaction pre-bookings in MySys. First of 5–7 planned MySys automations.
 
-**Current stage:** MVP spec **approved** (`SPEC.md` v1.6, 15 Oct 2026). No code yet. The MVP runs on the MySys **test site** from the office Mac Mini; production runs on the same Mac Mini (CEO decision 3, 15 Oct 2026).
+**Current stage:** **building production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 on the MySys **test site**: a supervised `po-agent demo` booked trial PO 2609017B end to end, from the laptop and from the office Mac Mini, with Joey's Enter before every write (PRs #19-#30). Production is the agent running by itself, hourly, on the same Mac Mini (CEO decision 3, 15 Oct 2026): first unattended on the test site, then on live MySys once the go-live gates pass. What's in, what's out and the gates: `SPEC.md` -> Production. The code is still test site only.
+
+Setting up a new laptop: the steps below (from the MVP build) still apply.
 
 ## Start here (Windows, VS Code)
 
@@ -16,11 +18,12 @@ Automates the PO admin's B1 Homes `/048` compaction pre-bookings in MySys. First
 
 | File | What it is |
 |---|---|
-| `SPEC.md` | **Active spec:** the MVP on the office Mac Mini |
+| `SPEC.md` | **Active spec:** the MVP on the office Mac Mini, and its Production section (what's in, out, go-live gates) |
 | `CLAUDE.md` | Rules Claude Code reads every session |
-| `docs/workflow.md` | Step-by-step build runbook (Addy Osmani's agent-skills) |
+| `docs/workflow.md` | Step-by-step build runbook (Addy Osmani's agent-skills) and where the build stands |
+| `tasks/plan.md`, `tasks/todo.md` | The task plan (MVP slices, then Production) and the live task list |
 | `docs/macmini-setup.md` | How to set up the Mac Mini: agent user, power, clock, updates, secrets, launchd job |
-| `docs/demo-runbook.md` | How to reset the test site and demo the agent again (as often as you like) |
+| `docs/demo-runbook.md` | How to reset the test site and demo the agent again (as often as you like); written for the unattended `run`, which isn't built yet |
 | `docs/screen-map/` | Committed fake material only (test-site screenshots show the real trial POs, so they stay in `private/`) |
 | `.playwright/cli.config.json` | Playwright CLI settings for screen mapping (live site blocked) |
 | `private/` (you create it) | **Real client data, laptop only, git-ignored:** live screenshots, real PO PDFs, `cases.toml` |
