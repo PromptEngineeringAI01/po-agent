@@ -299,7 +299,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 ## Testing Strategy
 
 - **pytest at the two seams** in `docs/specs/spec.md` → Testing Decisions; behaviour, not private functions (normaliser unit tests allowed as a development aid).
-- **Seam 1 (offline):** every case in the spec's seam-1 table, including the live-title rows, on the **3 fake fixture POs** (generated in M2 from a fake B1-style template; the generator's dependency needs Joey's OK) and their mutations. Stubbed Claude in CI; real Claude with `-m live_claude`, run 3 times. **Zero false PROCEED in hybrid and deterministic-only modes.** Extra cases from the screen map:
+- **Seam 1 (offline):** every case in the spec's seam-1 table, including the live-title rows, on the **3 fake fixture POs** (fake text in `tests/seam1/fixtures/cases.toml`; no PDF generator, decided by Joey at 2.1, 29 Oct 2026; the corrupt and image-only PDFs are bytes built inside the test) and their mutations. The real two-column layout is read only in the laptop's real-PO seam (`-m real_data`). Stubbed Claude in CI; real Claude with `-m live_claude`, run 3 times. **Zero false PROCEED in hybrid and deterministic-only modes.** Extra cases from the screen map:
   - a project with a **Cancelled** Compaction Test task → PROCEED with the test config, `DUPLICATE_TASK` with `duplicate_ignores_cancelled = false`
   - a project with a non-Cancelled Compaction Test task for a **different** PO number → `DUPLICATE_TASK` (MVP strict rule)
   - search rows with other suffixes plus one `/048` row → PROCEED on that pln; two matching rows → `PROJECT_AMBIGUOUS`; a matching row with Company not B1 Homes → `PROJECT_NOT_FOUND`
@@ -322,7 +322,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Keep real client data (PDFs, live screenshots, captures, addresses) in `private/` only. Test-site screenshots and captures count as real data, because the trial POs are real. Anything committed (fixtures, `docs/screen-map.md`) is fake or redacted and holds no credentials; the only exception is the 3 trial POs' internal numbers, PO numbers and test-site plns (assumption 2).
 
 **Ask Joey first**
-- New dependency (including the fake-PO generator's in M2); a change to the model ID, the Claude prompt or the address rules (then rerun live-Claude seam 1).
+- New dependency; a change to the model ID, the Claude prompt or the address rules (then rerun live-Claude seam 1).
 - A change to any test, fixture or expected result (its own commit).
 - Changes to `.github/workflows/`, `config/test.toml`, `docs/macmini-setup.md`, `scripts/macmini-run.sh` or the launchd plist.
 - Anything that would tie `src/` to the Mac Mini or macOS.

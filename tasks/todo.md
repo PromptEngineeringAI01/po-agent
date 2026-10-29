@@ -51,7 +51,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 
 ## M2 — decision seam (S3)
 
-- [ ] **2.1** Seam-1 models (`more_pages`; frozen `Proceed` with `note_id`, internal no., pln, PDF name + bytes, existing task numbers) + fake fixture PO generator (3 fake POs + all mutations) · auto · pauses: generator dependency
+- [x] **2.1** Seam-1 models (`more_pages`; frozen `Proceed` with `note_id`, internal no., pln, PDF name + bytes, existing task numbers) + 3 fake POs as text + all mutations (`cases.toml`); no PDF generator (Joey, 29 Oct 2026) · auto
 - [ ] **2.2** Deterministic reader + steps 2a–4 (`NOTE_ALREADY_LINKED`, `NO_PDF`, `MULTIPLE_PDFS`, `PDF_UNREADABLE`, `NOT_B1`, `NOT_COMPACTION`, `PO_MISMATCH`) · auto
 - [ ] **2.3** `match_project()` + strict duplicate check (Cancelled toggle); `Skip(UNEXPECTED_SCREEN)`; deterministic-only → `ADDRESS_UNVERIFIABLE` · auto
 - [ ] **2.4** Address verify-not-extract + agreement, stubbed Claude; `false PROCEED: 0` · auto · pauses: address rules
