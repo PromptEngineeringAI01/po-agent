@@ -140,3 +140,9 @@ def test_pdf_bytes_are_the_same_on_every_call() -> None:
 def test_text_cases_have_no_pdf_bytes() -> None:
     with pytest.raises(ValueError):
         pdf_bytes("text")
+
+
+def test_no_pdf_is_committed_in_the_fixture_folder() -> None:
+    # The repo-data rule allows any PDF there; with no generator, none belongs.
+    folder = CASES_FILE.parent / "pdfs"
+    assert [p.name for p in folder.rglob("*") if p.suffix.lower() == ".pdf"] == []
