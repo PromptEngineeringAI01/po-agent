@@ -11,6 +11,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **25 Oct 2026: decision 2 made.** The CEO delegated decision 2 (Claude reading real client POs) to Joey, and approved the trial PDF sitting briefly on the Mac Mini's disk (D2). Joey: yes, on the Trial conditions terms (entry below).
 - **28 Oct 2026: MVP demo shown** on the test site: the supervised `po-agent demo` booked 2609017B from the laptop and the Mac Mini (PRs #19-#30).
 - **29 Oct 2026: production started** (entry below).
+- **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
+
+## 29 Oct 2026 - Go-live gate 1: MySys allows automation, no API (Joey)
+
+- **What:** Alltraders (the MySys vendor) allows the agent to automate the PO workflow on the MySys website. We won't use an API: Alltraders would charge for one. The agent keeps working through the website, as built (ADR-001).
+- **Effect:** go-live gate 1 is met. Gates 2-5 still stand. Nothing changes in the code, the agent's behaviour or its run output, and Must never #3 (test site only) is unchanged.
+- Carried in: `SPEC.md` -> Production (gate 1), `tasks/plan.md` -> Phase P (gate 1).
 
 ## 29 Oct 2026 - Switch to production (Joey)
 
