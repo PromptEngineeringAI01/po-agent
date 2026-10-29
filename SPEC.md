@@ -416,7 +416,7 @@ Until then everything above still holds. The code has no live profile and refuse
 - `po-agent demo` stays for supervised demos; it isn't the production path and isn't extended.
 
 **Go-live gates** (every one, before any contact with live MySys, including a read-only spike)
-1. **MySys permission:** MySys confirms in writing that automating the agent account is allowed (and says whether there's an API). If the answer is no, production stops.
+1. **MySys permission:** MySys confirms in writing that automating the agent account is allowed (and says whether there's an API). If the answer is no, production stops. **Met, 29 Oct 2026:** automation on the website is allowed; no API, because Alltraders would charge for one (decisions, 29 Oct 2026).
 2. **PO admin's live answers:** PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column is the one ending `/048` (open question 10); whether the agent account's password expires (open question 3).
 3. **CEO sign-off** for going live, with the **backlog cut-off date**: which older Notes the agent may touch.
 4. **Accounts:** the Anthropic `po-agent-trial` key; a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label for alerts.

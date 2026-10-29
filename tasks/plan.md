@@ -633,7 +633,7 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 **Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator unless a 2.1 case needs one; `po-agent demo` stays as is.
 
 **Go-live gates** (all before any contact with live MySys, read-only included). Gates 1-4 are other people's answers, so Joey starts them now, in parallel with P2-P5:
-1. MySys confirms automation is allowed (and whether there's an API). No → production stops.
+1. MySys confirms automation is allowed (and whether there's an API). No → production stops. **Met, 29 Oct 2026:** allowed on the website; no API (Alltraders would charge).
 2. The PO admin's live answers: PO Documents or Documents; Resolve or Solved; live's Client Ref No. column; the agent account's password expiry.
 3. CEO sign-off for going live, and the backlog cut-off date (which older Notes the agent may touch).
 4. Accounts: the Anthropic `po-agent-trial` key; a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
