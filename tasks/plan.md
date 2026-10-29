@@ -83,7 +83,7 @@ Serial, one task per session, no parallel agents (`docs/workflow.md` → Decisio
 |---|---|
 | M0b | **by hand**: Joey clicks, Claude observes, no code |
 | M1 | **step**: `/agent-skills:build`, one task at a time, plan mode first; follow Appendix A; source-driven-development for library calls |
-| M2 | **auto**: `/agent-skills:build auto` once M1 is merged. It pauses at each failing test (TDD) and at the ask-first points: generator dependency (2.1), address rules (2.4), Claude prompt and model ID (2.5), prices (2.6) |
+| M2 | **auto**: `/agent-skills:build auto` once M1 is merged. It pauses at each failing test (TDD) and at the ask-first points: address rules (2.4), Claude prompt and model ID (2.5), prices (2.6) |
 | M3 | **step** |
 | M4 | **step**, plan mode first; `doubt-driven-development` on the booker design (fresh session) before 4.1 |
 | M5 | **step** |
@@ -298,19 +298,19 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 
 ## Phase M2: decision seam (auto)
 
-### 2.1 Seam-1 models and the fake fixture POs · auto (pauses for the generator dependency)
+### 2.1 Seam-1 models and the fake fixture POs · auto
 
-**Description:** The seam-1 data shapes, and a generator that makes 3 **fake** B1-style POs plus every mutation the seam needs. The trial PDFs are real, so they are never used as fixtures.
-**Needs:** M1 merged; Joey's OK on the generator dependency (Open question 2).
+**Description:** The seam-1 data shapes, and 3 **fake** B1-style POs plus every mutation the seam needs. The trial PDFs are real, so they are never used as fixtures. **No fake-PDF generator (Joey, 29 Oct 2026):** the agent is only for B1 Homes, so the fake POs are their text layer (lean fakes); real PDF extraction is tested on the laptop (`-m real_data`).
+**Needs:** M1 merged.
 **Acceptance:**
 - `b1/models.py`: `Reading`, `NoteSnapshot` (title, body, attachment names, project linked or not), `MySysLookup` (every search row: pln, Client Ref No. and Company; `more_pages` (a second results page exists); project Client Internal No.; the raw Address string; Compaction Test tasks with status), `Proceed` (frozen: `note_id`, internal number, pln, PO number, email body, PDF file name and bytes, and the existing Compaction Test task numbers that W2 compares against) and `Skip` (reason), and `SkipReason` exactly as `docs/specs/spec.md` §3, including `NOTE_ALREADY_LINKED`.
-- `scripts/make_fixture_pdfs.py` writes deterministic PDFs (same bytes on every run) with a text layer in the B1 layout: issuer `B1 Homes Pty Ltd`, `COMPACTION`, Purchase Order No, and a Job Address block. Values are fake: `2600001B`–`2600003B`, `pln_10001`–`pln_10003`, `Sample Lane`-style addresses. Claude learns the layout from `private/pdfs/` and copies no real value into it.
+- ~~`scripts/make_fixture_pdfs.py`~~ (dropped, Joey 29 Oct 2026). Each fake PO is the text layer of a PDF in the B1 layout: issuer `B1 Homes Pty Ltd`, `COMPACTION`, Purchase Order No, and a Job Address block. Values are fake: `2600001B`–`2600003B`, `pln_10001`–`pln_10003`, `Sample Lane`-style addresses. Claude learns the layout from `private/pdfs/` and copies no real value into it. The two cases that need PDF bytes (corrupt, image-only) build them inside the tests with the standard library; no `.pdf` file is committed.
 - Mutations cover every row of the seam-1 table in `docs/specs/spec.md` plus SPEC → Testing Strategy's extra cases. Each case in `tests/seam1/fixtures/cases.toml` lists its Note snapshot, lookup, stub Claude reading and expected result.
 - A local check (not committed) confirms that no string from `private/` PDFs appears in the fixtures.
-- A committed test regenerates the fixture PDFs into a temp folder and requires every PDF under `tests/seam1/fixtures/pdfs/` to match a generated one byte for byte, so a real PDF copied there fails the check (the repo-data rule allows any PDF in that folder; decisions, 19 Oct 2026, widened 21 Oct).
+- ~~A committed test regenerates the fixture PDFs and byte-matches them~~ (no generator). Instead, a committed test requires `tests/seam1/fixtures/pdfs/` to hold no PDF, so a real PDF copied there fails the check (the repo-data rule allows any PDF in that folder; decisions, 19 Oct 2026, widened 21 Oct).
 
 **Verify:** `uv run scripts/check.py` (the repo-data rule allows these PDFs); fixtures go in their own `test:` commit.
-**Files:** `src/po_agent/b1/models.py`, `scripts/make_fixture_pdfs.py`, `tests/seam1/fixtures/pdfs/*` (generated), `tests/seam1/fixtures/cases.toml`, `tests/seam1/conftest.py`. **Scope:** M.
+**Files:** `src/po_agent/b1/models.py`, `tests/seam1/fixtures/cases.toml`, `tests/seam1/conftest.py`, `tests/seam1/seam1_cases.py` (the case loader and the two PDF byte builders; a module of its own because `tests/seam2` has a conftest too). **Scope:** M.
 
 ### 2.2 Deterministic reader and steps 2a–4 · auto
 
@@ -624,13 +624,13 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 | Step | Tasks | Notes | Done when |
 |---|---|---|---|
 | P1 Docs catch-up | - | README, workflow status, SPEC (Projects search on Enter, Production), this plan, todo, decisions | PR merged |
-| P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. A small fake-PDF generator only if a 2.1 case needs one (Joey decides at 2.1; dependency needs his OK) | Checkpoint M2: `false PROCEED: 0` in stubbed, live-Claude ×3, deterministic-only and real-PO runs |
+| P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. No fake-PDF generator (Joey, 29 Oct 2026, at 2.1) | Checkpoint M2: `false PROCEED: 0` in stubbed, live-Claude ×3, deterministic-only and real-PO runs |
 | P3 Run controls and decide-only | 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4 | 3.2 reuses the demo's Projects search (Enter, `submit_project_search`). 3.6 needs M0b.2 row 23 | Checkpoint M3; decide-only green on the laptop and the Mac Mini |
 | P4 Real booker | M0b.2, doubt-driven design review, then 4.1-4.5 | Built from `mysys/booking.py` (Phase M4 intro). PO Documents confirmed with the PO admin first (SPEC open question 11) | Checkpoint M4 without 4.6; seam 2 booking cases green |
 | P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job loaded | 1.10 also confirms the Mac Mini login, Keychain and `po-agent-trial` key. Replaces M6's checks: S1-S8 on the scheduled job | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5) |
 | P6 Go live | New tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
 
-**Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator unless a 2.1 case needs one; `po-agent demo` stays as is.
+**Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator (Joey, 29 Oct 2026); `po-agent demo` stays as is.
 
 **Go-live gates** (all before any contact with live MySys, read-only included). Gates 1-4 are other people's answers, so Joey starts them now, in parallel with P2-P5:
 1. MySys confirms automation is allowed (and whether there's an API). No → production stops.
@@ -674,7 +674,7 @@ Found in the 16 Oct 2026 reviews and accepted for a 3-PO trial on the test site.
 - **gitleaks** is allowlisted by path (`tests/test_hooks.py`), so a real key pasted into that file would pass; allowlisting the exact fake string is the stricter option.
 - **Branch protection on `main`** isn't set; `guard_bash.py` patterns are a backstop only (Joey's call).
 - **Disk leftovers on the Mac Mini:** Chromium's HTTP cache and temp profile may hold the PDF or pages until the OS cleans `$TMPDIR`; a SIGKILL at the 20-minute limit skips the `finally` cleanup until the next run. FileVault is on.
-- **Fixture PDFs are byte-checked only from 2.1:** until the generator exists, a real PDF copied into `tests/seam1/fixtures/pdfs/` would pass the repo-data rule. The "no `private/` strings" check stays local only.
+- **Fixture PDFs:** there is no generator (Joey, 29 Oct 2026), so from 2.1 a test fails on any PDF in `tests/seam1/fixtures/pdfs/`; before 2.1 a real PDF copied there would have passed the repo-data rule. The "no `private/` strings" check stays local only.
 - **Page 1 only:** with more than 50 Pending Notes in the pool, older eligible Notes wait. Not an issue at trial volume.
 - **Process-group kill** is tested only under Git Bash and CI, not macOS `/bin/bash` 3.2, until the first hung run on the Mac Mini.
 - **CI gitleaks action** needs a `GITLEAKS_LICENSE` secret if the GitHub owner is an organisation; check in 1.3, or use the gitleaks binary directly.
@@ -682,7 +682,7 @@ Found in the 16 Oct 2026 reviews and accepted for a 3-PO trial on the test site.
 ## Open questions (Joey)
 
 1. ~~**Merge the PR stack first?**~~ **Done:** PRs #1–#5 are merged (`origin/main` at `73d468d`, the same commit as `plan-mvp`). Still to do: fast-forward the local `main`, and delete or reset the stale `m1-walking-skeleton` branch (see the header). At the freeze (workflow 4.4), one commit holds `tasks/`, the D1–D7 `docs/decisions.md` entry and the SPEC changes in Doc drift.
-2. ~~**New dependencies.**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** M1: `playwright`, `pdfplumber`, `anthropic`, `pydantic`, `keyring`; dev: `pytest`, `ruff`, `pre-commit`. M2: a fake-PDF generator. Recommended: `reportlab` (BSD; `invariant=1` gives byte-identical output), dev-only. OK to treat approving this plan as approving this list? Anything else still gets asked.
+2. ~~**New dependencies.**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** M1: `playwright`, `pdfplumber`, `anthropic`, `pydantic`, `keyring`; dev: `pytest`, `ruff`, `pre-commit`. M2: ~~a fake-PDF generator (`reportlab`)~~ **not needed (Joey, 29 Oct 2026, at 2.1):** the fake POs are text; the corrupt and image-only PDFs are built in the tests with the standard library. OK to treat approving this plan as approving this list? Anything else still gets asked.
 3. ~~**Guard allowlist additions**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** beyond `docs/specs/spec.md` §5: the login actions (fill username, fill password, click "Log in") and the module navigation clicks (Project top tab, Note Pool, Projects sub-tab). Both are needed to reach the screens §5 already allows. Recommended: yes, with a dated decisions entry and §5 updated at the freeze.
 4. ~~**NOTE values the contract doesn't define:**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** (a) a decide-only Note that would have been booked, and (b) a Note a person took mid-run. Recommended: (a) `"outcome": "skipped"`, `"reason": "DECIDE_ONLY"`; (b) `"outcome": "untouched"`, `"reason": "NOTE_TAKEN"`. Both are run-output values only, not new skip reasons in the decision engine. Recorded in decisions + SPEC.
 5. ~~**CI installs Chromium**~~ **Answered (Joey, 16 Oct 2026): yes, as recommended.** (one step added to Appendix A's YAML) so the guard's tests use a real browser on local HTML. Recommended: yes. The alternative, a fake locator, wouldn't test accessible-name resolution, which is the denylist's weak point.
