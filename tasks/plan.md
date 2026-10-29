@@ -3,13 +3,14 @@
 **Status:** **Approved by Joey, 16 Oct 2026** (Open questions 2–8 answered as recommended); frozen when the freeze commit merges · written by `/agent-skills:plan`; revised the same day after a doubt-driven review (decisions D1–D5 below), then given a small fix pass after a second review (D6, D7, and the guard, dependency and safety fixes)
 **Planned from:** `SPEC.md` **v1.10**, `docs/screen-map.md` v1.1, `docs/specs/spec.md` v1.6, `docs/decisions.md` (16 Oct 2026), `docs/workflow.md` v5.9, `docs/macmini-setup.md` v1.1, `CLAUDE.md`.
 **Git state:** those versions are on `main` (PRs #1–#5 merged; `origin/main` at `73d468d`, the same commit as `plan-mvp`). The local `main` is stale at `58cde2b`: fast-forward it (`git switch main && git merge --ff-only origin/main`) before branching. A stale local branch `m1-walking-skeleton` already exists at `58cde2b`; Joey deletes it or resets it to `origin/main` before M1 starts, or Stage 5's `git switch -c m1-walking-skeleton` fails.
+**Production (29 Oct 2026, decisions):** the MVP demo was shown on 28 Oct 2026. The tasks below are now built in the order of [Phase P: Production](#phase-p-production), which also has the go-live gates. Task numbers and acceptance criteria are unchanged.
 **Freeze point:** when Joey approves this file (`docs/workflow.md` Stage 4.4). After that, a behaviour change needs a dated `docs/decisions.md` entry plus `SPEC.md` and this file, in the same commit.
 
 ## Overview
 
 Build the MVP PO Agent so that it books the 3 trial POs (2609017B → pln_66935, 2609034B → pln_66938, 2610002B → pln_66940) on the MySys test site, unattended, from a launchd job on the office Mac Mini. Every check runs before any write. Every write goes through the action guard and is read back. Anything uncertain goes back to the Agent Pool. The slices run in order: M0b (screens still to map, by hand) → M1 walking skeleton and Mac Mini spike → M2 decision seam (offline) → M3 decide-only → M4 first booking → M5 safety → M6 demo. M0b is done by hand alongside M1–M2. M0b.1 must be written up before 1.8 (the spike needs its panel anchors and reload behaviour, rows 26–27), and M0b.2 before M4.
 
-**Supervised demo (27 Oct 2026, decisions):** `po-agent demo` books the one trial PO 2609017B by hand-supervised steps for the CEO demo on 28 Oct. It sits beside the plan: it doesn't replace 3.x or 4.x, and `run` still refuses until 4.5.
+**Supervised demo (27 Oct 2026, decisions):** `po-agent demo` books the one trial PO 2609017B by hand-supervised steps for the CEO demo on 28 Oct. It sits beside the plan: it doesn't replace 3.x or 4.x, and `run` still refuses until 4.5. **Shown on 28 Oct 2026** from the laptop and the Mac Mini (PRs #21-#30). Its screens in `src/po_agent/mysys/booking.py` (take the Note, download, Projects search on Enter, Create New Task, Hold, Link to Project through Choose Project, Solved, each read back) are the **proven booking steps** that M4 turns into the real booker.
 
 ## Architecture decisions (from the spec; restated so each task can lean on them)
 
@@ -120,6 +121,8 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Files:** `private/captures/test/*` (git-ignored), `docs/screen-map.md`, `SPEC.md`, `docs/decisions.md`, `tasks/plan.md` (only if frozen).
 
 ### M0b.2: Task detail, Link to Project, PO Number prefill (rows 19, 20, 24), then write-up · by hand
+
+**Partly seen in the demo (28 Oct 2026, decisions):** Link to Project opens a floating window "Choose Project" (Search/filter, After..., Before...; no results until a search runs on Enter); its probe snapshots are in `private/captures/test/`. The write-up still maps it properly, with the rest of this task.
 
 **Also row 23 (moved from M0b.1, decisions, 25 Oct 2026), needed before 3.6:** open a Note in the Playwright window; in his normal browser, as himself, Joey assigns it to someone else; back in the Playwright window, does "Assignee:" change by itself? The write-up records the answer in the screen map and SPEC → Assignee check (which never relies on it).
 
@@ -467,6 +470,8 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 
 ## Phase M4: first booking (step, plan mode first)
 
+**Start from the demo (production, 29 Oct 2026):** `src/po_agent/mysys/booking.py` holds the steps the demo proved on the test site. M4 reuses them behind `book()`, which takes only a `Proceed` from the decision engine, has no Enter prompt, runs `before_write` and reads back after every write. A doubt-driven review of the booker design (fresh session) comes before 4.1.
+
 Each W-step test books **only as far as its step** on the test site and leaves the task for Joey to cancel (reset). Its teardown returns the Note to the pool in a fresh context. W-step tests run one at a time, with a reset between them (Cross-cutting rules). The booker's `book()` takes an optional `stop_after` step for these tests (Open question 8). Every test gets its `Proceed` by running all checks on a trial PO first. Every W step starts with `controls.before_write(note_id, step)` (3.5, 3.6); only W1's and W4's run the assignee check (D7).
 
 ### 4.1 W1: fill Create New Task and read it back · step
@@ -588,6 +593,8 @@ The run controls and the assignee check moved to M3 (3.5, 3.6) under D1. M5 now 
 
 ## Phase M6: MVP demo (by hand)
 
+**Superseded (28 Oct 2026):** the demo shown was the supervised `po-agent demo` (Overview), not the unattended run below. 6.1-6.4 were not done as written; their checks (S1-S8 on the scheduled job) move to Phase P step 5.
+
 ### 6.1 Go/no-go and stop rehearsal · by hand
 **Acceptance:** `/agent-skills:ship` checklist against S1–S8 with the rollback (`launchctl bootout`; `enabled = false`) is written and Joey decides go. The job is loaded again (`launchctl bootstrap`; it was unloaded after 4.6, D1). `enabled = false` merged → `launchctl kickstart` exits before login (S6). Set back to `true`. `bootout` stops the job and `bootstrap` restores it.
 **Verify:** `runs.log` shows the exit-before-login run. **Files:** `config/test.toml` (two PRs, by Joey's choice).
@@ -607,6 +614,32 @@ The run controls and the assignee check moved to M3 (3.5, 3.6) under D1. M5 now 
 ### Checkpoint: Complete
 - [ ] S1–S8 met; three demos in a row; CEO note sent.
 - [ ] Next: `docs/workflow.md` Stage 8 (`/agent-skills:code-simplify`, architecture review).
+
+---
+
+## Phase P: Production
+
+From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is the agent running by itself, hourly, on the office Mac Mini: unattended on the test site first, then on live MySys once every go-live gate has passed. The tasks keep their numbers and acceptance criteria from the phases above; this is the order they're built in. Must never #3 (test site only) holds until Joey changes it as the first go-live task.
+
+| Step | Tasks | Notes | Done when |
+|---|---|---|---|
+| P1 Docs catch-up | - | README, workflow status, SPEC (Projects search on Enter, Production), this plan, todo, decisions | PR merged |
+| P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. A small fake-PDF generator only if a 2.1 case needs one (Joey decides at 2.1; dependency needs his OK) | Checkpoint M2: `false PROCEED: 0` in stubbed, live-Claude ×3, deterministic-only and real-PO runs |
+| P3 Run controls and decide-only | 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4 | 3.2 reuses the demo's Projects search (Enter, `submit_project_search`). 3.6 needs M0b.2 row 23 | Checkpoint M3; decide-only green on the laptop and the Mac Mini |
+| P4 Real booker | M0b.2, doubt-driven design review, then 4.1-4.5 | Built from `mysys/booking.py` (Phase M4 intro). PO Documents confirmed with the PO admin first (SPEC open question 11) | Checkpoint M4 without 4.6; seam 2 booking cases green |
+| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job loaded | 1.10 also confirms the Mac Mini login, Keychain and `po-agent-trial` key. Replaces M6's checks: S1-S8 on the scheduled job | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5) |
+| P6 Go live | New tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
+
+**Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator unless a 2.1 case needs one; `po-agent demo` stays as is.
+
+**Go-live gates** (all before any contact with live MySys, read-only included). Gates 1-4 are other people's answers, so Joey starts them now, in parallel with P2-P5:
+1. MySys confirms automation is allowed (and whether there's an API). No → production stops.
+2. The PO admin's live answers: PO Documents or Documents; Resolve or Solved; live's Client Ref No. column; the agent account's password expiry.
+3. CEO sign-off for going live, and the backlog cut-off date (which older Notes the agent may touch).
+4. Accounts: the Anthropic `po-agent-trial` key; a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
+5. A week of hourly test-site runs with zero wrong bookings (P5).
+
+**Live order** (P6, each step with its own dated decisions entry): read-only `spike` on live, then `run --decide-only` on live, then `run` booking one PO per run, watched, then full hourly runs.
 
 ---
 

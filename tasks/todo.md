@@ -8,6 +8,17 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 **One agent at a time:** no laptop test-site run (seam-2 tests, `run`, `spike`) while the Mac Mini job is loaded, and no manual Mac Mini run while a laptop run is going (plan → Cross-cutting rules).
 
+## Production order (from 29 Oct 2026; plan -> Phase P, `SPEC.md` -> Production)
+
+The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the unticked tasks in this order; numbers and acceptance criteria are unchanged.
+
+- [ ] **P1** Docs catch-up and the Production sections (this PR) · Claude writes, Joey merges
+- [ ] **P2** Decide: 2.1-2.6
+- [ ] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
+- [ ] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
+- [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job; a week of hourly runs with zero wrong bookings
+- [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week): live spike, then decide-only, then one booking per run, watched · tasks written then
+
 ## Freeze — before any build
 
 - [x] **F.1** Joey approves `tasks/plan.md` (workflow Stage 4.4); Open questions 2–8 answered as recommended (16 Oct 2026) · by hand
@@ -19,7 +30,7 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 ## M0b — screens still to map (Stage 3E)
 
 - [x] **M0b.1** (done, 25 Oct 2026; rows 21–22 dropped, row 23 moved to M0b.2) Moving between windows, anchors for unlabelled controls and panels, Note Pool filter reload and search (`fill` + Refresh), reopening an open project (rows 25–28); one Assign returns a Note (15b); Claude writes them up · by hand · **blocks 1.8** and M3
-- [ ] **M0b.2** Task detail, Link to Project search/select (and its target's name), PO Number prefill, empty Documents area (rows 19, 20, 24); does an open Note window refresh its Assignee (row 23, needed before 3.6); anchors for every remaining weak locator (open item 8 closed); upload saved before Submit?; reset; Claude writes them up · by hand · blocks M4
+- [ ] **M0b.2** (Choose Project, row 20, partly seen live in the demo, 28 Oct 2026) Task detail, Link to Project search/select (and its target's name), PO Number prefill, empty Documents area (rows 19, 20, 24); does an open Note window refresh its Assignee (row 23, needed before 3.6); anchors for every remaining weak locator (open item 8 closed); upload saved before Submit?; reset; Claude writes them up · by hand · blocks M4
 
 **Checkpoint M0b:** rows 19–28 captured; no M0b item left in SPEC or the screen map; both PRs merged; test site reset.
 
@@ -80,7 +91,16 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 **Checkpoint M5:** check green; full seam 2 green; manual mid-run takeover (4.5) done; review + security review; docs drift checked.
 
+## Demo - shown 28 Oct 2026 (decisions, 27-28 Oct 2026)
+
+- [x] **D.1** (done: PR #21, 28 Oct 2026) `po-agent demo --site test --headed`: one trial PO, 2609017B -> pln_66935, Enter before every write; `--until-check` read-only · step
+- [x] **D.2** (done: PRs #22-#28, 28 Oct 2026) Live fixes: label reads, project window, Link to Project via Choose Project, `--probe-link`, Enter runs both project searches, Projects filter check · step
+- [x] **D.3** (done: PRs #29-#30, 28 Oct 2026) "Page blocked" fixed by the guarded pointer move (10 of 10 hands-off runs); the new task row read until whole · step
+- [x] **D.4** (done, 28 Oct 2026) Demo shown: full bookings from the laptop and the Mac Mini. `src/po_agent/mysys/booking.py` holds the proven booking steps for M4 · by hand
+
 ## M6 — MVP demo
+
+**Superseded by the Demo above:** 6.1-6.4 were written for the unattended run and weren't done as written. Their checks (S1-S8 on the scheduled job) move to P5.
 
 - [ ] **6.1** `/agent-skills:ship` go/no-go; load the job again, then rehearse `enabled = false` and `launchctl bootout` (S6) · by hand
 - [ ] **6.2** Demo 1: scheduled run (S4), fresh 2609034B copy (S5), controls (S6), evidence (S7) · by hand

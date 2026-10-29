@@ -1,10 +1,14 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.17 · 25 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.18 · 29 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
+**Now: production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 as a supervised `po-agent demo` (one trial PO, Joey's Enter before every write), from the laptop and the Mac Mini. The goal is now the agent running by itself, hourly, on the Mac Mini: unattended on the test site first, then on live after the go-live gates (`SPEC.md` -> Production; `tasks/plan.md` -> Phase P). The stages below still describe how each task is built.
+
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.18:** status caught up with the 28 Oct 2026 MVP demo (PRs #19-#30); production order added to "Where you are" (decisions, 29 Oct 2026).
 
 **v5.16:** Milestone A first: a decide-only demo on the Mac Mini, then 3.6 and M4 (decisions, 25 Oct 2026). Plan mode only on the review-stop tasks; other tasks are one prompt, and the advisor chat can start each task in a Terminal tab. The repo is public. Appendix A's CI matches the real `check.yml` (gitleaks-action v3).
 
@@ -22,13 +26,14 @@
 |---|---|---|
 | 0–2 | Tools, GitHub repo, skills | **Done** (14–15 Oct 2026) |
 | 3 | M0: SOP walkthrough on the test site, screen map, the six checks, 3 real PDFs and `cases.toml` in `private/` | **Done** (16 Oct 2026, PRs #3–#5) |
-| 3E | M0b: the screens still to map | M0b.1 **done** (25 Oct 2026; rows 21–22 dropped, row 23 moved to M0b.2). M0b.2 **to do, by hand**, before M4 (row 23 before 3.6) |
+| 3E | M0b: the screens still to map | M0b.1 **done** (25 Oct 2026; rows 21–22 dropped, row 23 moved to M0b.2). M0b.2 **to do, by hand**, before 4.1 (row 23 before 3.6); the demo already saw Link to Project's Choose Project window live (decisions, 28 Oct 2026) |
 | 4 | SPEC check, plan, doubt review, freeze | **Done** (16 Oct 2026, PRs #5–#7) |
-| 5 | Build, one task at a time | **In progress.** 1.1–1.7 done (PRs #9, #12–#14, #16–#18); next 1.8 |
-| **A** | **Milestone A:** decide-only on the Mac Mini, demo to the CEO | After 1.4, 1.6–1.10, M0b.1, M2, 3.1–3.3, 3.5, 3.4 |
-| 6 | Verify on the test site and the Mac Mini | After M3 and M4 |
-| 7 | MVP demo (M6) | After M5 |
-| 8 | After the MVP | Later |
+| 5 | Build, one task at a time | 1.1-1.8 done (PRs #9, #12-#14, #16-#18, #20). The supervised demo (`po-agent demo`, PRs #21-#30) proved the booking steps in `mysys/booking.py` on the test site |
+| **A** | **Milestone A:** decide-only on the Mac Mini, demo to the CEO | **Not done as planned:** the 28 Oct CEO demo was the supervised booking demo instead (decisions, 27 Oct 2026); decide-only runs come back in P (3.4) |
+| 7 | MVP demo | **Shown, 28 Oct 2026:** `po-agent demo` booked 2609017B from the laptop and the Mac Mini; "page blocked" fixed (PR #29), 10 of 10 hands-off runs without it |
+| **P** | **Production** (decisions, 29 Oct 2026) | **In progress.** In order: docs catch-up (this version); decide 2.1-2.6; run controls 3.1-3.6 and decide-only runs; real booker 4.1-4.5; unattended on the test site (1.9, 1.10, 4.6, 5.1, 5.2); go live after the gates in `SPEC.md` -> Production |
+| 6 | Verify on the test site and the Mac Mini | Part of P (unattended on test) |
+| 8 | After the MVP | Folded into P |
 
 `tasks/todo.md` is the live task list; tick tasks there, not here.
 
