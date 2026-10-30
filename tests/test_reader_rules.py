@@ -77,11 +77,12 @@ def test_pdf_that_matches_gives_its_po_number():
 @pytest.mark.parametrize(
     ("text", "why"),
     [
-        (PDF_TEXT.replace("B1 Homes", "Other Homes"), "NOT_B1_HOMES"),
+        (PDF_TEXT.replace("B1 Homes", "Other Homes"), "NOT_B1"),
+        ("Other Homes Pty Ltd\n" + PDF_TEXT, "NOT_B1"),  # issuer = first line
         (PDF_TEXT.replace("COMPACTION", "SURVEY"), "NOT_COMPACTION"),
-        (PDF_TEXT.replace("2600001B/048", "2600002B/048"), "PO_NUMBER_MISMATCH"),
-        (PDF_TEXT.replace("Purchase Order No", "Order"), "PO_NUMBER_MISMATCH"),
-        (PDF_TEXT + "\nPurchase Order No 2600002B/048", "PO_NUMBER_MISMATCH"),
+        (PDF_TEXT.replace("2600001B/048", "2600002B/048"), "PO_MISMATCH"),
+        (PDF_TEXT.replace("Purchase Order No", "Order"), "PO_MISMATCH"),
+        (PDF_TEXT + "\nPurchase Order No 2600002B/048", "PO_MISMATCH"),
     ],
 )
 def test_pdf_that_does_not_match_stops(text, why):
@@ -93,7 +94,7 @@ def test_pdf_that_does_not_match_stops(text, why):
 def test_internal_number_must_equal_the_note_title():
     with pytest.raises(WriteNotStarted) as error:
         rules.check_pdf(PDF_TEXT, "2600001B/048", "2600009B")
-    assert reason(error) == "INTERNAL_NO_MISMATCH"
+    assert reason(error) == "PO_MISMATCH"
 
 
 def test_unreadable_pdf_bytes_stop():

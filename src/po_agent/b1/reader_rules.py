@@ -1,9 +1,9 @@
-"""The supervised demo's deterministic checks (decisions, 27 Oct 2026).
+"""The deterministic reader and the supervised demo's checks.
 
-Pure functions, no browser code: the attachment rule, the PDF checks, the
-project match and the task rows (SPEC.md -> MySys screen rules). A failed
-check raises a typed error with a fixed detail and a reason identifier; PDF
-text, addresses and cell text never go into it.
+Pure functions, no browser code: the deterministic reading (task 2.2), the
+attachment rule, the PDF checks, the project match and the task rows (SPEC.md
+-> MySys screen rules). A failed demo check raises a typed error with a fixed
+detail and a SkipReason; PDF text, addresses and cell text never go into it.
 """
 
 import io
@@ -13,14 +13,19 @@ from urllib.parse import parse_qs, urlsplit
 
 import pdfplumber
 
+from po_agent.b1.models import DeterministicReading, SkipReason
 from po_agent.core.errors import PartialWrite, WriteNotStarted
 
 COMPANY = "B1 Homes"
+# The issuer, as the first line of every B1 Homes PO reads.
+ISSUER = "B1 Homes Pty Ltd"
 PO_SUFFIX = "048"
 # <internal no>_048[_n].pdf, as in b1/decision.py (open question 10).
 _FILE_NAME = re.compile(rf"([0-9A-Z]+)_{PO_SUFFIX}(?:_[0-9]+)?\.(?i:pdf)")
 # "Purchase Order No 2609017B/048" (the trial PDFs).
 _PDF_PO = re.compile(r"Purchase Order No\.?\s*:?\s*([0-9A-Z]+/[0-9]{3})")
+# A live-style title "[B1 Homes] Order 2609034B/048", read on either site.
+_TITLE_PO = re.compile(rf"\[B1 Homes\] Order ([0-9A-Z]+/{PO_SUFFIX})(?=\s|$)")
 # "(tsk_200001) | Compaction Test" plus the row's button texts, which
 # inner text can run on without a break.
 _TASK_HEADER = re.compile(
@@ -64,18 +69,47 @@ def pdf_text(data: bytes) -> str:
         raise WriteNotStarted("PDF not readable", reason="PDF_UNREADABLE") from None
 
 
-def check_pdf(text: str, file_po: str, internal_no: str) -> str:
-    """Step 4: the PDF names B1 Homes and COMPACTION, holds exactly one PO
-    number, equal to the file name's, whose internal number is the Note's."""
-    if COMPANY not in text:
-        raise WriteNotStarted("PDF check failed", reason="NOT_B1_HOMES")
-    if "COMPACTION" not in text:
-        raise WriteNotStarted("PDF check failed", reason="NOT_COMPACTION")
+def text_layer(data: bytes) -> str:
+    """The PDF's text, or "" when pdfplumber can't read it (PDF_UNREADABLE)."""
+    try:
+        return pdf_text(data)
+    except WriteNotStarted:
+        return ""
+
+
+def read_pdf(text: str, file_name: str, title: str) -> DeterministicReading:
+    """Step 4's deterministic reading; empty where nothing is found.
+
+    The issuer is the first non-empty line. The PO number is the one
+    "Purchase Order No" value; none, or two different ones, read as empty.
+    The address is left empty (Claude extracts it, section 4).
+    """
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
     found = set(_PDF_PO.findall(text))
-    if found != {file_po}:
-        raise WriteNotStarted("PDF check failed", reason="PO_NUMBER_MISMATCH")
-    if file_po.split("/")[0] != internal_no:
-        raise WriteNotStarted("PDF check failed", reason="INTERNAL_NO_MISMATCH")
+    po_number = found.pop() if len(found) == 1 else ""
+    file_match = _FILE_NAME.fullmatch(file_name)
+    title_match = _TITLE_PO.match(title.strip())
+    return DeterministicReading(
+        issuer=lines[0] if lines else "",
+        contains_compaction="COMPACTION" in text,
+        po_number=po_number,
+        client_internal_no=po_number.split("/")[0],
+        po_from_filename=f"{file_match.group(1)}/{PO_SUFFIX}" if file_match else "",
+        po_from_title=title_match.group(1) if title_match else None,
+    )
+
+
+def check_pdf(text: str, file_po: str, internal_no: str) -> str:
+    """Step 4: the PDF's issuer is B1 Homes, it names COMPACTION and holds
+    exactly one PO number, equal to the file name's, whose internal number
+    is the Note's."""
+    reading = read_pdf(text, "", "")
+    if reading.issuer != ISSUER:
+        raise WriteNotStarted("PDF check failed", reason=SkipReason.NOT_B1)
+    if not reading.contains_compaction:
+        raise WriteNotStarted("PDF check failed", reason=SkipReason.NOT_COMPACTION)
+    if reading.po_number != file_po or reading.client_internal_no != internal_no:
+        raise WriteNotStarted("PDF check failed", reason=SkipReason.PO_MISMATCH)
     return file_po
 
 
