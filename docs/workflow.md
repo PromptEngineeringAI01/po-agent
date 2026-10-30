@@ -1,12 +1,14 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.18 · 29 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.19 · 30 Oct 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Now: production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 as a supervised `po-agent demo` (one trial PO, Joey's Enter before every write), from the laptop and the Mac Mini. The goal is now the agent running by itself, hourly, on the Mac Mini: unattended on the test site first, then on live after the go-live gates (`SPEC.md` -> Production; `tasks/plan.md` -> Phase P). The stages below still describe how each task is built.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.19:** production build loop (from task 2.3): each task session in its own worktree; `/goal` only for the code half after Joey approves the tests, never on the test site; a fresh-session `/code-review` on 2.4, 2.5, M3, M4 and 5.2; `/verify-pr` before every merge; when to start a fresh advisor chat.
 
 **v5.18:** status caught up with the 28 Oct 2026 MVP demo (PRs #19-#30); production order added to "Where you are" (decisions, 29 Oct 2026).
 
@@ -145,6 +147,18 @@ Update docs/screen-map.md (the rows I just mapped, fake values only) and SPEC.md
 
 ## Stage 5 — Build each task (repeat for every task in `tasks/todo.md`)
 
+### Production build loop (from task 2.3, 30 Oct 2026)
+
+The advisor chat runs the steps below; Joey answers review stops and merges. Steps 1-10 underneath still say what each step must achieve.
+
+1. **Start:** on "merged, start the next one", the advisor pulls `main` and starts a linked task session **in its own worktree** (its own folder and branch), so the advisor's checkout stays on `main` and two sessions never share a folder.
+2. **Tests first:** the session writes the failing tests. On a review-stop task (2.2-2.5, M3, M4, 5.2) it stops; the advisor brings Joey a short summary; Joey approves; the session commits them as `test:`.
+3. **Code with `/goal`** (offline code only): the session sets a goal such as `uv run scripts/check.py prints "check: all passed", the seam-1 cases for task <N> pass, no file under tests/ changed since the test: commit, or stop after 20 rounds`. A separate model judges each round from the evidence printed in the chat.
+   - Never `/goal` before Joey approves the tests on a review-stop task: the loop would run past the stop.
+   - Never `/goal` on anything that touches the test site (seam 2, decide-only, booking): no retry loops against MySys. Those runs stay one at a time, watched.
+4. **Independent review** on 2.4, 2.5, M3, M4 and 5.2: `/code-review` in a fresh session that didn't write the code (the M4 doubt review stays as below). Fix Important findings once.
+5. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, the check, CI on the latest commit. Then Joey merges with **Create a merge commit**.
+
 1. **Branch** from up-to-date `main`, one branch per task (e.g. `m1-1.2-hooks`):
 
    ```powershell
@@ -262,6 +276,7 @@ Change the expected result in one seam-1 fixture.
 
 - **Clear** after each task's PR is open; after any session that read real captures or PDFs from `private/`; and before a doubt review, which needs a context that didn't write the design.
 - **Don't clear** mid-task, including at the test-first pause, or during a `/agent-skills:build auto` run.
+- **Fresh advisor chat** (the chat that starts tasks and verifies PRs) when one of these happens: a goal step is done (decide, run controls, real booker, unattended, go live); the chat has been compacted once (it says so) or runs past a day; or it repeats a question already settled, forgets a decision, or starts mixing up PR numbers. Before switching, ask it for a handover (what's merged, what's open, the next task, anything waiting on Joey) and paste that into the new chat. Memory files and `tasks/` carry the rest.
 - **Resuming** after a break: `claude --resume` and pick the task's session by name (`claude --continue` opens the most recent conversation in the folder, which may be a different one).
 
 ### When something goes sideways
