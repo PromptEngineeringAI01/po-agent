@@ -7,6 +7,7 @@ Strategy). Fake values only. Order agreed in 2.1: the Job Address block check
 """
 
 import pytest
+
 from po_agent.b1.address import (
     ProjectAddress,
     job_address_block,
@@ -14,7 +15,6 @@ from po_agent.b1.address import (
     parse_project_address,
     verify_address,
 )
-
 from po_agent.b1.models import Reading, SkipReason
 
 PROJECT = "Lot 123 (#45) Sample Lane Sampleville 6000 WA"
@@ -279,7 +279,7 @@ def test_a_street_or_suburb_not_in_the_block_is_unverifiable() -> None:
 
 
 def test_a_value_must_match_whole_words_in_the_block() -> None:
-    result = verify_address(reading(suburb="Sample"), PDF_TEXT, PROJECT)
+    result = verify_address(reading(suburb="Samplevil"), PDF_TEXT, PROJECT)
     assert result is SkipReason.ADDRESS_UNVERIFIABLE
     project = "Lot 12 Sample Lane Sampleville"
     result = verify_address(reading(lot="12"), PDF_TEXT, project)
