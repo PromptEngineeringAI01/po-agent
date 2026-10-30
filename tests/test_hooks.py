@@ -411,13 +411,17 @@ def test_protect_paths_applies_repo_rules_inside_a_worktree(rel, places):
     assert_blocked(protect(places["project"] / rel, places), "protect_paths")
 
 
-@pytest.mark.parametrize("rel", ["src/x.py", "tests/seam1/test_new.py", "docs/decisions.md"])
+@pytest.mark.parametrize(
+    "rel", ["src/x.py", "tests/seam1/test_new.py", "docs/decisions.md"]
+)
 def test_protect_paths_allows_ordinary_files_in_a_worktree(rel, places):
     assert_allowed(protect(places["project"] / WORKTREE / rel, places))
 
 
 def test_protect_paths_asks_for_ask_first_files_in_a_worktree(places):
-    assert_asks(protect(places["project"] / WORKTREE / ".github/workflows/check.yml", places))
+    assert_asks(
+        protect(places["project"] / WORKTREE / ".github/workflows/check.yml", places)
+    )
 
 
 def test_protect_paths_blocks_an_escape_from_a_worktree_into_claude(places):
