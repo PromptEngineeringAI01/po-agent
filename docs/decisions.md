@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 29 Oct 2026, production)
+# PO Agent - decision log (updated 30 Oct 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -20,6 +20,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **What:** a path inside `.claude/worktrees/<name>/` (one level only) is checked with the same repo rules, measured from that worktree's root. Its own `.claude/`, `.env*`, `config/live*.toml`, `secrets/` and `state/` stay blocked; `.github/workflows/`, the Mac Mini files and existing seam-1 fixtures still ask; a nested worktree, a loose file in `.claude/worktrees/` and a `../` escape into `.claude/` are blocked. Tests in `tests/test_hooks.py`.
 - **Loosens:** writes become possible in ordinary files of a worktree, the same files a session may already write in the main checkout. Nothing else changes. No change to the agent's behaviour in MySys or its run output.
 - Carried in: `.claude/hooks/protect_paths.py` (Joey, by hand), `SPEC.md` (repo layout), `tasks/plan.md` (1.2).
+
+## 30 Oct 2026 - Task 2.4: a tighter Job Address block rule (Joey)
+
+- **What:** the address check (§4 step 1) no longer accepts Claude's lot, street and suburb as whole words anywhere in the Job Address block. Now the label line must start `Lot <lot>` (Claude's lot). If more follows on that line, the rest must be exactly `<street> <suburb>` plus an optional tail; if nothing follows, the line under it must end with `<street> <suburb>` plus an optional tail. The tail is nothing, a state, a 4-digit postcode, or both in either order. Compared on normalised text; exactly one `Job Address:` label. Else `ADDRESS_UNVERIFIABLE`, before the project compare (`ADDRESS_MISMATCH`), as before.
+- **Why:** the 2.4 code review found two holes in the looser rule: a PDF lot `12-A`, `12 A` or `12/13` passed as Claude's lot `12`; and the line under the label also holds the Supplier column, so a supplier street and suburb could pass. The real layout (the 3 trial PDFs, checked as masked shapes) is the two-line form: the label line ends `Job Address: Lot <lot>`, the next line is Supplier text, then `<street> <suburb> <state>` at its end. The one-line form keeps SPEC's must-pass example passing.
+- **Effect:** stricter only; nothing is loosened. A `(#n)` group anywhere but right after the project's lot stays in *R*, so it skips `ADDRESS_MISMATCH`.
+- Carried in: `SPEC.md` -> Project address, `docs/specs/spec.md` §4, `tasks/plan.md` 2.4.
 
 ## 29 Oct 2026 - Task 2.2: one reader, SkipReason names in the demo (Joey)
 

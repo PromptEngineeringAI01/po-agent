@@ -4,12 +4,13 @@ Pure functions, no browser code.
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from po_agent.b1 import reader_rules as rules
+from po_agent.b1.address import verify_address
 from po_agent.b1.models import (
     CompactionTask,
     DeterministicReading,
@@ -17,6 +18,7 @@ from po_agent.b1.models import (
     NotePoolRow,
     NoteSnapshot,
     Proceed,
+    Reading,
     SearchRow,
     Skip,
     SkipReason,
@@ -175,6 +177,20 @@ def check_duplicate(
     return tuple(task.task_no for task in tasks)
 
 
+class ClaudeUnavailable(Exception):
+    """The Claude reader timed out or failed after its retry (step 6)."""
+
+
+def _readers_agree(deterministic: DeterministicReading, claude: Reading) -> bool:
+    """Step 7: identical issuer, COMPACTION, PO number and internal number."""
+    return (
+        claude.issuer == deterministic.issuer
+        and claude.contains_compaction == deterministic.contains_compaction
+        and claude.po_number == deterministic.po_number
+        and claude.client_internal_no == deterministic.client_internal_no
+    )
+
+
 def decide(
     note: NoteSnapshot,
     internal_no: str,
@@ -185,17 +201,54 @@ def decide(
     site: Site,
     reader_mode: ReaderMode,
     duplicate_ignores_cancelled: bool,
+    read_claude: Callable[[], str] | None = None,
 ) -> Skip | Proceed:
     """Steps 2a-11 in section 2 order on the inputs given; the first failing
     step decides. Deterministic-only mode has no Claude extraction to verify,
-    so a PO that passes step 8 skips ADDRESS_UNVERIFIABLE at step 9 (C4)."""
+    so a PO that passes step 8 skips ADDRESS_UNVERIFIABLE at step 9 (C4).
+
+    read_claude (hybrid only) returns Claude's raw JSON reading. It must turn
+    every timeout and SDK error into ClaudeUnavailable (2.5); any other
+    exception propagates. It is called only after steps 2a-4 pass.
+    """
+    if reader_mode not in ("hybrid", "deterministic-only"):
+        raise ValueError("unknown reader mode")
+    reader = read_claude if reader_mode == "hybrid" else None
+    if reader_mode == "hybrid" and reader is None:
+        raise ValueError("hybrid mode needs a Claude reader")
     checked = check_note_and_pdf(note, internal_no, pdf_text)
     if isinstance(checked, Skip):
         return checked
-    if reader_mode != "deterministic-only":
-        # Steps 6-7 and 9 in hybrid mode come with 2.4.
-        raise NotImplementedError("hybrid decide() needs the Claude reading")
+    claude: Reading | None = None
+    if reader is not None:
+        try:
+            raw = reader()
+        except ClaudeUnavailable:
+            return Skip(reason=SkipReason.CLAUDE_UNAVAILABLE)
+        try:
+            claude = Reading.model_validate_json(raw)
+        except ValidationError:
+            return Skip(reason=SkipReason.CLAUDE_INVALID_OUTPUT)
+        if not _readers_agree(checked.reading, claude):
+            return Skip(reason=SkipReason.READERS_DISAGREE)
     pln = check_project(lookup, internal_no, site)
     if isinstance(pln, Skip):
         return pln
-    return Skip(reason=SkipReason.ADDRESS_UNVERIFIABLE)
+    if claude is None:
+        return Skip(reason=SkipReason.ADDRESS_UNVERIFIABLE)
+    address = verify_address(claude, pdf_text, lookup.address)
+    if address is not None:
+        return Skip(reason=address)
+    task_nos = check_duplicate(lookup.tasks, duplicate_ignores_cancelled)
+    if isinstance(task_nos, Skip):
+        return task_nos
+    return Proceed(
+        note_id=note.note_id,
+        internal_no=checked.internal_no,
+        pln=pln,
+        po_number=checked.reading.po_number,
+        email_body=checked.email_body,
+        pdf_file_name=checked.pdf_file_name,
+        pdf_bytes=pdf_bytes,
+        existing_task_nos=task_nos,
+    )

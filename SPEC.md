@@ -272,7 +272,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 **Project address (rows 06–07), for §4**
 - Source: the project window's **Address:** (the same string as the search row). Shape: `Lot <lot> [(#<house no>)] <street> <suburb> [<postcode>] [<state>]`, e.g. `Lot 123 (#45) Sample Lane Sampleville 6000 WA`.
 - Parse after the §4 normalisation: drop a trailing state and postcode, drop the `(#…)` group, take the token after `Lot` as the lot (letters allowed, e.g. `12A`; compared as case-folded strings). The rest is the street-and-suburb text *R*. No leading `Lot` → `ADDRESS_UNVERIFIABLE`.
-- Verify: lot equal, and normalised `<Claude street> <Claude suburb>` equals *R*, so the agent never has to guess where the street ends. Each of Claude's three values must also appear in the PDF's **Job Address** block (the "Job Address:" field and the line under it).
+- Verify: lot equal, and normalised `<Claude street> <Claude suburb>` equals *R*, so the agent never has to guess where the street ends. First, Claude's values must sit in the PDF's **Job Address** block (decisions, 30 Oct 2026): the label line must start `Lot <lot>` (Claude's lot). If more follows on that line, the rest must be exactly `<street> <suburb>` plus an optional tail; if nothing follows, the line under it must end with `<street> <suburb>` plus an optional tail. The tail is nothing, a state, a 4-digit postcode, or both in either order. Compared on normalised text; exactly one `Job Address:` label. Else `ADDRESS_UNVERIFIABLE`; then a lot or *R* that differs is `ADDRESS_MISMATCH`.
 - Must pass (fake values): PDF "Job Address: Lot 123 / Sample Lane Sampleville WA" vs project "Lot 123 (#45) Sample Lane Sampleville 6000 WA".
 
 **Duplicate check (row 07), step 10**
