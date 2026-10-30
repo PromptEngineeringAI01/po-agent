@@ -321,3 +321,94 @@ def test_the_block_check_comes_before_the_project_compare() -> None:
     # Not in the block and not on the project: the block check decides.
     result = verify_address(reading(lot="77"), PDF_TEXT, PROJECT)
     assert result is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+# --- the tighter block rule (Joey, 30 Oct 2026: review findings 1 and 2) ---
+# The real layout: the label line ends "Job Address: Lot <lot>"; the line
+# under it is Supplier text, then "<street> <suburb> <state>" at its end.
+
+LOT_12 = "Lot 12 Sample Lane Sampleville 6000 WA"
+
+
+@pytest.mark.parametrize("pdf_lot", ["Lot 12-A", "Lot 12 A", "Lot 12/13"])
+def test_a_longer_pdf_lot_does_not_pass_as_claudes_lot(pdf_lot: str) -> None:
+    # Finding 1: Claude's "12" is only the start of the PDF's lot.
+    two_lines = PDF_TEXT.replace("Lot 123", pdf_lot)
+    one_line = f"Job Address: {pdf_lot} Sample Lane Sampleville WA"
+    for text in (two_lines, one_line):
+        result = verify_address(reading(lot="12"), text, LOT_12)
+        assert result is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+def test_the_supplier_street_and_suburb_do_not_pass() -> None:
+    # Finding 2: the line under the label also holds the Supplier column.
+    project = "Lot 123 Supplier Road Supplierton 6998 WA"
+    claude = reading(street="Supplier Road", suburb="Supplierton")
+    result = verify_address(claude, PDF_TEXT, project)
+    assert result is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+def test_the_spec_example_passes_above_a_supplier_line() -> None:
+    # The fixture's one-line layout: the Supplier text is on the next line.
+    text = PDF_TEXT.replace(
+        "Job Address: Lot 123\nUnit 1, 2 Supplier Road Supplierton WA"
+        " Sample Lane Sampleville WA",
+        "Job Address: Lot 123 / Sample Lane Sampleville WA\n"
+        "Unit 1, 2 Supplier Road Supplierton WA",
+    )
+    assert text != PDF_TEXT
+    assert verify_address(reading(), text, PROJECT) is None
+
+
+@pytest.mark.parametrize(
+    "tail", ["", " WA", " WA 6000", " 6000", " 6000 WA", ", WA.", " wa 6000"]
+)
+def test_street_and_suburb_end_the_line_under_the_label(tail: str) -> None:
+    text = PDF_TEXT.replace(
+        "Sample Lane Sampleville WA", f"Sample Lane Sampleville{tail}"
+    )
+    assert verify_address(reading(), text, PROJECT) is None
+
+
+@pytest.mark.parametrize(
+    "tail", [" WA Australia", " WA 6000 WA 6000", " 600", " Supplierton WA", " WA X"]
+)
+def test_anything_else_after_the_suburb_is_unverifiable(tail: str) -> None:
+    text = PDF_TEXT.replace(
+        "Sample Lane Sampleville WA", f"Sample Lane Sampleville{tail}"
+    )
+    result = verify_address(reading(), text, PROJECT)
+    assert result is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Job Address: Lot 123 Unit 4 Sample Lane Sampleville WA",  # words between
+        "Job Address: Lot 123 Sample Lane Sampleville WA Supplierton",
+        "Job Address: Lot 123 Sampleville",
+    ],
+)
+def test_a_one_line_address_must_be_lot_street_suburb(line: str) -> None:
+    result = verify_address(reading(), line, PROJECT)
+    assert result is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+def test_the_lot_must_be_the_first_thing_after_the_label() -> None:
+    text = PDF_TEXT.replace("Job Address: Lot 123", "Job Address: Site Lot 123")
+    result = verify_address(reading(), text, PROJECT)
+    assert result is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+@pytest.mark.parametrize(
+    "project",
+    [
+        "Lot 123 Sample Lane (#45) Sampleville 6000 WA",
+        "Lot 123 Sample Lane Sampleville (#45) 6000 WA",
+        "Lot 123 Sample Lane Sampleville 6000 WA (#45)",
+    ],
+)
+def test_a_house_number_not_right_after_the_lot_is_a_mismatch(project: str) -> None:
+    # Review nit 1: only "Lot <lot> (#n)" is dropped; anywhere else the number
+    # stays in R, so the compare fails safe.
+    assert verify_address(reading(), PDF_TEXT, project) is SkipReason.ADDRESS_MISMATCH
