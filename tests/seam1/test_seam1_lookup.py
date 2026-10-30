@@ -30,6 +30,19 @@ from po_agent.b1.models import (
     SkipReason,
 )
 
+# Steps 2a-4 and 6-7: a case that skips here never reaches the project lookup.
+BEFORE_THE_LOOKUP = {
+    SkipReason.NOTE_ALREADY_LINKED,
+    SkipReason.NO_PDF,
+    SkipReason.MULTIPLE_PDFS,
+    SkipReason.PDF_UNREADABLE,
+    SkipReason.NOT_B1,
+    SkipReason.NOT_COMPACTION,
+    SkipReason.PO_MISMATCH,
+    SkipReason.CLAUDE_UNAVAILABLE,
+    SkipReason.CLAUDE_INVALID_OUTPUT,
+    SkipReason.READERS_DISAGREE,
+}
 INTERNAL_NO = "2600001B"
 # A clean fake PO (values fake), as in test_seam1_reader_checks.
 PDF_TEXT = """B1 Homes Pty Ltd
@@ -134,6 +147,8 @@ def test_seam1_case_lookup_steps_in_hybrid_mode(seam1_case: Seam1Case) -> None:
         return
     config = seam1_case.config
     expect = seam1_case.expect
+    if expect.reason in BEFORE_THE_LOOKUP:  # the lookup is never read
+        return
     project = check_project(seam1_case.lookup, internal_no, config.site)
     if expect.reason in (
         SkipReason.PROJECT_NOT_FOUND,
