@@ -5,6 +5,7 @@ description = "Books B1 Homes /048 compaction POs in MySys (test site MVP)"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "anthropic>=2.3.0",
     "keyring>=25.7.0",
     "pdfplumber>=0.11.10",
     "playwright>=1.64.1",
