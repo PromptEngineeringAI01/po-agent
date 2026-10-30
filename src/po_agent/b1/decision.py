@@ -4,15 +4,20 @@ Pure functions, no browser code.
 """
 
 import re
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.models import (
+    CompactionTask,
     DeterministicReading,
+    MySysLookup,
     NotePoolRow,
     NoteSnapshot,
+    Proceed,
+    SearchRow,
     Skip,
     SkipReason,
 )
@@ -20,6 +25,10 @@ from po_agent.b1.models import (
 # test-body-filename is the only rule a config can select in the MVP;
 # live-b1-title exists for offline tests of real live Notes (SPEC.md, section 2 row).
 TitleRule = Literal["test-body-filename", "live-b1-title"]
+# The code is test site only (Must never #3); "live" is the live match rule as
+# pure logic, for offline tests, with no host or config behind it.
+Site = Literal["test", "live"]
+ReaderMode = Literal["hybrid", "deterministic-only"]
 
 UNLINKED_PROJECT = "---"
 # Spec open question 10: live numbers look like 2609034B; until confirmed,
@@ -103,3 +112,90 @@ def check_note_and_pdf(
         email_body=note.body,
         reading=reading,
     )
+
+
+def _client_ref(internal_no: str, site: Site) -> str | None:
+    """The Client Ref No. a matching project holds, lower case; None when
+    there is no internal number to match."""
+    wanted = internal_no.strip().lower()
+    if site == "test":
+        ref = wanted
+    elif site == "live":
+        ref = f"{wanted}/{rules.PO_SUFFIX}"
+    else:
+        raise ValueError("unknown site")
+    return ref if wanted else None
+
+
+def _is_ref(value: str, ref: str | None) -> bool:
+    return ref is not None and value.strip().lower() == ref
+
+
+def match_project(
+    rows: Sequence[SearchRow], more_pages: bool, internal_no: str, site: Site
+) -> Skip | str:
+    """Step 8's match rule (SPEC.md -> MySys screen rules -> Project search):
+    the pln of the one B1 Homes row whose Client Ref No. (trimmed, any case)
+    is <internal no> on test or <internal no>/048 on live. Other rows are
+    ignored. The driver (3.2) calls this to choose the pln link it opens."""
+    ref = _client_ref(internal_no, site)
+    # A set: a list can show the same row twice (screen map row 27).
+    plns = {
+        row.pln
+        for row in rows
+        if row.company.strip() == rules.COMPANY and _is_ref(row.client_ref_no, ref)
+    }
+    if more_pages or len(plns) > 1:
+        return Skip(reason=SkipReason.PROJECT_AMBIGUOUS)
+    if not plns:
+        return Skip(reason=SkipReason.PROJECT_NOT_FOUND)
+    return plns.pop()
+
+
+def check_project(lookup: MySysLookup, internal_no: str, site: Site) -> Skip | str:
+    """Step 8: the matched pln, and the opened project's Client Internal No.
+    satisfies the same rule, else UNEXPECTED_SCREEN (the run loop stops)."""
+    pln = match_project(lookup.search_rows, lookup.more_pages, internal_no, site)
+    if isinstance(pln, Skip):
+        return pln
+    if not _is_ref(lookup.project_internal_no, _client_ref(internal_no, site)):
+        return Skip(reason=SkipReason.UNEXPECTED_SCREEN)
+    return pln
+
+
+def check_duplicate(
+    tasks: Sequence[CompactionTask], ignores_cancelled: bool
+) -> Skip | tuple[str, ...]:
+    """Step 10 (MVP strict): any Compaction Test task counts, whatever its PO
+    number; a Cancelled one only when ignores_cancelled is false. On a pass,
+    every existing task number, Cancelled ones too, for W2."""
+    for task in tasks:
+        if not (ignores_cancelled and task.status.strip() == rules.CANCELLED):
+            return Skip(reason=SkipReason.DUPLICATE_TASK)
+    return tuple(task.task_no for task in tasks)
+
+
+def decide(
+    note: NoteSnapshot,
+    internal_no: str,
+    pdf_text: str,
+    pdf_bytes: bytes,
+    lookup: MySysLookup,
+    *,
+    site: Site,
+    reader_mode: ReaderMode,
+    duplicate_ignores_cancelled: bool,
+) -> Skip | Proceed:
+    """Steps 2a-11 in section 2 order on the inputs given; the first failing
+    step decides. Deterministic-only mode has no Claude extraction to verify,
+    so a PO that passes step 8 skips ADDRESS_UNVERIFIABLE at step 9 (C4)."""
+    checked = check_note_and_pdf(note, internal_no, pdf_text)
+    if isinstance(checked, Skip):
+        return checked
+    if reader_mode != "deterministic-only":
+        # Steps 6-7 and 9 in hybrid mode come with 2.4.
+        raise NotImplementedError("hybrid decide() needs the Claude reading")
+    pln = check_project(lookup, internal_no, site)
+    if isinstance(pln, Skip):
+        return pln
+    return Skip(reason=SkipReason.ADDRESS_UNVERIFIABLE)
