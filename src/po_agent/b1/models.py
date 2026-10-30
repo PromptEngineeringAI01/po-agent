@@ -62,6 +62,20 @@ class Reading(_Frozen):
     site_suburb: str = ""
 
 
+class ClaudeReading(Reading):
+    """Claude's reading as its JSON must give it: every field required, so a
+    missing one is invalid output (CLAUDE_INVALID_OUTPUT), never a default.
+    Also the structured-output schema sent to Claude (b1/reader_claude.py)."""
+
+    issuer: str
+    contains_compaction: bool
+    po_number: str
+    client_internal_no: str
+    site_lot: str
+    site_street: str
+    site_suburb: str
+
+
 class DeterministicReading(Reading):
     """The deterministic reading also carries the file name's and, on live,
     the title's PO number (section 3)."""

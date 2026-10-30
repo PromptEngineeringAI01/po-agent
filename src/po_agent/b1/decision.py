@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.address import verify_address
 from po_agent.b1.models import (
+    ClaudeReading,
     CompactionTask,
     DeterministicReading,
     MySysLookup,
@@ -226,7 +227,7 @@ def decide(
         except ClaudeUnavailable:
             return Skip(reason=SkipReason.CLAUDE_UNAVAILABLE)
         try:
-            claude = Reading.model_validate_json(raw)
+            claude = ClaudeReading.model_validate_json(raw)
         except ValidationError:
             return Skip(reason=SkipReason.CLAUDE_INVALID_OUTPUT)
         if not _readers_agree(checked.reading, claude):

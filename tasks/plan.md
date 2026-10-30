@@ -354,8 +354,8 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Description:** The real Claude reader: no tools, structured output, validated again by pydantic. Use the `claude-api` and `source-driven-development` skills. The model ID is pinned here, because the live seam below needs it.
 **Needs:** 2.4; Joey approves the prompt and the exact model ID before the first live run.
 **Acceptance:**
-- `config/test.toml` has an exact dated Sonnet-class `claude_model_id` (ask-first).
-- The request has **no tools**, temperature 0, bounded output tokens, a timeout of about 60 s, one retry on a transient error, and structured output in the reading schema. Its input is the PDF as a document plus the Note title and body, framed as untrusted data. The key comes from `secrets.get("anthropic_api_key")` and is passed to the client explicitly.
+- `config/test.toml` has an exact Sonnet-class `claude_model_id` (ask-first): `claude-sonnet-5-5`; current Sonnets have no dated ID (decisions, 30 Oct 2026).
+- The request has **no tools**, no sampling parameters (temperature 0 is rejected by the API; decisions, 30 Oct 2026), no fallback model, effort `low`, bounded output tokens, a timeout of about 60 s, one retry on a transient error, and structured output in the reading schema. Its input is the PDF as a document plus the Note title and body, framed as untrusted data. The key comes from `secrets.get("anthropic_api_key")` and is passed to the client explicitly.
 - Invalid or missing fields → `CLAUDE_INVALID_OUTPUT`; repeated failure → `CLAUDE_UNAVAILABLE`. Usage and AUD cost are calculated from the config price table.
 - `tests/seam1/test_seam1_live_claude.py` (`-m live_claude`) runs every fixture through both real readers and prints per-field agreement (field names only), tokens, cost and `false PROCEED: N`. It fails if N > 0.
 

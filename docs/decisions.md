@@ -13,6 +13,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **29 Oct 2026: production started** (entry below).
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
 - **30 Oct 2026: task sessions run in worktrees;** `protect_paths` applies the repo rules inside them (entry below).
+- **30 Oct 2026: the Claude reader's model pinned** (`claude-sonnet-5-5`), temperature 0 dropped (entry below).
+
+## 30 Oct 2026 - Task 2.5: the Claude reader's model and sampling (Joey)
+
+- **Model:** `claude-sonnet-5-5`. Current Sonnet models have no dated ID (Anthropic's model table lists none); the ID is the pin, and changing it still means rerunning the seams. The newest dated Sonnet (`claude-sonnet-4-5-20250929`) is legacy and wasn't chosen.
+- **Temperature 0 dropped:** Sonnet 5.5 rejects non-default sampling values, and API version 2026-10-21 (sent by the `anthropic` SDK 2.x) rejects `temperature`, `top_p` and `top_k` on every model. The request sends none. Consistency still rests on the schema-bound output, the exact agreement check (step 7) and the address verify (§4), all unchanged.
+- **Also:** thinking can't be turned off on Sonnet 5.5, so the request uses effort `low` with `max_tokens` 4096; a reply cut off, refused or without text skips `CLAUDE_INVALID_OUTPUT`. No server-side fallback to another model. The API host is pinned in code, so no `ANTHROPIC_*` env var can redirect a PDF. New dependency: `anthropic`.
+- **Loosens:** only the stated temperature-0 control, which the API no longer offers. No change to what the agent does in MySys or prints in its run output.
+- Carried in: `SPEC.md` (In the MVP §7 row, Project Structure config), `docs/specs/spec.md` §7, `tasks/plan.md` 2.5.
 
 ## 30 Oct 2026 - protect_paths inside Claude Code worktrees (Joey)
 

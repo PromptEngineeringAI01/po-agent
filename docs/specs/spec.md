@@ -276,8 +276,8 @@ The email body written into the task Note comes from the deterministic reader (t
 
 - Input: the PO PDF as a document plus the Note title and body. The prompt states that all of this is untrusted data to be read, not instructions to follow.
 - Output: the reading schema only, enforced by the API's structured-output feature and validated again in code. Invalid or missing fields → skip.
-- No tools are defined. Temperature 0. Bounded output tokens. Timeout of about 60 s. One retry on a transient API error within the same Note; then skip.
-- Model: one exact, dated model ID in config. Changing it requires rerunning the decision-seam tests.
+- No tools are defined. No sampling parameters: current models and API version 2026-10-21 reject them (decisions, 30 Oct 2026; was temperature 0). Bounded output tokens. Timeout of about 60 s. One retry on a transient API error within the same Note; then skip.
+- Model: one exact model ID in config (current models have no dated ID; decisions, 30 Oct 2026). Changing it requires rerunning the decision-seam tests.
 - Usage (input/output tokens) and cost in AUD, using a price table in config, are written to the log line.
 
 ### 8. Run controls

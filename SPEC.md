@@ -54,7 +54,7 @@ The MVP proves that:
 | §2 step 10 duplicate check | **Stricter than v1:** any Compaction Test task on the project counts as a duplicate, whatever its PO number, because the project's task table doesn't show PO numbers (screen map row 07). The **test profile ignores Compaction Test tasks whose status is Cancelled** (`duplicate_ignores_cancelled = true`), because Joey resets the test site by cancelling tasks. Every other status, and every status on live, counts |
 | §5 action guard + build check | All, plus the denylist and allowlist additions in [MySys screen rules](#mysys-screen-rules). It's cheap and it's the main safety control |
 | §6 booker W1–W5 with read-back | All, with the values and read-backs in [MySys screen rules](#mysys-screen-rules). W2's task-detail read-back and W4's search need slice M0b.2 first |
-| §7 Claude reader | All: no tools, structured output validated again by pydantic, temperature 0, pinned model ID, 60 s timeout, one retry |
+| §7 Claude reader | All: no tools, structured output validated again by pydantic, no sampling parameters (the API rejects them; decisions, 30 Oct 2026), pinned model ID (`claude-sonnet-5-5`), 60 s timeout, one retry |
 | §8 run controls | `enabled` kill switch (at start and before every write step), Perth window, run cap, fresh login, assignee check **before W1 and W4** (D7), the **stale-Note stop** at run start (D6), **stop the run on the first unexpected screen or failed write** |
 | Skip → back to pool | Through **Assign** with the pool as assignee (C3 answered yes, 16 Oct 2026); exact steps in [MySys screen rules](#mysys-screen-rules) → Note window |
 | `reader_mode = deterministic-only` | Yes: every PO skips `ADDRESS_UNVERIFIABLE` (approved C4 behaviour); a few lines of code |
@@ -173,7 +173,7 @@ agent_user_name = "Agent 1 (MySys Only)"
 title_rule = "test-body-filename"
 reader_mode = "hybrid"            # hybrid | deterministic-only
 enabled = true                    # kill switch: false on main → next run exits before login
-claude_model_id = "<exact model ID, pinned in M2>"
+claude_model_id = "claude-sonnet-5-5"   # pinned in M2 (task 2.5)
 duplicate_ignores_cancelled = true   # test only: Joey resets the test site by cancelling tasks; never true on live
 max_notes_per_run = 10           # MVP values; v1 defaults are 25 Notes / 12 minutes
 max_run_minutes = 12
