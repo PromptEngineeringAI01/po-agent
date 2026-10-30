@@ -207,20 +207,22 @@ def decide(
     step decides. Deterministic-only mode has no Claude extraction to verify,
     so a PO that passes step 8 skips ADDRESS_UNVERIFIABLE at step 9 (C4).
 
-    read_claude (hybrid only) returns Claude's raw JSON reading, or raises
-    ClaudeUnavailable; it is called only after steps 2a-4 pass.
+    read_claude (hybrid only) returns Claude's raw JSON reading. It must turn
+    every timeout and SDK error into ClaudeUnavailable (2.5); any other
+    exception propagates. It is called only after steps 2a-4 pass.
     """
-    if reader_mode == "hybrid" and read_claude is None:
-        raise ValueError("hybrid mode needs a Claude reader")
     if reader_mode not in ("hybrid", "deterministic-only"):
         raise ValueError("unknown reader mode")
+    reader = read_claude if reader_mode == "hybrid" else None
+    if reader_mode == "hybrid" and reader is None:
+        raise ValueError("hybrid mode needs a Claude reader")
     checked = check_note_and_pdf(note, internal_no, pdf_text)
     if isinstance(checked, Skip):
         return checked
     claude: Reading | None = None
-    if read_claude is not None and reader_mode == "hybrid":
+    if reader is not None:
         try:
-            raw = read_claude()
+            raw = reader()
         except ClaudeUnavailable:
             return Skip(reason=SkipReason.CLAUDE_UNAVAILABLE)
         try:

@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 29 Oct 2026, production)
+# PO Agent - decision log (updated 30 Oct 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -12,6 +12,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **28 Oct 2026: MVP demo shown** on the test site: the supervised `po-agent demo` booked 2609017B from the laptop and the Mac Mini (PRs #19-#30).
 - **29 Oct 2026: production started** (entry below).
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
+
+## 30 Oct 2026 - Task 2.4: a tighter Job Address block rule (Joey)
+
+- **What:** the address check (§4 step 1) no longer accepts Claude's lot, street and suburb as whole words anywhere in the Job Address block. Now the label line must start `Lot <lot>` (Claude's lot). If more follows on that line, the rest must be exactly `<street> <suburb>` plus an optional tail; if nothing follows, the line under it must end with `<street> <suburb>` plus an optional tail. The tail is nothing, a state, a 4-digit postcode, or both in either order. Compared on normalised text; exactly one `Job Address:` label. Else `ADDRESS_UNVERIFIABLE`, before the project compare (`ADDRESS_MISMATCH`), as before.
+- **Why:** the 2.4 code review found two holes in the looser rule: a PDF lot `12-A`, `12 A` or `12/13` passed as Claude's lot `12`; and the line under the label also holds the Supplier column, so a supplier street and suburb could pass. The real layout (the 3 trial PDFs, checked as masked shapes) is the two-line form: the label line ends `Job Address: Lot <lot>`, the next line is Supplier text, then `<street> <suburb> <state>` at its end. The one-line form keeps SPEC's must-pass example passing.
+- **Effect:** stricter only; nothing is loosened. A `(#n)` group anywhere but right after the project's lot stays in *R*, so it skips `ADDRESS_MISMATCH`.
+- Carried in: `SPEC.md` -> Project address, `docs/specs/spec.md` §4, `tasks/plan.md` 2.4.
 
 ## 29 Oct 2026 - Task 2.2: one reader, SkipReason names in the demo (Joey)
 

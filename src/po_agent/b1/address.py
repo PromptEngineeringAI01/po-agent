@@ -69,24 +69,47 @@ def parse_project_address(address: str) -> ProjectAddress | None:
     return ProjectAddress(lot=match.group(1).casefold(), rest=" ".join(rest))
 
 
-def job_address_block(pdf_text: str) -> str | None:
-    """The text after the one "Job Address:" label on its line, plus the line
-    under it; None when the label is missing or appears more than once."""
+def _block_lines(pdf_text: str) -> tuple[str, str] | None:
+    """The text after the one "Job Address:" label on its line, and the line
+    under it ("" when there is none); None when the label is missing or
+    appears more than once."""
     if len(_JOB_ADDRESS.findall(pdf_text)) != 1:
         return None
     lines = pdf_text.splitlines()
     for index, line in enumerate(lines):
         match = _JOB_ADDRESS.search(line)
         if match is not None:
-            return "\n".join([line[match.end() :], *lines[index + 1 : index + 2]])
+            under = lines[index + 1] if index + 1 < len(lines) else ""
+            return line[match.end() :], under
     return None  # the label spans a line break
 
 
-def _contains(words: list[str], value: str) -> bool:
-    """value's words appear as a run of whole words in words."""
-    wanted = value.split()
-    size = len(wanted)
-    return any(words[i : i + size] == wanted for i in range(len(words) - size + 1))
+def job_address_block(pdf_text: str) -> str | None:
+    """The Job Address block: the label line's rest plus the line under it."""
+    lines = _block_lines(pdf_text)
+    return None if lines is None else "\n".join(part for part in lines if part)
+
+
+def _ends_with_address(words: list[str], address: list[str]) -> bool:
+    """words end with the address, then nothing, a state, a postcode, or a
+    state and a postcode in either order."""
+    for size in range(3):
+        head, tail = words[: len(words) - size], words[len(words) - size :]
+        if head[-len(address) :] == address and _is_tail(tail):
+            return True
+    return False
+
+
+def _is_tail(words: list[str]) -> bool:
+    states = [word in _STATES for word in words]
+    postcodes = [bool(_POSTCODE.fullmatch(word)) for word in words]
+    return (
+        sum(states) <= 1
+        and sum(postcodes) <= 1
+        and all(
+            state or postcode for state, postcode in zip(states, postcodes, strict=True)
+        )
+    )
 
 
 def verify_address(
@@ -94,26 +117,36 @@ def verify_address(
 ) -> SkipReason | None:
     """Step 9: None when Claude's lot, street and suburb pass, else the skip.
 
-    First each value must be in the PDF's Job Address block (the lot as
-    "Lot <lot>"), else ADDRESS_UNVERIFIABLE; then the lot must equal the
-    project's and street + suburb must equal R, else ADDRESS_MISMATCH.
+    First the PDF's Job Address block (decisions, 30 Oct 2026): the label
+    line must start "Lot <lot>". If more follows on it, that rest must be
+    exactly "<street> <suburb>" plus an optional tail (state, postcode, or
+    both in either order); if nothing follows, the line under it must end
+    with "<street> <suburb>" and an optional tail. Else ADDRESS_UNVERIFIABLE.
+    Then the lot must equal the project's and street + suburb must equal R,
+    else ADDRESS_MISMATCH.
     """
     lot = _words(claude.site_lot)
     if lot[:1] == ["lot"]:
         lot = lot[1:]
     street, suburb = normalise(claude.site_street), normalise(claude.site_suburb)
-    block = job_address_block(pdf_text)
-    if len(lot) != 1 or not street or not suburb or block is None:
+    lines = _block_lines(pdf_text)
+    if len(lot) != 1 or not street or not suburb or lines is None:
         return SkipReason.ADDRESS_UNVERIFIABLE
-    words = normalise(block).split()
-    if not all(
-        _contains(words, value)
-        for value in (normalise(f"lot {lot[0]}"), street, suburb)
-    ):
+    label_line, under = (normalise(line).split() for line in lines)
+    head = normalise(f"lot {lot[0]}").split()
+    address = f"{street} {suburb}".split()
+    rest = label_line[len(head) :]
+    if label_line[: len(head)] != head:
+        return SkipReason.ADDRESS_UNVERIFIABLE
+    if rest:
+        found = rest[: len(address)] == address and _is_tail(rest[len(address) :])
+    else:
+        found = _ends_with_address(under, address)
+    if not found:
         return SkipReason.ADDRESS_UNVERIFIABLE
     project = parse_project_address(project_address)
     if project is None:
         return SkipReason.ADDRESS_UNVERIFIABLE
-    if lot[0] != project.lot or f"{street} {suburb}" != project.rest:
+    if lot[0] != project.lot or " ".join(address) != project.rest:
         return SkipReason.ADDRESS_MISMATCH
     return None
