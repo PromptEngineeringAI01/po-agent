@@ -10,6 +10,10 @@ then matched by whole folders, never as a string prefix, so `plans-evil/`
 isn't inside `plans/`. Outside the repo, only three folders may be written
 (decisions, 24 Oct 2026): `~/.claude/plans/`, this project's memory folder and
 `<temp>/claude/`.
+
+A Claude Code worktree under `.claude/worktrees/<name>/` is a checkout of
+this repo, so a path inside one gets the same rules, measured from that
+worktree's root; its own `.claude/` stays blocked (decisions, 30 Oct 2026).
 """
 
 import fnmatch
@@ -63,9 +67,12 @@ def allowed_outside(project_raw: str) -> list[Path]:
     ]
 
 
-def decide_in_repo(path: Path, project: Path) -> str | None:
+def decide_in_repo(path: Path, project: Path, in_worktree: bool = False) -> str | None:
     """'ask', or None to allow; raises Blocked."""
     parts = [p.lower() for p in path.relative_to(project).parts]
+    if not in_worktree and parts[:2] == [".claude", "worktrees"] and len(parts) > 3:
+        worktree = project.joinpath(*path.relative_to(project).parts[:3])
+        return decide_in_repo(path, worktree, in_worktree=True)
     rel = "/".join(parts)
     if ".claude" in parts:
         raise Blocked(".claude/ is changed only by Joey, by hand")

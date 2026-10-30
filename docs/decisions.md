@@ -12,6 +12,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **28 Oct 2026: MVP demo shown** on the test site: the supervised `po-agent demo` booked 2609017B from the laptop and the Mac Mini (PRs #19-#30).
 - **29 Oct 2026: production started** (entry below).
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
+- **30 Oct 2026: task sessions run in worktrees;** `protect_paths` applies the repo rules inside them (entry below).
+
+## 30 Oct 2026 - protect_paths inside Claude Code worktrees (Joey)
+
+- **Why:** from task 2.3 each task session runs in its own Claude Code worktree (`docs/workflow.md` v5.19), which the app puts at `.claude/worktrees/<name>/`. `protect_paths` read every path there as `.claude/` and blocked all writes, so the 2.3 session copied files in with `cp`, going around the hook.
+- **What:** a path inside `.claude/worktrees/<name>/` (one level only) is checked with the same repo rules, measured from that worktree's root. Its own `.claude/`, `.env*`, `config/live*.toml`, `secrets/` and `state/` stay blocked; `.github/workflows/`, the Mac Mini files and existing seam-1 fixtures still ask; a nested worktree, a loose file in `.claude/worktrees/` and a `../` escape into `.claude/` are blocked. Tests in `tests/test_hooks.py`.
+- **Loosens:** writes become possible in ordinary files of a worktree, the same files a session may already write in the main checkout. Nothing else changes. No change to the agent's behaviour in MySys or its run output.
+- Carried in: `.claude/hooks/protect_paths.py` (Joey, by hand), `SPEC.md` (repo layout), `tasks/plan.md` (1.2).
 
 ## 29 Oct 2026 - Task 2.2: one reader, SkipReason names in the demo (Joey)
 
