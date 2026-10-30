@@ -392,6 +392,39 @@ def test_protect_paths_checks_every_edit_tool(tool, places):
     assert_blocked(protect(path, places, tool), "protect_paths")
 
 
+WORKTREE = ".claude/worktrees/m2-task"
+
+WORKTREE_BLOCKED = [
+    f"{WORKTREE}/.claude/settings.json",
+    f"{WORKTREE}/.claude/hooks/protect_paths.py",
+    f"{WORKTREE}/.env",
+    f"{WORKTREE}/config/live.toml",
+    f"{WORKTREE}/state/s.json",
+    f"{WORKTREE}/.claude/worktrees/nested/src/x.py",
+    ".claude/worktrees/loose.txt",
+    WORKTREE,
+]
+
+
+@pytest.mark.parametrize("rel", WORKTREE_BLOCKED)
+def test_protect_paths_applies_repo_rules_inside_a_worktree(rel, places):
+    assert_blocked(protect(places["project"] / rel, places), "protect_paths")
+
+
+@pytest.mark.parametrize("rel", ["src/x.py", "tests/seam1/test_new.py", "docs/decisions.md"])
+def test_protect_paths_allows_ordinary_files_in_a_worktree(rel, places):
+    assert_allowed(protect(places["project"] / WORKTREE / rel, places))
+
+
+def test_protect_paths_asks_for_ask_first_files_in_a_worktree(places):
+    assert_asks(protect(places["project"] / WORKTREE / ".github/workflows/check.yml", places))
+
+
+def test_protect_paths_blocks_an_escape_from_a_worktree_into_claude(places):
+    path = f"{places['project']}/{WORKTREE}/../../settings.json"
+    assert_blocked(protect(path, places), "protect_paths")
+
+
 def test_protect_paths_relative_path_is_resolved_against_cwd(places):
     assert_blocked(protect(".claude/settings.json", places), "protect_paths")
 
