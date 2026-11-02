@@ -52,12 +52,13 @@ class PrivateDirMissing(Exception):
 @dataclass
 class CaseResult:
     """One case's outcome: no value from the PDF, Note or MySys, except the
-    Proceed (pln and PO number) and expect_pln, which the report never prints."""
+    Proceed and the expected pln and PO number, which the report never prints."""
 
     case_id: str
     expect: str
     expect_reason: str
     expect_pln: str
+    expect_po: str  # the PDF file name's PO number
     mysys_shape: bool
     result: Skip | Proceed | None = None
     untouched: bool = False  # step 0 left the Note alone
@@ -67,11 +68,10 @@ class CaseResult:
     def false_proceed(self) -> bool:
         if not isinstance(self.result, Proceed):
             return False
-        po_number = f"{self.result.internal_no}/{rules.PO_SUFFIX}"
         return (
             self.expect != "PROCEED"
             or self.result.pln != self.expect_pln
-            or self.result.po_number != po_number
+            or self.result.po_number != self.expect_po
         )
 
 
@@ -217,6 +217,7 @@ def evaluate(folder: Path) -> list[CaseResult]:
             expect=raw["expect"],
             expect_reason=raw.get("expect_reason", ""),
             expect_pln=raw.get("expect_pln", ""),
+            expect_po=rules.po_from_file_name(raw["pdf"]),
             mysys_shape=mysys_shape,
             agree=_agreement(plumber, pypdf, address),
         )
