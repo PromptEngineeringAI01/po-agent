@@ -1,17 +1,21 @@
-"""The deterministic reader and the supervised demo's checks.
+"""The code readers and the supervised demo's checks.
 
 Pure functions, no browser code: the deterministic reading (task 2.2), the
-attachment rule, the PDF checks, the project match and the task rows (SPEC.md
--> MySys screen rules). A failed demo check raises a typed error with a fixed
-detail and a SkipReason; PDF text, addresses and cell text never go into it.
+pypdf text for the second reader (task 2.5), the attachment rule, the PDF
+checks, the project match and the task rows (SPEC.md -> MySys screen rules).
+A failed demo check raises a typed error with a fixed detail and a
+SkipReason; PDF text, addresses and cell text never go into it.
 """
 
 import io
+import logging
 import re
+import warnings
 from collections.abc import Mapping, Sequence
 from urllib.parse import parse_qs, urlsplit
 
 import pdfplumber
+import pypdf
 
 from po_agent.b1.models import DeterministicReading, SkipReason
 from po_agent.core.errors import PartialWrite, WriteNotStarted
@@ -33,6 +37,12 @@ _TASK_HEADER = re.compile(
     r"(?:\s*(?:Undo Cancellation|Cancel|Un-Hold|Hold))*\s*"
 )
 CANCELLED = "Cancelled"
+
+# pypdf logs its warnings ("EOF marker not found"), which would reach stderr;
+# only core/output.py prints (SPEC.md -> Code style).
+_PYPDF_LOG = logging.getLogger("pypdf")
+_PYPDF_LOG.addHandler(logging.NullHandler())
+_PYPDF_LOG.propagate = False
 
 
 def pdf_file_name(hrefs: Sequence[str]) -> str:
@@ -77,12 +87,24 @@ def text_layer(data: bytes) -> str:
         return ""
 
 
+def pypdf_text_layer(data: bytes) -> str:
+    """The PDF's text as pypdf reads it, the second reader (decisions, 2 Nov
+    2026); "" when pypdf can't read it (PDF_UNREADABLE)."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            reader = pypdf.PdfReader(io.BytesIO(data))
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception:  # pypdf raises many types; its message can quote the file
+        return ""
+
+
 def read_pdf(text: str, file_name: str, title: str) -> DeterministicReading:
-    """Step 4's deterministic reading; empty where nothing is found.
+    """Step 4's deterministic reading; empty where nothing is found. The
+    second reader reads pypdf's text with it too.
 
     The issuer is the first non-empty line. The PO number is the one
     "Purchase Order No" value; none, or two different ones, read as empty.
-    The address is left empty (Claude extracts it, section 4).
     """
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     found = set(_PDF_PO.findall(text))

@@ -37,6 +37,8 @@ Adopt **Option B: Hybrid with two independent readers**.
 
 *Note (15 Oct 2026):* the trial and production now run on the office Mac Mini (ADR-002 Accepted, CEO decision 3). A shell script started by launchd runs the agent; no Claude session runs there. This decision is unchanged.
 
+*Note (2 Nov 2026): superseded for the reader.* Joey dropped the Claude reader to keep the agent free (`docs/decisions.md`, 2 Nov 2026). The second reader is now pypdf, a second PDF library; its reading must equal pdfplumber's. The address is no longer extracted by a reader: the project's address in MySys gives the values, and the PDF's Job Address block must hold them. The rest stands: the script does every click through the allowed actions, and it proceeds only when both readings agree with each other and with MySys. Joey informs the CEO.
+
 ## Evaluation method
 
 ### Gates (pass/fail; failing any one removes the option)

@@ -1,7 +1,7 @@
 # PO Agent — Requirements and Design Spec (v1)
 
 **Status:** Approved for build. The CEO approved the design and trial, including the safeguards (CEO decision brief, decision 1; recorded 13 Oct 2026). Decision 3 (hosting) was made on 15 Oct 2026: the office Mac Mini, for the trial and production. Decision 2 (Claude reading real client POs) is pending and blocks go-live only. Remaining blockers are in [Areas of concern](#areas-of-concern-policy-conflicts-and-risks).
-**Version:** 1.7 · 16 Oct 2026 (1.7: the MVP plan freeze, decisions D1–D7 in `docs/decisions.md`: the guard's `vet()`/`act()` split, the select rule, the login and navigation actions, the widened build check (§5); the MVP's stale-Note stop, assignee check before W1 and W4 only, and one agent at a time (§8); the PDF briefly on disk (§10). 1.6: fixed against `docs/screen-map.md` v1.1: step 0 needs an unlinked Note, new step 2a and skip reason `NOTE_ALREADY_LINKED`, project match on Client Ref No. `<internal no>/048`, project-address parse, "close" denylisted, W1–W3 read-backs as in `SPEC.md` → MySys screen rules; the 3 trial POs are real B1 POs, so seam 1's committed fixtures are generated fakes and the address examples are fake. 1.5: the denylist adds Pending on the Note, Undo Cancellation, Un-Hold and Change Project, from the screen map. 1.4: W5 is the Note's **Solved** button, because the test site has no Resolve button. 1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
+**Version:** 1.8 · 2 Nov 2026 (1.8: the Claude reader is dropped to keep the agent free (decisions, 2 Nov 2026): steps 6-7 are a second code reader (pypdf) that must agree with the first, §4 checks the PDF's Job Address block against the project's address in MySys on both readers' text, §7 is the second reader, and the Claude skip reasons are gone. 1.7: the MVP plan freeze, decisions D1–D7 in `docs/decisions.md`: the guard's `vet()`/`act()` split, the select rule, the login and navigation actions, the widened build check (§5); the MVP's stale-Note stop, assignee check before W1 and W4 only, and one agent at a time (§8); the PDF briefly on disk (§10). 1.6: fixed against `docs/screen-map.md` v1.1: step 0 needs an unlinked Note, new step 2a and skip reason `NOTE_ALREADY_LINKED`, project match on Client Ref No. `<internal no>/048`, project-address parse, "close" denylisted, W1–W3 read-backs as in `SPEC.md` → MySys screen rules; the 3 trial POs are real B1 POs, so seam 1's committed fixtures are generated fakes and the address examples are fake. 1.5: the denylist adds Pending on the Note, Undo Cancellation, Un-Hold and Change Project, from the screen map. 1.4: W5 is the Note's **Solved** button, because the test site has no Resolve button. 1.3: CEO decision 3, the trial and production run on the office Mac Mini, a launchd job as a standard user with secrets in its Keychain, replacing the cloud routine; C8 narrowed to MFA/password expiry; C18 closed. 1.2: delivered as an MVP first, `SPEC.md`; trial host is an Anthropic cloud routine; secrets for that host and no state between routine runs in the MVP; paths moved into the repo. 1.1: decision 1 approved; safeguards adopted for partial writes, accuracy breaches and the fallback; logging simplified to a daily log file plus a skip list)
 **Author:** Joey Wu (PE AI Champion), drafted with Claude · **Decision owner:** CEO
 **Built from:** `docs/intent.md`, `docs/decisions.md`, `docs/specs/ADR-001-po-agent-architecture.md` (approved by the CEO through the CEO decision brief, decision 1, recorded 13 Oct 2026), `docs/specs/ADR-002-po-agent-hosting.md`.
 **Companions:** `SPEC.md` (active MVP spec) · `docs/specs/mission.md` · `docs/specs/tech-stack.md` · `docs/specs/roadmap.md` · `docs/specs/README.md` (glossary and reading order)
@@ -180,10 +180,10 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 | 3 | Exactly one PDF attachment; download it. | `NO_PDF` / `MULTIPLE_PDFS` |
 | 4 | Deterministic read (text layer present, issuer, COMPACTION, PO number, internal no, file name PO, live title PO). | `PDF_UNREADABLE`, `NOT_B1`, `NOT_COMPACTION`, `PO_MISMATCH` |
 | 5 | (Live, if enabled) sender domain check. See concern C6. | `NOT_B1` |
-| 6 | Claude read (skipped in deterministic-only mode). Validate schema. | `CLAUDE_UNAVAILABLE`, `CLAUDE_INVALID_OUTPUT` |
-| 7 | Agreement: issuer, COMPACTION, PO number and internal no must be identical across readers. | `READERS_DISAGREE` |
+| 6 | Second code reader (§7): pypdf reads the PDF's text again (decisions, 2 Nov 2026). | `PDF_UNREADABLE` |
+| 7 | Agreement: issuer, COMPACTION, PO number and the Job Address label line (normalised) must be identical in both readers' text. | `READERS_DISAGREE` |
 | 8 | Project lookup by internal no (read-only): exactly one matching row, i.e. Company B1 Homes and Client Ref No. `<internal no>/048` (live; on test the bare internal no). Rows with other suffixes are ignored: on live the search returns 3–4 projects per internal number (Joey, 16 Oct 2026). | `PROJECT_NOT_FOUND` (retryable), `PROJECT_AMBIGUOUS` |
-| 9 | Address verify (§4): lot, street, suburb. | `ADDRESS_MISMATCH`, `ADDRESS_UNVERIFIABLE` |
+| 9 | Address check (§4): the PDF's Job Address block against the project's address, on both readers' text. | `ADDRESS_MISMATCH`, `ADDRESS_UNVERIFIABLE`, `READERS_DISAGREE` |
 | 10 | Duplicate check: project has no Compaction Test with this PO number, unless it's the agent's own partial booking recorded in the skip list (then resume it, §6). | `DUPLICATE_TASK` |
 | 11 | **PROCEED** with values: pln, PO number, email body, PDF. | — |
 | 12 | Booker (§6). | `PARTIAL_WRITE` or `WRITE_NOT_STARTED` |
@@ -192,7 +192,7 @@ Any skip → assign the Note back to the pool it came from (see concern C3), wri
 
 ### 3. Data shapes
 
-**Reading** (both readers fill the same shape; the deterministic reader leaves the address empty in hybrid mode):
+**Reading** (both code readers read the same fields, each from its own text; no reader extracts the address, decisions 2 Nov 2026):
 
 | Field | Type | Example |
 |---|---|---|
@@ -200,15 +200,12 @@ Any skip → assign the Note back to the pool it came from (see concern C3), wri
 | contains_compaction | yes/no | yes |
 | po_number | text or empty | `2609034B/048` |
 | client_internal_no | text or empty | `2609034B` |
-| site_lot | text or empty | `123` |
-| site_street | text or empty | `Sample Lane` |
-| site_suburb | text or empty | `Sampleville` |
 
 The deterministic reading also carries `po_from_filename` and, on live, `po_from_title`.
 
-**Log line** (one JSON line per Note per run that the agent assigns to itself, in a daily log file): time (AWST), run id, site, note id, outcome (booked / skipped / partial), skip reason, PO number, pln, both readings, model ID, Claude input/output tokens, task ID if a task was created. Each run ends with one summary line: Notes seen, booked, skipped, partial, duration. Only failures get extra detail: the failing check or write step, plus a screenshot.
+**Log line** (one JSON line per Note per run that the agent assigns to itself, in a daily log file): time (AWST), run id, site, note id, outcome (booked / skipped / partial), skip reason, PO number, pln, both readings, task ID if a task was created. Each run ends with one summary line: Notes seen, booked, skipped, partial, duration. Only failures get extra detail: the failing check or write step, plus a screenshot.
 
-**Run output** (stdout) is separate from the log and deliberately short: `INFO`, `NOTE`, `ALERT` and `RUN_SUMMARY` lines only, with no PDF text, addresses, Note bodies or Claude readings (`SPEC.md` → Code style). It goes into the Mac Mini's run log and alert issues, so untrusted PDF content must never reach it.
+**Run output** (stdout) is separate from the log and deliberately short: `INFO`, `NOTE`, `ALERT` and `RUN_SUMMARY` lines only, with no PDF text, addresses, Note bodies or readings (`SPEC.md` → Code style). It goes into the Mac Mini's run log and alert issues, so untrusted PDF content must never reach it.
 
 **Skip list** (one small file, written atomically): note id, reason, first skipped at, retry until (for `PROJECT_NOT_FOUND`), and for partial bookings the task ID and the last completed write step.
 
@@ -219,7 +216,6 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 | `PROJECT_NOT_FOUND` | **Yes**, every run until 24 h after first skip (wall-clock) *(MVP: final)* |
 | `NO_PDF`, `MULTIPLE_PDFS`, `PDF_UNREADABLE` | No |
 | `NOT_B1`, `NOT_COMPACTION`, `PO_MISMATCH` | No |
-| `CLAUDE_UNAVAILABLE`, `CLAUDE_INVALID_OUTPUT` | No (by policy; see concern C5) |
 | `READERS_DISAGREE` | No |
 | `PROJECT_AMBIGUOUS` | No |
 | `NOTE_ALREADY_LINKED` | No |
@@ -228,17 +224,16 @@ The deterministic reading also carries `po_from_filename` and, on live, `po_from
 | `UNEXPECTED_SCREEN` (before any write) | No |
 | `PARTIAL_WRITE` (after Submit) | Not a final skip: the agent alerts Joey and resumes its own booking on the next run (approved; concern C2) *(MVP: alert; Note left assigned to the agent; the run stops; Joey finishes by hand)* |
 
-### 4. Address check — "verify, not extract" (ADR action item 2)
+### 4. Address check against MySys (ADR action item 2; decisions, 30 Oct and 2 Nov 2026)
 
-- **Claude extracts** lot, street and suburb from the PDF's site/delivery address.
-- **Deterministic code verifies** each one:
-  1. it appears in the PDF's Job Address block, in place (`SPEC.md` -> Project address; decisions, 30 Oct 2026): the label line must start `Lot <lot>` (Claude's lot). If more follows on that line, the rest must be exactly `<street> <suburb>` plus an optional tail; if nothing follows, the line under it must end with `<street> <suburb>` plus an optional tail. The tail is nothing, a state, a 4-digit postcode, or both in either order. Compared on normalised text; exactly one `Job Address:` label. Not scattered across the document (concern C15), not taken from the Supplier text that shares the block's lines
-  2. it equals the MySys project's lot, street and suburb after normalisation. MySys holds one Address string (`Lot <lot> [(#<house no>)] <street> <suburb> [<postcode>] [<state>]`), so the lot is the token after "Lot", the `(#…)` group is dropped, and Claude's street and suburb together must equal the remaining text (`SPEC.md` → MySys screen rules → Project address).
+- **MySys gives the values.** The project holds one Address string (`Lot <lot> [(#<house no>)] <street> <suburb> [<postcode>] [<state>]`): the lot is the word after "Lot" (letters and digits only), the `(#…)` group is dropped, and the remaining text, without a trailing state and postcode, is the street-and-suburb *R* (`SPEC.md` → MySys screen rules → Project address). No reader extracts the address.
+- **The PDF's Job Address block must hold them, in place:** the label line must start `Lot <lot>`, the lot one word of letters and digits, equal to the project's. If more follows on that line, the rest must be exactly *R* plus an optional tail; if nothing follows, the line under it must end with *R* plus an optional tail. The tail is nothing, a state, a 4-digit postcode, or both in either order. Compared on normalised text; exactly one `Job Address:` label, on one line. Not scattered across the document (concern C15), not taken from the Supplier text that shares the block's lines.
+- **Reasons:** `ADDRESS_UNVERIFIABLE` when something can't be parsed (the project address, no single label, a label line not starting `Lot <lot>`, a lone lot with nothing under it); `ADDRESS_MISMATCH` when both parse and the lot or *R* is not where the rule needs it.
+- **Both readers:** the check runs on pdfplumber's and pypdf's text; if the two results differ, `READERS_DISAGREE`.
 - **Normalisation:** case-fold; collapse whitespace and punctuation; strip a leading "Lot"; map street-type abbreviations to one form (St/Street, Rd/Road, Ave/Avenue, Dr/Drive, Cres/Crescent, Ct/Court, Pl/Place, Bvd/Boulevard, Pde/Parade, Tce/Terrace, Cl/Close, Hwy/Highway, Ln/Lane, and others found in fixtures); ignore postcode and state.
-- **Not normalised:** lot numbers must be equal as strings after stripping "Lot" (they can carry a letter, e.g. `12A`); street names and suburbs must be equal after the rules above (no fuzzy matching, no edit distance).
+- **Not normalised:** lot numbers must be equal as case-folded strings (they can carry a letter, e.g. `12A`); street names and suburbs must be equal after the rules above (no fuzzy matching, no edit distance).
 - Example that must pass (fake values): PDF "Job Address: Lot 123 / Sample Lane Sampleville WA" vs project "Lot 123 (#45) Sample Lane Sampleville 6000 WA".
-- Any of the three missing, not found in the PDF, or different → skip.
-- **Deterministic-only mode** has no Claude extraction to verify. Until a deterministic address extractor is built, it skips every PO with `ADDRESS_UNVERIFIABLE`, so the admin works the pool as today (approved; concern C4).
+- Anything missing, not found in the block, or different → skip.
 
 ### 5. Action guard
 
@@ -270,15 +265,15 @@ A failure at or after W2 is a **partial write**. The agent can't undo it (Cancel
 
 A wrong value found on read-back (wrong project, wrong PO number or missing PDF) is an **accuracy breach**: the agent switches itself off (§8) and alerts Joey.
 
-The email body written into the task Note comes from the deterministic reader (the Note text as MySys shows it), never from Claude. It is typed as plain text.
+The email body written into the task Note is the Note text as MySys shows it, never anything read from the PDF. It is typed as plain text.
 
-### 7. Claude reader
+### 7. Second reader (replaces the Claude reader; decisions, 2 Nov 2026)
 
-- Input: the PO PDF as a document plus the Note title and body. The prompt states that all of this is untrusted data to be read, not instructions to follow.
-- Output: the reading schema only, enforced by the API's structured-output feature and validated again in code. Invalid or missing fields → skip.
-- No tools are defined. Temperature 0. Bounded output tokens. Timeout of about 60 s. One retry on a transient API error within the same Note; then skip.
-- Model: one exact, dated model ID in config. Changing it requires rerunning the decision-seam tests.
-- Usage (input/output tokens) and cost in AUD, using a price table in config, are written to the log line.
+- pypdf, a second PDF library, reads the PDF's text again; the first reader is pdfplumber. Both are code: no AI, no paid API, so the agent costs nothing per PO.
+- From pypdf's text the same rules read the issuer (first non-empty line), COMPACTION, the one PO number and the Job Address label line. Each must equal the first reader's (the label line after §4's normalisation), else `READERS_DISAGREE`. No text from pypdf → `PDF_UNREADABLE`.
+- The line under the label isn't compared: pypdf reads the Supplier column apart from it. Instead §4's check runs on both texts and must give the same result.
+- pypdf's warnings never reach run output.
+- What is lost: Claude could have read a new PDF layout. B1 Homes' layout is fixed, and any change in it fails a check and skips, so nothing is booked on a layout the code doesn't know.
 
 ### 8. Run controls
 

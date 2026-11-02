@@ -14,6 +14,20 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
 - **30 Oct 2026: task sessions run in worktrees;** `protect_paths` applies the repo rules inside them (entry below).
 - **2 Nov 2026: Claude merges verified PRs and edits skills** (entry below).
+- **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
+
+## 2 Nov 2026 - Claude reader dropped; two code readers plus a MySys-fed address check (Joey)
+
+- **What:** the paid Claude reader (task 2.5 as planned) is not built. Instead:
+  1. **A second code reader:** pypdf reads the PDF's text again. Its issuer (first non-empty line), COMPACTION, PO number and Job Address label line (normalised) must equal pdfplumber's, else `READERS_DISAGREE`. If pypdf reads no text, `PDF_UNREADABLE`.
+  2. **The address check is fed by MySys:** the project's address gives the lot and street-and-suburb *R*, and the 30 Oct block rule checks that the PDF's Job Address block holds them. It runs on both readers' text, and if the two results differ, `READERS_DISAGREE`. `ADDRESS_UNVERIFIABLE` when something can't be parsed (the project address, no single label, a label line not starting `Lot <lot>` with a one-word lot, or a lone lot with nothing under it); otherwise a failure is `ADDRESS_MISMATCH`. So an address split across the PDF is now `ADDRESS_MISMATCH`, and a PDF or project lot like `12-A` or `12/13` is `ADDRESS_UNVERIFIABLE`.
+  3. `decide()` is code only: no reader mode, no Claude call. Its order: steps 2a-4, the second reader, the project lookup, the address check, the duplicate check, PROCEED. A PO that passes every check now PROCEEDs, where deterministic-only mode always skipped `ADDRESS_UNVERIFIABLE`. `CLAUDE_UNAVAILABLE` and `CLAUDE_INVALID_OUTPUT` leave the skip reasons.
+- **Why:** the agent must cost nothing per PO: no Anthropic API, API key, model ID or prices. It reads B1 Homes POs only, and their layout is fixed, so code can read them. pypdf reads the PDF independently of pdfplumber: it splits the columns differently (it reads the Supplier column apart from the address), so the two texts are not copies. On the 3 trial PDFs (checked on the laptop, booleans only) the readers agree, and both texts pass the address check against the trial projects.
+- **What is lost:** Claude could have read a PO in a new layout. Mitigation: any mismatch skips, so a layout change sends the Note back to the pool, never to a wrong booking.
+- **Loosens?** The second reader is no longer a different kind of reader (AI against code), but two code readers must still agree, and the address values now come from MySys instead of a reader, which removes the extraction step the 30 Oct review had to tighten. Nothing that acts in MySys changes. Run output is unchanged: skip reasons only, and pypdf's warnings are kept out of it.
+- **CEO:** decision 1 approved the two-reader design with Claude as one reader. Joey informs the CEO of this change.
+- **Not yet done:** the config, CLI and secrets still carry the Claude settings (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, the `anthropic_api_key` secret, decide-only asking for it). A follow-up task removes them; `CLAUDE.md` (Joey's) and `docs/macmini-setup.md` still name the key and the live-Claude seam.
+- Carried in: `SPEC.md`, `docs/specs/spec.md` §2-§4 and §7, ADR-001 (a dated note), `tasks/plan.md` 2.5 and 2.6, `tasks/todo.md`.
 
 ## 2 Nov 2026 - Claude merges verified PRs and edits skills (Joey)
 
