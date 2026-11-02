@@ -81,13 +81,13 @@ Merge only if all of these hold; otherwise report and ask Joey:
 
 - Steps 2-6 found nothing Important, and the local check (or, if skipped, CI) passed.
 - Every CI check passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
-- The PR doesn't touch `.claude/hooks/`, `.claude/settings*.json`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, and doesn't loosen a safety control. Those PRs stay Joey's to merge.
+- The PR doesn't touch `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, and doesn't loosen a safety control. Those PRs stay Joey's to merge.
 
 ```bash
 gh pr merge $ARGUMENTS --merge
 ```
 
-Only that form: never squash, rebase, `--admin`, `--auto` or `--delete-branch` (the hook blocks them). Then `git -C <repo> pull -q` on `main` if the main checkout is on `main` with no tracked changes, and say "merged" in the report.
+Only that form, as the whole command (nothing before or after it, no `bash -c`): never squash, rebase, `--admin`, `--auto` or `--delete-branch` (the hook blocks them). Then `git -C <repo> pull -q` on `main` if the main checkout is on `main` with no tracked changes, and say "merged" in the report.
 
 ## 8. Report
 

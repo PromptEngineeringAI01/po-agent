@@ -47,7 +47,19 @@ TEXT_RULES = [
             re.IGNORECASE,
         ),
     ),
+    (
+        "gh pr merge",
+        "only `gh pr merge <n> --merge`, alone, after /verify-pr (Must never #9)",
+        re.compile(r"\bpr\s+merge\b", re.IGNORECASE),
+    ),
+    (
+        "gh alias",
+        "an alias could hide a forbidden merge (Must never #9)",
+        re.compile(r"\bgh(\.exe)?\s+alias\b", re.IGNORECASE),
+    ),
 ]
+# The one merge Claude may run, as the whole command (decisions, 2 Nov 2026).
+ALLOWED_MERGE = re.compile(r"gh(\.exe)?\s+pr\s+merge\s+\d+\s+--merge")
 
 # Tokens made only of these end a simple command (`;`, `&&`, `|`, `(`, ...).
 SEPARATOR_CHARS = set(";&|()`")
@@ -255,19 +267,6 @@ def check_rm(words: list[str]) -> None:
         raise Blocked("rm -rf", "delete by hand if it's really needed")
 
 
-def check_merge(words: list[str]) -> None:
-    """Claude merges one PR by number with a merge commit, nothing else:
-    `gh pr merge <n> --merge` (decisions, 2 Nov 2026)."""
-    if program(words[0]) != "gh" or words[1:3] != ["pr", "merge"]:
-        return
-    args = words[3:]
-    if len(args) != 2 or not args[0].isdigit() or args[1] != "--merge":
-        raise Blocked(
-            "gh pr merge",
-            "only `gh pr merge <n> --merge`, after /verify-pr (Must never #9)",
-        )
-
-
 def check_stage(args: list[str]) -> None:
     skip_next = False
     for arg in args:
@@ -286,6 +285,8 @@ def check_stage(args: list[str]) -> None:
 
 
 def check(command: str, cwd: str | None, depth: int = 0) -> None:
+    if depth == 0 and ALLOWED_MERGE.fullmatch(command.strip()):
+        return
     for rule, why, pattern in TEXT_RULES:
         if pattern.search(command):
             raise Blocked(rule, why)
@@ -305,7 +306,6 @@ def check(command: str, cwd: str | None, depth: int = 0) -> None:
             continue
         check_playwright(words)
         check_rm(words)
-        check_merge(words)
         push = git_args(words, ("push",))
         if push:
             check_push(push[1], cwd)

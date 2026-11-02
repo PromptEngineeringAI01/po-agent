@@ -72,6 +72,6 @@ One line to Joey: the task, the session link `[title](#<session id>)`, and when 
 ## When the session reports
 
 - **Review stop:** read its report (`list_events`), check the tests fail for the right reason, and bring Joey a short summary: what the tests pin down, each choice with your view, your recommendation. Relay his answer with `SendMessage`.
-- **Second-model review** (medium and high risk): start a read-only reviewer sub-agent with model `fable` on the task's worktree, with the prompt in `docs/workflow.md` Appendix C; send its findings to the task session for triage.
+- **Second-model review** (medium and high risk): start a read-only reviewer sub-agent with model `opus` on the task's worktree, with the prompt in `docs/workflow.md` Appendix C; send its findings to the task session for triage.
 - **PR:** run `/verify-pr <n>`.
 - **Blocked by a hook:** don't let it work around the hook (`cp`, a different tool). Report it to Joey; hooks are his.
