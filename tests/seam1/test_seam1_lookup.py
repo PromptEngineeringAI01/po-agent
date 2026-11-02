@@ -1,36 +1,31 @@
 """Seam 1, steps 8 and 10 (task 2.3): the project match, the project window
-check and the duplicate check, plus `decide()` end to end in
-deterministic-only mode.
+check and the duplicate check.
 
 `match_project()` is the one match rule: `check_project()` (step 8) uses it,
 and the driver (3.2) calls it to choose which `pln_...` link to open.
-`check_duplicate()` is step 10. Hybrid `decide()` needs the agreement and
-address steps (2.4), so here every case's hybrid result is checked on the
-lookup steps only, and `decide()` runs every case in deterministic-only mode.
+`check_duplicate()` is step 10. Here every case is checked on the lookup steps
+only; test_seam1_decide.py runs `decide()` end to end.
 """
 
 import pytest
-from seam1_cases import POOL, Seam1Case, pdf_bytes
+from seam1_cases import POOL, Seam1Case
 
-from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import (
     check_duplicate,
     check_project,
-    decide,
     eligible_internal_no,
     match_project,
 )
 from po_agent.b1.models import (
     CompactionTask,
     MySysLookup,
-    NoteSnapshot,
-    Proceed,
     SearchRow,
     Skip,
     SkipReason,
 )
 
-# Steps 2a-4 and 6-7: a case that skips here never reaches the project lookup.
+# Steps 2a-4 and the readers' agreement: a case that skips here never reaches
+# the project lookup.
 BEFORE_THE_LOOKUP = {
     SkipReason.NOTE_ALREADY_LINKED,
     SkipReason.NO_PDF,
@@ -39,27 +34,9 @@ BEFORE_THE_LOOKUP = {
     SkipReason.NOT_B1,
     SkipReason.NOT_COMPACTION,
     SkipReason.PO_MISMATCH,
-    SkipReason.CLAUDE_UNAVAILABLE,
-    SkipReason.CLAUDE_INVALID_OUTPUT,
     SkipReason.READERS_DISAGREE,
 }
 INTERNAL_NO = "2600001B"
-# A clean fake PO (values fake), as in test_seam1_reader_checks.
-PDF_TEXT = """B1 Homes Pty Ltd
-1 Builder Way
-Purchase Order No 2600001B/048
-Order Type: COMPACTION TEST Job: Sample Job
-COMPACTION Compaction test 1 each $10.00* $10.00"""
-FILE_NAME = "2600001B_048_1.pdf"
-BODY = f"Please find attached Purchase Order / Quotation file {FILE_NAME}"
-NOTE = NoteSnapshot(
-    note_id="1001",
-    title=BODY,
-    body=BODY,
-    attachment_names=(FILE_NAME,),
-    project_linked=False,
-)
-PDF_BYTES = b"%PDF-stand-in"
 
 
 def row(pln: str, ref: str, company: str = "B1 Homes") -> SearchRow:
@@ -86,59 +63,11 @@ def skip(reason: SkipReason) -> Skip:
     return Skip(reason=reason)
 
 
-def decide_det_only(
-    snapshot: NoteSnapshot = NOTE,
-    text: str = PDF_TEXT,
-    project: MySysLookup | None = None,
-    site: str = "test",
-    ignores_cancelled: bool = True,
-) -> Skip | Proceed:
-    return decide(
-        snapshot,
-        INTERNAL_NO,
-        text,
-        PDF_BYTES,
-        project or lookup(),
-        site=site,
-        reader_mode="deterministic-only",
-        duplicate_ignores_cancelled=ignores_cancelled,
-    )
-
-
-def case_text(case: Seam1Case) -> str:
-    if case.pdf in ("corrupt", "image-only"):
-        return rules.text_layer(pdf_bytes(case.pdf))
-    return case.pdf_text
-
-
 # --- every seam-1 case ---
 
 
-def test_seam1_case_deterministic_only_end_to_end(seam1_case: Seam1Case) -> None:
-    # Zero false PROCEED: every case gives exactly its expected result.
-    internal_no = eligible_internal_no(
-        seam1_case.pool_row, seam1_case.config.title_rule, POOL
-    )
-    expect = seam1_case.expect_deterministic_only
-    if internal_no is None:  # step 0: untouched, never opened
-        assert expect.result == "untouched"
-        return
-    assert expect.reason is not None
-    result = decide(
-        seam1_case.note,
-        internal_no,
-        case_text(seam1_case),
-        PDF_BYTES,
-        seam1_case.lookup,
-        site=seam1_case.config.site,
-        reader_mode="deterministic-only",
-        duplicate_ignores_cancelled=seam1_case.config.duplicate_ignores_cancelled,
-    )
-    assert result == skip(expect.reason)
-
-
-def test_seam1_case_lookup_steps_in_hybrid_mode(seam1_case: Seam1Case) -> None:
-    # Steps 8 and 10 give the case's hybrid skip when it is a lookup skip;
+def test_seam1_case_lookup_steps(seam1_case: Seam1Case) -> None:
+    # Steps 8 and 10 give the case's skip when it is a lookup skip;
     # otherwise they pass, with the expected pln and task numbers.
     internal_no = eligible_internal_no(
         seam1_case.pool_row, seam1_case.config.title_rule, POOL
@@ -361,59 +290,3 @@ def test_one_live_task_among_cancelled_ones_is_a_duplicate() -> None:
 def test_every_existing_task_number_is_kept_for_w2() -> None:
     tasks = (task("tsk_200003", "Cancelled"), task("tsk_200001", "Cancelled"))
     assert check_duplicate(tasks, True) == ("tsk_200003", "tsk_200001")
-
-
-# --- decide(), deterministic-only: section 2 order ---
-
-
-def test_a_clean_po_skips_address_unverifiable() -> None:
-    assert decide_det_only() == skip(SkipReason.ADDRESS_UNVERIFIABLE)
-
-
-def test_steps_2a_to_4_come_before_the_project_lookup() -> None:
-    no_project = lookup(search_rows=(), project_internal_no="")
-    linked = NOTE.model_copy(update={"project_linked": True})
-    text = PDF_TEXT.replace("2600001B/048", "2600002B/048")
-    result = decide_det_only(linked, project=no_project)
-    assert result == skip(SkipReason.NOTE_ALREADY_LINKED)
-    result = decide_det_only(text=text, project=no_project)
-    assert result == skip(SkipReason.PO_MISMATCH)
-
-
-ON_HOLD = (task("tsk_200001", "On Hold"),)
-
-
-@pytest.mark.parametrize(
-    ("project", "reason"),
-    [
-        (lookup(search_rows=(), tasks=ON_HOLD), "PROJECT_NOT_FOUND"),
-        (lookup(more_pages=True, tasks=ON_HOLD), "PROJECT_AMBIGUOUS"),
-        (lookup(project_internal_no="2600004B", tasks=ON_HOLD), "UNEXPECTED_SCREEN"),
-    ],
-)
-def test_the_project_lookup_comes_before_the_address_and_duplicate_steps(
-    project: MySysLookup, reason: str
-) -> None:
-    assert decide_det_only(project=project) == skip(SkipReason(reason))
-
-
-@pytest.mark.parametrize("ignores_cancelled", [True, False])
-def test_the_address_step_comes_before_the_duplicate_check(
-    ignores_cancelled: bool,
-) -> None:
-    # Deterministic-only skips at step 9, whatever tasks the project has.
-    result = decide_det_only(
-        project=lookup(tasks=ON_HOLD), ignores_cancelled=ignores_cancelled
-    )
-    assert result == skip(SkipReason.ADDRESS_UNVERIFIABLE)
-
-
-def test_the_site_picks_the_match_rule_in_decide() -> None:
-    project = lookup(
-        search_rows=(row("pln_10001", f"{INTERNAL_NO}/048"),),
-        project_internal_no=f"{INTERNAL_NO}/048",
-    )
-    result = decide_det_only(project=project, site="live")
-    assert result == skip(SkipReason.ADDRESS_UNVERIFIABLE)
-    result = decide_det_only(project=project, site="test")
-    assert result == skip(SkipReason.PROJECT_NOT_FOUND)

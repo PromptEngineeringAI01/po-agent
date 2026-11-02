@@ -66,7 +66,7 @@ def case_text(case: Seam1Case) -> str:
     return case.pdf_text
 
 
-# --- every seam-1 case, both reader modes ---
+# --- every seam-1 case ---
 
 
 def test_seam1_case_steps_2a_to_4(seam1_case: Seam1Case) -> None:
@@ -77,28 +77,24 @@ def test_seam1_case_steps_2a_to_4(seam1_case: Seam1Case) -> None:
         assert seam1_case.expect.result == "untouched"
         return
     result = check_note_and_pdf(seam1_case.note, internal_no, case_text(seam1_case))
-    for expect in (seam1_case.expect, seam1_case.expect_deterministic_only):
-        if expect.reason in STEPS_2A_TO_4:
-            assert result == Skip(reason=expect.reason)
-        else:  # skips later, or proceeds: steps 2a-4 pass
-            assert isinstance(result, NoteChecked)
+    expect = seam1_case.expect
+    # pypdf's own PDF_UNREADABLE comes after steps 2a-4, at the agreement step.
+    pypdf_only = seam1_case.pdf == "text" and not seam1_case.pypdf_text.strip()
+    if expect.reason in STEPS_2A_TO_4 and not pypdf_only:
+        assert result == Skip(reason=expect.reason)
+    else:  # skips later, or proceeds: steps 2a-4 pass
+        assert isinstance(result, NoteChecked)
 
 
-def test_seam1_reading_agrees_with_claude_on_proceed_cases(
-    seam1_case: Seam1Case,
-) -> None:
-    # The four fields step 7 compares must come out identical on a clean PO.
+def test_seam1_readings_agree_on_proceed_cases(seam1_case: Seam1Case) -> None:
+    # The fields the agreement step compares come out identical from both
+    # readers' texts on a clean PO.
     if seam1_case.expect.result != "proceed":
         return
-    internal_no = eligible_internal_no(
-        seam1_case.pool_row, seam1_case.config.title_rule, POOL
-    )
-    assert internal_no is not None
-    result = check_note_and_pdf(seam1_case.note, internal_no, seam1_case.pdf_text)
-    assert isinstance(result, NoteChecked)
-    fields = ("issuer", "contains_compaction", "po_number", "client_internal_no")
-    for field in fields:
-        assert getattr(result.reading, field) == getattr(seam1_case.claude, field)
+    plumber = rules.read_pdf(seam1_case.pdf_text, "", "")
+    pypdf = rules.read_pdf(seam1_case.pypdf_text, "", "")
+    for field in ("issuer", "contains_compaction", "po_number", "client_internal_no"):
+        assert getattr(pypdf, field) == getattr(plumber, field)
 
 
 # --- what a passing Note gives the later steps ---
@@ -119,13 +115,6 @@ def test_a_clean_po_gives_its_reading_file_name_and_body() -> None:
             po_from_title=None,
         ),
     )
-
-
-def test_the_deterministic_reading_leaves_the_address_empty() -> None:
-    result = checked()
-    assert isinstance(result, NoteChecked)
-    assert (result.reading.site_lot, result.reading.site_street) == ("", "")
-    assert result.reading.site_suburb == ""
 
 
 def test_email_body_is_the_note_body_as_shown_never_the_title() -> None:

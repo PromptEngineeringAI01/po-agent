@@ -48,8 +48,6 @@ def test_skip_reasons_are_exactly_the_spec_table() -> None:
         "NOT_B1",
         "NOT_COMPACTION",
         "PO_MISMATCH",
-        "CLAUDE_UNAVAILABLE",
-        "CLAUDE_INVALID_OUTPUT",
         "READERS_DISAGREE",
         "PROJECT_AMBIGUOUS",
         "NOTE_ALREADY_LINKED",
@@ -81,7 +79,11 @@ def test_reading_defaults_to_empty_fields() -> None:
         "",
         "",
     )
-    assert (reading.site_lot, reading.site_street, reading.site_suburb) == ("", "", "")
+
+
+def test_reading_has_no_address_fields() -> None:
+    # Decisions, 2 Nov 2026: no reader extracts the address; MySys gives it.
+    assert not {"site_lot", "site_street", "site_suburb"} & set(Reading.model_fields)
 
 
 def test_reading_is_strict_and_closed() -> None:
@@ -106,7 +108,7 @@ def test_deterministic_reading_carries_the_file_name_and_title_po() -> None:
 def test_readings_are_frozen() -> None:
     reading = Reading(contains_compaction=True)
     with pytest.raises(ValidationError):
-        reading.site_lot = "316"  # type: ignore[misc]
+        reading.po_number = "2600009B/048"  # type: ignore[misc]
 
 
 # --- NoteSnapshot and MySysLookup ---

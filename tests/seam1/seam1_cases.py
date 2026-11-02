@@ -8,6 +8,7 @@ its own: tests/seam2 has a conftest too, so `import conftest` is ambiguous.)
 
 import copy
 import tomllib
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -18,7 +19,6 @@ from po_agent.b1.models import (
     MySysLookup,
     NotePoolRow,
     NoteSnapshot,
-    Reading,
     SkipReason,
 )
 
@@ -26,8 +26,8 @@ CASES_FILE = Path(__file__).parent / "fixtures" / "cases.toml"
 POOL = "Agent Pool"
 
 # Every row of docs/specs/spec.md -> Seam 1 table and of SPEC.md -> Testing
-# Strategy's extra cases, plus the screen rules' project checks. Each must be
-# covered by at least one case.
+# Strategy's extra cases, plus the screen rules' project checks and the code
+# readers of decisions, 2 Nov 2026. Each must be covered by at least one case.
 COVERAGE = {
     # spec table
     "fake-pos-test-config": "3 POs, test-site config -> PROCEED",
@@ -45,7 +45,7 @@ COVERAGE = {
     "street-abbreviation": "Street <-> St -> PROCEED",
     "case-change": "case changes -> PROCEED",
     "postcode-state-removed": "postcode and state removed -> PROCEED",
-    "address-split": "address split across the PDF -> ADDRESS_UNVERIFIABLE",
+    "address-split": "address split across the PDF -> ADDRESS_MISMATCH",
     "project-not-found": "internal no not in MySys -> PROJECT_NOT_FOUND",
     "project-ambiguous": "two matching projects -> PROJECT_AMBIGUOUS",
     "duplicate-same-po": "Compaction Test with the same PO -> DUPLICATE_TASK",
@@ -54,10 +54,7 @@ COVERAGE = {
     "image-only-pdf": "image-only PDF -> PDF_UNREADABLE",
     "corrupt-pdf": "corrupt PDF -> PDF_UNREADABLE",
     "injected-text": "injected text never PROCEEDs with its value",
-    "claude-lot-elsewhere": "Claude's lot from elsewhere in the PDF -> skip",
-    "claude-wrong-po": "Claude's PO wrong -> READERS_DISAGREE",
-    "claude-invalid-json": "Claude invalid JSON -> CLAUDE_INVALID_OUTPUT",
-    "claude-timeout": "Claude timeout -> CLAUDE_UNAVAILABLE",
+    "lot-elsewhere": "project's lot only outside the block -> ADDRESS_MISMATCH",
     # SPEC.md extras
     "cancelled-task-test": "Cancelled task, test config -> PROCEED",
     "cancelled-task-strict": "Cancelled task, not ignored -> DUPLICATE_TASK",
@@ -73,6 +70,18 @@ COVERAGE = {
     "more-pages": "a second results page -> PROJECT_AMBIGUOUS",
     "project-internal-no-differs": "project window internal no -> UNEXPECTED_SCREEN",
     "spec-address-example": "section 4's must-pass address example",
+    # decisions, 2 Nov 2026: the second code reader and the MySys-fed address
+    "second-reader-unreadable": "pypdf reads no text -> PDF_UNREADABLE",
+    "readers-disagree-issuer": "pypdf's issuer differs -> READERS_DISAGREE",
+    "readers-disagree-compaction": "pypdf finds no COMPACTION -> READERS_DISAGREE",
+    "readers-disagree-po": "pypdf's PO number differs -> READERS_DISAGREE",
+    "readers-disagree-job-address": "pypdf's Job Address line differs",
+    "readers-disagree-address-check": "one reader's text fails the address",
+    "readers-agree-normalised": "Job Address line differs in case and spaces only",
+    "longer-pdf-lot": "PDF lot 12-A or 12/13, project lot 12",
+    "supplier-street": "project street and suburb are the supplier's",
+    "no-job-address": "no Job Address label -> ADDRESS_UNVERIFIABLE",
+    "project-address-unparsed": "project address without Lot -> UNVERIFIABLE",
 }
 
 
@@ -112,15 +121,14 @@ class Seam1Case(_Closed):
     covers: tuple[str, ...]
     config: CaseConfig = CaseConfig()
     note: NoteSnapshot
-    # "text": pdf_text is the PDF's text layer (lean fakes; no PDF file).
+    # "text": pdf_text is the PDF's text layer as pdfplumber reads it and
+    # pypdf_text as pypdf reads it (lean fakes; no PDF file).
     pdf: Literal["text", "none", "image-only", "corrupt"]
     pdf_text: str
+    pypdf_text: str
     lookup: MySysLookup
-    claude: Reading
-    claude_error: Literal["invalid-json", "timeout"] | None = None
     never_in_output: tuple[str, ...] = ()
     expect: Expect
-    expect_deterministic_only: Expect
 
     @property
     def pool_row(self) -> NotePoolRow:
@@ -152,15 +160,25 @@ def _tuples(value: Any) -> Any:
     return value
 
 
+# Which texts each replace list changes (fixtures/cases.toml header).
+_REPLACES = {
+    "pdf_replace": ("pdf_text", "pypdf_text"),
+    "plumber_replace": ("pdf_text",),
+    "pypdf_replace": ("pypdf_text",),
+}
+
+
 def _build(raw: dict[str, Any], bases: dict[str, Any]) -> Seam1Case:
     raw = dict(raw)
     data = _merge(bases[raw.pop("base")], raw)
-    text = data["pdf_text"].lstrip("\n")
-    for old, new in data.pop("pdf_replace", []):
-        if old not in text:
-            raise ValueError(f"case {data['id']}: pdf_replace text not in base")
-        text = text.replace(old, new)
-    data["pdf_text"] = text
+    texts = {key: data[key].lstrip("\n") for key in ("pdf_text", "pypdf_text")}
+    for replace, keys in _REPLACES.items():
+        for old, new in data.pop(replace, []):
+            for key in keys:
+                if old not in texts[key]:
+                    raise ValueError(f"case {data['id']}: {replace} not in {key}")
+                texts[key] = texts[key].replace(old, new)
+    data.update(texts)
     return Seam1Case.model_validate(_tuples(data))
 
 
@@ -172,23 +190,8 @@ def load_cases(path: Path = CASES_FILE) -> list[Seam1Case]:
 CASES = load_cases()
 
 
-def _image_only_pdf() -> bytes:
-    """One page showing a 1x1 grey image and no text: no text layer."""
-    pixel = b"\x80"
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200]"
-        b" /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>",
-        b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1"
-        b" /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n"
-        + pixel
-        + b"\nendstream",
-    ]
-    content = b"q 100 0 0 100 50 50 cm /Im1 Do Q"
-    objects.append(
-        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream"
-    )
+def _assemble(objects: list[bytes]) -> bytes:
+    """A PDF file of the numbered objects, object 1 the catalog."""
     out = bytearray(b"%PDF-1.4\n")
     offsets = []
     for number, body in enumerate(objects, start=1):
@@ -200,6 +203,46 @@ def _image_only_pdf() -> bytes:
     out += b"trailer\n<< /Size %d /Root 1 0 R >>\n" % (len(objects) + 1)
     out += b"startxref\n%d\n%%%%EOF\n" % xref
     return bytes(out)
+
+
+def _stream(content: bytes, entries: bytes = b"") -> bytes:
+    head = b"<< %s/Length %d >>\nstream\n" % (entries, len(content))
+    return head + content + b"\nendstream"
+
+
+def _image_only_pdf() -> bytes:
+    """One page showing a 1x1 grey image and no text: no text layer."""
+    return _assemble(
+        [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200]"
+            b" /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>",
+            _stream(
+                b"\x80",
+                b"/Type /XObject /Subtype /Image /Width 1 /Height 1"
+                b" /ColorSpace /DeviceGray /BitsPerComponent 8 ",
+            ),
+            _stream(b"q 100 0 0 100 50 50 cm /Im1 Do Q"),
+        ]
+    )
+
+
+def text_pdf(lines: Sequence[str]) -> bytes:
+    """One page showing the lines in Helvetica, one under another: a text
+    layer both pdfplumber and pypdf read (ASCII without parentheses or
+    backslashes, which would need escaping)."""
+    shown = b" ".join(b"(%s) Tj 0 -14 Td" % line.encode("ascii") for line in lines)
+    return _assemble(
+        [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]"
+            b" /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            _stream(b"BT /F1 10 Tf 50 750 Td " + shown + b" ET"),
+        ]
+    )
 
 
 def pdf_bytes(kind: str) -> bytes:
