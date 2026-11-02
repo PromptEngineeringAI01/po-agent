@@ -177,9 +177,6 @@ def decide_only(
             or isinstance(error, Exception)
             and _return_after_stop(guard, config, options, login, log, progress.note_id)
         )
-        if isinstance(error, controls.KillSwitch) and returned:
-            output.info("kill switch on: run stopped")
-            return 0
         try:
             log.event(
                 "error",
@@ -190,6 +187,9 @@ def decide_only(
             )
         except OSError:
             pass  # the ALERT and RUN_SUMMARY still go out
+        if isinstance(error, controls.KillSwitch) and returned:
+            output.info("kill switch on: run stopped")
+            return 0
         # The original error stays in the traceback as the cause.
         if not returned:
             raise UnexpectedScreen(
