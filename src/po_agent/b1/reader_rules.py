@@ -39,7 +39,9 @@ _TASK_HEADER = re.compile(
 CANCELLED = "Cancelled"
 
 # pypdf logs its warnings ("EOF marker not found"), which would reach stderr;
-# only core/output.py prints (SPEC.md -> Code style).
+# only core/output.py prints (SPEC.md -> Code style). The NullHandler stops
+# Python's last-resort handler printing them, and propagate=False stops a root
+# handler a caller may set up later; set once, when this module is imported.
 _PYPDF_LOG = logging.getLogger("pypdf")
 _PYPDF_LOG.addHandler(logging.NullHandler())
 _PYPDF_LOG.propagate = False
