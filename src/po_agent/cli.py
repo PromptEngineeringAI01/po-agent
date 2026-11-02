@@ -19,7 +19,8 @@ to stderr, because an exception's text can quote page content: the traceback
 goes to logs/ only with --detailed-log, else nowhere.
 
 Order: run_id (before anything can fail), command line, leftover download
-folders swept (D2), run-mode refusal (D1, until 4.5), config, secrets, then
+folders swept (D2), run-mode refusal (D1, until 4.5), config, the kill
+switch and the Perth window (3.5: exit 0, nothing launched), secrets, then
 the mode. Config and secret problems exit 2 before any browser is launched.
 """
 
@@ -34,7 +35,7 @@ import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
-from po_agent.core import demo, output, run, secrets
+from po_agent.core import controls, demo, output, run, secrets
 from po_agent.core.config import CONFIG_DIR, Config, load_config
 from po_agent.core.errors import (
     AccuracyBreach,
@@ -70,6 +71,8 @@ SECRETS_FOR: dict[output.Mode, tuple[SecretName, ...]] = {
     "decide-only": _MYSYS,
     "demo": _MYSYS,
 }
+# The Perth window (3.5): spike and demo are laptop work and ignore it.
+WINDOW_MODES: tuple[output.Mode, ...] = ("run", "decide-only")
 
 
 class _Parser(argparse.ArgumentParser):
@@ -164,6 +167,14 @@ def _run(
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")
     config = load_config(options.site, CONFIG_DIR)
+    if not config.enabled:
+        output.info("kill switch on: run not started")
+        return 0
+    if mode in WINDOW_MODES and not controls.in_window(
+        config.run_window, controls.now()
+    ):
+        output.info("outside the run window: run not started")
+        return 0
     credentials = {name: secrets.get(name) for name in SECRETS_FOR[mode]}
     output.info("config loaded")
     return start(mode, config, credentials, options, summary)

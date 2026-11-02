@@ -14,6 +14,8 @@ pool -> one NOTE line. The only writes are the two Assigns; no booking code
 is imported (Must never #7). Any error while the agent may hold a Note: the
 browser closes, one return in a fresh browser context, then the run stops
 (exit 1); if that return fails, the ALERT says the Note stays with the agent.
+The run cap is checked before each Note is started (3.5); a KillSwitch from
+`controls.before_write` takes the same return, then the run exits 0.
 """
 
 import argparse
@@ -33,7 +35,7 @@ from po_agent.b1.decision import (
     eligible_internal_no,
 )
 from po_agent.b1.models import NotePoolRow, NoteSnapshot, Proceed, Skip, SkipReason
-from po_agent.core import output
+from po_agent.core import controls, output
 from po_agent.core.config import Config
 from po_agent.core.errors import PoAgentError, UnexpectedScreen, identifier
 from po_agent.core.runlog import RunLog
@@ -140,6 +142,7 @@ def decide_only(
         credentials["mysys_test_password"],
     )
     progress = _Progress()
+    started = controls.now()
     try:
         with driver.open_browser(
             headed=options.headed, slow_mo=options.slow_mo, downloads=downloads
@@ -152,7 +155,14 @@ def decide_only(
             driver.set_note_pool_filters(guard, panel, config.pool_name)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, config, summary)
-            for note in oldest_first(found, config.max_notes_per_run):
+            ordered = oldest_first(found, len(found))
+            for done, note in enumerate(ordered):
+                if controls.cap_reached(config, started, done):
+                    output.info(
+                        "run cap reached: {left} notes left for the next run",
+                        left=len(ordered) - done,
+                    )
+                    break
                 with driver.note_downloads(page, downloads):
                     line = _one_note(guard, page, config, login, log, note, progress)
                 output.note(line)
@@ -167,6 +177,9 @@ def decide_only(
             or isinstance(error, Exception)
             and _return_after_stop(guard, config, options, login, log, progress.note_id)
         )
+        if isinstance(error, controls.KillSwitch) and returned:
+            output.info("kill switch on: run stopped")
+            return 0
         try:
             log.event(
                 "error",
