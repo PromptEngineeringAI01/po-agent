@@ -49,10 +49,17 @@ TEXT_RULES = [
     ),
     (
         "gh pr merge",
-        "Joey merges (Must never #9)",
-        re.compile(r"\bgh\s+pr\s+merge\b"),
+        "only `gh pr merge <n> --merge`, alone, after /verify-pr (Must never #9)",
+        re.compile(r"\bpr\s+merge\b", re.IGNORECASE),
+    ),
+    (
+        "gh alias",
+        "an alias could hide a forbidden merge (Must never #9)",
+        re.compile(r"\bgh(\.exe)?\s+alias\b", re.IGNORECASE),
     ),
 ]
+# The one merge Claude may run, as the whole command (decisions, 2 Nov 2026).
+ALLOWED_MERGE = re.compile(r"gh(\.exe)?\s+pr\s+merge\s+\d+\s+--merge")
 
 # Tokens made only of these end a simple command (`;`, `&&`, `|`, `(`, ...).
 SEPARATOR_CHARS = set(";&|()`")
@@ -278,6 +285,8 @@ def check_stage(args: list[str]) -> None:
 
 
 def check(command: str, cwd: str | None, depth: int = 0) -> None:
+    if depth == 0 and ALLOWED_MERGE.fullmatch(command.strip()):
+        return
     for rule, why, pattern in TEXT_RULES:
         if pattern.search(command):
             raise Blocked(rule, why)

@@ -335,7 +335,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Send, reply to, forward or delete email; touch Outlook.
 - Put a secret anywhere but keyring (the laptop's Credential Manager, `poagent`'s Keychain on the Mac Mini) or a `PO_AGENT_*` environment variable.
 - Commit anything from `private/`, or copy real client data into a committed file, a PR, an issue, run output or the Mac Mini (exceptions: the trial POs' identifiers, assumption 2, and the Mac Mini reading the trial POs from the test site, with each PDF on disk only from its download until it's read, Trial conditions).
-- Push to `main`, force-push or merge. Joey merges.
+- Push to `main` or force-push. Merge only with `gh pr merge <n> --merge`, after `/verify-pr` passes and CI is green; a PR that touches the hooks, settings, the verify-pr skill, CI, the guard or the check, or loosens a safety control, stays Joey's (decisions, 2 Nov 2026).
 
 ## Trial conditions
 

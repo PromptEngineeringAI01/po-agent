@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 30 Oct 2026, production)
+# PO Agent - decision log (updated 2 Nov 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -13,6 +13,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **29 Oct 2026: production started** (entry below).
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
 - **30 Oct 2026: task sessions run in worktrees;** `protect_paths` applies the repo rules inside them (entry below).
+- **2 Nov 2026: Claude merges verified PRs and edits skills** (entry below).
+
+## 2 Nov 2026 - Claude merges verified PRs and edits skills (Joey)
+
+- **Why:** Joey wants routine steps automated: merging a PR he has OK'd, and keeping the task skills (`start-task`, `verify-pr`) in step with `docs/workflow.md`, were the last hand steps in the build loop.
+- **What:** `guard_bash` allows exactly `gh pr merge <n> --merge` (one PR by number, a merge commit) and blocks every other form: squash, rebase, `--admin`, `--auto`, `--delete-branch`, no number, no method. The old text rule that blocked any command naming `gh pr merge` is gone, so a commit message may mention it. `protect_paths` allows writes inside `.claude/skills/` except `skills/verify-pr/` (it decides what Claude may merge); `.claude/hooks/`, `.claude/settings*.json` and everything else in `.claude/` stay blocked, including a `.claude/` folder nested in a skill. The allowed merge must be the whole command: any other text naming `pr merge` (shell constructs, `xargs`, backticks, another language, a commit message) and any `gh alias` stay blocked, after the PR's own review found those bypasses. Claude merges only after `/verify-pr` passes with no Important finding and CI is green on the latest commit; a PR that touches `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, or loosens a safety control, stays Joey's to merge. Tests in `tests/test_hooks.py`.
+- **Loosens:** Must never #9 (Claude may now merge) and the `.claude/` rule (Claude may edit skills). It doesn't loosen pushes to `main`, force-push, the hooks, settings, the guard, CI or the repo-data check: Claude still can't switch off its own guardrails. No change to the agent's behaviour in MySys or its run output.
+- Carried in: `.claude/hooks/guard_bash.py` and `.claude/hooks/protect_paths.py` (Joey, by hand), `CLAUDE.md` (Must never #9, Conventions), `SPEC.md` (Must never list), `tasks/plan.md` (1.2), `docs/workflow.md`.
 
 ## 30 Oct 2026 - protect_paths inside Claude Code worktrees (Joey)
 
