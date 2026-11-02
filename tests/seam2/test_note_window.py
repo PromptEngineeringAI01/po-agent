@@ -20,6 +20,8 @@ from po_agent.core import run, runlog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
+from .conftest import ResetStateError
+
 pytestmark = pytest.mark.testsite
 
 TRIAL_INTERNAL_NO = "2609034B"  # the Note row 15b was mapped on
@@ -58,7 +60,7 @@ def taken(config, login) -> Iterator[list[str]]:
 
 
 def test_note_window_takes_a_note_and_hands_it_back(
-    page, guard, config, login, check_note_pool_reset, taken, tmp_path
+    page, guard, config, login, taken, tmp_path
 ):
     agent, pool = config.agent_user_name, config.pool_name
     log = runlog.RunLog(RUN_ID, guard, directory=tmp_path)
@@ -68,12 +70,20 @@ def test_note_window_takes_a_note_and_hands_it_back(
     driver.leave_menu(guard, page)
     driver.set_note_pool_filters(guard, panel, pool)
     listing = driver.read_note_pool(guard, panel)
-    check_note_pool_reset(listing)
-    (note,) = [
+    # Precondition: exactly one Pending, unlinked, eligible 2609034B Note in
+    # the Agent Pool. Only the Note this test uses (Joey, 2 Nov 2026:
+    # 2610002B's Note is Solved on the test site); the shared 1.8 check
+    # stays for the other seam-2 tests.
+    found = [
         n
         for n in run.eligible_notes(listing.rows, config.title_rule, pool)
         if n.internal_no == TRIAL_INTERNAL_NO
     ]
+    if listing.pages != 1 or len(found) != 1:
+        raise ResetStateError(
+            f"not in the reset state: {TRIAL_INTERNAL_NO} eligible={len(found)}"
+        )
+    (note,) = found
 
     window = driver.open_note(guard, page, panel, note.note_id)
     lines_before = driver.log_line_count(window)
