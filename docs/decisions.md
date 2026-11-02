@@ -15,7 +15,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **30 Oct 2026: task sessions run in worktrees;** `protect_paths` applies the repo rules inside them (entry below).
 - **2 Nov 2026: Claude merges verified PRs and edits skills** (entry below).
 - **2 Nov 2026: decide-only built** (task 3.3; entry below).
+- **2 Nov 2026: run controls built** (task 3.5; entry below).
 - **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
+
+## 2 Nov 2026 - Run controls: kill switch, Perth window, run cap (Joey, task 3.5)
+
+- **What:** after the config loads, `enabled = false` ends every mode (`run`, `decide-only`, `spike`, `demo`) with `INFO  kill switch on: run not started` and exit 0, before secrets are read or a browser starts. `run` and `run --decide-only` outside Mon-Fri 07:00-18:00 `run_window.tz` end the same way with `INFO  outside the run window: run not started`; `spike`, `demo` and seam 2 (its clock is pinned inside the window) ignore the window. Before each Note is started, the run stops taking Notes once `max_notes_per_run` Notes were started or `max_run_minutes` have passed since the run began, with `INFO  run cap reached: <n> notes left for the next run`; the Note in progress is finished. `controls.before_write(note_id, step)` re-reads `enabled` before every W step and runs the assignee check (3.6) only before W1 and W4 (D7): switched off before W1 or W2 it raises `KillSwitch`, the run returns the Note in a fresh browser context and ends with `INFO  kill switch on: run stopped`, exit 0; from W3 on it is `PartialWrite`, as is an unreadable config there (before W3, `ConfigError`). New dependency `tzdata` (Joey approved, 2 Nov 2026), because Windows has no time-zone database for `zoneinfo`.
+- **Why:** D1 and Open questions 6 and 7. The note cap now prints an INFO line too, because a run that leaves Notes behind should say so in `runs.log`.
+- **Loosens?** No: it adds stops before and during a run. Nothing new acts in MySys.
+- Carried in: `SPEC.md` (Code style -> run output), `tasks/plan.md` (3.5).
 
 ## 2 Nov 2026 - Claude reader dropped; two code readers plus a MySys-fed address check (Joey)
 

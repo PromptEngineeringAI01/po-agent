@@ -450,6 +450,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - Outside Mon–Fri 07:00–18:00 Australia/Perth (an injectable clock in tests) → exit 0, no MySys contact. The window applies to `run` and `run --decide-only`; `spike` and seam-2 tests ignore it, so laptop work after 18:00 still runs.
 - The cap (`max_notes_per_run` 10, `max_run_minutes` 12) is checked before starting each Note. A Note in progress is finished, never abandoned mid-write (Open question 7).
 - `controls.before_write(note_id, step)` exists for the booker: it re-reads `enabled` from `config/test.toml` before every step (Open question 6) and calls the assignee check (3.6) only for W1 and W4 (D7). Before W1 or W2 (nothing submitted yet), `enabled = false` → close the browser context and return the Note to the pool in a fresh context, then exit 0. From W3 on → `PartialWrite`.
+- Each stop prints its fixed `INFO` line (SPEC → Code style). The kill switch at start applies to every mode, `spike` and `demo` too; seam 2 pins its clock inside the window. `tzdata` is a new dependency (decisions, 2 Nov 2026, 3.5).
 
 **Verify:** `uv run scripts/check.py` (offline tests with a fake driver that records whether login was called).
 **Files:** `src/po_agent/core/run.py`, `src/po_agent/core/controls.py`, `src/po_agent/core/config.py`, `tests/test_run_controls_offline.py`. **Scope:** S–M.

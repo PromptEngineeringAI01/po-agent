@@ -11,11 +11,12 @@ timeout text, assertion diffs and captured output can all quote page text.
 """
 
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 
 import pytest
 from playwright.sync_api import Page
 
-from po_agent.core import secrets
+from po_agent.core import controls, secrets
 from po_agent.core.config import Config, load_config
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
@@ -23,6 +24,7 @@ from po_agent.mysys.guard import ActionGuard
 SCRUBBED_MARKERS = ("testsite", "real_data")
 # The 3 trial POs (SPEC.md -> Trial conditions): internal numbers only.
 TRIAL_INTERNAL_NOS = ("2609017B", "2609034B", "2610002B")
+IN_WINDOW = datetime(2026, 11, 2, 2, 0, tzinfo=UTC)  # Monday 10:00 Perth
 
 
 @pytest.hookimpl(wrapper=True)
@@ -36,6 +38,13 @@ def pytest_runtest_makereport(item, call):
         report.longrepr = f"{item.nodeid}: {kind}"
         report.sections = []
     return report
+
+
+@pytest.fixture(autouse=True)
+def inside_run_window(monkeypatch):
+    """Seam 2 ignores the Perth window (3.5), so laptop work after 18:00
+    still runs: the clock reads Monday 10:00 Perth."""
+    monkeypatch.setattr(controls, "now", lambda: IN_WINDOW)
 
 
 @pytest.fixture(scope="session")
