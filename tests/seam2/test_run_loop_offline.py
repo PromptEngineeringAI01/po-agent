@@ -59,7 +59,8 @@ class FakeNote:
     linked: bool = False
     names: tuple[str, ...] = (FILE,)
     lookup: MySysLookup = CLEAN.lookup
-    fail_at: str | None = None  # a call name that raises UnexpectedScreen
+    fail_at: str | None = None  # a call name that raises `fail_with`
+    fail_with: type[BaseException] = UnexpectedScreen
     taken: int = 0
 
 
@@ -78,8 +79,11 @@ class FakeMySys:
 
     def _call(self, name: str, note_id: str | None = None) -> None:
         self.calls.append(f"{name} {note_id}" if note_id else name)
-        if note_id and self.notes[note_id].fail_at == name:
-            raise UnexpectedScreen("fake failure", note_id=note_id)
+        note = self.notes.get(note_id) if note_id else None
+        if note and note.fail_at == name:
+            if note.fail_with is UnexpectedScreen:
+                raise UnexpectedScreen("fake failure", note_id=note_id)
+            raise note.fail_with("fake failure")
 
     @contextmanager
     def open_browser(self, *, headed, slow_mo, downloads=None):
@@ -482,6 +486,42 @@ def test_an_error_before_the_note_is_taken_stops_without_a_return(mysys, capsys)
     assert fake.notes["300001"].taken == 0
     ((kind, alert),) = alerts_of(lines)
     assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300001")
+
+
+def test_any_other_error_after_the_take_returns_the_note_and_names_it(mysys, capsys):
+    fake = mysys(
+        {"300001": FakeNote("2600001B", fail_at="download", fail_with=RuntimeError)}
+    )
+
+    code = decide_only()
+
+    lines = output(capsys)
+    assert code == 1
+    assert fake.notes["300001"].assignee == POOL
+    ((kind, alert),) = alerts_of(lines)
+    assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300001")
+
+
+def test_ctrl_c_after_the_take_names_the_note_as_not_returned(mysys, capsys):
+    # Joey stopping a watched laptop run: no return attempt, but the ALERT
+    # says which Note stays with the agent.
+    fake = mysys(
+        {
+            "300001": FakeNote(
+                "2600001B", fail_at="download", fail_with=KeyboardInterrupt
+            )
+        }
+    )
+
+    code = decide_only()
+
+    lines = output(capsys)
+    assert code == 1
+    assert fake.calls.count("open_browser") == 1
+    assert fake.notes["300001"].assignee == AGENT
+    ((kind, alert),) = alerts_of(lines)
+    assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300001")
+    assert "not returned to the pool" in alert["detail"]
 
 
 # --- the detailed log ------------------------------------------------------------
