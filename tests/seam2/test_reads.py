@@ -1,13 +1,15 @@
 """Seam 2, the read-only lookups on the MySys test site (task 3.2; marker
 testsite).
 
-For each trial PO, from the reset state (docs/workflow.md 6.1): its one
-eligible Note in the Agent Pool is opened (not taken: opening and downloading
-change nothing, rows 02, 05), its one "Download document" link counted and
-the PDF downloaded into memory, the download folder left empty; then a reload,
-the Projects search and the project window read into a MySysLookup, whose
-match is the trial pln. Only reading actions are done. Assertions use counts,
-action names and the trial identifiers only, never an address or page text.
+The download is the same code for every PO, so one Note proves it: the one
+eligible 2609034B Note in the Agent Pool is opened (not taken: opening and
+downloading change nothing, rows 02, 05), its one "Download document" link
+counted and the PDF downloaded into memory, the download folder left empty.
+The project reads need no Note: for each trial PO, the Projects search and
+the project window read into a MySysLookup, whose match is the trial pln,
+whatever its tasks' state (Joey, 2 Nov 2026: no reset for a read-only test).
+Only reading actions are done. Assertions use counts, action names and the
+trial identifiers only, never an address or page text.
 
 On the laptop (the main checkout's private/fixtures/ found), each trial PO's
 lookup is also written to private/fixtures/lookup-<internal no>.json, to copy
@@ -46,6 +48,7 @@ READING = {
     "submit_project_search",
     "open_project",
 }
+DOWNLOAD_NOTE = "2609034B"  # its Note stays in the Agent Pool (3.1)
 RETRIED = {"open_note", "open_project"}  # opening clicks a covered page may fail
 
 
@@ -67,20 +70,23 @@ def private_fixtures() -> Path | None:
     return path if path.is_dir() else None
 
 
-@pytest.mark.parametrize("internal_no", list(TRIAL_PLNS))
-def test_reads_the_attachment_and_the_project(
-    config,
-    credentials,
-    guard,
-    check_project_reset,
-    tmp_path,
-    internal_no,
-):
-    login = (
+@pytest.fixture
+def login(config, credentials) -> tuple[str, str, str]:
+    return (
         str(config.base_url),
         credentials["mysys_test_username"],
         credentials["mysys_test_password"],
     )
+
+
+def only_reading(guard) -> bool:
+    return {action for action, _ in guard.history} <= READING and all(
+        outcome == "done" or (outcome == "failed" and action in RETRIED)
+        for action, outcome in guard.history
+    )
+
+
+def test_reads_downloads_the_pdf_of_one_note(config, login, guard, tmp_path):
     downloads = tmp_path / "po-agent-dl-20261102T000000Z-seam"
     downloads.mkdir()
 
@@ -90,39 +96,42 @@ def test_reads_the_attachment_and_the_project(
         driver.leave_menu(guard, page)
         driver.set_note_pool_filters(guard, panel, config.pool_name)
         listing = driver.read_note_pool(guard, panel)
-        # Precondition: this trial PO's one eligible Note in the Agent Pool.
+        # Precondition: the one eligible 2609034B Note in the Agent Pool.
         found = [
             note
             for note in run.eligible_notes(
                 listing.rows, config.title_rule, config.pool_name
             )
-            if note.internal_no == internal_no
+            if note.internal_no == DOWNLOAD_NOTE
         ]
         if listing.pages != 1 or len(found) != 1:
-            pytest.fail(f"not in the reset state: {internal_no} eligible={len(found)}")
+            pytest.fail(
+                f"not in the reset state: {DOWNLOAD_NOTE} eligible={len(found)}"
+            )
 
         window = driver.open_note(guard, page, panel, found[0].note_id)
         with driver.note_downloads(page, downloads):
             names = driver.attachment_names(window)
             pdf = driver.download_pdf(guard, page, window)
-        assert isinstance(pdf, driver.Pdf)
-        assert names == (pdf.file_name,)
-        assert pdf.file_name.startswith(f"{internal_no}_048")
-        assert pdf.data.startswith(b"%PDF")
-        assert not [path for path in downloads.rglob("*") if path.is_file()]
 
+    assert isinstance(pdf, driver.Pdf)
+    assert names == (pdf.file_name,)
+    assert pdf.file_name.startswith(f"{DOWNLOAD_NOTE}_048")
+    assert pdf.data.startswith(b"%PDF")
+    assert not [path for path in downloads.rglob("*") if path.is_file()]
+    assert only_reading(guard)
+
+
+@pytest.mark.parametrize("internal_no", list(TRIAL_PLNS))
+def test_reads_each_trial_project(config, login, guard, internal_no):
+    with driver.open_browser(headed=False, slow_mo=0) as page:
         lookup = driver.project_lookup(guard, page, *login, internal_no, config.site)
 
-    check_project_reset(internal_no, lookup)
     assert check_project(lookup, internal_no, config.site) == TRIAL_PLNS[internal_no]
     assert lookup.more_pages is False
     assert lookup.address  # read, not compared: never an address in a test
     assert all(task.task_no.startswith("tsk_") for task in lookup.tasks)
-    assert {action for action, _ in guard.history} <= READING
-    assert all(
-        outcome == "done" or (outcome == "failed" and action in RETRIED)
-        for action, outcome in guard.history
-    )
+    assert only_reading(guard)
 
     fixtures = private_fixtures()
     if fixtures is not None:

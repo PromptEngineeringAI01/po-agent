@@ -15,8 +15,6 @@ from collections.abc import Callable, Iterator
 import pytest
 from playwright.sync_api import Page
 
-from po_agent.b1.models import MySysLookup
-from po_agent.b1.reader_rules import CANCELLED
 from po_agent.core import secrets
 from po_agent.core.config import Config, load_config
 from po_agent.mysys import driver
@@ -71,7 +69,7 @@ class ResetStateError(Exception):
 
 @pytest.fixture
 def check_note_pool_reset(config) -> Callable[[driver.NotePoolList], None]:
-    """Note Pool part of the reset-state precondition (the project part below).
+    """Note Pool part of the reset-state precondition.
 
     Under Agent Pool + Locked, Status Pending: exactly one eligible, unlinked
     Note per trial PO. The error names counts and trial numbers only.
@@ -88,23 +86,6 @@ def check_note_pool_reset(config) -> Callable[[driver.NotePoolList], None]:
             raise ResetStateError(
                 f"not in the reset state: rows={len(listing.rows)}, "
                 f"eligible={len(found)}, per trial PO={counts}"
-            )
-
-    return check
-
-
-@pytest.fixture
-def check_project_reset() -> Callable[[str, MySysLookup], None]:
-    """Project part of the reset-state precondition (3.2): no Compaction Test
-    task on the trial pln that isn't Cancelled, for a test that needs none.
-    The error names the trial number and a count only."""
-
-    def check(internal_no: str, lookup: MySysLookup) -> None:
-        live = [task for task in lookup.tasks if task.status.strip() != CANCELLED]
-        if live:
-            raise ResetStateError(
-                f"not in the reset state: {internal_no} has {len(live)} "
-                "Compaction Test task(s) not Cancelled"
             )
 
     return check
