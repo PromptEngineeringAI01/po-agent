@@ -140,14 +140,14 @@ def start(
     summary: output.RunSummary,
 ) -> int:
     """The mode's entry point and its exit code; it fills the summary's
-    counts. M3 builds decide-only."""
+    counts. Decide-only's run log goes to logs/ only with --detailed-log."""
     if mode == "spike":
         return run.spike(config, credentials, options, summary)
+    downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
     if mode == "demo":
-        downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
         return demo.run(config, credentials, options, summary, downloads)
-    output.info("decide-only not built yet")
-    return 0
+    logs = LOGS_DIR if options.detailed_log else None
+    return run.decide_only(config, credentials, options, summary, downloads, logs)
 
 
 def _demo_read_only(options: argparse.Namespace) -> bool:

@@ -14,6 +14,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **29 Oct 2026: go-live gate 1 met.** MySys allows automating the workflow on the website; no API (entry below).
 - **30 Oct 2026: task sessions run in worktrees;** `protect_paths` applies the repo rules inside them (entry below).
 - **2 Nov 2026: Claude merges verified PRs and edits skills** (entry below).
+- **2 Nov 2026: decide-only built** (task 3.3; entry below).
 - **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
 
 ## 2 Nov 2026 - Claude reader dropped; two code readers plus a MySys-fed address check (Joey)
@@ -28,6 +29,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **CEO:** decision 1 approved the two-reader design with Claude as one reader. Joey informs the CEO of this change.
 - **Done by PR #44 (task 2.5b):** the Claude settings left in config, CLI and secrets (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, the `anthropic_api_key` secret, decide-only asking for it) are removed, and `docs/macmini-setup.md` no longer names the key. Still left: `CLAUDE.md` (Joey's) names the key and the live-Claude seam, and the unused `live_claude` marker stays while `scripts/check.py` (Joey's) deselects it.
 - Carried in: `SPEC.md`, `docs/specs/spec.md` §2-§4 and §7, ADR-001 (a dated note), `tasks/plan.md` 2.5 and 2.6, `tasks/todo.md`.
+
+## 2 Nov 2026 - Decide-only: how each Note is opened, and the stopped Note's output (Joey, task 3.3)
+
+- **What:** the decide-only run opens every Note it works on by "Finding a Note again" (reload, All Pools, the exact Note ID), which is also its reload between Notes. Before taking a Note it reads "Assignee:": anything but `pool_name` means a person has it, so it gets `"outcome": "untouched", "reason": "NOTE_TAKEN"` and is never taken. Before it goes back, every Note is found again and its Assignee must read the agent; otherwise a person took it mid-run, so it is `NOTE_TAKEN` and left with them (second review: the open window can be minutes old). On an error while the agent holds a Note, the browser closes and one return runs in a fresh browser context, then the run stops (exit 1, or the error's own code, e.g. 2 for a failed login); on Ctrl+C there is no return attempt. The stopped Note prints no `NOTE` line: its `ALERT` carries the `note_id`, and the detail says "Note not returned to the pool" if that return failed. NOTE lines and RUN_SUMMARY keep `tokens_in`, `tokens_out` and `cost_aud` at 0.
+- **Why:** the run list is read once at the start, so a person can take a listed Note before the agent reaches it; an Assign then would take it from them. Opening every Note the same way keeps one path that works whether or not the agent holds it. A NOTE line for a stopped Note would claim an outcome the run didn't reach.
+- **Loosens?** No: it adds a check before the first write on each Note. The full assignee check (3.6) and the stale-Note stop still come before any booking.
+- Carried in: `SPEC.md` (MySys screen rules -> Note Pool), `tasks/plan.md` (3.3).
 
 ## 2 Nov 2026 - Claude merges verified PRs and edits skills (Joey)
 

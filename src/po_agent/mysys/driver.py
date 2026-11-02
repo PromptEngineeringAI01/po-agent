@@ -703,6 +703,20 @@ def return_note(
 # Attachment and download (rows 02, 05)
 
 
+def note_body(window: Locator, file_name: str) -> str:
+    """The Note's body (row 02): the <pre> in the window whose text ends with
+    the file name (27 Oct 2026; the title heading and the file-name <span>
+    end with it too). Untrusted data: never printed."""
+    ends = re.compile(rf"{re.escape(file_name)}\s*$")
+    body = window.locator("pre").filter(has_text=ends)
+    try:
+        if body.count() != 1:
+            raise UnexpectedScreen("Note body not found once")
+        return body.inner_text().strip()
+    except PlaywrightError:
+        raise UnexpectedScreen("Note body not readable") from None
+
+
 @dataclass(frozen=True)
 class Pdf:
     """The one downloaded PDF, in memory only (D2)."""

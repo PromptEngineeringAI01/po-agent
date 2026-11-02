@@ -334,18 +334,6 @@ def test_options_reach_the_mode_and_summary_is_last(env, started, capsys):
         assert f"fake-{name}" not in captured.out
 
 
-def test_decide_only_not_built_yet_says_so_and_exits_0(env, capsys):
-    set_secrets(env)
-    message = "INFO  decide-only not built yet"
-
-    code = cli.main(["run", "--site", "test", "--decide-only"])
-
-    captured = capsys.readouterr()
-    assert code == 0
-    assert message in lines(captured)
-    assert summary_of(captured)["exit_code"] == 0
-
-
 # --- typed errors and the catch-all ----------------------------------------------
 
 

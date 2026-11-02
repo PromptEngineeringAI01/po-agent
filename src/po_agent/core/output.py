@@ -25,7 +25,6 @@ from po_agent.core.errors import identifier
 
 InfoMessage = Literal[
     "config loaded",
-    "decide-only not built yet",
     "logged in",
     "note pool filters set",
     "note pool read: {rows} rows, {eligible} eligible",
