@@ -20,8 +20,6 @@ from po_agent.core import run, runlog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
-from .conftest import ResetStateError
-
 pytestmark = pytest.mark.testsite
 
 TRIAL_INTERNAL_NO = "2609034B"  # the Note row 15b was mapped on
@@ -80,7 +78,7 @@ def test_note_window_takes_a_note_and_hands_it_back(
         if n.internal_no == TRIAL_INTERNAL_NO
     ]
     if listing.pages != 1 or len(found) != 1:
-        raise ResetStateError(
+        pytest.fail(
             f"not in the reset state: {TRIAL_INTERNAL_NO} eligible={len(found)}"
         )
     (note,) = found
