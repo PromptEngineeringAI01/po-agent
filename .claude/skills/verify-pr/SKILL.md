@@ -1,12 +1,12 @@
 ---
 name: verify-pr
-description: Verify a PO Agent pull request before Joey merges it - commits, tests-only-in-test-commits, guard and safety changes, repo data, the local check and CI on the latest commit - then report in a few lines and ask Joey to merge. Use when a task session reports a PR, or when Joey says "verify PR <n>" or "/verify-pr <n>".
+description: Verify a PO Agent pull request - commits, tests-only-in-test-commits, guard and safety changes, repo data, the local check and CI on the latest commit - then merge it with a merge commit if it passes, or report to Joey if not. Use when a task session reports a PR, or when Joey says "verify PR <n>" or "/verify-pr <n>".
 argument-hint: <PR number>
 ---
 
 # Verify a PR
 
-Verify PR `$ARGUMENTS` in `PromptEngineeringAI01/po-agent`. Read-only except for running the check: never merge, push to `main`, approve, comment on the PR, or edit the branch. If something fails, report it; fixing is a separate step Joey or the task session does.
+Verify PR `$ARGUMENTS` in `PromptEngineeringAI01/po-agent`. Read-only except for running the check and the merge in step 7: never push to `main`, approve, comment on the PR, or edit the branch. If something fails, report it; fixing is a separate step Joey or the task session does.
 
 ## 1. Fetch
 
@@ -54,6 +54,7 @@ Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_fi
 - No em dash in added lines: `git diff origin/main...origin/<headRefName> | grep '^+' | grep -c '—'` must be 0.
 - If the PR changes what the agent does in MySys or prints in run output, or loosens a safety control: a dated `docs/decisions.md` entry is in the PR, with `SPEC.md` and `tasks/plan.md` updated in the same commit.
 - Real data: only the 3 trial POs' internal numbers, PO numbers and test-site plns may appear. No addresses, client names or PDF text.
+- The PR has Intent, What changed, Risk and Testing. The risk level is at least what docs/workflow.md step 5 gives for the files changed (Important if it's understated). Medium/high: the second-model findings and the must-fix triage are in the PR. High: the fresh-session /code-review is there too.
 
 ## 5. Local check
 
@@ -74,13 +75,25 @@ gh pr view $ARGUMENTS --json headRefOid,mergeable -q '.headRefOid+" "+.mergeable
 
 Every check passes, the runs are for `headRefOid` (not an older push), and `mergeable` is `MERGEABLE`. If it reads `UNKNOWN`, wait briefly and read it again.
 
-## 7. Report
+## 7. Merge (decisions, 2 Nov 2026)
+
+Merge only if all of these hold; otherwise report and ask Joey:
+
+- Steps 2-6 found nothing Important, and the local check (or, if skipped, CI) passed.
+- Every CI check passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
+- The PR doesn't touch `.claude/hooks/`, `.claude/settings*.json`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, and doesn't loosen a safety control. Those PRs stay Joey's to merge.
+
+```bash
+gh pr merge $ARGUMENTS --merge
+```
+
+Only that form: never squash, rebase, `--admin`, `--auto` or `--delete-branch` (the hook blocks them). Then `git -C <repo> pull -q` on `main` if the main checkout is on `main` with no tracked changes, and say "merged" in the report.
+
+## 8. Report
 
 Three to five lines, in Joey's language:
 
-- Ready to merge or not, and the one reason if not.
+- Merged, or not merged and the one reason why.
 - The check result (`N passed, check: all passed`) and CI result.
 - Anything Important from steps 2-4, then at most five Nits.
 - Anything that makes `CLAUDE.md`, `SPEC.md` or `docs/macmini-setup.md` out of date.
-
-Then ask Joey to merge with **Create a merge commit**. Never merge yourself.

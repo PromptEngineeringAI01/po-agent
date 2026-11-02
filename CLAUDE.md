@@ -31,7 +31,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 - `uv run scripts/check.py` passes, and you show its output before saying a task is done.
 - Touched readers, prompt, model ID or address rules → ask me, then run the live-Claude seam; show `false PROCEED: 0`.
 - Touched `mysys/` or the booker → run seam 2 on the test site (or ask me to run it); show the result.
-- Review every diff against Must never, `SPEC.md` and `tasks/plan.md`. Important = would break behaviour, write a wrong value to MySys, leak data or break a Must-never rule. Style and naming are Nits; report at most five.
+- Review every diff against Must never, `SPEC.md` and `tasks/plan.md`, at the depth its risk level sets (`docs/workflow.md`, Production build loop steps 5-6). Important = would break behaviour, write a wrong value to MySys, leak data or break a Must-never rule. Style and naming are Nits; report at most five.
 - Flag it when a change makes this file, `SPEC.md` or `docs/macmini-setup.md` out of date.
 - Do only what the task asks: no mutation probes, no second review round unless the fixes were large, no doc edits the task doesn't need.
 
