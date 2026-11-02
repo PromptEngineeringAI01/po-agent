@@ -38,13 +38,15 @@ _TASK_HEADER = re.compile(
 )
 CANCELLED = "Cancelled"
 
-# pypdf logs its warnings ("EOF marker not found"), which would reach stderr;
-# only core/output.py prints (SPEC.md -> Code style). The NullHandler stops
+# pypdf and pdfminer (under pdfplumber) log their warnings ("EOF marker not
+# found", "MediaBox missing from /Page"), which would reach stderr; only
+# core/output.py prints (SPEC.md -> Code style). The NullHandler stops
 # Python's last-resort handler printing them, and propagate=False stops a root
 # handler a caller may set up later; set once, when this module is imported.
-_PYPDF_LOG = logging.getLogger("pypdf")
-_PYPDF_LOG.addHandler(logging.NullHandler())
-_PYPDF_LOG.propagate = False
+for _name in ("pypdf", "pdfminer"):
+    _log = logging.getLogger(_name)
+    _log.addHandler(logging.NullHandler())
+    _log.propagate = False
 
 
 def pdf_file_name(hrefs: Sequence[str]) -> str:

@@ -57,7 +57,7 @@ The MVP proves that:
 | §7 second reader | **Replaced** (decisions, 2 Nov 2026): pypdf reads the PDF's text again. Its issuer, COMPACTION, PO number and Job Address label line (normalised) must equal pdfplumber's, else `READERS_DISAGREE`; no pypdf text → `PDF_UNREADABLE`. The address check runs on both texts; different results → `READERS_DISAGREE` |
 | §8 run controls | `enabled` kill switch (at start and before every write step), Perth window, run cap, fresh login, assignee check **before W1 and W4** (D7), the **stale-Note stop** at run start (D6), **stop the run on the first unexpected screen or failed write** |
 | Skip → back to pool | Through **Assign** with the pool as assignee (C3 answered yes, 16 Oct 2026); exact steps in [MySys screen rules](#mysys-screen-rules) → Note window |
-| `reader_mode` | Gone from the decision engine: one code-only mode (decisions, 2 Nov 2026). The config key goes in the config clean-up |
+| `reader_mode` | Gone: one code-only mode, and no Claude setting in config, CLI or secrets (decisions, 2 Nov 2026; task 2.5b) |
 | `--decide-only` | Runs every check, returns each Note to the pool, books nothing. Used before the first booking |
 
 ### Deferred to v1 (after the MVP demo)
@@ -77,7 +77,7 @@ The MVP proves that:
 
 ## Tech Stack
 
-As `docs/specs/tech-stack.md`: Python 3.12 (uv, locked), Playwright for Python with Chromium (headless on the Mac Mini, headed on the laptop), pdfplumber (text layer only), Anthropic Python SDK (structured output, no tools), pydantic v2, pytest, ruff, `zoneinfo`, `tomllib`, `keyring`.
+As `docs/specs/tech-stack.md`: Python 3.12 (uv, locked), Playwright for Python with Chromium (headless on the Mac Mini, headed on the laptop), pdfplumber (text layer only), pypdf (the second reader), pydantic v2, pytest, ruff, `zoneinfo`, `tomllib`, `keyring`.
 
 **Host for the MVP:** the office Mac Mini (CEO decision 3). A standard macOS user `poagent` runs `scripts/macmini-run.sh` from a launchd LaunchAgent at 7 minutes past each hour, 07:07–17:07 Monday–Friday, clock on Australia/Perth. FileVault on; no Claude Code for that user. Exact steps: `docs/macmini-setup.md`.
 
@@ -87,9 +87,8 @@ As `docs/specs/tech-stack.md`: Python 3.12 (uv, locked), Playwright for Python w
 |---|---|---|
 | MySys test username | `PO_AGENT_MYSYS_TEST_USERNAME` | `mysys_test_username` |
 | MySys test password | `PO_AGENT_MYSYS_TEST_PASSWORD` | `mysys_test_password` |
-| Anthropic key for the reader | `PO_AGENT_ANTHROPIC_API_KEY` | `anthropic_api_key` |
 
-The reader's key is passed to the SDK client explicitly and is never called `ANTHROPIC_API_KEY`.
+No Anthropic key: the Claude reader was dropped (decisions, 2 Nov 2026). `ANTHROPIC_API_KEY` is never read.
 
 ## Commands
 
@@ -169,15 +168,11 @@ base_url = "https://test-prompt.mysys.com.au/index.php?option=com_cweb&view=mana
 pool_name = "Agent Pool"
 agent_user_name = "Agent 1 (MySys Only)"
 title_rule = "test-body-filename"
-reader_mode = "hybrid"            # hybrid | deterministic-only
 enabled = true                    # kill switch: false on main → next run exits before login
-claude_model_id = "<exact model ID, pinned in M2>"
 duplicate_ignores_cancelled = true   # test only: Joey resets the test site by cancelling tasks; never true on live
 max_notes_per_run = 10           # MVP values; v1 defaults are 25 Notes / 12 minutes
 max_run_minutes = 12
 run_window = { days = "Mon-Fri", start = "07:00", end = "18:00", tz = "Australia/Perth" }
-aud_per_usd = 1.433
-claude_price_usd_per_mtok = { input = 0.0, output = 0.0 }   # filled from the pricing page in M2
 ```
 
 ## Code Style
@@ -344,8 +339,8 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 *Replaces the Trial waiver (v1.5) for the cloud routine. On the Mac Mini, ADR-002 gates H2 and H5 pass, so nothing is waived (CEO decision 3, 15 Oct 2026).* The trial runs on these conditions:
 
 - The Mac Mini's agent user `poagent` is a **standard** (non-admin) account used only by the agent; Joey and a backup admin have the admin accounts. FileVault is on.
-- The MySys credentials are the **test-site** agent account's. The Anthropic key is dedicated, named `po-agent-trial`, with a low monthly spend limit. Both, and the Mac Mini's GitHub token (this repo only: contents read, issues write), live only in `poagent`'s Keychain.
-- No Claude Code or other AI tool is installed for `poagent`; nothing on the Mac Mini runs a Claude session apart from the reader's API calls.
+- The MySys credentials are the **test-site** agent account's. They and the Mac Mini's GitHub token (this repo only: contents read, issues write), live only in `poagent`'s Keychain.
+- No Claude Code or other AI tool is installed for `poagent`; nothing on the Mac Mini runs a Claude session or calls the Anthropic API.
 - Run output follows the stdout contract (no PO content beyond PO number and pln).
 - No real client data is copied to the Mac Mini during the MVP. The one exception is the **3 trial POs, which are real** (Joey, 16 Oct 2026): runs read their PDFs and Notes from the test site, keep them in memory and send them to Claude, as on live. The browser writes every download to disk, so a trial PDF is on the Mac Mini's disk only from its download until it's read into memory, a moment later; leftovers are removed at the next run start (D2, 16 Oct 2026). Nothing else from them is written to the Mac Mini's disk apart from the run output (PO number and pln). **The CEO must confirm decision 2, on these terms, before the first Mac Mini run that downloads a trial PO** (M3). Other real data stays on the laptop (see below).
 - At the end of the trial, Joey unloads the job, revokes the key, has the test password changed and deletes the test items from the Keychain. Live credentials go onto the Mac Mini only after the CEO's go-live sign-off.
@@ -421,7 +416,7 @@ Until then everything above still holds. The code has no live profile and refuse
 1. **MySys permission:** MySys confirms in writing that automating the agent account is allowed (and says whether there's an API). If the answer is no, production stops. **Met, 29 Oct 2026:** automation on the website is allowed; no API, because Alltraders would charge for one (decisions, 29 Oct 2026).
 2. **PO admin's live answers:** PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column is the one ending `/048` (open question 10); whether the agent account's password expires (open question 3).
 3. **CEO sign-off** for going live, with the **backlog cut-off date**: which older Notes the agent may touch.
-4. **Accounts:** the Anthropic `po-agent-trial` key; a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label for alerts.
+4. **Accounts:** a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label for alerts.
 5. **A week of hourly test-site runs** on the Mac Mini (step 5) with **zero wrong bookings**, and the real-PO seam on 10-20 real POs (S3's 80% line).
 
 **Live order** (each step its own dated `docs/decisions.md` entry): read-only `spike` on live, then `run --decide-only` on live, then `run` booking **one PO per run, watched**, then full hourly runs.

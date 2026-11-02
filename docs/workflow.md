@@ -57,7 +57,7 @@ Always type the full name (`/agent-skills:build`): a bare `/build` is "Unknown c
 | Build a task (test-first, small commits) | `/agent-skills:build task <N>` (M2: `/agent-skills:build auto`); Stage 5 step 3 |
 | Run the tests | `/agent-skills:test` |
 | Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4; plus the second-model review on medium and high risk (Stage 5, Production build loop step 6) |
-| Library calls (Playwright, Anthropic SDK, pdfplumber) | `Use the source-driven-development skill …` (M1, M2, M4) |
+| Library calls (Playwright, pdfplumber, pypdf) | `Use the source-driven-development skill …` (M1, M2, M4) |
 | Challenge a risky design in a fresh session | `Use the doubt-driven-development skill on …` (before M4) |
 | A failure that isn't obvious | `Use the debugging-and-error-recovery skill on …` |
 | An open question you can't answer | `Use the interview-me skill on …` |
@@ -158,7 +158,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 1. **Start:** on "merged, start the next one", the advisor pulls `main` and starts a linked task session **in its own worktree** (its own folder and branch), so the advisor's checkout stays on `main` and two sessions never share a folder. One task per session. Small fixes in the same files may go together in one task; unrelated work never does.
 2. **Research and plan before code.** The session reads the task in `tasks/plan.md`, the code it builds on and the SPEC lines, then restates in a few lines what it will change and how it will prove it. Any open design choice goes to Joey **one question at a time**, each with the agent's recommendation (the `interview-me` skill when there are several). Decisions go into the PR's Intent section, not only the chat. If the design talk was long, the session compacts before coding with a line saying what to keep ("keep: the decisions, the files, the test plan").
 3. **Tests first,** within a test budget:
-   - The fewest tests that pin the task's acceptance criteria and its Must-never points. No test that restates the implementation, and no mocking of our own code; fakes only at the edges (MySys pages, the Anthropic API, the clock), as the seams already do.
+   - The fewest tests that pin the task's acceptance criteria and its Must-never points. No test that restates the implementation, and no mocking of our own code; fakes only at the edges (MySys pages, the clock), as the seams already do.
    - On a review-stop task (2.2-2.5, M3, M4, 5.2) the session stops; the advisor brings Joey a short summary: what each test pins down, and any test that looks like padding or mocks too much. Joey approves; the session commits them as `test:`.
    - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it.
    - When Claude makes the same kind of mistake twice: one targeted regression test plus a line under **Lessons** in `CLAUDE.md` (Joey commits that line).
@@ -237,7 +237,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    - **M4 doubt review** (first write to MySys): before task 4.1, in a fresh session: `Use the doubt-driven-development skill on the booker design in tasks/plan.md against docs/screen-map.md.`
 
 4. **Test first.** Claude writes the failing test and shows it failing. ✓ It fails because the code doesn't exist or doesn't handle the case yet, not because of a typo or an import error. On 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2 it stops for you: reply `Test looks right. Commit it and continue.` On the other tasks it commits the test and carries on; check the failure in its summary.
-5. **Verify.** ✓ `check: all passed`. If readers, prompt or model changed: `false PROCEED: 0` from the live-Claude seam (and the real-PO seam on the laptop). If `mysys/` or the booker changed: the seam 2 result on the test site (reset first, 6.1).
+5. **Verify.** ✓ `check: all passed`. If the readers or address rules changed: `false PROCEED: 0` from seam 1 (in the check) and the real-PO seam on the laptop. If `mysys/` or the booker changed: the seam 2 result on the test site (reset first, 6.1).
 6. **Debug** anything not obvious: `Use the debugging-and-error-recovery skill on this: <paste the error>`.
 7. **Review**, once:
 
@@ -262,7 +262,6 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 ```powershell
 git switch main
 git pull
-uv run keyring set po-agent anthropic_api_key
 uv run keyring set po-agent mysys_test_username
 uv run keyring set po-agent mysys_test_password
 ```
@@ -358,7 +357,7 @@ Not part of the MVP. In short: `/agent-skills:code-simplify` once; Matt Pocock's
 4. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case
 5. `pytest tests -m "not live_claude and not testsite and not real_data"`
 
-**Secrets:** `src/po_agent/core/secrets.py` reads `PO_AGENT_<NAME>` from the environment, else keyring service `po-agent`. Names: `anthropic_api_key`, `mysys_test_username`, `mysys_test_password`. Never `ANTHROPIC_API_KEY`.
+**Secrets:** `src/po_agent/core/secrets.py` reads `PO_AGENT_<NAME>` from the environment, else keyring service `po-agent`. Names: `mysys_test_username`, `mysys_test_password` (no Anthropic key since 2 Nov 2026). Never `ANTHROPIC_API_KEY`.
 
 **CI:** `.github/workflows/check.yml`, no secrets:
 

@@ -30,7 +30,7 @@ select = ["E", "F", "W", "I", "UP", "B"]
 testpaths = ["tests"]
 addopts = "--strict-markers"
 markers = [
-    "live_claude: calls the real Claude API (needs PO_AGENT_ANTHROPIC_API_KEY)",
+    "live_claude: unused since the Claude reader was dropped (2 Nov 2026); kept while scripts/check.py deselects it",
     "testsite: drives the MySys test site (needs the test-site secrets)",
     "real_data: reads real POs from private/ (laptop only, never in CI)",
 ]
