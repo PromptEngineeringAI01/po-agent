@@ -433,3 +433,122 @@ def test_a_house_number_not_right_after_the_lot_is_a_mismatch(project: str) -> N
     # Review nit 1 (2.4): only "Lot <lot> (#n)" is dropped; anywhere else the
     # number stays in R, so the compare fails safe.
     assert verify_address(PDF_TEXT, project) is SkipReason.ADDRESS_MISMATCH
+
+
+# --- review findings, 2.5 (2 Nov 2026) ---
+# 1. pypdf reads the Supplier column apart, so on its text the line under a
+#    lone lot must be exactly R plus the tail (exact_line_under=True);
+#    pdfplumber's line keeps the suffix rule, and decide() needs both.
+
+
+def test_pypdfs_line_under_the_label_is_exactly_the_address() -> None:
+    assert verify_address(PYPDF_TEXT, PROJECT, exact_line_under=True) is None
+
+
+@pytest.mark.parametrize(
+    "tail", ["", " WA", " WA 6000", " 6000", " 6000 WA", ", WA.", " wa 6000"]
+)
+def test_the_exact_line_under_takes_the_same_tails(tail: str) -> None:
+    text = PYPDF_TEXT.replace(
+        "Sample Lane Sampleville WA", f"Sample Lane Sampleville{tail}"
+    )
+    assert verify_address(text, PROJECT, exact_line_under=True) is None
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "North Sample Lane Sampleville WA",  # a longer street
+        "Lot 999 Sample Lane Sampleville WA",  # another lot before it
+        "7 Other St Sample Lane Sampleville WA",  # another street before it
+        "Unit 1, 2 Supplier Road Supplierton WA Sample Lane Sampleville WA",
+    ],
+)
+def test_anything_before_the_address_on_the_exact_line_is_a_mismatch(
+    line: str,
+) -> None:
+    text = PYPDF_TEXT.replace("Sample Lane Sampleville WA", line)
+    result = verify_address(text, PROJECT, exact_line_under=True)
+    assert result is SkipReason.ADDRESS_MISMATCH
+
+
+def test_a_supplier_street_ending_in_the_projects_street_is_a_mismatch() -> None:
+    text = "Job Address: Lot 5\nACME Pty 23 North Main St Perth WA 6000"
+    project = "Lot 5 Main Street Perth WA 6000"
+    result = verify_address(text, project, exact_line_under=True)
+    assert result is SkipReason.ADDRESS_MISMATCH
+
+
+def test_the_one_line_form_is_exact_in_both_modes() -> None:
+    text = "Job Address: Lot 123 / Sample Lane Sampleville WA"
+    assert verify_address(text, PROJECT, exact_line_under=True) is None
+    longer = "Job Address: Lot 123 North Sample Lane Sampleville WA"
+    result = verify_address(longer, PROJECT, exact_line_under=True)
+    assert result is SkipReason.ADDRESS_MISMATCH
+
+
+# 2. R of one word (a suburb alone) would pass any street in it.
+
+
+@pytest.mark.parametrize(
+    "project",
+    ["Lot 1 Baldivis", "Lot 1 (#3) Baldivis 6171 WA", "Lot 1 Baldivis WA"],
+)
+def test_a_project_address_of_one_word_after_the_lot_is_unparsed(
+    project: str,
+) -> None:
+    assert parse_project_address(project) is None
+    text = "Job Address: Lot 1\nSample Lane Baldivis WA"
+    assert verify_address(text, project) is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+# 3. Any spelling of the label counts: a second one is never missed.
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "Job  Address: Lot 316 Sample Lane Sampleville",  # two spaces
+        "Job Address: Lot 316 Sample Lane Sampleville",  # no-break space
+        "JobAddress: Lot 316 Sample Lane Sampleville",
+        "Job Address - Lot 316 Sample Lane Sampleville",
+        "JOB ADDRESS Lot 316 Sample Lane Sampleville",
+        "Job_Address: Lot 316 Sample Lane Sampleville",
+        "Job\nAddress: Lot 316 Sample Lane Sampleville",
+    ],
+)
+def test_a_second_label_in_any_spelling_is_unverifiable(extra: str) -> None:
+    text = f"{PDF_TEXT}\n{extra}"
+    assert job_address_line(text) is None
+    assert verify_address(text, PROJECT) is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+def test_a_lone_label_in_another_spelling_is_unverifiable() -> None:
+    text = PDF_TEXT.replace("Job Address:", "Job  Address:")
+    assert verify_address(text, PROJECT) is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+# 4. Non-ASCII letters would fold into word breaks, so two different names
+#    could compare equal.
+
+
+@pytest.mark.parametrize(
+    ("pdf_suburb", "project_suburb"),
+    [
+        ("Samplèville", "Sampléville"),
+        ("Samplèville", "Samplèville"),
+        ("Sampleville", "Sampléville"),
+        ("Samplèville", "Sampleville"),
+    ],
+)
+def test_a_non_ascii_letter_on_either_side_is_unverifiable(
+    pdf_suburb: str, project_suburb: str
+) -> None:
+    text = PDF_TEXT.replace("Sampleville WA", f"{pdf_suburb} WA")
+    project = f"Lot 123 Sample Lane {project_suburb}"
+    assert verify_address(text, project) is SkipReason.ADDRESS_UNVERIFIABLE
+
+
+def test_non_ascii_punctuation_alone_still_passes() -> None:
+    text = PDF_TEXT.replace("Unit 1, 2", "Unit 1 – 2")
+    assert verify_address(text, PROJECT) is None
