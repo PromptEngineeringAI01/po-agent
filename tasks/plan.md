@@ -61,7 +61,7 @@ M0b.2 (rows 19, 20, 23, 24) + its write-up ───────────┐ 
 M1: 1.1 uv+check ─► 1.2 hooks ─► 1.3 pre-commit+CI ─► 1.5 config/secrets/errors ─► 1.4 guard+guard_check
         ─► 1.6 output+CLI ─► 1.7 eligibility ─► 1.8 spike (needs M0b.1) ─► 1.9 wrapper+plist ─► 1.10 Mac Mini spike (S1), then bootout
                                                                                    │
-M2: 2.1 models+fake fixtures ─► 2.2 reader+steps 2a–4 ─► 2.3 project match+duplicate ─► 2.4 address+agreement ─► 2.5 Claude reader+model pin ─► 2.6 prices+real-PO seam (S3)
+M2: 2.1 models+fake fixtures ─► 2.2 reader+steps 2a–4 ─► 2.3 project match+duplicate ─► 2.4 address+agreement ─► 2.5 second code reader+MySys-fed address ─► 2.6 real-PO seam (S3)
                                                                                    │
 M3 (needs M2, M0b.1): 3.1 take/return Note ─► 3.2 attachments+reads ─► 3.3 decide-only run ─► 3.4 laptop + Mac Mini (CEO decision 2)
                       ─► 3.5 kill switch/window/cap ─► 3.6 assignee check            (D1: controls before any write)
@@ -349,30 +349,33 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Verify:** `uv run scripts/check.py`.
 **Files:** `src/po_agent/b1/address.py`, `src/po_agent/b1/decision.py`, `tests/seam1/test_address_normaliser.py`, `tests/seam1/test_seam1_hybrid_stub.py`. **Scope:** M.
 
-### 2.5 Claude reader and the model ID · auto (pauses: prompt review, model ID)
+### 2.5 Second code reader and the MySys-fed address check · step (pauses: failing tests)
 
-**Description:** The real Claude reader: no tools, structured output, validated again by pydantic. Use the `claude-api` and `source-driven-development` skills. The model ID is pinned here, because the live seam below needs it.
-**Needs:** 2.4; Joey approves the prompt and the exact model ID before the first live run.
+*Replaced 2 Nov 2026* (decisions, 2 Nov 2026): Joey dropped the paid Claude reader to keep the agent free. No Anthropic API, API key, model ID or prices.
+
+**Description:** A second code reader (pypdf) and an address check fed by the project's address in MySys; `decide()` becomes code only.
+**Needs:** 2.4; Joey approves the failing tests (done 2 Nov 2026) and `pypdf` as a dependency.
 **Acceptance:**
-- `config/test.toml` has an exact dated Sonnet-class `claude_model_id` (ask-first).
-- The request has **no tools**, temperature 0, bounded output tokens, a timeout of about 60 s, one retry on a transient error, and structured output in the reading schema. Its input is the PDF as a document plus the Note title and body, framed as untrusted data. The key comes from `secrets.get("anthropic_api_key")` and is passed to the client explicitly.
-- Invalid or missing fields → `CLAUDE_INVALID_OUTPUT`; repeated failure → `CLAUDE_UNAVAILABLE`. Usage and AUD cost are calculated from the config price table.
-- `tests/seam1/test_seam1_live_claude.py` (`-m live_claude`) runs every fixture through both real readers and prints per-field agreement (field names only), tokens, cost and `false PROCEED: N`. It fails if N > 0.
+- `reader_rules.pypdf_text_layer(bytes)`: pypdf's text, "" when pypdf can't read it; never raises; pypdf's warnings never reach stdout or stderr.
+- `check_second_reader(pdf_text, pypdf_text)`: no pypdf text → `PDF_UNREADABLE`; issuer, COMPACTION, PO number and the Job Address label line (normalised) equal, else `READERS_DISAGREE`.
+- `verify_address(pdf_text, project_address)`: the project's lot and *R* checked against the Job Address block by the 30 Oct rule; the lot is one word of letters and digits on both sides. `ADDRESS_UNVERIFIABLE` when something can't be parsed, else `ADDRESS_MISMATCH`. `decide()` runs it on both texts; different results → `READERS_DISAGREE`.
+- `decide(note, internal_no, pdf_text, pypdf_text, pdf_bytes, lookup, *, site, duplicate_ignores_cancelled)`: no reader mode, no Claude; order 2a-4, second reader, lookup, address, duplicate, PROCEED. `CLAUDE_UNAVAILABLE` and `CLAUDE_INVALID_OUTPUT` removed from `SkipReason`; `Reading` has no address fields.
+- Seam 1: each fake PO carries pdfplumber's and pypdf's layout; every case gives its expected result; the 3 fake POs PROCEED; `false PROCEED: 0`.
 
-**Verify:** `uv run scripts/check.py` (fake client); `uv run pytest tests/seam1 -m live_claude` → `false PROCEED: 0`.
-**Files:** `src/po_agent/b1/reader_claude.py`, `src/po_agent/b1/decision.py`, `config/test.toml` (ask-first), `tests/seam1/test_reader_claude.py`, `tests/seam1/test_seam1_live_claude.py`. **Scope:** M.
+**Verify:** `uv run scripts/check.py`.
+**Files:** `src/po_agent/b1/reader_rules.py`, `address.py`, `decision.py`, `models.py`, `tests/seam1/` (`test_seam1_decide.py`, `test_seam1_second_reader.py`, fixtures). **Scope:** M.
+**Follow-up (own task):** remove the Claude settings from config, CLI and secrets (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, `anthropic_api_key`, decide-only asking for the key).
 
-### 2.6 Prices and the real-PO seam (S3) · auto (pauses: prices; laptop runs)
+### 2.6 The real-PO seam (S3) · auto (pauses: laptop runs)
 
-**Description:** Fill the price table, add the laptop-only real-PO seam, and produce the S3 evidence.
-**Needs:** 2.5; Joey's OK on the prices (from the pricing page).
+**Description:** Add the laptop-only real-PO seam and produce the S3 evidence. No prices: the agent has no paid API (decisions, 2 Nov 2026).
+**Needs:** 2.5.
 **Acceptance:**
-- `config/test.toml` has `claude_price_usd_per_mtok` for the pinned model. 2.5's cost line used zero prices until now.
-- `tests/seam1/test_seam1_real_data.py` (`-m real_data`) reads `private/fixtures/cases.toml` (the 3 recent real POs plus the 3 trial POs, with test-site lookups as MySys shows them), is skipped when `private/` is absent (an error instead when `-m real_data` is selected explicitly), reports per-field agree/disagree **without values**, coverage and cost per PO, and fails on any false PROCEED. `tests/seam1/conftest.py` applies 1.8's failure-report hook to `real_data` tests (pydantic's `input_value=…` on invalid Claude output would otherwise print PDF text).
-- S3: `-m live_claude` run 3 times → `false PROCEED: 0` each time; deterministic-only → 0; real-data → 0, and the 3 trial POs PROCEED with the right pln and PO number. Every skip of a clean real PO is reviewed with Joey before M3.
+- `tests/seam1/test_seam1_real_data.py` (`-m real_data`) reads `private/fixtures/cases.toml` (the 3 recent real POs plus the 3 trial POs, with test-site lookups as MySys shows them), reads each PDF with both code readers, is skipped when `private/` is absent (an error instead when `-m real_data` is selected explicitly), reports per-field agree/disagree **without values** and coverage, and fails on any false PROCEED. `tests/seam1/conftest.py` applies 1.8's failure-report hook to `real_data` tests, so no PDF text reaches a failure report.
+- S3: real-data → `false PROCEED: 0`, and the 3 trial POs PROCEED with the right pln and PO number. Every skip of a clean real PO is reviewed with Joey before M3.
 
-**Verify:** `uv run scripts/check.py`; the three seam commands above, with output shown.
-**Files:** `config/test.toml` (ask-first), `tests/seam1/test_seam1_real_data.py`, `tests/seam1/conftest.py`. **Scope:** S.
+**Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam1 -m real_data`, with output shown.
+**Files:** `tests/seam1/test_seam1_real_data.py`, `tests/seam1/conftest.py`. **Scope:** S.
 
 ### Checkpoint: M2 (S3)
 - [ ] `check: all passed`; live-Claude ×3 `false PROCEED: 0`; deterministic-only 0; real-PO 0 with the report shown.

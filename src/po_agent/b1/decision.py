@@ -4,13 +4,13 @@ Pure functions, no browser code.
 """
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.address import verify_address
+from po_agent.b1.address import job_address_line, normalise, verify_address
 from po_agent.b1.models import (
     CompactionTask,
     DeterministicReading,
@@ -18,7 +18,6 @@ from po_agent.b1.models import (
     NotePoolRow,
     NoteSnapshot,
     Proceed,
-    Reading,
     SearchRow,
     Skip,
     SkipReason,
@@ -30,7 +29,6 @@ TitleRule = Literal["test-body-filename", "live-b1-title"]
 # The code is test site only (Must never #3); "live" is the live match rule as
 # pure logic, for offline tests, with no host or config behind it.
 Site = Literal["test", "live"]
-ReaderMode = Literal["hybrid", "deterministic-only"]
 
 UNLINKED_PROJECT = "---"
 # Spec open question 10: live numbers look like 2609034B; until confirmed,
@@ -74,7 +72,7 @@ class NoteChecked(BaseModel):
 
     internal_no: str
     pdf_file_name: str
-    # The Note's body as MySys shows it: never the title, never Claude.
+    # The Note's body as MySys shows it: never the title.
     email_body: str = Field(repr=False)
     reading: DeterministicReading
 
@@ -177,66 +175,64 @@ def check_duplicate(
     return tuple(task.task_no for task in tasks)
 
 
-class ClaudeUnavailable(Exception):
-    """The Claude reader timed out or failed after its retry (step 6)."""
+def _label_line(pdf_text: str) -> str | None:
+    line = job_address_line(pdf_text)
+    return None if line is None else normalise(line)
 
 
-def _readers_agree(deterministic: DeterministicReading, claude: Reading) -> bool:
-    """Step 7: identical issuer, COMPACTION, PO number and internal number."""
-    return (
-        claude.issuer == deterministic.issuer
-        and claude.contains_compaction == deterministic.contains_compaction
-        and claude.po_number == deterministic.po_number
-        and claude.client_internal_no == deterministic.client_internal_no
-    )
+def check_second_reader(pdf_text: str, pypdf_text: str) -> Skip | None:
+    """The second code reader (decisions, 2 Nov 2026): pypdf's text must read
+    as pdfplumber's. No pypdf text -> PDF_UNREADABLE. The issuer, COMPACTION,
+    the PO number and the Job Address label line (normalised) must be equal,
+    else READERS_DISAGREE. The line under the label is not compared: pypdf
+    reads the Supplier column apart from it, and decide() runs the address
+    check on both texts instead."""
+    if not pypdf_text.strip():
+        return Skip(reason=SkipReason.PDF_UNREADABLE)
+    plumber = rules.read_pdf(pdf_text, "", "")
+    pypdf = rules.read_pdf(pypdf_text, "", "")
+    if (
+        pypdf.issuer != plumber.issuer
+        or pypdf.contains_compaction != plumber.contains_compaction
+        or pypdf.po_number != plumber.po_number
+        or _label_line(pypdf_text) != _label_line(pdf_text)
+    ):
+        return Skip(reason=SkipReason.READERS_DISAGREE)
+    return None
 
 
 def decide(
     note: NoteSnapshot,
     internal_no: str,
     pdf_text: str,
+    pypdf_text: str,
     pdf_bytes: bytes,
     lookup: MySysLookup,
     *,
     site: Site,
-    reader_mode: ReaderMode,
     duplicate_ignores_cancelled: bool,
-    read_claude: Callable[[], str] | None = None,
 ) -> Skip | Proceed:
     """Steps 2a-11 in section 2 order on the inputs given; the first failing
-    step decides. Deterministic-only mode has no Claude extraction to verify,
-    so a PO that passes step 8 skips ADDRESS_UNVERIFIABLE at step 9 (C4).
+    step decides: steps 2a-4, the second reader, the project lookup (8), the
+    address check against the project's address (9), the duplicate check
+    (10). Code only, no Claude (decisions, 2 Nov 2026).
 
-    read_claude (hybrid only) returns Claude's raw JSON reading. It must turn
-    every timeout and SDK error into ClaudeUnavailable (2.5); any other
-    exception propagates. It is called only after steps 2a-4 pass.
+    pdf_text is pdfplumber's text layer and pypdf_text pypdf's, each "" when
+    its library reads none. The address check runs on both; if their results
+    differ, READERS_DISAGREE.
     """
-    if reader_mode not in ("hybrid", "deterministic-only"):
-        raise ValueError("unknown reader mode")
-    reader = read_claude if reader_mode == "hybrid" else None
-    if reader_mode == "hybrid" and reader is None:
-        raise ValueError("hybrid mode needs a Claude reader")
     checked = check_note_and_pdf(note, internal_no, pdf_text)
     if isinstance(checked, Skip):
         return checked
-    claude: Reading | None = None
-    if reader is not None:
-        try:
-            raw = reader()
-        except ClaudeUnavailable:
-            return Skip(reason=SkipReason.CLAUDE_UNAVAILABLE)
-        try:
-            claude = Reading.model_validate_json(raw)
-        except ValidationError:
-            return Skip(reason=SkipReason.CLAUDE_INVALID_OUTPUT)
-        if not _readers_agree(checked.reading, claude):
-            return Skip(reason=SkipReason.READERS_DISAGREE)
+    second = check_second_reader(pdf_text, pypdf_text)
+    if second is not None:
+        return second
     pln = check_project(lookup, internal_no, site)
     if isinstance(pln, Skip):
         return pln
-    if claude is None:
-        return Skip(reason=SkipReason.ADDRESS_UNVERIFIABLE)
-    address = verify_address(claude, pdf_text, lookup.address)
+    address = verify_address(pdf_text, lookup.address)
+    if verify_address(pypdf_text, lookup.address) != address:
+        return Skip(reason=SkipReason.READERS_DISAGREE)
     if address is not None:
         return Skip(reason=address)
     task_nos = check_duplicate(lookup.tasks, duplicate_ignores_cancelled)
