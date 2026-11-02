@@ -274,3 +274,20 @@ def test_the_site_picks_the_match_rule_in_decide() -> None:
         update={"config": CLEAN.config.model_copy(update={"site": "live"})}
     )
     assert isinstance(run(live, lookup=lookup), Proceed)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "North Sample Lane Sampleville WA",
+        "Lot 999 Sample Lane Sampleville WA",
+        "7 Other St Sample Lane Sampleville WA",
+    ],
+)
+def test_more_before_the_address_under_the_label_never_proceeds(line: str) -> None:
+    # Review finding 1 (2.5): pdfplumber's line shares the Supplier column, so
+    # it only has to end with the address; pypdf's line must be exactly it.
+    plumber = CLEAN.pdf_text.replace("Sample Lane Sampleville WA", line)
+    pypdf = CLEAN.pypdf_text.replace("Sample Lane Sampleville WA", line)
+    result = run(CLEAN, pdf_text=plumber, pypdf_text=pypdf)
+    assert result == skip(SkipReason.READERS_DISAGREE)

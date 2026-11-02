@@ -9,6 +9,9 @@ PDF_UNREADABLE. The line under the label is left to the address check, which
 runs on both texts: pypdf reads the Supplier column apart from it.
 """
 
+import subprocess
+import sys
+
 import pytest
 from seam1_cases import pdf_bytes, text_pdf
 
@@ -74,13 +77,20 @@ def test_bytes_pypdf_cannot_read_are_empty_never_an_error(data: bytes) -> None:
     assert rules.pypdf_text_layer(data) == ""
 
 
-def test_pypdf_prints_nothing_on_a_broken_pdf(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_pypdf_prints_nothing_on_a_broken_pdf() -> None:
     # pypdf logs warnings ("EOF marker not found"); only output.py prints.
-    rules.pypdf_text_layer(pdf_bytes("corrupt"))
-    rules.pypdf_text_layer(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n")
-    assert capsys.readouterr() == ("", "")
+    # In a fresh interpreter, because pytest's own logging and warnings
+    # capture would hide what reaches a real run's stderr (review, 2.5).
+    broken = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
+    code = (
+        "from po_agent.b1 import reader_rules as rules\n"
+        f"rules.pypdf_text_layer({pdf_bytes('corrupt')!r})\n"
+        f"rules.pypdf_text_layer({broken!r})\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=60
+    )
+    assert (done.returncode, done.stdout, done.stderr) == (0, "", "")
 
 
 # --- the agreement ---
