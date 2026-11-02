@@ -35,7 +35,7 @@ from po_agent.b1.decision import (
 from po_agent.b1.models import NotePoolRow, NoteSnapshot, Proceed, Skip, SkipReason
 from po_agent.core import output
 from po_agent.core.config import Config
-from po_agent.core.errors import PoAgentError, UnexpectedScreen
+from po_agent.core.errors import PoAgentError, UnexpectedScreen, identifier
 from po_agent.core.runlog import RunLog
 from po_agent.core.secrets import SecretName
 from po_agent.mysys import driver
@@ -188,7 +188,7 @@ def decide_only(
         if not isinstance(error, PoAgentError):
             raise UnexpectedScreen("run stopped", note_id=progress.note_id) from error
         if error.note_id is None:
-            error.note_id = progress.note_id
+            error.note_id = identifier(progress.note_id)
         raise
     finally:
         shutil.rmtree(downloads, ignore_errors=True)
@@ -216,13 +216,21 @@ def _one_note(
         )
     progress.taken = True
     driver.take_note(guard, window, config.agent_user_name, log, note_id)
-    decision, still_open = _decide(guard, page, config, login, log, note, window)
+    decision = _decide(guard, page, config, login, log, note, window)
     if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
-    if still_open is None:  # the project read reloaded: the window is gone
-        still_open = driver.find_note_again(guard, page, *login, note_id)
+    # Found again and read before it goes back: the open window can be
+    # minutes old, and a person may have taken the Note meanwhile.
+    window = driver.find_note_again(guard, page, *login, note_id)
+    still_ours = driver.read_assignee(window) == config.agent_user_name
+    log.event("assignee_check", note_id=note_id, step="return", ok=still_ours)
+    if not still_ours:  # a person has it now: left with them
+        progress.taken = False
+        return output.Note(
+            note_id=note_id, outcome="untouched", reason=NOTE_TAKEN, po_number=po_number
+        )
     driver.return_note(
-        guard, still_open, config.agent_user_name, config.pool_name, log, note_id
+        guard, window, config.agent_user_name, config.pool_name, log, note_id
     )
     progress.taken = False
     proceed = isinstance(decision, Proceed)
@@ -245,10 +253,10 @@ def _decide(
     log: RunLog,
     note: EligibleNote,
     window: Locator,
-) -> tuple[Skip | Proceed, Locator | None]:
+) -> Skip | Proceed:
     """Steps 2a-11 on what the Note window and MySys show. The project is
-    read only once the Note and PDF checks pass; that read reloads, so the
-    window comes back as None."""
+    read only once the Note and PDF checks pass (that read reloads, so the
+    window is gone after it)."""
     note_id = note.note_id
     linked = not driver.is_unlinked(window, log, note_id)
     names: tuple[str, ...] = ()
@@ -268,10 +276,10 @@ def _decide(
     pypdf = rules.pypdf_text_layer(data) if pdf else ""
     early = check_note_and_pdf(snapshot, note.internal_no, plumber)
     if isinstance(early, Skip):
-        return early, window
+        return early
     second = check_second_reader(plumber, pypdf)
     if second is not None:
-        return second, window
+        return second
     lookup = driver.project_lookup(guard, page, *login, note.internal_no, "test")
     decision = decide(
         snapshot,
@@ -283,7 +291,7 @@ def _decide(
         site="test",
         duplicate_ignores_cancelled=config.duplicate_ignores_cancelled,
     )
-    return decision, None
+    return decision
 
 
 def _return_after_stop(
