@@ -31,49 +31,37 @@ from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
 LOAD_TIMEOUT_MS = driver.LOAD_TIMEOUT_MS
-POLL_MS = 500
+POLL_MS = driver.POLL_MS
 # Live 28 Oct 2026: the Choose Project window's content showed only
 # after a 15 s wait had given up.
 LINK_TIMEOUT_MS = 60_000
 # The Projects search: Joey saw pauses of about 10 s (28 Oct 2026).
 SEARCH_TIMEOUT_MS = 60_000
-OPEN_TRIES = 4  # x 15 s
+OPEN_TRIES = driver.OPEN_TRIES
 CREATOR = "Perth Scheduling"
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
 REMINDER = "Send me a reminder email every days"
 OFFICE = "Prompt Engineering Pty Ltd"
 NOT_CHOSEN = "Choose..."
-SELECT_USER = "--Select User--"
-SELECT_POOL = "--Select Pool--"
-ALL_POOLS = "All Pools"
-ALL_LOCKED = "All"
-PROJECTS_NO_RECORD = "No record found."
+SELECT_USER = driver.SELECT_USER
+SELECT_POOL = driver.SELECT_POOL
+ALL_POOLS = driver.ALL_POOLS
+ALL_LOCKED = driver.ALL_LOCKED
+PROJECTS_NO_RECORD = driver.PROJECTS_NO_RECORD
 NEW_TASK_STATUSES = ("New Project", "Inspection Analysis")
 SNAPSHOT_DIR = Path(__file__).resolve().parents[3] / "private" / "captures" / "test"
 
 
-# Finding windows and fields
+# Finding windows and fields; the shared ones live in driver.py.
 
-
-def _innermost(page: Page, *holds: Locator) -> Locator:
-    """The innermost visible element that holds every locator in `holds`."""
-    found = page.locator("*")
-    for inner in holds:
-        found = found.filter(has=inner)
-    return found.filter(has_not=found).visible
-
-
-def _exact(text: str) -> re.Pattern[str]:
-    return re.compile(rf"^{re.escape(text)}$")
-
-
-def _label_pattern(label: str) -> re.Pattern[str]:
-    """The label's words with any whitespace between them: live S5 (28 Oct
-    2026) failed on "Client Internal No.:" whose spaces aren't plain spaces
-    in the page (ARIA snapshots show them as plain). JavaScript's \\s, which
-    Playwright uses for the match, includes the non-breaking space."""
-    words = (re.escape(word) for word in label.split())
-    return re.compile(r"^\s*" + r"\s+".join(words) + r"\s*$")
+_innermost = driver._innermost
+_exact = driver._exact
+_labelled = driver._labelled
+_shows = driver._shows
+note_window = driver.note_window
+leave_menu = driver.leave_menu
+read_assignee = driver.read_assignee
+read_status = driver.read_status
 
 
 def _container(window: Locator, label: str, control: str) -> Locator:
@@ -95,36 +83,6 @@ def _field(window: Locator, label: str, control: str) -> Locator:
 
 def _chosen(select: Locator) -> str:
     return (select.locator("option:checked").text_content() or "").strip()
-
-
-def _labelled(window: Locator, label: str) -> str:
-    """The text after a bold label: "Assignee: Agent Pool" -> "Agent Pool".
-    The label's parent also holds an Unlink button on the Note window.
-
-    Waits up to 15 s for exactly one visible label: live (28 Oct 2026) the
-    project window's details render after the window shows, and Assign
-    re-renders the Note window. Two visible labels fail at once (strict)."""
-    strong = window.locator("strong").filter(has_text=_label_pattern(label)).visible
-    try:
-        strong.wait_for(state="visible", timeout=LOAD_TIMEOUT_MS)
-    except PlaywrightError:
-        raise UnexpectedScreen("label not found once") from None
-    try:
-        text = strong.locator("xpath=..").inner_text()
-    except PlaywrightError:
-        raise UnexpectedScreen("label not readable") from None
-    # str.split() splits on any Unicode whitespace, the non-breaking space too.
-    value = " ".join(text.split()).removeprefix(" ".join(label.split())).strip()
-    return value.removesuffix("Unlink").strip()
-
-
-def _shows(locator: Locator, timeout: int | None = None) -> bool:
-    """Waits (the page's default timeout, else `timeout`) for one element."""
-    try:
-        locator.wait_for(state="visible", timeout=timeout)
-        return True
-    except PlaywrightError:
-        return False
 
 
 def _gone(locator: Locator) -> bool:
@@ -155,38 +113,6 @@ def save_snapshot(page: Page, step: str) -> Path | None:
 # Note window (rows 02-04, 13-15b)
 
 
-def note_window(page: Page, note_id: str) -> Locator:
-    heading = page.get_by_role(
-        "heading", name=re.compile(rf"^Note {re.escape(note_id)} - ")
-    )
-    return _innermost(page, heading, page.get_by_role("group", name="Status buttons"))
-
-
-def leave_menu(guard: ActionGuard, page: Page) -> None:
-    """Moves the pointer off the header after a Project menu choice.
-
-    Root cause of "page blocked" (27-28 Oct 2026): Playwright's pointer stays
-    where its last click left it, in the header; while the header is hovered
-    the page covers the body and takes no click below it ("<body> intercepts
-    pointer events"). A click elsewhere in the header keeps it there. So the
-    guard moves the pointer, with no click, onto the list's status line below
-    the header (move_pointer_off_menu; decisions, 28 Oct 2026)."""
-    status = (
-        page.get_by_text(driver.FOOTER)
-        .or_(page.get_by_text(driver.NO_RECORD, exact=True))
-        .or_(page.get_by_text(PROJECTS_NO_RECORD, exact=True))
-        .visible
-    )
-    if not _shows(status, LOAD_TIMEOUT_MS):
-        raise UnexpectedScreen("list status line not shown")
-    guard.act("move_pointer_off_menu", page.locator("body"), status)
-    item = driver._project_menu(page).get_by_text("Note Pool", exact=True)
-    try:
-        item.wait_for(state="hidden", timeout=LOAD_TIMEOUT_MS)
-    except PlaywrightError:
-        raise UnexpectedScreen("Project menu did not close") from None
-
-
 def _open(guard: ActionGuard, action: str, scope: Locator, target: Locator) -> None:
     """An opening, searching or refreshing click (it changes nothing in
     MySys), tried OPEN_TRIES times in case the page is still covered (see
@@ -211,14 +137,6 @@ def open_note(guard: ActionGuard, page: Page, panel: Locator, note_id: str) -> L
     if not _shows(window, LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("Note window did not open")
     return window
-
-
-def read_assignee(window: Locator) -> str:
-    return _labelled(window, "Assignee:")
-
-
-def read_status(window: Locator) -> str:
-    return _labelled(window, "Status:")
 
 
 def has_link_to_project(window: Locator) -> bool:
