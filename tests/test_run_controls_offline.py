@@ -322,3 +322,23 @@ def test_before_write_with_an_unreadable_config_stops(checks, step, error):
 
     with pytest.raises(error):
         gate.before_write("300001", step)
+
+
+def test_a_kill_switch_mid_note_is_in_the_detailed_log(env, mysys, capsys, tmp_path):
+    mysys(
+        {
+            "300001": FakeNote(
+                "2600001B", fail_at="download", fail_with=controls.KillSwitch
+            )
+        }
+    )
+
+    code = cli.main(["run", "--site", "test", "--decide-only", "--detailed-log"])
+
+    run_id = summary_of(lines_of(capsys))["run_id"]
+    assert code == 0
+    log = tmp_path / "logs" / f"{run_id}.jsonl"
+    events = [json.loads(line) for line in log.read_text("utf-8").splitlines()]
+    assert ("error", "300001", "KillSwitch") in [
+        (e["event"], e["note_id"], e.get("type")) for e in events
+    ]
