@@ -142,7 +142,16 @@ BASH_BLOCKED = {
     "push HEAD to main": "git push origin HEAD:main",
     "push a branch to main": "git push origin m1-1.2-hooks:main",
     "push to refs/heads/main": "git push origin HEAD:refs/heads/main",
-    "gh pr merge": "gh pr merge 11 --merge",
+    # Claude merges only one PR by number, as a merge commit (decisions, 2 Nov 2026)
+    "gh pr merge squash": "gh pr merge 11 --squash",
+    "gh pr merge rebase": "gh pr merge 11 --rebase",
+    "gh pr merge admin": "gh pr merge 11 --merge --admin",
+    "gh pr merge auto": "gh pr merge 11 --merge --auto",
+    "gh pr merge delete branch": "gh pr merge 11 --merge --delete-branch",
+    "gh pr merge no number": "gh pr merge --merge",
+    "gh pr merge no method": "gh pr merge 11",
+    "gh pr merge after a safe command": "git status && gh pr merge 11 --squash",
+    "gh pr merge inside bash -c": "bash -c 'gh pr merge 11 --admin'",
     # rm -rf and its spellings
     "rm -rf": "rm -rf build",
     "rm -fr": "rm -fr build",
@@ -191,6 +200,9 @@ BASH_ALLOWED = {
     "push a branch": "git push -u origin m1-1.2-hooks",
     "push a branch whose name starts with main": "git push -u origin main-fix",
     "gh pr create": 'gh pr create --title "feat: hooks" --body x',
+    "gh pr merge with a merge commit": "gh pr merge 11 --merge",
+    "gh pr merge with gh.exe": "gh.exe pr merge 40 --merge",
+    "commit message naming gh pr merge": 'git commit -m "docs: gh pr merge rules"',
     "rm one file": "rm build/tmp.txt",
     "rm -r without force": "rm -r build",
     "set -euo pipefail": "set -euo pipefail; uv run ruff check .",
@@ -345,6 +357,8 @@ def protect(path, places, tool: str = "Write"):
 
 
 REPO_BLOCKED = [
+    ".claude/skills",
+    ".claude/skills/x/.claude/settings.json",
     ".claude/settings.json",
     ".claude/hooks/guard_bash.py",
     ".CLAUDE\\hooks\\x.py",
@@ -363,6 +377,9 @@ REPO_ASKS = [
 ]
 
 REPO_ALLOWED = [
+    # Claude may edit skills, not hooks or settings (decisions, 2 Nov 2026)
+    ".claude/skills/start-task/SKILL.md",
+    ".claude/skills/new-skill/SKILL.md",
     "src/x.py",
     "src/po_agent/core/secrets.py",
     "src/po_agent/core/state.py",
@@ -416,6 +433,16 @@ def test_protect_paths_applies_repo_rules_inside_a_worktree(rel, places):
 )
 def test_protect_paths_allows_ordinary_files_in_a_worktree(rel, places):
     assert_allowed(protect(places["project"] / WORKTREE / rel, places))
+
+
+def test_protect_paths_allows_skills_in_a_worktree(places):
+    path = places["project"] / WORKTREE / ".claude/skills/start-task/SKILL.md"
+    assert_allowed(protect(path, places))
+
+
+def test_protect_paths_blocks_an_escape_from_skills_into_settings(places):
+    path = f"{places['project']}/.claude/skills/../settings.json"
+    assert_blocked(protect(path, places), "protect_paths")
 
 
 def test_protect_paths_asks_for_ask_first_files_in_a_worktree(places):
