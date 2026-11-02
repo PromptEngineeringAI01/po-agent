@@ -271,8 +271,10 @@ def summary_of(lines: list[str]) -> dict:
 
 
 def opened(fake: FakeMySys) -> list[str]:
-    """The Note IDs found and opened, in order."""
-    return [c.split()[1] for c in fake.calls if c.startswith("find_again ")]
+    """The Note IDs found and opened, in order, each once (a Note is found
+    again before it goes back)."""
+    found = [c.split()[1] for c in fake.calls if c.startswith("find_again ")]
+    return list(dict.fromkeys(found))
 
 
 # --- the loop ----------------------------------------------------------------
