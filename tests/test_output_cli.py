@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 import keyring
@@ -19,7 +20,7 @@ from keyring.backends.null import Keyring as NullKeyring
 from pydantic import ValidationError
 
 from po_agent import cli
-from po_agent.core import output
+from po_agent.core import controls, output
 from po_agent.core.errors import (
     AccuracyBreach,
     ConfigError,
@@ -66,7 +67,8 @@ SUMMARY_FIELDS = {
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    """No secrets anywhere, temp and logs under tmp_path."""
+    """No secrets anywhere, temp and logs under tmp_path; the clock at
+    Monday 10:00 Perth, inside the run window (3.5)."""
     for name in SECRET_NAMES:
         monkeypatch.delenv(f"PO_AGENT_{name.upper()}", raising=False)
     previous = keyring.get_keyring()
@@ -75,6 +77,7 @@ def env(monkeypatch, tmp_path):
     temp.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(temp))
     monkeypatch.setattr(cli, "LOGS_DIR", tmp_path / "logs")
+    monkeypatch.setattr(controls, "now", lambda: datetime(2026, 11, 2, 2, tzinfo=UTC))
     yield monkeypatch
     keyring.set_keyring(previous)
 
