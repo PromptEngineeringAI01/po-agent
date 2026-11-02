@@ -218,8 +218,8 @@ def decide(
     (10). Code only, no Claude (decisions, 2 Nov 2026).
 
     pdf_text is pdfplumber's text layer and pypdf_text pypdf's, each "" when
-    its library reads none. The address check runs on both; if their results
-    differ, READERS_DISAGREE.
+    its library reads none. The address check runs on both, exact under the
+    label on pypdf's; if their results differ, READERS_DISAGREE.
     """
     checked = check_note_and_pdf(note, internal_no, pdf_text)
     if isinstance(checked, Skip):
@@ -231,7 +231,10 @@ def decide(
     if isinstance(pln, Skip):
         return pln
     address = verify_address(pdf_text, lookup.address)
-    if verify_address(pypdf_text, lookup.address) != address:
+    # pypdf reads the Supplier column apart, so its line under the label must
+    # be exactly the address (review, 2.5).
+    pypdf_address = verify_address(pypdf_text, lookup.address, exact_line_under=True)
+    if pypdf_address != address:
         return Skip(reason=SkipReason.READERS_DISAGREE)
     if address is not None:
         return Skip(reason=address)

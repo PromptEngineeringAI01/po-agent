@@ -273,7 +273,8 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - The lot is one word of letters and digits (`Lot 12-A` or `Lot 12/13` doesn't parse).
 - Verify against the PDF's **Job Address** block (decisions, 30 Oct and 2 Nov 2026; no reader extracts the address): the label line must start `Lot <lot>`, the lot one word of letters and digits, equal to the project's. If more follows on that line, the rest must be exactly *R* plus an optional tail; if nothing follows, the line under it must end with *R* plus an optional tail, so the agent never has to guess where the street ends. The tail is nothing, a state, a 4-digit postcode, or both in either order. Compared on normalised text; exactly one `Job Address:` label, on one line.
 - `ADDRESS_UNVERIFIABLE` when something can't be parsed: the project address, no single label, a label line not starting `Lot <lot>`, or a lone lot with nothing under it. `ADDRESS_MISMATCH` when both parse and the lot or *R* is not where the rule needs it.
-- The check runs on pdfplumber's and pypdf's text; if the two results differ, `READERS_DISAGREE`.
+- The check runs on pdfplumber's and pypdf's text; if the two results differ, `READERS_DISAGREE`. pypdf reads the Supplier column apart, so on its text the line under a lone lot must be **exactly** *R* plus the tail.
+- Also `ADDRESS_UNVERIFIABLE` (2.5 review, 2 Nov 2026): *R* of fewer than two words; a second label in any spelling (`Job  Address`, `JobAddress`, `Job Address -`); a non-ASCII letter in the project address or the block.
 - Must pass (fake values): PDF "Job Address: Lot 123 / Sample Lane Sampleville WA" vs project "Lot 123 (#45) Sample Lane Sampleville 6000 WA".
 
 **Duplicate check (row 07), step 10**
