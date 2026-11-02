@@ -14,6 +14,9 @@ isn't inside `plans/`. Outside the repo, only three folders may be written
 A Claude Code worktree under `.claude/worktrees/<name>/` is a checkout of
 this repo, so a path inside one gets the same rules, measured from that
 worktree's root; its own `.claude/` stays blocked (decisions, 30 Oct 2026).
+
+Inside `.claude/`, only `skills/` may be written: Claude edits skills, never
+hooks or settings (decisions, 2 Nov 2026).
 """
 
 import fnmatch
@@ -74,6 +77,9 @@ def decide_in_repo(path: Path, project: Path, in_worktree: bool = False) -> str 
         worktree = project.joinpath(*path.relative_to(project).parts[:3])
         return decide_in_repo(path, worktree, in_worktree=True)
     rel = "/".join(parts)
+    if parts[:2] == [".claude", "skills"] and ".claude" not in parts[2:]:
+        if len(parts) > 2:
+            return None
     if ".claude" in parts:
         raise Blocked(".claude/ is changed only by Joey, by hand")
     if any(p.startswith(".env") for p in parts):

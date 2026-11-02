@@ -24,7 +24,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 6. Commit or copy out anything from `private/` (real client data), `logs/`, `state/`, traces, or a codegen recording with credentials in it. Real data never goes into a committed file, PR, issue or run output, and isn't copied to the Mac Mini during the MVP. Only exception: the 3 trial POs are real; their internal numbers, PO numbers and test-site plns may appear in committed files and run output, and the Mac Mini reads them from the test site; a trial PDF is on the Mac Mini's disk only from its download until it's read into memory, a moment later, and leftovers are removed at the next run start (`SPEC.md` assumption 2, Trial conditions; decisions, 16 Oct 2026, D2). Their PDFs, addresses and client names never leave `private/` and MySys.
 7. Start a write (Create New Task) before every check in scope (`SPEC.md` → In the MVP; `docs/specs/spec.md` §2 steps 2–4 and 6–11) has passed.
 8. Edit a test, fixture or expected result to make it pass.
-9. Push to `main`, force-push, or merge a PR. Joey merges.
+9. Push to `main` or force-push. Merge a PR only with `gh pr merge <n> --merge`, after `/verify-pr` passes with no Important finding and CI is green on the latest commit; never squash, rebase, `--admin` or `--auto` (decisions, 2 Nov 2026).
 
 ## Done means
 
@@ -47,7 +47,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 - Real client data: you may read `private/` (real PDFs, live and test-site screenshots, captures) to understand the pages. Test-site captures count as real data, because the trial POs are real. Anything you write to a committed file (screen map, fixtures, tests, docs) uses fake or redacted values; seam-1 fixture PDFs are generated fakes, never a trial PDF.
 - Secrets: env var `PO_AGENT_<NAME>` first, else keyring service `po-agent`; names `anthropic_api_key`, `mysys_test_username`, `mysys_test_password`. Never use the name `ANTHROPIC_API_KEY`, except in `tests/test_config_secrets.py`, which sets it to prove it's ignored (decisions, 16 Oct 2026, D4).
 - Branch per task from up-to-date `main`; one task per session; Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
-- `.claude/settings.json` ships with permission rules (incl. the Playwright CLI deny list); M1 adds the hooks. From M1 on, files in `.claude/` are changed only by Joey, by hand.
+- `.claude/settings.json` ships with permission rules (incl. the Playwright CLI deny list); M1 adds the hooks. From M1 on, files in `.claude/` are changed only by Joey, by hand, except `.claude/skills/`, which Claude may edit (decisions, 2 Nov 2026).
 - A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control (the guard, the hooks, the repo-data check, CI, a Must-never rule), needs a dated entry in `docs/decisions.md`, plus `SPEC.md` and `tasks/plan.md`, in the same commit. Tightening a dev-tooling rule needs only a clear commit message.
 - New text uses a plain dash "-", not the em dash "—".
 - Never hand-edit `uv.lock` or other generated files; change them only through their tool (uv).

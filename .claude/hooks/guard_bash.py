@@ -47,11 +47,6 @@ TEXT_RULES = [
             re.IGNORECASE,
         ),
     ),
-    (
-        "gh pr merge",
-        "Joey merges (Must never #9)",
-        re.compile(r"\bgh\s+pr\s+merge\b"),
-    ),
 ]
 
 # Tokens made only of these end a simple command (`;`, `&&`, `|`, `(`, ...).
@@ -260,6 +255,19 @@ def check_rm(words: list[str]) -> None:
         raise Blocked("rm -rf", "delete by hand if it's really needed")
 
 
+def check_merge(words: list[str]) -> None:
+    """Claude merges one PR by number with a merge commit, nothing else:
+    `gh pr merge <n> --merge` (decisions, 2 Nov 2026)."""
+    if program(words[0]) != "gh" or words[1:3] != ["pr", "merge"]:
+        return
+    args = words[3:]
+    if len(args) != 2 or not args[0].isdigit() or args[1] != "--merge":
+        raise Blocked(
+            "gh pr merge",
+            "only `gh pr merge <n> --merge`, after /verify-pr (Must never #9)",
+        )
+
+
 def check_stage(args: list[str]) -> None:
     skip_next = False
     for arg in args:
@@ -297,6 +305,7 @@ def check(command: str, cwd: str | None, depth: int = 0) -> None:
             continue
         check_playwright(words)
         check_rm(words)
+        check_merge(words)
         push = git_args(words, ("push",))
         if push:
             check_push(push[1], cwd)
