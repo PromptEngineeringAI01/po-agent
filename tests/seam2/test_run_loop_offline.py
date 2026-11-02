@@ -61,6 +61,7 @@ class FakeNote:
     lookup: MySysLookup = CLEAN.lookup
     fail_at: str | None = None  # a call name that raises `fail_with`
     fail_with: type[BaseException] = UnexpectedScreen
+    person_takes_at: str | None = None  # a call during which a person takes it
     taken: int = 0
 
 
@@ -80,6 +81,8 @@ class FakeMySys:
     def _call(self, name: str, note_id: str | None = None) -> None:
         self.calls.append(f"{name} {note_id}" if note_id else name)
         note = self.notes.get(note_id) if note_id else None
+        if note and note.person_takes_at == name:
+            note.assignee = PERSON
         if note and note.fail_at == name:
             if note.fail_with is UnexpectedScreen:
                 raise UnexpectedScreen("fake failure", note_id=note_id)
@@ -358,9 +361,9 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
             **zero,
         },
     ]
-    # A would-book Note: the project read reloads, so it is found again to
-    # go back. A Note skipped before the project read goes back from its
-    # open window, with no download or project read it doesn't need.
+    # Every Note is found again, its Assignee read, before it goes back (a
+    # person may have taken it meanwhile). A Note skipped before the project
+    # read has no download or project read it doesn't need.
     per_note = {
         n: [c.split()[0] for c in fake.calls if c.endswith(f" {n}")] for n in fake.notes
     }
@@ -375,6 +378,7 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
             "body",
             "lookup",
             "find_again",
+            "assignee",
             "return",
         ],
         "300002": [
@@ -384,9 +388,19 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
             "2a",
             "names",
             "download",
+            "find_again",
+            "assignee",
             "return",
         ],
-        "300003": ["find_again", "assignee", "take", "2a", "return"],
+        "300003": [
+            "find_again",
+            "assignee",
+            "take",
+            "2a",
+            "find_again",
+            "assignee",
+            "return",
+        ],
     }
     assert all(v.assignee == POOL for v in fake.notes.values())
     summary = summary_of(lines)
@@ -415,6 +429,30 @@ def test_a_note_a_person_holds_is_never_taken(mysys, capsys):
     (note,) = notes_of(lines)
     assert (note["outcome"], note["reason"]) == ("untouched", "NOTE_TAKEN")
     assert summary_of(lines)["skipped"] == 0
+
+
+@pytest.mark.parametrize("during", ["lookup", "2a"])
+def test_a_note_a_person_takes_mid_run_is_not_returned(mysys, capsys, during):
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B", person_takes_at=during),
+            "300002": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = decide_only()
+
+    lines = output(capsys)
+    assert code == 0
+    assert "return 300001" not in fake.calls
+    assert fake.notes["300001"].assignee == PERSON
+    assert fake.notes["300002"].assignee == POOL  # the run goes on
+    first, _ = notes_of(lines)
+    assert (first["note_id"], first["outcome"], first["reason"]) == (
+        "300001",
+        "untouched",
+        "NOTE_TAKEN",
+    )
 
 
 # --- stop on the first failure ---------------------------------------------------
