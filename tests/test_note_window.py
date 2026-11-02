@@ -7,13 +7,13 @@ heading "Note <id> - ...", the user and pool lists found by their
 placeholder options, Send Email Notification ticked when the window opens,
 and the Logs list (an h4 "Logs" and one list item per line, newest first:
 "<date> User Assigned: (By <user>)" in an <em>, then "From <x> to <y>").
-The reload test serves a fake login or app page for a fake base URL through
-page.route. Values are fake. Tests never act on the page themselves
-(guard_check.py): what a click did shows up through inline JS.
+The reload test loads a fake login or app page as a data: URL. Values are
+fake. Tests never act on the page themselves (guard_check.py): what a click did shows up through inline JS.
 """
 
 import json
 from collections.abc import Iterator
+from urllib.parse import quote
 
 import pytest
 from playwright.sync_api import Browser, Page, sync_playwright
@@ -28,7 +28,6 @@ POOL = "Agent Pool"
 NOTE_ID = "300001"
 RUN_ID = "20261102T010203Z-abcd"
 CLOSE = '<div><span title="Close">close</span></div>'
-BASE_URL = "https://mysys.example.test/"
 USER = "fake-user"
 PASSWORD = "fake-Password-42"
 
@@ -271,13 +270,10 @@ def test_reload_home_logs_in_again_only_if_the_login_page_shows(
     page, guard, logged_out
 ):
     html = LOGIN_PAGE.format(app=APP_PAGE) if logged_out else APP_PAGE
-    # A fake base URL served from memory: no request leaves the test.
-    page.route(
-        BASE_URL + "**",
-        lambda route: route.fulfill(content_type="text/html", body=html),
-    )
+    # The fake page as a data: URL: no request leaves the test.
+    base_url = "data:text/html," + quote(html)
 
-    driver.reload_home(guard, page, BASE_URL, USER, PASSWORD)
+    driver.reload_home(guard, page, base_url, USER, PASSWORD)
 
     logins = ["login_username", "login_password", "login_submit"]
     assert actions(guard) == (logins if logged_out else [])
