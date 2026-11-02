@@ -1,12 +1,14 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.19 · 30 Oct 2026 · **Owner:** Joey Wu
+**Version:** v5.20 · 2 Nov 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Now: production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 as a supervised `po-agent demo` (one trial PO, Joey's Enter before every write), from the laptop and the Mac Mini. The goal is now the agent running by itself, hourly, on the Mac Mini: unattended on the test site first, then on live after the go-live gates (`SPEC.md` -> Production; `tasks/plan.md` -> Phase P). The stages below still describe how each task is built.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
+
+**v5.20:** review and testing by risk (from four agentic-engineering talks, see Sources). Every PR states a risk level (low, medium, high) with evidence; medium and high get one review by a second model (Fable 5.1, a different model from the Opus builder), high also a fresh-session `/code-review`; each finding is rated for harm and likelihood, then triaged "must-fix or overthinking" once. Tests: the fewest that pin the acceptance, real code over mocks, one targeted test when a mistake repeats. Session reports open with a recap and ask one question at a time. Second-model review: Appendix C.
 
 **v5.19:** production build loop (from task 2.3): each task session in its own worktree; `/goal` only for the code half after Joey approves the tests, never on the test site; a fresh-session `/code-review` on 2.4, 2.5, M3, M4 and 5.2; `/verify-pr` before every merge; when to start a fresh advisor chat.
 
@@ -54,7 +56,7 @@ Always type the full name (`/agent-skills:build`): a bare `/build` is "Unknown c
 |---|---|
 | Build a task (test-first, small commits) | `/agent-skills:build task <N>` (M2: `/agent-skills:build auto`); Stage 5 step 3 |
 | Run the tests | `/agent-skills:test` |
-| Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4 |
+| Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4; plus the second-model review on medium and high risk (Stage 5, Production build loop step 6) |
 | Library calls (Playwright, Anthropic SDK, pdfplumber) | `Use the source-driven-development skill …` (M1, M2, M4) |
 | Challenge a risky design in a fresh session | `Use the doubt-driven-development skill on …` (before M4) |
 | A failure that isn't obvious | `Use the debugging-and-error-recovery skill on …` |
@@ -151,13 +153,38 @@ Update docs/screen-map.md (the rows I just mapped, fake values only) and SPEC.md
 
 The advisor chat runs the steps below; Joey answers review stops and merges. Steps 1-10 underneath still say what each step must achieve.
 
-1. **Start:** on "merged, start the next one", the advisor pulls `main` and starts a linked task session **in its own worktree** (its own folder and branch), so the advisor's checkout stays on `main` and two sessions never share a folder.
-2. **Tests first:** the session writes the failing tests. On a review-stop task (2.2-2.5, M3, M4, 5.2) it stops; the advisor brings Joey a short summary; Joey approves; the session commits them as `test:`.
-3. **Code with `/goal`** (offline code only): the session sets a goal such as `uv run scripts/check.py prints "check: all passed", the seam-1 cases for task <N> pass, no file under tests/ changed since the test: commit, or stop after 20 rounds`. A separate model judges each round from the evidence printed in the chat.
+Joey talks to one chat, the advisor. It starts each task session, relays his answers, verifies PRs and keeps the list of decisions waiting on him. Joey doesn't need to read the task sessions' tool calls; he reads their reports and the PR.
+
+1. **Start:** on "merged, start the next one", the advisor pulls `main` and starts a linked task session **in its own worktree** (its own folder and branch), so the advisor's checkout stays on `main` and two sessions never share a folder. One task per session. Small fixes in the same files may go together in one task; unrelated work never does.
+2. **Research and plan before code.** The session reads the task in `tasks/plan.md`, the code it builds on and the SPEC lines, then restates in a few lines what it will change and how it will prove it. Any open design choice goes to Joey **one question at a time**, each with the agent's recommendation (the `interview-me` skill when there are several). Decisions go into the PR's Intent section, not only the chat. If the design talk was long, the session compacts before coding with a line saying what to keep ("keep: the decisions, the files, the test plan").
+3. **Tests first,** within a test budget:
+   - The fewest tests that pin the task's acceptance criteria and its Must-never points. No test that restates the implementation, and no mocking of our own code; fakes only at the edges (MySys pages, the Anthropic API, the clock), as the seams already do.
+   - On a review-stop task (2.2-2.5, M3, M4, 5.2) the session stops; the advisor brings Joey a short summary: what each test pins down, and any test that looks like padding or mocks too much. Joey approves; the session commits them as `test:`.
+   - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it.
+   - When Claude makes the same kind of mistake twice: one targeted regression test plus a line under **Lessons** in `CLAUDE.md` (Joey commits that line).
+4. **Code with `/goal`** (offline code only): the session sets a goal such as `uv run scripts/check.py prints "check: all passed", the seam-1 cases for task <N> pass, no file under tests/ changed since the test: commit, or stop after 20 rounds`. A separate model judges each round from the evidence printed in the chat.
    - Never `/goal` before Joey approves the tests on a review-stop task: the loop would run past the stop.
    - Never `/goal` on anything that touches the test site (seam 2, decide-only, booking): no retry loops against MySys. Those runs stay one at a time, watched.
-4. **Independent review** on 2.4, 2.5, M3, M4 and 5.2: `/code-review` in a fresh session that didn't write the code (the M4 doubt review stays as below). Fix Important findings once.
-5. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, the check, CI on the latest commit. Then Joey merges with **Create a merge commit**.
+5. **Evidence and risk.** Before review, the session writes the PR description with four sections:
+   - **Intent:** the task, the SPEC slice, and the decisions made with Joey.
+   - **What changed:** each file and why; which commits touch tests (`test:` only); anything near a Must-never rule.
+   - **Risk: low, medium or high,** with one line on why. **High:** anything in `mysys/` or the booker, the guard, hooks or CI, the readers or decision engine, the address rules, the model ID or prompt, anything that writes to MySys (that is, every review-stop task). **Medium:** any other change under `src/` or `scripts/`. **Low:** docs, tests-only and tooling that doesn't touch a safety control. When unsure, pick the higher level.
+   - **Testing:** the evidence, pasted: the tail of `uv run scripts/check.py`, the seam-1 counts, and where they apply `false PROCEED: 0` and the seam-2 or decide-only stdout. Only the stdout contract goes in; never screenshots, captures, PDF text, addresses or Note bodies (Must never #6).
+6. **Review, once, by risk:**
+
+   | Risk | Review |
+   |---|---|
+   | Low | `/agent-skills:review` in the session. Nothing else. |
+   | Medium | The same, plus one **second-model review** (Appendix C). |
+   | High | The second-model review plus `/code-review` in a fresh Opus session; the advisor merges the two lists, dropping duplicates. M4 keeps the doubt review below. |
+
+   - The reviewers rate every finding on two scales, 1-5: **harm** if it happens and **likelihood**. Anything that could break a Must-never rule or write a wrong value to MySys is a must-fix, however unlikely.
+   - The session that wrote the code answers each finding in one line: **must-fix or overthinking**, and why. It fixes the must-fixes once and adds the triage table to the PR.
+   - No second review round unless the fixes were large. Reviewers asked to find bugs always find something, so repeated rounds add noise, not safety.
+   - The second-model review runs from a fresh, short context (a sub-agent of the advisor), not from the builder's long one: cheaper, and it doesn't inherit the builder's blind spots.
+7. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, the check, CI on the latest commit, and the four PR sections with the right risk level and, for medium and high, the review triage. Then Joey merges with **Create a merge commit**. A low-risk PR with clean evidence needs only a skim; on high, Joey reads the diff of the safety files.
+8. **Reports to Joey** (from task sessions and the advisor) open with a one-line recap of what this session is about, use plain words (no shorthand from deep in the code), ask **one question at a time**, and end with the next action. When Joey asks "where are we?", the advisor lists the sessions in flight, the PRs waiting, and the open decisions.
+9. **Rules that matter are enforced, not just written.** Agents drift from `CLAUDE.md` as their context grows. A rule Claude has broken twice gets a Lessons line and, if it guards safety, a hook, a check or a `/verify-pr` step (Joey edits `.claude/`).
 
 1. **Branch** from up-to-date `main`, one branch per task (e.g. `m1-1.2-hooks`):
 
@@ -174,7 +201,7 @@ The advisor chat runs the steps below; Joey answers review stops and merges. Ste
    - **Normal tasks** (1.6, 1.7, 1.8, 1.9, 5.1, M2's 2.1 and 2.6): no plan mode, one prompt that runs through to the PR:
 
      ```text
-     /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md). When check passes, run the code-review-and-quality skill once, fix Important findings, tick <N>, push and open the PR with the Review guide. Then stop; don't merge.
+     /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md). When check passes, run the code-review-and-quality skill once, fix Important findings, tick <N>, push and open the PR with the Intent, What changed, Risk and Testing sections (Production build loop step 5). Then stop; don't merge.
      ```
 
    - **Review-stop tasks** (1.4, M3: 3.1–3.6, M4: 4.1–4.5, 5.2; M2's 2.2–2.5 stop inside the auto run): press **Shift+Tab** to turn plan mode on, then:
@@ -218,14 +245,14 @@ The advisor chat runs the steps below; Joey answers review stops and merges. Ste
    /agent-skills:review
    ```
 
-   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. One review round plus its fixes is enough; don't review again unless the fixes were large.
+   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. On medium and high risk, add the second-model review and the must-fix triage (Production build loop step 6). One review round plus its fixes is enough; don't review again unless the fixes were large.
 8. **Push and open the PR.** If `main` has moved since you branched, Claude merges it in first:
 
    ```text
-   Tick the task in tasks/todo.md. Merge origin/main into this branch if it has moved, resolve any conflicts and re-run uv run scripts/check.py. Then push this branch and open a PR that links the SPEC.md slice it implements, with a "Review guide" section: why each file changed, which commits touch tests (they must be test: commits only), anything near a CLAUDE.md must-never rule, and the check output.
+   Tick the task in tasks/todo.md. Merge origin/main into this branch if it has moved, resolve any conflicts and re-run uv run scripts/check.py. Then push this branch and open a PR with the Intent, What changed, Risk and Testing sections from docs/workflow.md (Production build loop step 5): the SPEC.md slice, why each file changed, which commits touch tests (they must be test: commits only), anything near a CLAUDE.md must-never rule, the risk level with its reason, and the check output.
    ```
 
-9. **You merge** (Claude can't): open the PR → once CI exists (task 1.3), wait for the green **check** → read the Review guide and skim **Files changed** for: no secret or real data, no live host (`prompt.mysys.com.au`), tests changed only in `test:` commits, files within the task → **Create a merge commit** (not squash).
+9. **You merge** (Claude can't): open the PR → once CI exists (task 1.3), wait for the green **check** → read the Risk and Testing sections and skim **Files changed** for: no secret or real data, no live host (`prompt.mysys.com.au`), tests changed only in `test:` commits, files within the task → **Create a merge commit** (not squash).
 10. **Lessons.** If Claude made the same mistake twice, add one line under **Lessons** in `CLAUDE.md`. `/exit`.
 
 ### Straight after M1 merges
@@ -399,7 +426,26 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 | No runs after a power cut or restart | The Mac is waiting at the FileVault screen: log in as `poagent` and lock the screen (`docs/macmini-setup.md` section 10). |
 | The Mac Mini can't log in to MySys | Check the spike output and try a login by hand in Safari on the Mac Mini; if MySys blocks the office address, record it in `docs/decisions.md` and tell the CEO. |
 
+## Appendix C - Second-model reviewer (medium and high risk PRs)
+
+Task sessions build on Opus; the second review runs on **Fable 5.1**, a different Claude model, so it shares fewer blind spots than Opus reviewing its own code. It needs no other account or plan, and the code stays with Anthropic. A model from another lab would catch more; add one later if Joey gets a second plan.
+
+**Run it:** the advisor starts a reviewer sub-agent with model `fable`, read-only (no edits, no commits, no pushes), pointed at the task's worktree, with the prompt below. It returns the findings to the advisor, which sends them to the task session for triage. If Fable 5.1 isn't available on the plan, use Opus in a fresh sub-agent: the minimum, but still free of the builder's context.
+
+**Data rule:** the reviewer reads **only the task worktree** (worktrees hold tracked files only, so no `private/`, `logs/` or `state/`). Never point it at the main checkout, `private/`, captures or logs, and never paste real data into its prompt.
+
+**Prompt:**
+
+```text
+You are reviewing a pull request in the git worktree at <path>. Read only files inside that folder; change nothing. Run `git -C <path> diff origin/main...HEAD` and read CLAUDE.md (Must never), SPEC.md and the task in tasks/plan.md.
+Find real defects only: wrong behaviour, a wrong value written to MySys, a broken Must-never rule, missing error handling at the MySys or PDF edge, tests that mock our own code or don't test the acceptance criteria. Ignore style.
+For each finding give: file:line, one sentence, harm 1-5, likelihood 1-5, and the concrete input that triggers it. If you find nothing serious, say so; don't invent findings. At most 8 findings, worst first.
+```
+
+The session that wrote the code then triages each finding "must-fix or overthinking" (Production build loop step 6) and pastes the reviewer's list and the triage into the PR.
+
 ## Sources
 
 - Addy Osmani's agent-skills: [greenfield tutorial](https://skills.addy.ie/tutorials/new-app/), [skills catalogue](https://skills.addy.ie/skills/), [repo](https://github.com/addyosmani/agent-skills) (read 14 Oct 2026)
 - [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
+- v5.20 review and testing rules, drawn from: David Ondrej, [My Agentic Engineering Workflow (after 15,700 sessions)](https://www.youtube.com/watch?v=F8rc-ULd4_4) (second-model review, harm x likelihood, must-fix triage, test budget); Kun Chen, [High Throughput Agentic Engineering](https://www.youtube.com/watch?v=MSbacZ99E14) (one orchestrator chat, review gate by risk, PR risk and testing evidence); Brendan O'Leary, [Agentic Engineering: Working With AI, Not Just Using It](https://www.youtube.com/watch?v=BEKc4P87XKo) (research, plan, implement; context hygiene); Jason Ku, [A Meta Engineer's Agentic Engineering Workflow](https://www.youtube.com/watch?v=Ukju3maxbEQ) (grill before code, re-entry reports, cheap fresh-context review driver, instruction drift). Watched 2 Nov 2026.
