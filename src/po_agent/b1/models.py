@@ -21,7 +21,8 @@ class NotePoolRow(BaseModel):
 
 
 class SkipReason(StrEnum):
-    """Skip reasons, exactly docs/specs/spec.md section 3."""
+    """Skip reasons, exactly docs/specs/spec.md section 3 (no Claude reasons
+    since decisions, 2 Nov 2026)."""
 
     PROJECT_NOT_FOUND = "PROJECT_NOT_FOUND"
     NO_PDF = "NO_PDF"
@@ -30,8 +31,6 @@ class SkipReason(StrEnum):
     NOT_B1 = "NOT_B1"
     NOT_COMPACTION = "NOT_COMPACTION"
     PO_MISMATCH = "PO_MISMATCH"
-    CLAUDE_UNAVAILABLE = "CLAUDE_UNAVAILABLE"
-    CLAUDE_INVALID_OUTPUT = "CLAUDE_INVALID_OUTPUT"
     READERS_DISAGREE = "READERS_DISAGREE"
     PROJECT_AMBIGUOUS = "PROJECT_AMBIGUOUS"
     NOTE_ALREADY_LINKED = "NOTE_ALREADY_LINKED"
@@ -47,19 +46,16 @@ class _Frozen(BaseModel):
 
 
 class Reading(_Frozen):
-    """What a reader found in the PDF (section 3); both readers fill it.
+    """What a reader found in the PDF (section 3). Empty means not found.
 
-    Empty means not found. The deterministic reader leaves the address empty
-    in hybrid mode.
+    No reader extracts the address: the project's address in MySys gives the
+    values the PDF is checked against (decisions, 2 Nov 2026).
     """
 
     issuer: str = ""
     contains_compaction: bool
     po_number: str = ""
     client_internal_no: str = ""
-    site_lot: str = ""
-    site_street: str = ""
-    site_suburb: str = ""
 
 
 class DeterministicReading(Reading):

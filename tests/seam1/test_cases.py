@@ -6,14 +6,23 @@ against the spec's table, the fake-value rule and step 0, which exists.
 
 import io
 import re
+import tomllib
 
 import pdfplumber
 import pytest
-from seam1_cases import CASES, CASES_FILE, COVERAGE, POOL, Seam1Case, pdf_bytes
+from seam1_cases import (
+    CASES,
+    CASES_FILE,
+    COVERAGE,
+    POOL,
+    Seam1Case,
+    _build,
+    pdf_bytes,
+)
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import eligible_internal_no
-from po_agent.b1.models import Proceed, SkipReason
+from po_agent.b1.models import Proceed
 from po_agent.core.errors import WriteNotStarted
 
 FAKE_INTERNAL_NO = re.compile(r"26000[0-9]{2}[A-Z]")
@@ -49,30 +58,25 @@ def test_every_internal_number_is_fake() -> None:
     }
 
 
-def test_deterministic_only_never_proceeds(seam1_case: Seam1Case) -> None:
-    # Concern C4: no deterministic address extractor yet.
-    assert seam1_case.expect_deterministic_only.result != "proceed"
+def test_proceed_cases_read_in_both_layouts(seam1_case: Seam1Case) -> None:
+    # Each reader's own layout (fixtures/cases.toml header): a PROCEED must
+    # hold with pypdf's columns read apart, not only on a copy of pdfplumber's.
+    if seam1_case.expect.result == "proceed":
+        assert seam1_case.pypdf_text != seam1_case.pdf_text
+        assert "Job Address:" in seam1_case.pypdf_text
 
 
-def test_deterministic_only_matches_hybrid_before_claude(seam1_case: Seam1Case) -> None:
-    hybrid, deterministic = seam1_case.expect, seam1_case.expect_deterministic_only
-    if hybrid.result == "untouched":
-        assert deterministic.result == "untouched"
-    elif hybrid.reason in {
-        SkipReason.NOTE_ALREADY_LINKED,
-        SkipReason.NO_PDF,
-        SkipReason.MULTIPLE_PDFS,
-        SkipReason.PDF_UNREADABLE,
-        SkipReason.NOT_B1,
-        SkipReason.NOT_COMPACTION,
-        SkipReason.PO_MISMATCH,
-        SkipReason.PROJECT_NOT_FOUND,
-        SkipReason.PROJECT_AMBIGUOUS,
-        SkipReason.UNEXPECTED_SCREEN,
-    }:
-        assert deterministic == hybrid
-    else:  # steps 6-10 in hybrid: deterministic-only stops at the address
-        assert deterministic.reason is SkipReason.ADDRESS_UNVERIFIABLE
+def test_a_replace_text_missing_from_a_reader_fails_the_load() -> None:
+    raw = tomllib.loads(CASES_FILE.read_text(encoding="utf-8"))
+    case = {
+        "id": "x",
+        "base": "p1",
+        "covers": [],
+        "pdf_replace": [["Unit 1, 2 Supplier Road Supplierton WA Sample", "y"]],
+        "expect": {"result": "untouched"},
+    }
+    with pytest.raises(ValueError, match="pdf_replace not in pypdf_text"):
+        _build(case, raw["po"])
 
 
 def test_step0_eligibility_matches_the_case(seam1_case: Seam1Case) -> None:
