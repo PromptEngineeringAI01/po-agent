@@ -421,7 +421,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Description:** `po-agent run --site test --decide-only`: for each eligible Note, assign → 2a → attachments → download → decide → back to the pool, with NOTE lines.
 **Needs:** 3.2; Open question 4 (NOTE outcome for a would-book Note).
 **Acceptance:**
-- Eligible Notes come from the list read once at the start (1.8), oldest first by Note ID, up to `max_notes_per_run`. Untouched Notes are never opened. Every processed Note ends back in the Agent Pool, and nothing is booked.
+- Eligible Notes come from the list read once at the start (1.8), oldest first by Note ID, up to `max_notes_per_run`. Notes past the cap are never opened, and a Note a person holds is never taken. Every processed Note ends back in the Agent Pool, and nothing is booked.
 - One `NOTE` line per Note (reason, po_number, pln, tokens, cost_aud), then `RUN_SUMMARY` with `"mode": "decide-only"`.
 - An `UnexpectedScreen` error or a `Skip(UNEXPECTED_SCREEN)` before any write → one attempt to return the Note to the pool through the normal path, in a fresh browser context if the old one was closed ("Finding a Note again"), then stop the run (exit 1). If the return fails, the Note stays with the agent and the ALERT says so.
 - An offline loop test with a fake driver (not `testsite`) covers ordering, untouched Notes, a skipped Note not taken twice, reload between Notes and stop-on-first-failure.

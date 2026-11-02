@@ -156,26 +156,39 @@ def decide_only(
                 with driver.note_downloads(page, downloads):
                     line = _one_note(guard, page, config, login, log, note, progress)
                 output.note(line)
+                progress.note_id = None  # done: a later error isn't this Note's
                 if line.outcome == "skipped":
                     summary.skipped += 1
-    except Exception as error:
-        if isinstance(error, PoAgentError) and error.note_id is None:
-            error.note_id = progress.note_id
-        log.event(
-            "error",
-            note_id=progress.note_id,
-            step=getattr(error, "step", None),
-            ok=False,
-            type=type(error).__name__,
+    except BaseException as error:
+        # The return first: nothing else in here may stop it. Ctrl+C or a
+        # system exit skips it, and the ALERT still names the Note.
+        returned = (
+            not progress.taken
+            or isinstance(error, Exception)
+            and _return_after_stop(guard, config, options, login, log, progress.note_id)
         )
-        if progress.taken and not _return_after_stop(
-            guard, config, options, login, log, progress.note_id
-        ):
-            # The original error stays in the traceback as the cause.
+        try:
+            log.event(
+                "error",
+                note_id=progress.note_id,
+                step=getattr(error, "step", None),
+                ok=False,
+                type=type(error).__name__,
+            )
+        except OSError:
+            pass  # the ALERT and RUN_SUMMARY still go out
+        # The original error stays in the traceback as the cause.
+        if not returned:
             raise UnexpectedScreen(
                 "run stopped; Note not returned to the pool",
                 note_id=progress.note_id,
             ) from error
+        if progress.note_id is None:
+            raise
+        if not isinstance(error, PoAgentError):
+            raise UnexpectedScreen("run stopped", note_id=progress.note_id) from error
+        if error.note_id is None:
+            error.note_id = progress.note_id
         raise
     finally:
         shutil.rmtree(downloads, ignore_errors=True)
