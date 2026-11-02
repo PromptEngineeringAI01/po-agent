@@ -306,14 +306,13 @@ def test_before_write_kill_switch_before_anything_is_submitted(checks, step):
 def test_before_write_kill_switch_after_a_submit_is_a_partial_write(checks, step):
     gate, calls, config_dir = checks
     gate.before_write("300001", "W1")
-    calls.clear()
     _write_config(config_dir, **{"enabled = true": "enabled = false"})
 
     with pytest.raises(PartialWrite) as raised:
         gate.before_write("300001", step)
 
     assert (raised.value.note_id, raised.value.step) == ("300001", step)
-    assert calls == []  # the switch is read first
+    assert calls == [("300001", "W1")]  # the switch is read first: no W4 check
 
 
 @pytest.mark.parametrize(("step", "error"), [("W1", ConfigError), ("W3", PartialWrite)])
