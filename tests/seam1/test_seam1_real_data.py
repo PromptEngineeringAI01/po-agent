@@ -189,6 +189,38 @@ def test_a_missing_pdf_is_an_error(tmp_path) -> None:
         evaluate(folder)
 
 
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ('expect_reason = ""', 'expect_reason = "Lot 123 Sample Lane"'),
+        ('expect = "PROCEED"', 'expect = "Lot 123 Sample Lane"'),
+    ],
+    ids=["reason", "expect"],
+)
+def test_an_expectation_that_isnt_an_enum_value_fails_without_printing_it(
+    tmp_path, old: str, new: str
+) -> None:
+    # Review, 2.6: expect and expect_reason reach the printed report.
+    folder = fake_private(tmp_path / "private", MYSYS_CASE.replace(old, new))
+    with pytest.raises(ValueError) as error:
+        evaluate(folder)
+    assert str(error.value) == "case real-1: expect or expect_reason not valid"
+
+
+def test_an_odd_pdf_name_is_decided_not_an_error(tmp_path) -> None:
+    # Review, 2.6: a name that isn't <no>_048[_n].pdf skips like any other.
+    odd = "2600001B_048_1 copy.pdf"
+    folder = fake_private(
+        tmp_path / "private",
+        MYSYS_CASE.replace('pdf = "2600001B_048_1.pdf"', f'pdf = "{odd}"'),
+    )
+    (folder / "pdfs" / "2600001B_048_1.pdf").rename(folder / "pdfs" / odd)
+    results = evaluate(folder)
+    assert [r.case_id for r in results] == ["real-1"]
+    assert "case real-1: SKIP PO_MISMATCH (expected PROCEED)" in report_lines(results)
+    assert false_proceeds(results) == 0
+
+
 # --- offline: no private/, and the failure-report scrub ---
 
 LEAKY_TESTS = f"""
