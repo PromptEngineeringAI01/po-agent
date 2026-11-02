@@ -99,7 +99,7 @@ Check (= CI):        uv run scripts/check.py        healthy: last line "check: a
 Run seam, test site: uv run pytest tests/seam2 -m testsite
 Spike (read-only):   uv run po-agent spike --site test       login, filter Agent Pool + Locked, list eligible Notes
 Screen mapping (M0): playwright-cli open --headed "<test-site URL>"   Claude opens it; YOU log in and click; Claude runs snapshot / screenshot
-Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses private/fixtures; skipped when absent; never in CI
+Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses the main checkout's private/fixtures (or SEAM1_PRIVATE_DIR); skipped when absent, an error with -m real_data; never in CI
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
 Supervised demo:     uv run po-agent demo --site test --headed [--until-check]   one PO, Enter before every write (decisions, 27 Oct 2026)

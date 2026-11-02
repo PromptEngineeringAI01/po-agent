@@ -372,14 +372,15 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Needs:** 2.5.
 **Acceptance:**
 - `tests/seam1/test_seam1_real_data.py` (`-m real_data`) reads `private/fixtures/cases.toml` (the 3 recent real POs plus the 3 trial POs, with test-site lookups as MySys shows them), reads each PDF with both code readers, is skipped when `private/` is absent (an error instead when `-m real_data` is selected explicitly), reports per-field agree/disagree **without values** and coverage, and fails on any false PROCEED. `tests/seam1/conftest.py` applies 1.8's failure-report hook to `real_data` tests, so no PDF text reaches a failure report.
-- S3: real-data → `false PROCEED: 0`, and the 3 trial POs PROCEED with the right pln and PO number. Every skip of a clean real PO is reviewed with Joey before M3.
+- S3: real-data → `false PROCEED: 0`, and the 3 trial POs PROCEED with the right pln and PO number. Every skip of a clean real PO is reviewed with Joey.
+- **The S3 evidence is gathered after 3.2** (Joey, 2 Nov 2026): the seam merges first. The private cases need their lookups in the MySys shape. The 3 trial POs' lookups come from the agent's own read-only project reads (3.2's helper), and Joey records the 3 recent real POs (live site) by hand. Then `-m real_data` is re-run and its report shown.
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam1 -m real_data`, with output shown.
 **Files:** `tests/seam1/test_seam1_real_data.py`, `tests/seam1/conftest.py`. **Scope:** S.
 
 ### Checkpoint: M2 (S3)
-- [ ] `check: all passed` (seam 1 `false PROCEED: 0`); real-PO 0 with the report shown.
-- [ ] Skips of clean real POs reviewed with Joey.
+- [ ] `check: all passed` (seam 1 `false PROCEED: 0`).
+- [ ] After 3.2 (S3 evidence, see 2.6): real-PO `false PROCEED: 0` with the report shown; skips of clean real POs reviewed with Joey.
 - [ ] `/agent-skills:review` on the M2 PRs.
 - [ ] **Gate for M3:** M0b.1 written up (panels and list anchors, Note Pool search and reload, moving between windows, one-Assign return; rows 21–23 dropped or moved, decisions 25 Oct 2026) and merged; test site reset.
 
@@ -409,6 +410,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - "Download document" links are counted in the Note window **before** any click, by SPEC → Attachment and download (decisions, 25 Oct 2026; rows 21–22 not mapped): exactly one whose URL `file_name` ends `.pdf` (any case) goes on; 0 → `NO_PDF`, more than 1 → `MULTIPLE_PDFS`, anything else → `NO_PDF`. Offline tests cover 0, 1, 2 links, an upper-case `.PDF`, a non-PDF and a link with no `file_name`. Download inside `expect_download` into the run's `po-agent-dl-<run_id>` directory; read the first file into memory and delete it at once (D2). A second download is deleted unread. The preview window is never used.
 - After the download, reload `base_url` (the Note window would cover the Projects results, row 25), then Project → Projects sub-tab, Search anchored inside the Projects panel (row 26). **First, on the test site:** does `fill` alone run this search (not mapped in M0b.1)? If not, click the panel's "Search" label to move focus (add it to the allowlist in this task, with a dated decisions entry); if that fails too, stop and ask Joey. Wait up to 15 s for "No record found." or rows that each contain the internal number, else `UnexpectedScreen`. Parse every row (pln, Client Ref No., Company, Address) and whether there is a second page. Choose the row with `match_project()` (2.3) and open it by its `pln_…` link. Read Client Internal No., Address, and every "(tsk_…) | Compaction Test" header row with the Status from its details row, into `MySysLookup`.
 - The seam-2 precondition helper gains its project part: no non-Cancelled Compaction Test task on a trial pln where the test needs none.
+- A laptop-only helper writes each trial PO's lookup, as MySys shows it, into `private/fixtures/cases.toml` (never a committed file), for 2.6's S3 evidence (Joey, 2 Nov 2026).
 - Tests assert structure and the trial identifiers only, never an address. An offline test checks the download directory is empty after a Note, and after an exception mid-Note.
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k reads` for the 3 trial plns.

@@ -6,6 +6,7 @@ is in tests/seam1/test_real_pdf.py (real_data, laptop only).
 
 import subprocess
 import sys
+import warnings
 
 import pytest
 
@@ -104,6 +105,30 @@ def test_unreadable_pdf_bytes_stop():
     with pytest.raises(WriteNotStarted) as error:
         rules.pdf_text(b"not a pdf")
     assert reason(error) == "PDF_UNREADABLE"
+
+
+def test_pdfplumber_warnings_never_leave_the_reader(monkeypatch):
+    # A warning can quote PDF text, and pytest's warnings summary isn't
+    # scrubbed (review, 2.6): pdf_text silences them, as pypdf_text_layer does.
+    class Page:
+        def extract_text(self):
+            warnings.warn("Lot 123 Sample Lane", UserWarning, stacklevel=1)
+            return "text"
+
+    class Pdf:
+        pages = [Page()]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(rules.pdfplumber, "open", lambda data: Pdf())
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        assert rules.pdf_text(b"%PDF") == "text"
+    assert seen == []
 
 
 def test_pdfminer_prints_nothing_on_a_broken_pdf():

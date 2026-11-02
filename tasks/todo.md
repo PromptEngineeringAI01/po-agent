@@ -57,16 +57,16 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **2.4** Address verify-not-extract + agreement, stubbed Claude; `false PROCEED: 0` · auto · pauses: address rules
 - [ ] **2.5** (replaced 2 Nov 2026: no Claude reader) Second code reader (pypdf) + address check fed by MySys; `decide()` code only; `false PROCEED: 0` · step · pauses: failing tests
 - [x] **2.5b** (done, 2 Nov 2026) Remove the Claude settings from config, CLI and secrets (`reader_mode`, model ID, prices, `anthropic_api_key`) · step
-- [ ] **2.6** Real-PO seam (`-m real_data`, both code readers); no prices · auto · pauses: laptop runs
+- [ ] **2.6** Real-PO seam (`-m real_data`, both code readers); no prices · auto · pauses: laptop runs. The S3 evidence comes after 3.2 (Joey, 2 Nov 2026): trial lookups from 3.2's helper, the 3 recent real POs recorded by Joey
 
-**Checkpoint M2:** check green; seam 1 and real-PO `false PROCEED: 0`; clean-PO skips reviewed; review. **Gate for M3:** M0b.1 merged (already needed by 1.8); reset.
+**Checkpoint M2:** check green; seam 1 `false PROCEED: 0`; review. After 3.2: real-PO `false PROCEED: 0`, clean-PO skips reviewed. **Gate for M3:** M0b.1 merged (already needed by 1.8); reset.
 
 ## M3 — decide-only + run controls
 
 **Milestone A** (decisions, 25 Oct 2026): 1.4, 1.6, 1.7, M0b.1, 1.8, 1.9, 1.10; M2 (2.1–2.6); M3's 3.1, 3.2, 3.3, 3.5, then 3.4, then the decide-only demo to the CEO. 3.6 comes after the demo, before M4.
 
 - [ ] **3.1** Take a Note and hand it back (untick + read back, assign to agent, step 2a, assign to pool; anchored lists; runlog format incl. `assignee_check`) · step
-- [ ] **3.2** Attachment count, download (`downloads_path` at launch; file read into memory and deleted at once), project search via `match_project()`, project reads → `MySysLookup` · step
+- [ ] **3.2** Attachment count, download (`downloads_path` at launch; file read into memory and deleted at once), project search via `match_project()`, project reads → `MySysLookup`; laptop-only helper writes each trial PO's lookup into `private/fixtures/cases.toml` (never committed) · step
 - [ ] **3.3** `run --decide-only` loop with NOTE lines; offline loop test + seam-2 `decide_only` · step
 - [ ] **3.5** Kill switch (start + `before_write` every step), Perth window, run cap · step
 - [ ] **3.6** Assignee check (All Pools + exact Note ID) before W1 and W4 only (D7); stale-Note stop at run start (D6) · step · after the Milestone A demo, before M4
