@@ -18,6 +18,7 @@ from urllib.parse import quote
 import pytest
 from playwright.sync_api import Browser, Page, sync_playwright
 
+from po_agent.b1.models import NotePoolRow
 from po_agent.core import runlog
 from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys import driver
@@ -278,3 +279,29 @@ def test_reload_home_logs_in_again_only_if_the_login_page_shows(
     logins = ["login_username", "login_password", "login_submit"]
     assert actions(guard) == (logins if logged_out else [])
     assert page.locator("li").get_by_text("Project", exact=True).is_visible()
+
+
+# --- Finding a Note again: the ID cell must equal the Note ID ---------------------
+
+
+def listing(*note_ids: str) -> driver.NotePoolList:
+    rows = tuple(
+        NotePoolRow(note_id=n, subject_note="fake", project="---", assignee=POOL)
+        for n in note_ids
+    )
+    return driver.NotePoolList(rows=rows, total=len(rows), pages=1)
+
+
+@pytest.mark.parametrize(
+    "note_ids, found",
+    [
+        (("300001",), True),
+        (("300001", "3000012"), True),  # the search matches substrings
+        (("3000012",), False),
+        (("1300001",), False),
+        ((), False),
+        (("300001", "300001"), False),  # the same row twice: not one
+    ],
+)
+def test_only_a_row_whose_id_equals_the_note_id_counts(note_ids, found):
+    assert driver.found_once(listing(*note_ids), NOTE_ID) is found

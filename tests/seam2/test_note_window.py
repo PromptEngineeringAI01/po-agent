@@ -98,8 +98,13 @@ def test_note_window_takes_a_note_and_hands_it_back(
     assert driver.read_status(window) == "Pending"
     assert driver.log_line_count(window) - lines_before == 2
 
-    outcomes = {outcome for _, outcome in guard.history}
-    assert outcomes == {"done"}
+    # Every action done; a covered-page click may fail first and be retried
+    # (opening and refreshing clicks only, driver._open_retried).
+    retried = {"open_note", "refresh_note_pool"}
+    assert all(
+        outcome == "done" or (outcome == "failed" and action in retried)
+        for action, outcome in guard.history
+    )
     path = tmp_path / f"{RUN_ID}.jsonl"
     events = [json.loads(line) for line in path.read_text("utf-8").splitlines()]
     named = [e.get("action") or e["event"] for e in events]
