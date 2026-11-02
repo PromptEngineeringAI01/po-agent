@@ -12,7 +12,7 @@ from keyring.errors import KeyringError
 
 from po_agent.core.errors import ConfigError
 
-SecretName = Literal["anthropic_api_key", "mysys_test_username", "mysys_test_password"]
+SecretName = Literal["mysys_test_username", "mysys_test_password"]
 SECRET_NAMES: tuple[str, ...] = get_args(SecretName)
 KEYRING_SERVICE = "po-agent"
 ENV_PREFIX = "PO_AGENT_"

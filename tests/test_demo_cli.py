@@ -17,7 +17,7 @@ from keyring.backends.null import Keyring as NullKeyring
 from po_agent import cli
 from po_agent.core import output
 
-SECRET_NAMES = ("anthropic_api_key", "mysys_test_username", "mysys_test_password")
+SECRET_NAMES = ("mysys_test_username", "mysys_test_password")
 
 
 @pytest.fixture

@@ -27,7 +27,6 @@ The office Mac Mini is model **A3238**: the 2024 Mac mini with the **M4** chip, 
 ## 1. Before you start
 
 - [ ] The repo is on GitHub (private) and `main` has M1's code.
-- [ ] An Anthropic API key just for this agent: console.anthropic.com → **API keys** → **Create key**, name `po-agent-trial`, with a low monthly spend limit (e.g. US$10).
 - [ ] The test-site agent account username and password, and confirmation that it has no MFA (SPEC open question 3).
 - [ ] A GitHub label for alerts. On your laptop: `gh label create po-agent-alert --color B60205`
 - [ ] A **fine-grained GitHub token** for the Mac Mini: github.com → Settings → Developer settings → Fine-grained tokens → **Generate**. Name `po-agent-macmini`; resource owner `PromptEngineeringAI01`; **only** the `po-agent` repository; permissions **Contents: Read-only**, **Issues: Read and write** (Metadata: Read-only is added automatically); expiry 90 days (diarise the renewal).
@@ -121,7 +120,6 @@ As `poagent`, in `~/po-agent`. Each command prompts for the value; type it yours
 ```bash
 uv run keyring set po-agent mysys_test_username
 uv run keyring set po-agent mysys_test_password
-uv run keyring set po-agent anthropic_api_key
 ```
 
 They go into `poagent`'s login Keychain (keyring service `po-agent`; names as `SPEC.md` → Secrets). Don't set any `PO_AGENT_*` environment variable on the Mac Mini.
@@ -202,6 +200,6 @@ After an `ALERT ACCURACY_BREACH`, do both, and restart only with the CEO's agree
 ## 12. At the end of the trial
 
 - Unload the job (section 11, step 2).
-- Revoke the `po-agent-trial` Anthropic key. Ask the MySys admin to change the test agent account's password. Delete the three test items from `poagent`'s Keychain (`uv run keyring del po-agent <name>`).
+- Ask the MySys admin to change the test agent account's password. Delete the two test items from `poagent`'s Keychain (`uv run keyring del po-agent <name>`).
 - Close the `po-agent-alert` issues once the CEO has reviewed the MVP demo note.
 - Production on this Mac Mini (roadmap phase 4) starts only after the CEO's go-live sign-off: live credentials go into the same Keychain then, never earlier.

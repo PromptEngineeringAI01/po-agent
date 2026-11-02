@@ -4,6 +4,9 @@ Pure functions on fake values: no browser, no real PDF. The real-PDF check
 is in tests/seam1/test_real_pdf.py (real_data, laptop only).
 """
 
+import subprocess
+import sys
+
 import pytest
 
 from po_agent.b1 import reader_rules as rules
@@ -101,6 +104,27 @@ def test_unreadable_pdf_bytes_stop():
     with pytest.raises(WriteNotStarted) as error:
         rules.pdf_text(b"not a pdf")
     assert reason(error) == "PDF_UNREADABLE"
+
+
+def test_pdfminer_prints_nothing_on_a_broken_pdf():
+    # pdfminer logs warnings ("MediaBox missing from /Page"); only output.py
+    # prints. In a fresh interpreter, because pytest's own logging capture
+    # would hide what reaches a real run's stderr (as for pypdf, 2.5).
+    no_mediabox = (
+        b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+        b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+        b"3 0 obj<</Type/Page/Parent 2 0 R>>endobj\n"
+        b"trailer<</Root 1 0 R>>\n%%EOF\n"
+    )
+    code = (
+        "from po_agent.b1 import reader_rules as rules\n"
+        f"rules.text_layer({no_mediabox!r})\n"
+        f"rules.text_layer({b'not a pdf'!r})\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=60
+    )
+    assert (done.returncode, done.stdout, done.stderr) == (0, "", "")
 
 
 # Project search (step 5)

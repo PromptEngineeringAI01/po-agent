@@ -43,7 +43,7 @@ Each needs a dated `docs/decisions.md` entry and the SPEC change, in the freeze 
 ## Cross-cutting rules (apply to every task)
 
 - **TDD (CLAUDE.md):** write the failing test, run it and show it fails for the expected reason. Stop for Joey before writing code only on 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2; on the other tasks, commit the test and carry on (decisions, 24 Oct 2026). The test goes in its own `test:` commit, then the code. CLAUDE.md wins over `/agent-skills:build auto`: in M2, auto stops at the failing tests of 2.2–2.5 (Open question 9).
-- **Done means:** `uv run scripts/check.py` ends with `check: all passed`, and its output is shown. If a task touches readers, prompt, model or address rules: ask Joey first, then run the live-Claude seam and show `false PROCEED: 0`. The live seam exists only from 2.5, so 2.2–2.4 are done on the stubbed seam, and 2.5's first live run covers them (say so in each PR). If a task touches `mysys/` or the booker: run seam 2 on the test site, or ask Joey to run it (reset first, workflow 6.1).
+- **Done means:** `uv run scripts/check.py` ends with `check: all passed`, and its output is shown. If a task touches the readers or address rules: ask Joey first, then show seam 1's `false PROCEED: 0` (in the check) and, on the laptop, the real-PO seam's (`-m real_data`, from 2.6). No live-Claude seam: the Claude reader was dropped (decisions, 2 Nov 2026). If a task touches `mysys/` or the booker: run seam 2 on the test site, or ask Joey to run it (reset first, workflow 6.1).
 - **References.** "workflow 6.1" means `docs/workflow.md` section 6.1 (the test-site reset). A bare number such as 4.3 is a task in this plan.
 - **No real data in output.** Test-site and real-PO tests must never print an address, client name, PDF text or Note body: not in assertion messages, not in reports, not in run output. Assert on booleans, counts, enum values and the trial identifiers only, because pytest's assertion rewriting prints compared values. Test-site captures count as real data.
 - **New dependencies** need Joey's OK (list in Open question 2). **Ask-first files:** `.github/workflows/`, `config/test.toml`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, the plist. They appear in this plan, but each task still says what changes in them.
@@ -364,7 +364,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 
 **Verify:** `uv run scripts/check.py`.
 **Files:** `src/po_agent/b1/reader_rules.py`, `address.py`, `decision.py`, `models.py`, `tests/seam1/` (`test_seam1_decide.py`, `test_seam1_second_reader.py`, fixtures). **Scope:** M.
-**Follow-up (own task):** remove the Claude settings from config, CLI and secrets (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, `anthropic_api_key`, decide-only asking for the key).
+**Follow-up (task 2.5b, done):** remove the Claude settings from config, CLI and secrets (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, `anthropic_api_key`, decide-only asking for the key).
 
 ### 2.6 The real-PO seam (S3) · auto (pauses: laptop runs)
 
@@ -378,7 +378,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 **Files:** `tests/seam1/test_seam1_real_data.py`, `tests/seam1/conftest.py`. **Scope:** S.
 
 ### Checkpoint: M2 (S3)
-- [ ] `check: all passed`; live-Claude ×3 `false PROCEED: 0`; deterministic-only 0; real-PO 0 with the report shown.
+- [ ] `check: all passed` (seam 1 `false PROCEED: 0`); real-PO 0 with the report shown.
 - [ ] Skips of clean real POs reviewed with Joey.
 - [ ] `/agent-skills:review` on the M2 PRs.
 - [ ] **Gate for M3:** M0b.1 written up (panels and list anchors, Note Pool search and reload, moving between windows, one-Assign return; rows 21–23 dropped or moved, decisions 25 Oct 2026) and merged; test site reset.
@@ -627,10 +627,10 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 | Step | Tasks | Notes | Done when |
 |---|---|---|---|
 | P1 Docs catch-up | - | README, workflow status, SPEC (Projects search on Enter, Production), this plan, todo, decisions | PR merged |
-| P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. No fake-PDF generator (Joey, 29 Oct 2026, at 2.1) | Checkpoint M2: `false PROCEED: 0` in stubbed, live-Claude ×3, deterministic-only and real-PO runs |
+| P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. No fake-PDF generator (Joey, 29 Oct 2026, at 2.1) | Checkpoint M2: `false PROCEED: 0` in seam 1 and the real-PO run |
 | P3 Run controls and decide-only | 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4 | 3.2 reuses the demo's Projects search (Enter, `submit_project_search`). 3.6 needs M0b.2 row 23 | Checkpoint M3; decide-only green on the laptop and the Mac Mini |
 | P4 Real booker | M0b.2, doubt-driven design review, then 4.1-4.5 | Built from `mysys/booking.py` (Phase M4 intro). PO Documents confirmed with the PO admin first (SPEC open question 11) | Checkpoint M4 without 4.6; seam 2 booking cases green |
-| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job loaded | 1.10 also confirms the Mac Mini login, Keychain and `po-agent-trial` key. Replaces M6's checks: S1-S8 on the scheduled job | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5) |
+| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job loaded | 1.10 also confirms the Mac Mini login and Keychain. Replaces M6's checks: S1-S8 on the scheduled job | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5) |
 | P6 Go live | New tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
 
 **Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator (Joey, 29 Oct 2026); `po-agent demo` stays as is.
@@ -639,7 +639,7 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 1. MySys confirms automation is allowed (and whether there's an API). No → production stops. **Met, 29 Oct 2026:** allowed on the website; no API (Alltraders would charge).
 2. The PO admin's live answers: PO Documents or Documents; Resolve or Solved; live's Client Ref No. column; the agent account's password expiry.
 3. CEO sign-off for going live, and the backlog cut-off date (which older Notes the agent may touch).
-4. Accounts: the Anthropic `po-agent-trial` key; a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
+4. Accounts: a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
 5. A week of hourly test-site runs with zero wrong bookings (P5).
 
 **Live order** (P6, each step with its own dated decisions entry): read-only `spike` on live, then `run --decide-only` on live, then `run` booking one PO per run, watched, then full hourly runs.

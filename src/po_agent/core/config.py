@@ -49,26 +49,17 @@ class RunWindow(_Section):
         return self
 
 
-class ClaudePrices(_Section):
-    input: float = Field(ge=0)
-    output: float = Field(ge=0)
-
-
 class Config(_Section):
     site: Literal["test"]
     base_url: HttpUrl
     pool_name: str = Field(min_length=1)
     agent_user_name: str = Field(min_length=1)
     title_rule: Literal["test-body-filename"]
-    reader_mode: Literal["hybrid", "deterministic-only"]
     enabled: StrictBool
-    claude_model_id: str = Field(min_length=1)
     duplicate_ignores_cancelled: StrictBool
     max_notes_per_run: int = Field(gt=0)
     max_run_minutes: int = Field(gt=0)
     run_window: RunWindow
-    aud_per_usd: float = Field(gt=0)
-    claude_price_usd_per_mtok: ClaudePrices
 
     # https://docs.pydantic.dev/latest/concepts/validators/#field-after-validator
     @field_validator("base_url", mode="after")

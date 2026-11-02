@@ -67,7 +67,7 @@ ALERT_KINDS: dict[type[PoAgentError], output.AlertKind] = {
 _MYSYS: tuple[SecretName, ...] = ("mysys_test_username", "mysys_test_password")
 SECRETS_FOR: dict[output.Mode, tuple[SecretName, ...]] = {
     "spike": _MYSYS,
-    "decide-only": (*_MYSYS, "anthropic_api_key"),
+    "decide-only": _MYSYS,
     "demo": _MYSYS,
 }
 

@@ -56,7 +56,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **2.3** `match_project()` + strict duplicate check (Cancelled toggle); `Skip(UNEXPECTED_SCREEN)`; deterministic-only → `ADDRESS_UNVERIFIABLE` · auto
 - [ ] **2.4** Address verify-not-extract + agreement, stubbed Claude; `false PROCEED: 0` · auto · pauses: address rules
 - [ ] **2.5** (replaced 2 Nov 2026: no Claude reader) Second code reader (pypdf) + address check fed by MySys; `decide()` code only; `false PROCEED: 0` · step · pauses: failing tests
-- [ ] **2.5b** Remove the Claude settings from config, CLI and secrets (`reader_mode`, model ID, prices, `anthropic_api_key`) · step
+- [x] **2.5b** (done, 2 Nov 2026) Remove the Claude settings from config, CLI and secrets (`reader_mode`, model ID, prices, `anthropic_api_key`) · step
 - [ ] **2.6** Real-PO seam (`-m real_data`, both code readers); no prices · auto · pauses: laptop runs
 
 **Checkpoint M2:** check green; seam 1 and real-PO `false PROCEED: 0`; clean-PO skips reviewed; review. **Gate for M3:** M0b.1 merged (already needed by 1.8); reset.

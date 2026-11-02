@@ -31,7 +31,7 @@ from po_agent.core.errors import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-SECRET_NAMES = ("anthropic_api_key", "mysys_test_username", "mysys_test_password")
+SECRET_NAMES = ("mysys_test_username", "mysys_test_password")
 RUN_ID = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{4}")
 PAGE_TEXT = "12 Example Close"  # stands in for an address in a Playwright message
 NOTE_FIELDS = {
@@ -234,22 +234,17 @@ def test_spike_without_secrets_prints_alert_config_and_summary(env, started, cap
     assert started == []
 
 
-def test_decide_only_also_needs_the_claude_key(env, started, capsys):
-    set_secrets(env, ("mysys_test_username", "mysys_test_password"))
+@pytest.mark.parametrize(
+    "argv", [["run", "--site", "test", "--decide-only"], ["spike", "--site", "test"]]
+)
+def test_modes_need_only_the_mysys_secrets(env, started, capsys, argv):
+    # No Claude key since the Claude reader was dropped (decisions, 2 Nov 2026).
+    set_secrets(env)
 
-    code = cli.main(["run", "--site", "test", "--decide-only"])
-
-    captured = capsys.readouterr()
-    assert code == 2
-    assert "anthropic_api_key" in alert_of(captured)[1]["detail"]
-    assert started == []
-
-
-def test_spike_does_not_need_the_claude_key(env, started, capsys):
-    set_secrets(env, ("mysys_test_username", "mysys_test_password"))
-
-    assert cli.main(["spike", "--site", "test"]) == 0
+    assert cli.main(argv) == 0
     assert len(started) == 1
+    credentials = started[0][2]
+    assert set(credentials) == {"mysys_test_username", "mysys_test_password"}
 
 
 def test_run_without_decide_only_refuses_until_4_5(env, started, capsys):

@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 TEST_TOML = ROOT / "config" / "test.toml"
 TEST_HOST = "test-prompt.mysys.com.au"
 MADE_UP_HOST = "mysys.example.invalid"
-SECRET_NAMES = ("anthropic_api_key", "mysys_test_username", "mysys_test_password")
+SECRET_NAMES = ("mysys_test_username", "mysys_test_password")
 
 
 def repo_config() -> dict:
@@ -55,7 +55,6 @@ def test_repo_config_loads_as_the_test_profile():
     assert isinstance(config, Config)
     assert config.site == "test"
     assert config.base_url.host == TEST_HOST
-    assert config.reader_mode in ("hybrid", "deterministic-only")
     assert isinstance(config.enabled, bool)
     assert config.max_notes_per_run > 0
     assert config.run_window.tz == "Australia/Perth"
@@ -148,17 +147,39 @@ def test_config_file_with_a_made_up_host_is_a_config_error(tmp_path):
 @pytest.mark.parametrize(
     "changes",
     [
-        {"reader_mode": "claude-only"},
         {"title_rule": "anything"},
         {"enabled": "false"},
         {"max_notes_per_run": 0},
         {"max_run_minutes": -1},
-        {"aud_per_usd": 0},
     ],
 )
 def test_bad_values_are_config_errors(changes):
     with pytest.raises(ConfigError):
         parse_config(with_changes(**changes))
+
+
+CLAUDE_KEYS = {
+    "reader_mode": "hybrid",
+    "claude_model_id": "a-model",
+    "aud_per_usd": 1.433,
+    "claude_price_usd_per_mtok": {"input": 0.0, "output": 0.0},
+}
+
+
+def test_repo_config_has_no_claude_settings():
+    # The Claude reader was dropped (decisions, 2 Nov 2026).
+    assert CLAUDE_KEYS.keys().isdisjoint(repo_config())
+
+
+@pytest.mark.parametrize("key", CLAUDE_KEYS)
+def test_a_claude_setting_is_an_unknown_key(key):
+    data = {k: v for k, v in repo_config().items() if k not in CLAUDE_KEYS}
+    data[key] = CLAUDE_KEYS[key]
+
+    with pytest.raises(ConfigError) as caught:
+        parse_config(data)
+
+    assert key in str(caught.value)
 
 
 def test_missing_key_is_a_config_error():
@@ -270,24 +291,32 @@ def test_keyring_failure_is_a_config_error_without_its_text(
     assert caught.value.__suppress_context__
 
 
-def test_anthropic_api_key_env_var_is_ignored(clean_env, use_keyring):
+@pytest.mark.parametrize("name", SECRET_NAMES)
+def test_anthropic_api_key_env_var_is_ignored(name, clean_env, use_keyring):
     use_keyring(MemoryKeyring())
     clean_env.setenv("ANTHROPIC_API_KEY", "should-be-ignored")
 
     with pytest.raises(ConfigError) as caught:
-        secrets.get("anthropic_api_key")
+        secrets.get(name)
 
     assert "should-be-ignored" not in str(caught.value)
 
 
-def test_anthropic_api_key_env_var_does_not_override_keyring(clean_env, use_keyring):
-    use_keyring(MemoryKeyring({("po-agent", "anthropic_api_key"): "kr-key"}))
+@pytest.mark.parametrize("name", SECRET_NAMES)
+def test_anthropic_api_key_env_var_does_not_override_keyring(
+    name, clean_env, use_keyring
+):
+    use_keyring(MemoryKeyring({("po-agent", name): "kr-value"}))
     clean_env.setenv("ANTHROPIC_API_KEY", "should-be-ignored")
 
-    assert secrets.get("anthropic_api_key") == "kr-key"
+    assert secrets.get(name) == "kr-value"
 
 
-@pytest.mark.parametrize("name", ["mysys_live_password", "ANTHROPIC_API_KEY", ""])
+@pytest.mark.parametrize(
+    # anthropic_api_key: no Claude key since 2 Nov 2026 (decisions)
+    "name",
+    ["mysys_live_password", "ANTHROPIC_API_KEY", "anthropic_api_key", ""],
+)
 def test_unknown_secret_name_is_refused(name, clean_env, use_keyring):
     backend = use_keyring(MemoryKeyring())
 
