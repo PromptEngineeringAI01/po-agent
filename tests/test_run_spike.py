@@ -95,7 +95,7 @@ def fake(monkeypatch):
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    for name in ("anthropic_api_key", "mysys_test_username", "mysys_test_password"):
+    for name in ("mysys_test_username", "mysys_test_password"):
         monkeypatch.delenv(f"PO_AGENT_{name.upper()}", raising=False)
     monkeypatch.setenv("PO_AGENT_MYSYS_TEST_USERNAME", "fake-user")
     monkeypatch.setenv("PO_AGENT_MYSYS_TEST_PASSWORD", "fake-password")
