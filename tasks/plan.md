@@ -400,7 +400,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - Navigation: the driver reloads `base_url` between Notes (`driver.go_home()`), logging in again if the login page shows; after a reload it clicks Project before the Note Pool or Projects tab (row 27). It never clicks Minimize or a taskbar entry. To reach a Note it already assigned to itself, it reloads and follows "Finding a Note again" (Cross-cutting rules), searching with fill → Refresh (row 27); the reopened window has Send Email ticked again, so the untick rule above covers it. Assign to pool is **one** Assign (row 15b).
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k note_window` on one trial Note → it ends in the Agent Pool, Pending, with only two new log lines.
-**Files:** `src/po_agent/mysys/driver.py`, `src/po_agent/core/runlog.py`, `src/po_agent/cli.py` (`--detailed-log`), `tests/seam2/test_note_window.py`, `tests/test_runlog.py`. **Scope:** M.
+**Files:** `src/po_agent/mysys/driver.py`, `src/po_agent/mysys/booking.py` (shared helpers moved to the driver), `src/po_agent/core/runlog.py`, `tests/seam2/test_note_window.py`, `tests/test_runlog.py`, `tests/test_driver_note_window.py`. `--detailed-log` creates the `RunLog` in 3.3, the first mode that runs these steps; until then the CLI writes only its traceback line. Seam 2's `note_window` checks only its own trial Note's reset (Joey, 2 Nov 2026: 2610002B's Note was Solved). **Scope:** M.
 
 ### 3.2 Attachments, download and project reads · step
 
