@@ -236,18 +236,8 @@ def download_hrefs(window: Locator) -> list[str]:
         raise UnexpectedScreen("attachment not readable") from None
 
 
-def note_body(window: Locator, file_name: str) -> str:
-    """The Note's body (row 02): the <pre> in the window whose text ends with
-    the file name (27 Oct 2026; the title heading and the file-name <span>
-    end with it too). Untrusted data: never printed."""
-    ends = re.compile(rf"{re.escape(file_name)}\s*$")
-    body = window.locator("pre").filter(has_text=ends)
-    try:
-        if body.count() != 1:
-            raise UnexpectedScreen("Note body not found once")
-        return body.inner_text().strip()
-    except PlaywrightError:
-        raise UnexpectedScreen("Note body not readable") from None
+# Moved to the driver for the decide-only run (3.3); the demo keeps the name.
+note_body = driver.note_body
 
 
 def download_pdf(guard: ActionGuard, page: Page, window: Locator) -> tuple[str, bytes]:

@@ -425,6 +425,7 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 - One `NOTE` line per Note (reason, po_number, pln, tokens, cost_aud), then `RUN_SUMMARY` with `"mode": "decide-only"`.
 - An `UnexpectedScreen` error or a `Skip(UNEXPECTED_SCREEN)` before any write → one attempt to return the Note to the pool through the normal path, in a fresh browser context if the old one was closed ("Finding a Note again"), then stop the run (exit 1). If the return fails, the Note stays with the agent and the ALERT says so.
 - An offline loop test with a fake driver (not `testsite`) covers ordering, untouched Notes, a skipped Note not taken twice, reload between Notes and stop-on-first-failure.
+- Each Note is opened by "Finding a Note again" (the reload between Notes); its Assignee must read the pool before it is taken, else `NOTE_TAKEN`, untouched. The stopped Note has no `NOTE` line; its `ALERT` names it. `tokens_in`, `tokens_out` and `cost_aud` are always 0 (no Claude reader, decisions 2 Nov 2026). With `--detailed-log` the run log gets the `error` event and `cli.py` the one traceback (decisions, 2 Nov 2026, 3.3).
 
 **Verify:** `uv run scripts/check.py`; after a reset, `uv run pytest tests/seam2 -m testsite -k decide_only` → 3 NOTE lines, all 3 Notes back in the Agent Pool, no task created.
 **Files:** `src/po_agent/core/run.py`, `src/po_agent/cli.py`, `src/po_agent/core/output.py`, `tests/seam2/test_run_loop_offline.py`, `tests/seam2/test_decide_only.py`. **Scope:** M.
