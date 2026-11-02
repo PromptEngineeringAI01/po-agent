@@ -462,9 +462,15 @@ def find_note_again(
     _open_retried(guard, "refresh_note_pool", panel, refresh)
     wait_for_list(panel, before)
     listing = read_note_pool(guard, panel)
-    if [row.note_id for row in listing.rows].count(note_id) != 1:
+    if not found_once(listing, note_id):
         raise UnexpectedScreen("Note not found again", note_id=note_id)
     return open_note(guard, page, panel, note_id)
+
+
+def found_once(listing: NotePoolList, note_id: str) -> bool:
+    """Exactly one row whose ID cell equals the Note ID: the search matches
+    substrings, so 300001 also lists 3000012."""
+    return [row.note_id for row in listing.rows].count(note_id) == 1
 
 
 # Note window (rows 02-04, 13, 15b)
