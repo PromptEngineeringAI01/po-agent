@@ -35,32 +35,39 @@ def login(config, credentials) -> tuple[str, str, str]:
     )
 
 
-def trial_notes(page, guard, config, login, check) -> dict[str, str]:
-    """The reset check, then each trial PO's Note ID."""
-    driver.reload_home(guard, page, *login)
-    panel = driver.open_note_pool(guard, page)
-    driver.leave_menu(guard, page)
-    driver.set_note_pool_filters(guard, panel, config.pool_name)
-    listing = driver.read_note_pool(guard, panel)
-    check(listing)
-    found = run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
-    return {
-        n.internal_no: n.note_id for n in found if n.internal_no in TRIAL_INTERNAL_NOS
-    }
-
-
-def task_nos(page, guard, login) -> dict[str, tuple[str, ...]]:
-    lookups = {
-        number: driver.project_lookup(guard, page, *login, number, "test")
-        for number in TRIAL_INTERNAL_NOS
-    }
-    return {n: tuple(t.task_no for t in lookup.tasks) for n, lookup in lookups.items()}
+def read_site(config, login, check) -> tuple[dict[str, str], dict]:
+    """In a browser of its own, closed before the run opens one (Playwright's
+    sync API allows one at a time per thread): the reset check, each trial
+    PO's Note ID and each trial project's Compaction Test task numbers."""
+    guard = ActionGuard()
+    with driver.open_browser(headed=False, slow_mo=0) as page:
+        driver.reload_home(guard, page, *login)
+        panel = driver.open_note_pool(guard, page)
+        driver.leave_menu(guard, page)
+        driver.set_note_pool_filters(guard, panel, config.pool_name)
+        listing = driver.read_note_pool(guard, panel)
+        check(listing)
+        found = run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
+        notes = {
+            n.internal_no: n.note_id
+            for n in found
+            if n.internal_no in TRIAL_INTERNAL_NOS
+        }
+        tasks = {
+            number: tuple(
+                t.task_no
+                for t in driver.project_lookup(
+                    guard, page, *login, number, "test"
+                ).tasks
+            )
+            for number in TRIAL_INTERNAL_NOS
+        }
+    return notes, tasks
 
 
 @pytest.fixture
-def before(page, guard, config, login, check_note_pool_reset):
-    notes = trial_notes(page, guard, config, login, check_note_pool_reset)
-    tasks = task_nos(page, guard, login)
+def before(config, login, check_note_pool_reset):
+    notes, tasks = read_site(config, login, check_note_pool_reset)
     yield notes, tasks
     # Teardown: any trial Note left with the agent goes back to the pool.
     for note_id in notes.values():
@@ -80,7 +87,7 @@ def before(page, guard, config, login, check_note_pool_reset):
 
 
 def test_decide_only_run_returns_every_trial_note_and_books_nothing(
-    before, page, guard, config, login, capsys
+    before, config, login, capsys
 ):
     notes, tasks = before
 
@@ -100,6 +107,4 @@ def test_decide_only_run_returns_every_trial_note_and_books_nothing(
     assert sorted(n["note_id"] for n in note_lines) == sorted(notes.values())
     assert all(n["outcome"] == "skipped" for n in note_lines)
     # All 3 back in the Agent Pool, and no task created.
-    after = trial_notes(page, guard, config, login, lambda listing: None)
-    assert after == notes
-    assert task_nos(page, guard, login) == tasks
+    assert read_site(config, login, lambda listing: None) == (notes, tasks)
