@@ -8,7 +8,7 @@
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes and opens PRs; Joey merges.
 
-**v5.20:** review and testing by risk (from four agentic-engineering talks, see Sources). Every PR states a risk level (low, medium, high) with evidence; medium and high get one review by OpenAI's Codex (a second model from another lab), high also a fresh-session Claude `/code-review`; each finding is rated for harm and likelihood, then triaged "must-fix or overthinking" once. Tests: the fewest that pin the acceptance, real code over mocks, one targeted test when a mistake repeats. Session reports open with a recap and ask one question at a time. Codex setup: Appendix C.
+**v5.20:** review and testing by risk (from four agentic-engineering talks, see Sources). Every PR states a risk level (low, medium, high) with evidence; medium and high get one review by a second model (Fable 5.1, a different model from the Opus builder), high also a fresh-session `/code-review`; each finding is rated for harm and likelihood, then triaged "must-fix or overthinking" once. Tests: the fewest that pin the acceptance, real code over mocks, one targeted test when a mistake repeats. Session reports open with a recap and ask one question at a time. Second-model review: Appendix C.
 
 **v5.19:** production build loop (from task 2.3): each task session in its own worktree; `/goal` only for the code half after Joey approves the tests, never on the test site; a fresh-session `/code-review` on 2.4, 2.5, M3, M4 and 5.2; `/verify-pr` before every merge; when to start a fresh advisor chat.
 
@@ -56,7 +56,7 @@ Always type the full name (`/agent-skills:build`): a bare `/build` is "Unknown c
 |---|---|
 | Build a task (test-first, small commits) | `/agent-skills:build task <N>` (M2: `/agent-skills:build auto`); Stage 5 step 3 |
 | Run the tests | `/agent-skills:test` |
-| Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4; plus the Codex review on medium and high risk (Stage 5, Production build loop step 6) |
+| Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4; plus the second-model review on medium and high risk (Stage 5, Production build loop step 6) |
 | Library calls (Playwright, Anthropic SDK, pdfplumber) | `Use the source-driven-development skill …` (M1, M2, M4) |
 | Challenge a risky design in a fresh session | `Use the doubt-driven-development skill on …` (before M4) |
 | A failure that isn't obvious | `Use the debugging-and-error-recovery skill on …` |
@@ -175,13 +175,13 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    | Risk | Review |
    |---|---|
    | Low | `/agent-skills:review` in the session. Nothing else. |
-   | Medium | The same, plus one **Codex review** (Appendix C). |
-   | High | The Codex review plus `/code-review` in a fresh Claude session; the advisor merges the two lists, dropping duplicates. M4 keeps the doubt review below. |
+   | Medium | The same, plus one **second-model review** (Appendix C). |
+   | High | The second-model review plus `/code-review` in a fresh Opus session; the advisor merges the two lists, dropping duplicates. M4 keeps the doubt review below. |
 
    - The reviewers rate every finding on two scales, 1-5: **harm** if it happens and **likelihood**. Anything that could break a Must-never rule or write a wrong value to MySys is a must-fix, however unlikely.
    - The session that wrote the code answers each finding in one line: **must-fix or overthinking**, and why. It fixes the must-fixes once and adds the triage table to the PR.
    - No second review round unless the fixes were large. Reviewers asked to find bugs always find something, so repeated rounds add noise, not safety.
-   - The Codex review runs from a fresh, short context (the advisor or a new session), not from the builder's long one: cheaper, and it doesn't inherit the builder's blind spots.
+   - The second-model review runs from a fresh, short context (a sub-agent of the advisor), not from the builder's long one: cheaper, and it doesn't inherit the builder's blind spots.
 7. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, the check, CI on the latest commit, and the four PR sections with the right risk level and, for medium and high, the review triage. Then Joey merges with **Create a merge commit**. A low-risk PR with clean evidence needs only a skim; on high, Joey reads the diff of the safety files.
 8. **Reports to Joey** (from task sessions and the advisor) open with a one-line recap of what this session is about, use plain words (no shorthand from deep in the code), ask **one question at a time**, and end with the next action. When Joey asks "where are we?", the advisor lists the sessions in flight, the PRs waiting, and the open decisions.
 9. **Rules that matter are enforced, not just written.** Agents drift from `CLAUDE.md` as their context grows. A rule Claude has broken twice gets a Lessons line and, if it guards safety, a hook, a check or a `/verify-pr` step (Joey edits `.claude/`).
@@ -245,7 +245,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    /agent-skills:review
    ```
 
-   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. On medium and high risk, add the Codex review and the must-fix triage (Production build loop step 6). One review round plus its fixes is enough; don't review again unless the fixes were large.
+   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. On medium and high risk, add the second-model review and the must-fix triage (Production build loop step 6). One review round plus its fixes is enough; don't review again unless the fixes were large.
 8. **Push and open the PR.** If `main` has moved since you branched, Claude merges it in first:
 
    ```text
@@ -426,40 +426,26 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 | No runs after a power cut or restart | The Mac is waiting at the FileVault screen: log in as `poagent` and lock the screen (`docs/macmini-setup.md` section 10). |
 | The Mac Mini can't log in to MySys | Check the spike output and try a login by hand in Safari on the Mac Mini; if MySys blocks the office address, record it in `docs/decisions.md` and tell the CEO. |
 
-## Appendix C - Codex reviewer (medium and high risk PRs)
+## Appendix C - Second-model reviewer (medium and high risk PRs)
 
-A second model from another lab catches different mistakes than Claude reviewing Claude. Laptop only; never on the Mac Mini.
+Task sessions build on Opus; the second review runs on **Fable 5.1**, a different Claude model, so it shares fewer blind spots than Opus reviewing its own code. It needs no other account or plan, and the code stays with Anthropic. A model from another lab would catch more; add one later if Joey gets a second plan.
 
-**One-time setup (Joey, in PowerShell):**
+**Run it:** the advisor starts a reviewer sub-agent with model `fable`, read-only (no edits, no commits, no pushes), pointed at the task's worktree, with the prompt below. It returns the findings to the advisor, which sends them to the task session for triage. If Fable 5.1 isn't available on the plan, use Opus in a fresh sub-agent: the minimum, but still free of the builder's context.
 
-```powershell
-npm install -g @openai/codex
-codex login
-codex exec --help
-```
-
-`codex login` signs in with Joey's ChatGPT plan (or an OpenAI API key); Joey does the sign-in, never Claude. In `~/.codex/config.toml`, pick the newest GPT model at its highest reasoning setting. Check `codex exec --help` for the flags below; they can change between versions.
-
-**Data rule:** Codex runs **only inside a task worktree** (worktrees hold tracked files only, so no `private/`, `logs/` or `state/`), with the read-only sandbox, and the prompt forbids reading outside the worktree. Never run it from the main checkout, never give it a path into `private/`, captures or logs, and never paste real data into its prompt. The repo is public, so its code going to OpenAI exposes nothing new.
-
-**Run it** (the advisor or a fresh session, from the task's worktree):
-
-```text
-codex exec --sandbox read-only "<the prompt below>"
-```
+**Data rule:** the reviewer reads **only the task worktree** (worktrees hold tracked files only, so no `private/`, `logs/` or `state/`). Never point it at the main checkout, `private/`, captures or logs, and never paste real data into its prompt.
 
 **Prompt:**
 
 ```text
-You are reviewing a pull request in this git worktree. Read only files inside this folder. Run `git diff origin/main...HEAD` and read CLAUDE.md (Must never), SPEC.md and the task in tasks/plan.md.
+You are reviewing a pull request in the git worktree at <path>. Read only files inside that folder; change nothing. Run `git -C <path> diff origin/main...HEAD` and read CLAUDE.md (Must never), SPEC.md and the task in tasks/plan.md.
 Find real defects only: wrong behaviour, a wrong value written to MySys, a broken Must-never rule, missing error handling at the MySys or PDF edge, tests that mock our own code or don't test the acceptance criteria. Ignore style.
 For each finding give: file:line, one sentence, harm 1-5, likelihood 1-5, and the concrete input that triggers it. If you find nothing serious, say so; don't invent findings. At most 8 findings, worst first.
 ```
 
-The session that wrote the code then triages each finding "must-fix or overthinking" (Production build loop step 6) and pastes Codex's list and the triage into the PR.
+The session that wrote the code then triages each finding "must-fix or overthinking" (Production build loop step 6) and pastes the reviewer's list and the triage into the PR.
 
 ## Sources
 
 - Addy Osmani's agent-skills: [greenfield tutorial](https://skills.addy.ie/tutorials/new-app/), [skills catalogue](https://skills.addy.ie/skills/), [repo](https://github.com/addyosmani/agent-skills) (read 14 Oct 2026)
 - [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
-- v5.20 review and testing rules, drawn from: David Ondrej, [My Agentic Engineering Workflow (after 15,700 sessions)](https://www.youtube.com/watch?v=F8rc-ULd4_4) (cross-lab review, harm x likelihood, must-fix triage, test budget); Kun Chen, [High Throughput Agentic Engineering](https://www.youtube.com/watch?v=MSbacZ99E14) (one orchestrator chat, review gate by risk, PR risk and testing evidence); Brendan O'Leary, [Agentic Engineering: Working With AI, Not Just Using It](https://www.youtube.com/watch?v=BEKc4P87XKo) (research, plan, implement; context hygiene); Jason Ku, [A Meta Engineer's Agentic Engineering Workflow](https://www.youtube.com/watch?v=Ukju3maxbEQ) (grill before code, re-entry reports, cheap fresh-context review driver, instruction drift). Watched 2 Nov 2026.
+- v5.20 review and testing rules, drawn from: David Ondrej, [My Agentic Engineering Workflow (after 15,700 sessions)](https://www.youtube.com/watch?v=F8rc-ULd4_4) (second-model review, harm x likelihood, must-fix triage, test budget); Kun Chen, [High Throughput Agentic Engineering](https://www.youtube.com/watch?v=MSbacZ99E14) (one orchestrator chat, review gate by risk, PR risk and testing evidence); Brendan O'Leary, [Agentic Engineering: Working With AI, Not Just Using It](https://www.youtube.com/watch?v=BEKc4P87XKo) (research, plan, implement; context hygiene); Jason Ku, [A Meta Engineer's Agentic Engineering Workflow](https://www.youtube.com/watch?v=Ukju3maxbEQ) (grill before code, re-entry reports, cheap fresh-context review driver, instruction drift). Watched 2 Nov 2026.
