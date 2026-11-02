@@ -26,7 +26,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **What is lost:** Claude could have read a PO in a new layout. Mitigation: any mismatch skips, so a layout change sends the Note back to the pool, never to a wrong booking.
 - **Loosens?** The second reader is no longer a different kind of reader (AI against code), but two code readers must still agree, and the address values now come from MySys instead of a reader, which removes the extraction step the 30 Oct review had to tighten. Nothing that acts in MySys changes. Run output is unchanged: skip reasons only, and pypdf's warnings are kept out of it.
 - **CEO:** decision 1 approved the two-reader design with Claude as one reader. Joey informs the CEO of this change.
-- **Not yet done:** the config, CLI and secrets still carry the Claude settings (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, the `anthropic_api_key` secret, decide-only asking for it). A follow-up task removes them; `CLAUDE.md` (Joey's) and `docs/macmini-setup.md` still name the key and the live-Claude seam.
+- **Done by PR #44 (task 2.5b):** the Claude settings left in config, CLI and secrets (`reader_mode`, `claude_model_id`, `aud_per_usd`, `claude_price_usd_per_mtok`, the `anthropic_api_key` secret, decide-only asking for it) are removed, and `docs/macmini-setup.md` no longer names the key. Still left: `CLAUDE.md` (Joey's) names the key and the live-Claude seam, and the unused `live_claude` marker stays while `scripts/check.py` (Joey's) deselects it.
 - Carried in: `SPEC.md`, `docs/specs/spec.md` §2-§4 and §7, ADR-001 (a dated note), `tasks/plan.md` 2.5 and 2.6, `tasks/todo.md`.
 
 ## 2 Nov 2026 - Claude merges verified PRs and edits skills (Joey)
