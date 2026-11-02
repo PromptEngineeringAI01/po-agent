@@ -75,10 +75,13 @@ def po_from_file_name(file_name: str) -> str:
 
 
 def pdf_text(data: bytes) -> str:
-    """Every page's text; anything pdfplumber can't read -> PDF_UNREADABLE."""
+    """Every page's text; anything pdfplumber can't read -> PDF_UNREADABLE.
+    Its warnings are silenced, as pypdf's: one can quote the PDF."""
     try:
-        with pdfplumber.open(io.BytesIO(data)) as pdf:
-            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with pdfplumber.open(io.BytesIO(data)) as pdf:
+                return "\n".join(page.extract_text() or "" for page in pdf.pages)
     except Exception:  # pdfminer raises many types; its message can quote the file
         raise WriteNotStarted("PDF not readable", reason="PDF_UNREADABLE") from None
 
