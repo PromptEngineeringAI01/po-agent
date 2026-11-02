@@ -32,7 +32,9 @@ from po_agent.b1.models import (
     NoteSnapshot,
     Proceed,
     Skip,
+    SkipReason,
 )
+from po_agent.core.errors import WriteNotStarted
 
 # The 3 trial POs (SPEC.md -> Trial conditions): internal numbers only.
 TRIAL_INTERNAL_NOS = ("2609017B", "2609034B", "2610002B")
@@ -131,10 +133,19 @@ def real_po_results(
 # --- the seam ---
 
 
+def _file_name_po(file_name: str) -> str:
+    """The file name's PO number, "" when the name isn't <no>_048[_n].pdf
+    (decide() skips such a case like any other)."""
+    try:
+        return rules.po_from_file_name(file_name)
+    except WriteNotStarted:
+        return ""
+
+
 def _case_ids(raw_cases: list[dict[str, Any]]) -> list[str]:
     ids, real = [], 0
     for raw in raw_cases:
-        internal_no = rules.po_from_file_name(raw["pdf"]).split("/")[0]
+        internal_no = _file_name_po(raw["pdf"]).split("/")[0]
         if internal_no in TRIAL_INTERNAL_NOS:
             ids.append(internal_no)
         else:
@@ -202,22 +213,36 @@ def _decide(
     )
 
 
+def _expectation(raw: dict[str, Any], case_id: str) -> tuple[str, str]:
+    """expect and expect_reason, which the report prints: PROCEED with no
+    reason, or SKIP with a SkipReason; anything else fails with a fixed
+    message that prints no value (review, 2.6)."""
+    expect, reason = raw.get("expect"), raw.get("expect_reason", "")
+    if (expect == "PROCEED" and reason == "") or (
+        expect == "SKIP" and reason in set(SkipReason)
+    ):
+        return expect, reason
+    raise ValueError(f"case {case_id}: expect or expect_reason not valid")
+
+
 def evaluate(folder: Path) -> list[CaseResult]:
     """Every case through both readers and, when its lookup is in the MySys
-    shape, decide(). A missing PDF raises FileNotFoundError."""
+    shape, decide(). A missing PDF raises FileNotFoundError, an expectation
+    that isn't an enum value ValueError."""
     raw_cases = tomllib.loads((folder / CASES).read_text(encoding="utf-8"))["case"]
     results = []
     for raw, case_id in zip(raw_cases, _case_ids(raw_cases), strict=True):
+        expect, expect_reason = _expectation(raw, case_id)
         data = (folder / "pdfs" / raw["pdf"]).read_bytes()
         plumber, pypdf = rules.text_layer(data), rules.pypdf_text_layer(data)
         mysys_shape = MYSYS_FIELDS <= set(raw["lookup"])
         address = raw["lookup"]["address"] if mysys_shape else None
         result = CaseResult(
             case_id=case_id,
-            expect=raw["expect"],
-            expect_reason=raw.get("expect_reason", ""),
+            expect=expect,
+            expect_reason=expect_reason,
             expect_pln=raw.get("expect_pln", ""),
-            expect_po=rules.po_from_file_name(raw["pdf"]),
+            expect_po=_file_name_po(raw["pdf"]),
             mysys_shape=mysys_shape,
             agree=_agreement(plumber, pypdf, address),
         )
