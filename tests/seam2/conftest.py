@@ -69,7 +69,7 @@ class ResetStateError(Exception):
 
 @pytest.fixture
 def check_note_pool_reset(config) -> Callable[[driver.NotePoolList], None]:
-    """Note Pool part of the reset-state precondition (3.2 adds the project part).
+    """Note Pool part of the reset-state precondition.
 
     Under Agent Pool + Locked, Status Pending: exactly one eligible, unlinked
     Note per trial PO. The error names counts and trial numbers only.

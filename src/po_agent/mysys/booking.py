@@ -519,6 +519,17 @@ def _project_list(panel: Locator) -> tuple | None:
 def search_projects(
     guard: ActionGuard, page: Page, panel: Locator, internal_no: str
 ) -> list[dict[str, str]]:
+    """The demo's search: search_project_rows, a second results page counted
+    as ambiguous."""
+    rows, pages = search_project_rows(guard, page, panel, internal_no)
+    if pages > 1:
+        raise WriteNotStarted("project ambiguous", reason="PROJECT_AMBIGUOUS")
+    return rows
+
+
+def search_project_rows(
+    guard: ActionGuard, page: Page, panel: Locator, internal_no: str
+) -> tuple[list[dict[str, str]], int]:
     """Step 5: fill Search... with the internal number, press Enter (Joey,
     28 Oct 2026), then wait up to 60 s for the list to settle on its result.
 
@@ -529,8 +540,8 @@ def search_projects(
     not 15; a hit on a field not shown -> any settled list counts, and
     match_project picks the row; the same row twice -> match_project counts
     projects, not rows; a filter left set -> refused before searching. A
-    settled list is the same in two reads in a row. More than one results
-    page counts as ambiguous."""
+    settled list is the same in two reads in a row. Returns page 1's rows
+    and the number of results pages."""
     _check_project_filters(panel)
     before = _project_list(panel)
     search = panel.get_by_role("textbox", name="Search...", exact=True)
@@ -552,12 +563,8 @@ def search_projects(
         if state is not None and (state != before or holds_it):
             if state == last:
                 if state[0] == "none":
-                    return []
-                if state[2] > 1:
-                    raise WriteNotStarted(
-                        "project ambiguous", reason="PROJECT_AMBIGUOUS"
-                    )
-                return [dict(row) for row in state[1]]
+                    return [], 1
+                return [dict(row) for row in state[1]], state[2]
             last = state
         else:
             last = None

@@ -21,14 +21,30 @@ import re
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
-from playwright.sync_api import ElementHandle, Locator, Page, sync_playwright
+from playwright.sync_api import (
+    Download,
+    ElementHandle,
+    Locator,
+    Page,
+    sync_playwright,
+)
 from playwright.sync_api import Error as PlaywrightError
 from pydantic import ValidationError
 
-from po_agent.b1.models import NotePoolRow
-from po_agent.core.errors import LoginFailed, UnexpectedScreen
+from po_agent.b1 import reader_rules as rules
+from po_agent.b1.decision import Site, match_project
+from po_agent.b1.models import (
+    CompactionTask,
+    MySysLookup,
+    NotePoolRow,
+    SearchRow,
+    Skip,
+)
+from po_agent.core.errors import LoginFailed, PartialWrite, UnexpectedScreen
 from po_agent.core.runlog import RunLog
 from po_agent.mysys.guard import ActionGuard
 
@@ -76,12 +92,17 @@ class NotePoolList:
 
 
 @contextmanager
-def open_browser(*, headed: bool, slow_mo: int) -> Iterator[Page]:
-    """A fresh Chromium context; no storage state is loaded or saved."""
+def open_browser(
+    *, headed: bool, slow_mo: int, downloads: Path | None = None
+) -> Iterator[Page]:
+    """A fresh Chromium context; no storage state is loaded or saved.
+    Downloads go to `downloads`, the run's po-agent-dl-<run_id> folder (D2)."""
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=not headed, slow_mo=slow_mo)
+        browser = playwright.chromium.launch(
+            headless=not headed, slow_mo=slow_mo, downloads_path=downloads
+        )
         try:
-            context = browser.new_context()
+            context = browser.new_context(accept_downloads=downloads is not None)
             page = context.new_page()
             page.set_default_timeout(LOAD_TIMEOUT_MS)
             yield page
@@ -677,3 +698,135 @@ def return_note(
         lambda: read_status(window).startswith("Pending"),
     )
     log.flush(note_id=note_id, step=step)
+
+
+# Attachment and download (rows 02, 05)
+
+
+@dataclass(frozen=True)
+class Pdf:
+    """The one downloaded PDF, in memory only (D2)."""
+
+    file_name: str
+    data: bytes = field(repr=False)
+
+
+def _download_links(window: Locator) -> Locator:
+    return window.get_by_role("link", name="Download document", exact=True)
+
+
+def attachment_names(window: Locator) -> tuple[str, ...]:
+    """Each "Download document" link's URL file_name (URL-decoded), "" when
+    it has none. The link's name is only "Download document" (row 02)."""
+    try:
+        hrefs = [
+            link.get_attribute("href") or "" for link in _download_links(window).all()
+        ]
+    except PlaywrightError:
+        raise UnexpectedScreen("attachment not readable") from None
+    names = (parse_qs(urlsplit(href).query).get("file_name", []) for href in hrefs)
+    return tuple(found[0] if len(found) == 1 else "" for found in names)
+
+
+def download_pdf(guard: ActionGuard, page: Page, window: Locator) -> Pdf | None:
+    """The links are counted first: None, with no click, unless there is
+    exactly one and its file_name ends .pdf (any case); decide() gives the
+    skip reason (NO_PDF, MULTIPLE_PDFS). Else the click inside
+    expect_download, the first file read into memory and deleted at once.
+    A second download is deleted unread by note_downloads. Never the preview
+    window."""
+    names = attachment_names(window)
+    if len(names) != 1 or not names[0].lower().endswith(".pdf"):
+        return None
+    try:
+        with page.expect_download(timeout=LOAD_TIMEOUT_MS) as info:
+            guard.act("download_attachment", window, _download_links(window))
+        download = info.value
+        try:
+            data = Path(download.path()).read_bytes()
+        finally:
+            download.delete()
+        downloaded = download.suggested_filename
+    except (PlaywrightError, OSError):
+        raise UnexpectedScreen("PDF did not download") from None
+    if downloaded != names[0]:
+        raise UnexpectedScreen("download not the linked file")
+    return Pdf(file_name=downloaded, data=data)
+
+
+@contextmanager
+def note_downloads(page: Page, folder: Path) -> Iterator[None]:
+    """One Note's downloads: when the Note ends, even by an exception, every
+    download it fired is deleted and the folder emptied (D2)."""
+    seen: list[Download] = []
+
+    def record(download: Download) -> None:
+        seen.append(download)
+
+    page.on("download", record)
+    try:
+        yield
+    finally:
+        page.remove_listener("download", record)
+        for download in seen:
+            try:
+                download.delete()
+            except PlaywrightError:
+                pass
+        for path in folder.rglob("*"):
+            if path.is_file():
+                path.unlink(missing_ok=True)
+
+
+# Project reads (rows 06, 07, 25, 26)
+
+
+def project_lookup(
+    guard: ActionGuard,
+    page: Page,
+    base_url: str,
+    username: str,
+    password: str,
+    internal_no: str,
+    site: Site,
+) -> MySysLookup:
+    """Steps 8-10's reads: reload (the Note window would cover the results,
+    row 25), Project -> Projects, the demo's search (Enter), every row on
+    page 1; match_project() chooses the row, opened by its pln link; then its
+    Client Internal No., Address and Compaction Test tasks. With no single
+    match nothing is opened and the project fields stay empty."""
+    from po_agent.mysys import booking  # booking imports this module
+
+    reload_home(guard, page, base_url, username, password)
+    panel = booking.open_projects(guard, page)
+    rows, pages = booking.search_project_rows(guard, page, panel, internal_no)
+    try:
+        search_rows = tuple(
+            SearchRow(
+                pln=row["Project No."],
+                client_ref_no=row["Client Ref No."],
+                company=row["Company"],
+            )
+            for row in rows
+        )
+    except KeyError:
+        raise UnexpectedScreen("Projects columns not recognised") from None
+    more_pages = pages > 1
+    pln = match_project(search_rows, more_pages, internal_no, site)
+    if isinstance(pln, Skip):
+        return MySysLookup(search_rows=search_rows, more_pages=more_pages)
+    project = booking.open_project(guard, page, panel, pln)
+    try:
+        tasks = rules.compaction_tasks(booking.task_rows(project))
+    except PartialWrite:  # a read, before any write
+        raise UnexpectedScreen("task row not recognised") from None
+    return MySysLookup(
+        search_rows=search_rows,
+        more_pages=more_pages,
+        project_internal_no=booking.client_internal_no(project),
+        address=_labelled(project, "Address:"),
+        tasks=tuple(
+            CompactionTask(task_no=task_no, status=status)
+            for task_no, status in tasks.items()
+        ),
+    )
