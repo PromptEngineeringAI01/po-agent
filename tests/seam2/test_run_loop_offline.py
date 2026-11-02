@@ -493,7 +493,9 @@ def test_detailed_log_has_the_skips_and_one_traceback_per_error(
     mysys(
         {
             "300001": FakeNote("2600001B", names=()),
-            "300002": FakeNote("2600002B", fail_at="lookup"),
+            # Fails at the download: the fake PDF is 2600001B's, so this
+            # Note would skip PO_MISMATCH before any project lookup.
+            "300002": FakeNote("2600002B", fail_at="download"),
         }
     )
 
