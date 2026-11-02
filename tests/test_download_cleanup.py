@@ -62,7 +62,7 @@ def note_page(*links: str | None, linked: bool = True) -> str:
         "https://testsite.invalid/index.php?task=get_note_file_content&amp;download=1"
         f"&amp;user_note_id=9{'' if name is None else '&amp;file_name=' + quote(name)}"
         f'" onclick="event.preventDefault(); save({(name or "file")!r}, {FIRST!r});'
-        f' save({(name or "file")!r}, {SECOND!r})"><i class="fa fa-download"></i></a></div>'
+        f' save({(name or "file")!r}, {SECOND!r})"><i class="fa fa-download">v</i></a></div>'
         for name in links
     )
     return f"""
