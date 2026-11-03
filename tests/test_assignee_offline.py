@@ -9,15 +9,16 @@ seam2/test_run_loop_offline.py), which records every call. Values are fake.
 
 - Before W1 and W4: a fresh search (reload, All Pools, the Note ID); the one
   row whose ID equals the Note ID must have Assignee `agent_user_name`.
-  Zero or several such rows -> UnexpectedScreen. Someone else before W1 ->
-  NoteTaken (nothing written, the run carries on); before W4 ->
-  PartialWrite. W2, W3 and W5 don't search (D7).
+  Zero or several such rows -> UnexpectedScreen before W1. Someone else
+  before W1 -> NoteTaken (nothing written, the run carries on). Before W4
+  the task exists: someone else, no single row or a failed search ->
+  PartialWrite (3.6 review). W2, W3 and W5 don't search (D7).
 - Stale-Note stop (D6): in `run --decide-only`, after login and before the
   eligible list is read, the Pending Notes under All Users, All Pools and
   All (the test site's Assigned User list has no agent; decisions, 3 Nov
   2026): a row with the agent as Assignee -> ALERT UNEXPECTED_SCREEN with
-  its note_id, no Note opened, exit 1. A second page can't be read, so it
-  stops the same way. `spike` skips the read.
+  its note_id, no Note opened, exit 1, even with more pages. A second page
+  can't be read, so it stops the same way. `spike` skips the read.
 """
 
 import importlib.util
@@ -31,7 +32,12 @@ from po_agent import cli
 from po_agent.b1.models import NotePoolRow
 from po_agent.core import controls
 from po_agent.core.config import CONFIG_DIR
-from po_agent.core.errors import PartialWrite, PoAgentError, UnexpectedScreen
+from po_agent.core.errors import (
+    LoginFailed,
+    PartialWrite,
+    PoAgentError,
+    UnexpectedScreen,
+)
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -136,14 +142,39 @@ def test_someone_else_at_w4_is_a_partial_write(gate):
     ],
     ids=["none", "prefix-only", "suffix-only", "twice"],
 )
-@pytest.mark.parametrize("step", ["W1", "W4"])
-def test_not_exactly_one_equal_row_is_an_unexpected_screen(gate, rows, step):
+@pytest.mark.parametrize(
+    ("step", "error"), [("W1", UnexpectedScreen), ("W4", PartialWrite)]
+)
+def test_not_exactly_one_equal_row_stops_and_after_w3_is_a_partial_write(
+    gate, rows, step, error
+):
     checks, _ = gate(*rows)
 
-    with pytest.raises(UnexpectedScreen) as raised:
+    with pytest.raises(error) as raised:
         checks.before_write(NOTE_ID, step)
 
     assert (raised.value.note_id, raised.value.step) == (NOTE_ID, step)
+
+
+@pytest.mark.parametrize(
+    "failure", [UnexpectedScreen("fake"), LoginFailed("fake")], ids=["screen", "login"]
+)
+def test_a_failed_search_before_w4_is_a_partial_write(monkeypatch, failure):
+    # The task exists and is on hold: the run must never return the Note to
+    # the pool, where it would look unbooked.
+    def search(*args):
+        raise failure
+
+    monkeypatch.setattr(driver, "search_note", search)
+    check = controls.assignee_check(ActionGuard(), "page", LOGIN, AGENT)
+    checks = controls.Controls("test", CONFIG_DIR, assignee_check=check)
+
+    with pytest.raises(PartialWrite) as raised:
+        checks.before_write(NOTE_ID, "W4")
+    with pytest.raises(type(failure)):
+        checks.before_write(NOTE_ID, "W1")
+
+    assert (raised.value.note_id, raised.value.step) == (NOTE_ID, "W4")
 
 
 def test_w2_w3_and_w5_never_leave_their_window(gate):
@@ -189,6 +220,23 @@ def test_a_note_left_with_the_agent_stops_decide_only_before_any_note(mysys, cap
     assert not [x for x in lines if x.startswith("NOTE")]
     summary = json.loads(lines[-1].removeprefix("RUN_SUMMARY "))
     assert summary["exit_code"] == 1
+
+
+def test_a_note_with_the_agent_on_page_1_is_named_even_with_more_pages(mysys, capsys):
+    mysys(
+        {"300002": FakeNote("2600002B")},
+        agent_rows=(pool_row("300099", AGENT),),
+        agent_pages=2,
+    )
+
+    code = cli.main(["run", "--site", "test", "--decide-only"])
+
+    lines = lines_of(capsys)
+    assert code == 1
+    (alert,) = [x for x in lines if x.startswith("ALERT ")]
+    body = json.loads(alert.removeprefix("ALERT ").partition(" ")[2])
+    assert body["note_id"] == "300099"
+    assert body["detail"].startswith(STALE_DETAIL)
 
 
 def test_a_second_page_in_the_stale_note_read_stops_before_any_note(mysys, capsys):

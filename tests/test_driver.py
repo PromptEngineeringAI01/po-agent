@@ -297,6 +297,31 @@ def test_text_left_in_search_filter_is_an_unexpected_screen(page, guard):
     assert "300001" not in str(caught.value)
 
 
+def test_the_stale_note_read_lists_only_the_agents_rows_at_the_defaults(page, guard):
+    agent = "Agent 1 (MySys Only)"
+    rows = [*ROWS, ("300004", agent, "---", "Please find attached file x.pdf", 0)]
+    panel = panel_of(page, note_pool_page(rows=rows))
+
+    listing = driver.read_agent_notes(guard, panel, agent)
+
+    assert actions(guard) == []  # All Pools and All are the defaults
+    assert [row.note_id for row in listing.rows] == ["300004"]
+    assert listing.pages == 1
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [("filter_status", "All Status"), ("filter_user_id", "Unassigned")],
+)
+def test_the_stale_note_read_off_its_defaults_is_an_unexpected_screen(
+    page, guard, name, value
+):
+    panel = panel_of(page, note_pool_page(filters={name: value}))
+
+    with pytest.raises(UnexpectedScreen):
+        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)")
+
+
 # --- reading the list ------------------------------------------------------------
 
 

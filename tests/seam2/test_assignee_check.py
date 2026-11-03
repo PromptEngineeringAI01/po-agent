@@ -17,6 +17,7 @@ import pytest
 
 from po_agent.core import controls, run, runlog
 from po_agent.core.config import CONFIG_DIR
+from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -57,12 +58,16 @@ def taken(config, login) -> Iterator[list[str]]:
                 )
 
 
-def stale_ids(guard, page, login, agent) -> list[str]:
+def stale_stop(guard, page, login, agent) -> str | None:
+    """The run's stale-Note stop; the note_id it stops on, else None."""
     driver.reload_home(guard, page, *login)
     panel = driver.open_note_pool(guard, page)
     driver.leave_menu(guard, page)
-    listing = driver.read_agent_notes(guard, panel, agent)
-    return [row.note_id for row in listing.rows if row.assignee == agent]
+    try:
+        controls.stale_note_stop(guard, panel, agent)
+    except UnexpectedScreen as stopped:
+        return stopped.note_id or "<no note_id>"
+    return None
 
 
 def test_the_assignee_check_reads_the_agent_for_a_taken_trial_note(
@@ -74,7 +79,7 @@ def test_the_assignee_check_reads_the_agent_for_a_taken_trial_note(
     log = runlog.RunLog(RUN_ID, guard, directory=None)
 
     # Precondition: no Note with the agent, and one eligible trial Note.
-    assert stale_ids(guard, page, login, agent) == []
+    assert stale_stop(guard, page, login, agent) is None
     driver.reload_home(guard, page, *login)
     panel = driver.open_note_pool(guard, page)
     driver.leave_menu(guard, page)
@@ -95,7 +100,7 @@ def test_the_assignee_check_reads_the_agent_for_a_taken_trial_note(
     taken.append(note.note_id)
     driver.take_note(guard, window, agent, log, note.note_id)
 
-    assert stale_ids(guard, page, login, agent) == [note.note_id]
+    assert stale_stop(guard, page, login, agent) == note.note_id
     check = controls.assignee_check(guard, page, login, agent)
     gate = controls.Controls("test", CONFIG_DIR, assignee_check=check)
     gate.before_write(note.note_id, "W1")  # raises unless it reads the agent
