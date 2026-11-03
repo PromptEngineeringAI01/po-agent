@@ -18,6 +18,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **2 Nov 2026: run controls built** (task 3.5; entry below).
 - **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
 - **3 Nov 2026: M0b.2 mapped** (rows 19, 20, 23, 24; entry below). Every screen the MVP books through is now mapped.
+- **3 Nov 2026: assignee check and stale-Note stop built** (task 3.6; entry below).
+
+## 3 Nov 2026 - Assignee check and stale-Note stop (Joey, task 3.6)
+
+- **Assignee check:** `controls.assignee_check` is what `before_write` runs before W1 and W4 (D7): reload `base_url`, the Note Pool under All Pools and All, the Note ID searched (fill, then Refresh), and the one row whose ID cell equals the Note ID must have Assignee `agent_user_name`. Zero or several such rows -> `UnexpectedScreen`. Someone else before W1 raises `NoteTaken`, which like `KillSwitch` is not a `PoAgentError` (no ALERT); someone else before W4 is `PartialWrite`. The check only reads: closing the browser context and printing `"outcome": "untouched", "reason": "NOTE_TAKEN"`, and reopening the window the booker needs (row 25), come with the booker and run mode (4.1, 4.4, 4.5), because nothing calls `before_write` yet (Joey, 3 Nov 2026).
+- **Stale-Note stop, changed read:** the test site's Assigned User filter does not list the agent account (10 options, none the agent; seen read-only in 3.6's seam-2 run), so the stop can't filter by Assigned User. It reads the Note Pool under **All Users**, All Pools, Locked/Unlocked All, Status Pending, Search/filter empty (31 rows, one page of 50 on the test site), and stops on any row whose Assignee is `agent_user_name`: `ALERT UNEXPECTED_SCREEN` "a Note is still assigned to the agent from an earlier run" with its `note_id`, exit 1. Only page 1 is read, so **a second page stops the run too** (`UNEXPECTED_SCREEN` "Note Pool has more pages: stale-Note read incomplete"). On live, more than 50 Pending Notes would stop every run; that is handled before go-live (Joey, 3 Nov 2026). No new guard action: `set_user_filter` was proposed and dropped.
+- **From the 3.6 review:** at W4 the check raises `UnexpectedScreen` when the search fails or the Note isn't found once. The run mode (4.5) handles any error from W3 on as `PartialWrite` (Note left with the agent, so the stale-Note stop holds later runs), never a return to the pool, where the half-booked Note would look unbooked.
+- **Loosens?** No: both add stops before a write. Nothing new acts in MySys.
+- Carried in: `SPEC.md` (Note Pool -> Stale-Note stop), `tasks/plan.md` (3.6, 4.5).
 
 ## 3 Nov 2026 - M0b.2: task detail, Link to Project, PO prefill, assignee refresh (Joey; mapped with Claude observing)
 
