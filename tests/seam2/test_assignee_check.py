@@ -2,9 +2,9 @@
 (task 3.6; marker testsite).
 
 One trial Note, from the reset state (docs/workflow.md 6.1): with it in the
-Agent Pool, the stale-Note read (Assigned User = the agent, All Pools, All)
-lists nothing. The test takes the Note, then the stale-Note read lists
-exactly that Note, and the assignee check before W1 and before W4 (a fresh
+Agent Pool, the stale-Note read (All Users, All Pools, All, Pending) lists
+no Note with the agent. The test takes the Note, then the stale-Note read
+lists exactly that Note, and the assignee check before W1 and before W4 (a fresh
 reload and Note Pool search) passes: the row whose ID equals the Note ID
 reads the agent. The teardown returns the Note to the pool in a fresh
 browser context. Assertions use counts, enum values and the trial

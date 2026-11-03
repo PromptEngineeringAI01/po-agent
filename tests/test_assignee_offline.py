@@ -13,9 +13,11 @@ seam2/test_run_loop_offline.py), which records every call. Values are fake.
   NoteTaken (nothing written, the run carries on); before W4 ->
   PartialWrite. W2, W3 and W5 don't search (D7).
 - Stale-Note stop (D6): in `run --decide-only`, after login and before the
-  eligible list is read, a Pending Note still with the agent -> ALERT
-  UNEXPECTED_SCREEN with its note_id, no Note opened, exit 1. `spike` skips
-  the read.
+  eligible list is read, the Pending Notes under All Users, All Pools and
+  All (the test site's Assigned User list has no agent; decisions, 3 Nov
+  2026): a row with the agent as Assignee -> ALERT UNEXPECTED_SCREEN with
+  its note_id, no Note opened, exit 1. A second page can't be read, so it
+  stops the same way. `spike` skips the read.
 """
 
 import importlib.util
@@ -187,6 +189,24 @@ def test_a_note_left_with_the_agent_stops_decide_only_before_any_note(mysys, cap
     assert not [x for x in lines if x.startswith("NOTE")]
     summary = json.loads(lines[-1].removeprefix("RUN_SUMMARY "))
     assert summary["exit_code"] == 1
+
+
+def test_a_second_page_in_the_stale_note_read_stops_before_any_note(mysys, capsys):
+    fake = mysys(
+        {"300002": FakeNote("2600002B")},
+        agent_rows=(pool_row("300002", POOL),),
+        agent_pages=2,
+    )
+
+    code = cli.main(["run", "--site", "test", "--decide-only"])
+
+    lines = lines_of(capsys)
+    assert code == 1
+    assert "read" not in fake.calls
+    assert not [c for c in fake.calls if c.startswith(("find_again", "take"))]
+    assert [x.split()[1] for x in lines if x.startswith("ALERT ")] == [
+        "UNEXPECTED_SCREEN"
+    ]
 
 
 def test_with_no_note_left_with_the_agent_decide_only_goes_on(mysys, capsys):
