@@ -58,27 +58,12 @@ _innermost = driver._innermost
 _exact = driver._exact
 _labelled = driver._labelled
 _shows = driver._shows
+_container = driver.label_block
+_field = driver.field_by_label
 note_window = driver.note_window
 leave_menu = driver.leave_menu
 read_assignee = driver.read_assignee
 read_status = driver.read_status
-
-
-def _container(window: Locator, label: str, control: str) -> Locator:
-    """The innermost element in `window` holding the label text and a
-    `control` (CSS), e.g. the "PO Number" row and its input. Built from the
-    page root: a has_not locator is evaluated inside each candidate."""
-    page = window.page
-    found = (
-        page.locator("*")
-        .filter(has=page.get_by_text(label, exact=True))
-        .filter(has=page.locator(control))
-    )
-    return window.locator("*").and_(found.filter(has_not=found))
-
-
-def _field(window: Locator, label: str, control: str) -> Locator:
-    return _container(window, label, control).locator(control)
 
 
 def _chosen(select: Locator) -> str:
@@ -581,15 +566,7 @@ def client_internal_no(window: Locator) -> str:
     return _labelled(window, "Client Internal No.:")
 
 
-def task_rows(window: Locator) -> list[list[str]]:
-    """The Tasks table's rows as cell texts (header and details rows)."""
-    try:
-        return [
-            [c.strip() for c in row.locator("td").all_inner_texts()]
-            for row in window.locator("tbody tr").all()
-        ]
-    except PlaywrightError:
-        raise UnexpectedScreen("task table not readable") from None
+task_rows = driver.task_rows
 
 
 # Create New Task (rows 08-10)

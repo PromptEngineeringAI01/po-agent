@@ -20,6 +20,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **3 Nov 2026: M0b.2 mapped** (rows 19, 20, 23, 24; entry below). Every screen the MVP books through is now mapped.
 - **3 Nov 2026: assignee check and stale-Note stop built** (task 3.6; entry below).
 - **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
+- **3 Nov 2026: W1 built** (task 4.1; entry below).
+
+## 3 Nov 2026 - W1: Create New Task filled and read back (Joey, task 4.1)
+
+- **PO Documents or Documents** is a go-live gate (gate 2, the PO admin's live answer), not a 4.1 blocker: the test site uses PO Documents, as the walkthrough did (Joey, 3 Nov 2026). SPEC open question 11 now reads "confirm before go-live".
+- **What W1 does:** `book()` takes only a `Proceed` for the Note in hand (else `TypeError` / `WriteNotStarted` before anything), runs `before_write(note_id, "W1")`, reopens the project as step 10 does and stops with `WriteNotStarted` if the search's match isn't the Proceed's pln (checked before the project is opened), Client Internal No. fails the match rule, or the settled Compaction Test tasks differ from step 10's. Then Create New Task is filled by label and read back; any problem once the form is open closes the browser context (nothing is saved: the upload is saved only by Submit) and is `WriteNotStarted`. In 4.1 `book()` accepts only `stop_after="W1"`; nothing calls it outside seam 2 until 4.5.
+- **The Documents read-back** is "no file row" (an empty table counts as empty); the test site shows no table at all (row 09). It is what the demo's read-back already checked.
+- **Settled task table** built as planned (M4 gate entry); `project_lookup` uses it.
+- **Loosens?** No: every new check is a stop before Submit, and nothing new acts in MySys (no guard change).
+- Carried in: `SPEC.md` (W1 read-back wording, open question 11), `tasks/plan.md` (4.1 Needs and read-back, P4 row).
 
 ## 3 Nov 2026 - M4 gate: doubt review of the booker design (fresh session, before 4.1)
 
