@@ -79,16 +79,17 @@ class KillSwitch(Exception):
 def stale_note_stop(guard: ActionGuard, panel: Locator, agent: str) -> None:
     """A Pending Note still with the agent was left by an earlier run's
     partial write or failed return: the run takes no Note (D6). Only page 1
-    can be read, so a second page stops the run too."""
+    can be read, so a second page stops the run too (after page 1's rows,
+    so a stale Note there is named)."""
     listing = driver.read_agent_notes(guard, panel, agent)
-    if listing.pages > 1:
-        raise UnexpectedScreen("Note Pool has more pages: stale-Note read incomplete")
     for row in listing.rows:
         if row.assignee == agent:
             raise UnexpectedScreen(
                 "a Note is still assigned to the agent from an earlier run",
                 note_id=row.note_id,
             )
+    if listing.pages > 1:
+        raise UnexpectedScreen("Note Pool has more pages: stale-Note read incomplete")
 
 
 class NoteTaken(Exception):
@@ -107,21 +108,36 @@ def assignee_check(
 ) -> AssigneeCheck:
     """The check `Controls` runs before W1 and W4: reload, search the Note
     ID under All Pools, and the one row whose ID cell equals it must have
-    Assignee `agent`. Someone else -> NoteTaken before W1, PartialWrite
-    before W4 (the task exists and is on hold)."""
+    Assignee `agent`. Someone else -> NoteTaken before W1. Before W4 the
+    task exists and is on hold, so any failure is PartialWrite: the Note
+    stays with the agent and is never returned to the pool, where it would
+    look unbooked (3.6 review). `page` is the booker's browser context:
+    build one check per context."""
 
     def check(note_id: str, step: str) -> None:
         _, listing = driver.search_note(guard, page, *login, note_id)
         row = driver.exact_row(listing, note_id)
         if row is None:
             raise UnexpectedScreen("Note not found once", note_id=note_id, step=step)
-        if row.assignee == agent:
-            return
-        if step in NOT_SUBMITTED:
+        if row.assignee != agent:
             raise NoteTaken(note_id=note_id, step=step)
-        raise PartialWrite("Note taken mid-booking", note_id=note_id, step=step)
 
-    return check
+    def checked(note_id: str, step: str) -> None:
+        if step in NOT_SUBMITTED:
+            check(note_id, step)
+            return
+        try:
+            check(note_id, step)
+        except NoteTaken:
+            raise PartialWrite(
+                "Note taken mid-booking", note_id=note_id, step=step
+            ) from None
+        except Exception as error:
+            raise PartialWrite(
+                "assignee check failed mid-booking", note_id=note_id, step=step
+            ) from error
+
+    return checked
 
 
 class Controls:
