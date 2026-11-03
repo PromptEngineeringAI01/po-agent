@@ -70,6 +70,8 @@ class FakeMySys:
     notes: dict[str, FakeNote]
     rows: tuple[NotePoolRow, ...]
     fail_return: bool = False
+    # What the stale-Note read (3.6) lists: Notes still with the agent.
+    agent_rows: tuple[NotePoolRow, ...] = ()
     calls: list[str] = field(default_factory=list)
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
@@ -117,6 +119,11 @@ class FakeMySys:
         self.reads += 1
         self.calls.append("read")
         return driver.NotePoolList(rows=self.rows, total=len(self.rows), pages=1)
+
+    def read_agent_notes(self, guard, panel, agent):
+        self.calls.append("agent_notes")
+        rows = self.agent_rows
+        return driver.NotePoolList(rows=rows, total=len(rows), pages=1)
 
     def find_note_again(self, guard, page, base_url, username, password, note_id):
         # The real one reloads base_url first: a reload before every Note.
@@ -184,6 +191,7 @@ DRIVER_NAMES = (
     "leave_menu",
     "set_note_pool_filters",
     "read_note_pool",
+    "read_agent_notes",
     "find_note_again",
     "read_assignee",
     "take_note",
