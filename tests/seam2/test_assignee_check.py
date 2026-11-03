@@ -66,8 +66,10 @@ def stale_ids(guard, page, login, agent) -> list[str]:
 
 
 def test_the_assignee_check_reads_the_agent_for_a_taken_trial_note(
-    page, guard, config, login, taken
+    taken, page, guard, config, login
 ):
+    # `taken` first, so its teardown runs after `page` has closed its
+    # browser: Playwright's sync API allows one at a time per thread.
     agent, pool = config.agent_user_name, config.pool_name
     log = runlog.RunLog(RUN_ID, guard, directory=None)
 
