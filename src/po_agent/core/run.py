@@ -14,7 +14,9 @@ pool -> one NOTE line. The only writes are the two Assigns; no booking code
 is imported (Must never #7). Any error while the agent may hold a Note: the
 browser closes, one return in a fresh browser context, then the run stops
 (exit 1); if that return fails, the ALERT says the Note stays with the agent.
-The run cap is checked before each Note is started (3.5); a KillSwitch from
+Before the list is read, the stale-Note stop (3.6, D6): a Pending Note
+still with the agent stops the run (exit 1). The run cap is checked before
+each Note is started (3.5); a KillSwitch from
 `controls.before_write` takes the same return, then the run exits 0.
 """
 
@@ -152,6 +154,7 @@ def decide_only(
             output.info("logged in")
             panel = driver.open_note_pool(guard, page)
             driver.leave_menu(guard, page)
+            controls.stale_note_stop(guard, panel, config.agent_user_name)
             driver.set_note_pool_filters(guard, panel, config.pool_name)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, config, summary)

@@ -7,6 +7,11 @@ built before any booking code (D1).
   in `run_window.tz`; `spike`, `demo` and seam 2 ignore it.
 - Run cap: checked before each Note is started; a Note in progress is
   finished (Open question 7).
+- Stale-Note stop (D6): `run` and `run --decide-only`, after login and
+  before the eligible list is read; `spike` skips it.
+- Assignee check (3.6), before W1 and W4 only (D7): a fresh Note Pool read,
+  never the open Note window (row 23: it doesn't refresh its Assignee).
+  The booker reopens the window it needs afterwards (row 25).
 
 `now` is the one clock; tests replace it.
 """
@@ -16,8 +21,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from playwright.sync_api import Locator, Page
+
 from po_agent.core.config import Config, RunWindow, load_config
-from po_agent.core.errors import ConfigError, PartialWrite
+from po_agent.core.errors import ConfigError, PartialWrite, UnexpectedScreen
+from po_agent.mysys import driver
+from po_agent.mysys.guard import ActionGuard
 
 STEPS = ("W1", "W2", "W3", "W4", "W5")
 # Nothing is submitted before W3 (W2 submits the task), so a stop there
@@ -65,6 +74,54 @@ class KillSwitch(Exception):
         self.note_id = note_id
         self.step = step
         super().__init__(detail)
+
+
+def stale_note_stop(guard: ActionGuard, panel: Locator, agent: str) -> None:
+    """A Pending Note still with the agent was left by an earlier run's
+    partial write or failed return: the run takes no Note (D6). Only page 1
+    can be read, so a second page stops the run too."""
+    listing = driver.read_agent_notes(guard, panel, agent)
+    if listing.pages > 1:
+        raise UnexpectedScreen("Note Pool has more pages: stale-Note read incomplete")
+    for row in listing.rows:
+        if row.assignee == agent:
+            raise UnexpectedScreen(
+                "a Note is still assigned to the agent from an earlier run",
+                note_id=row.note_id,
+            )
+
+
+class NoteTaken(Exception):
+    """A person has the Note at the W1 check (nothing written yet): the run
+    closes the browser context and leaves the Note with them, outcome
+    "untouched", reason NOTE_TAKEN."""
+
+    def __init__(self, *, note_id: str, step: str) -> None:
+        self.note_id = note_id
+        self.step = step
+        super().__init__("Note taken by someone else")
+
+
+def assignee_check(
+    guard: ActionGuard, page: Page, login: tuple[str, str, str], agent: str
+) -> AssigneeCheck:
+    """The check `Controls` runs before W1 and W4: reload, search the Note
+    ID under All Pools, and the one row whose ID cell equals it must have
+    Assignee `agent`. Someone else -> NoteTaken before W1, PartialWrite
+    before W4 (the task exists and is on hold)."""
+
+    def check(note_id: str, step: str) -> None:
+        _, listing = driver.search_note(guard, page, *login, note_id)
+        row = driver.exact_row(listing, note_id)
+        if row is None:
+            raise UnexpectedScreen("Note not found once", note_id=note_id, step=step)
+        if row.assignee == agent:
+            return
+        if step in NOT_SUBMITTED:
+            raise NoteTaken(note_id=note_id, step=step)
+        raise PartialWrite("Note taken mid-booking", note_id=note_id, step=step)
+
+    return check
 
 
 class Controls:

@@ -196,9 +196,29 @@ def wait_for_list(panel: Locator, before: ElementHandle | None = None) -> None:
 def set_note_pool_filters(guard: ActionGuard, panel: Locator, pool_name: str) -> None:
     """Assigned Pool = pool_name, Locked/Unlocked = Locked, each read back;
     every other filter at its default and every textbox empty."""
-    wanted = {**FILTER_DEFAULTS, POOL_FILTER: pool_name, LOCK_FILTER: LOCKED}
     _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, pool_name)
     _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, LOCKED)
+    _check_filters(
+        panel, {**FILTER_DEFAULTS, POOL_FILTER: pool_name, LOCK_FILTER: LOCKED}
+    )
+
+
+def read_agent_notes(guard: ActionGuard, panel: Locator, agent: str) -> NotePoolList:
+    """The stale-Note read (D6): Assigned Pool = All Pools and Locked/
+    Unlocked = All, each read back; Assigned User at All Users (the test
+    site's Assigned User list has no agent; decisions, 3 Nov 2026), Status
+    left at Pending, every other filter at its default and Search/filter
+    empty. Page 1's rows with `agent` as Assignee; `total` and `pages` as
+    the footer says."""
+    _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, ALL_POOLS)
+    _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, ALL_LOCKED)
+    _check_filters(panel, FILTER_DEFAULTS)
+    listing = read_note_pool(guard, panel)
+    rows = tuple(row for row in listing.rows if row.assignee == agent)
+    return NotePoolList(rows=rows, total=listing.total, pages=listing.pages)
+
+
+def _check_filters(panel: Locator, wanted: dict[str, str]) -> None:
     try:
         for name, label in wanted.items():
             if _chosen(panel, name) != label:
@@ -456,18 +476,18 @@ def _open_retried(
                 raise
 
 
-def find_note_again(
+def search_note(
     guard: ActionGuard,
     page: Page,
     base_url: str,
     username: str,
     password: str,
     note_id: str,
-) -> Locator:
-    """Cross-cutting rule "Finding a Note again": reload, the Note Pool under
-    All Pools and All, search the Note ID (fill, then Refresh: row 27), the
-    one row whose ID cell equals it (the search matches substrings), opened.
-    The reopened window has Send Email ticked again."""
+) -> tuple[Locator, NotePoolList]:
+    """Cross-cutting rule "Finding a Note again", up to the read: reload, the
+    Note Pool under All Pools and All, search the Note ID (fill, then
+    Refresh: row 27), page 1 read. Every row whose ID contains the Note ID
+    is listed: pick the one with exact_row."""
     reload_home(guard, page, base_url, username, password)
     panel = open_note_pool(guard, page)
     leave_menu(guard, page)
@@ -482,16 +502,35 @@ def find_note_again(
     refresh = panel.get_by_role("button", name="Refresh", exact=True)
     _open_retried(guard, "refresh_note_pool", panel, refresh)
     wait_for_list(panel, before)
-    listing = read_note_pool(guard, panel)
+    return panel, read_note_pool(guard, panel)
+
+
+def find_note_again(
+    guard: ActionGuard,
+    page: Page,
+    base_url: str,
+    username: str,
+    password: str,
+    note_id: str,
+) -> Locator:
+    """search_note, then the one row whose ID cell equals the Note ID,
+    opened. The reopened window has Send Email ticked again."""
+    panel, listing = search_note(guard, page, base_url, username, password, note_id)
     if not found_once(listing, note_id):
         raise UnexpectedScreen("Note not found again", note_id=note_id)
     return open_note(guard, page, panel, note_id)
 
 
+def exact_row(listing: NotePoolList, note_id: str) -> NotePoolRow | None:
+    """The one row whose ID cell equals the Note ID, else None (none, or the
+    same ID twice): the search matches substrings, so 300001 also lists
+    3000012."""
+    rows = [row for row in listing.rows if row.note_id == note_id]
+    return rows[0] if len(rows) == 1 else None
+
+
 def found_once(listing: NotePoolList, note_id: str) -> bool:
-    """Exactly one row whose ID cell equals the Note ID: the search matches
-    substrings, so 300001 also lists 3000012."""
-    return [row.note_id for row in listing.rows].count(note_id) == 1
+    return exact_row(listing, note_id) is not None
 
 
 # Note window (rows 02-04, 13, 15b)
