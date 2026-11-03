@@ -92,7 +92,6 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "open_pool": "click",
         "set_pool_filter": "select",
         "set_locked_filter": "select",
-        "set_user_filter": "select",  # the stale-Note read, Joey 3 Nov 2026
         "search_note_pool": "fill",
         "refresh_note_pool": "click",
         "open_note": "click",
