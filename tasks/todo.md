@@ -30,7 +30,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 ## M0b — screens still to map (Stage 3E)
 
 - [x] **M0b.1** (done, 25 Oct 2026; rows 21–22 dropped, row 23 moved to M0b.2) Moving between windows, anchors for unlabelled controls and panels, Note Pool filter reload and search (`fill` + Refresh), reopening an open project (rows 25–28); one Assign returns a Note (15b); Claude writes them up · by hand · **blocks 1.8** and M3
-- [ ] **M0b.2** (Choose Project, row 20, partly seen live in the demo, 28 Oct 2026) Task detail, Link to Project search/select (and its target's name), PO Number prefill, empty Documents area (rows 19, 20, 24); does an open Note window refresh its Assignee (row 23, needed before 3.6); anchors for every remaining weak locator (open item 8 closed); upload saved before Submit?; reset; Claude writes them up · by hand · blocks M4
+- [x] **M0b.2** (done, 3 Nov 2026; Choose Project, row 20, partly seen live in the demo, 28 Oct 2026) Task detail, Link to Project search/select (and its target's name), PO Number prefill, empty Documents area (rows 19, 20, 24); does an open Note window refresh its Assignee (row 23, needed before 3.6); anchors for every remaining weak locator (open item 8 closed); upload saved before Submit?; reset; Claude writes them up · by hand · blocks M4
 
 **Checkpoint M0b:** rows 19–28 captured; no M0b item left in SPEC or the screen map; both PRs merged; test site reset.
 

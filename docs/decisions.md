@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 2 Nov 2026, production)
+# PO Agent - decision log (updated 3 Nov 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -17,6 +17,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **2 Nov 2026: decide-only built** (task 3.3; entry below).
 - **2 Nov 2026: run controls built** (task 3.5; entry below).
 - **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
+- **3 Nov 2026: M0b.2 mapped** (rows 19, 20, 23, 24; entry below). Every screen the MVP books through is now mapped.
+
+## 3 Nov 2026 - M0b.2: task detail, Link to Project, PO prefill, assignee refresh (Joey; mapped with Claude observing)
+
+- **How:** Joey booked 2609017B by hand in the Playwright window, logged in as the agent, up to Hold and Link to Project (no Solved); Claude only snapshotted. Then Joey reset the test site (cancelled the task, unlinked the Note by hand and returned it to the Agent Pool, and moved an old 2609017B copy that had sat with the agent since 16 Oct to himself).
+- **W2 read-back (row 19):** a cell of the new task's details row opens the task detail screen **in the project's own window** (heading `TSK_<n> PLN_<n> ...`). Its `tsk_<n> [Compaction Test]` section shows **PO Number**, **Lodged By** and the **Notes** text; the Client section shows **Task Creator**. The PDF is **not** on the task: it is filed on the **project's Documents tab**, in a section headed by the task number (Type Purchase Order, the file name). Choosing "-- Select Task --" in the window's select goes back to the project. New read-only allowlist entries: the details-row click, that select, and the project's Documents and Tasks buttons. The task screen's Save, Complete and uploads, and the Documents tab's Delete ("close"), Edit and checkboxes, are never touched.
+- **W4 (row 20):** Choose Project's results are a table; the agent clicks the **cell** named exactly the pln. The row is never the target, because its accessible name includes the Site Address and a "... Close" street would trip the denylist on every run. Choose Project closes by itself after the click.
+- **W1:** PO Number is **not prefilled** (row 24). The PO Documents upload is **saved only by Submit**: an abandoned form leaves no document on the project. The Documents area shows empty by having no table. Every weak field (Creator, Multiple Units, PO Number, PO Contact, Sale Office, Delivery Office, Note, both file inputs) sits in its own label block, so it is found by its exact label inside the `Create New Task` window, never by `nth` or a generated id. The Hold confirm is the "Hold" beside the heading `Hold Task: <task no>`, in one small block.
+- **Row 23:** an open Note window does **not** refresh its Assignee, log or the Note Pool row behind it when someone else reassigns the Note (tested twice). The assignee check (3.6) already reads a fresh Note Pool after a reload, so nothing changes there.
+- **Mapping lesson:** while Playwright CLI is attached, each click on "Choose File" queues a file chooser that survives a reload and swallows `playwright-cli upload`. Dragging the PDF from Explorer onto the upload area works instead.
+- **Loosens?** No: the new allowlist entries only open or read screens, and each write target is narrower (a cell, not a row).
+- Carried in: `docs/screen-map.md` v1.3 (rows 08-11, 13, 19, 20, 23, 24; open items 2, 4, 5, 8, 10), `SPEC.md` v1.21 (MySys screen rules: W1, W2, W3, W4, Assignee check, allowlist; In the MVP; Expected slices), `tasks/plan.md` (M0b.2, 3.6, 4.1, 4.2, 4.4).
 
 ## 2 Nov 2026 - Run controls: kill switch, Perth window, run cap (Joey, task 3.5)
 
