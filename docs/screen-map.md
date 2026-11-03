@@ -1,6 +1,6 @@
 # MySys screen map (test site)
 
-**Version:** 1.2 · 25 Oct 2026 (1.2: slice M0b.1, rows 25–28, 15b and the row-26 anchors; rows 21–22 not mapped and row 23 moved to M0b.2 (decisions, 25 Oct 2026); 1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026, and slice M0b.1 (rows 15b, 25–28) on 25 Oct 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
+**Version:** 1.3 · 3 Nov 2026 (1.3: slice M0b.2, rows 19, 20, 23 and 24, the label anchors for every weak Create New Task field and the Hold confirm button, the upload saved only by Submit; open items 2, 4, 5, 8 and 10 closed (decisions, 3 Nov 2026); 1.2: slice M0b.1, rows 25–28, 15b and the row-26 anchors; rows 21–22 not mapped and row 23 moved to M0b.2 (decisions, 25 Oct 2026); 1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026, slice M0b.1 (rows 15b, 25–28) on 25 Oct 2026, and slice M0b.2 (rows 19, 20, 23, 24) on 3 Nov 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
 
 Every value below is **fake**. The real captures stay in `private/`. **The test site's 3 trial POs are real B1 POs** (16 Oct 2026), so test-site captures and screenshots are real data too: never commit them.
 
@@ -41,6 +41,8 @@ Names kept as they are, because the agent uses them: the agent's account **Agent
 | cell "close" (×) beside the attached file | Create New Task → PO Documents | Removes the document |
 | "close" beside Task Client | Create New Task → Compaction Test | Clears the task client |
 | any checkbox | Hold Task dialog (reminder, reset turn-around time, related tasks) | Changes the hold or holds other jobs |
+| "close" ("Delete") and "edit" cells, row checkboxes, "Document Actions" | Project → Documents tab (row 19) | Deletes or changes a document |
+| "Save", "Complete", every Upload, any field | Task detail screen (row 19) | Certifies, completes or changes the task; the agent only reads there |
 
 Match these by **substring or regex, not exact name**: "Undo Cancellation" contains "Cancel", and Playwright's own locator for the task's Cancel needed `exact: true`. The spec's denylist (`docs/specs/spec.md` §5, v1.6) covers all of these, matched as substrings; v1.6 added **close**, which also covers the window Close controls (the agent reloads the page instead of closing windows). The Note Pool's Status filter lists a **Discard** option, so the agent leaves that filter at its default (Pending).
 
@@ -164,9 +166,9 @@ Window heading **"Create New Task"**.
 | Role | Accessible name | Locator | Default |
 |---|---|---|---|
 | text | Office | | Prompt Engineering Pty Ltd (read-only) |
-| checkbox | (label "Multiple Units") | weak: `getByRole('checkbox').nth(1)` | Unticked |
+| checkbox | (label "Multiple Units") | label anchor (M0b.2): the checkbox in the block holding the text "Multiple Units" | Unticked |
 | text | Project Client | | B1 Homes (read-only) |
-| combobox | (label "Creator") | weak: `locator('.controls > select')` | **The project's creator**, not Perth Scheduling (about 170 options) |
+| combobox | (label "Creator") | label anchor (M0b.2): the select in the block holding the text "Creator" (Client section) | **The project's creator**, not Perth Scheduling (about 170 options) |
 | checkbox ×4 | Sales Template Bundle: "- 0. Site Classification Bundle", "- 1.Single Storey Engineering Bundle", "- 2.Two Storey Engineering Bundle", "- 3. Architectural Drafting" | | Unticked |
 | checkbox ×54 | Individual services, incl. **"- Compaction Test"** | `getByRole('checkbox', { name: '- Compaction Test' })` | Unticked. The four bundle names repeat here, so exact names aren't unique for them; "- Compaction Test" is |
 | button | "Submit" | `getByRole('button', { name: 'Submit' })`, scoped to this window | **The write** |
@@ -183,13 +185,17 @@ Ticking **- Compaction Test** opens a sub-form under it. (**Creator** isn't in t
 |---|---|---|---|
 | Task Client | text "Same as Project", button "Select Client", "close" | `getByRole('button', { name: 'Select Client' })` | Same as Project. **The "close" clears it: never touch** |
 | Task Name | textbox "Task Name" | `getByRole('textbox', { name: 'Task Name' })` | Empty |
-| PO Number | textbox (no name) | weak: `div:nth-child(2) > .controls > input` | `2600001B/048` |
-| PO Contact | combobox (no name) | weak | Choose... |
-| **PO Documents** | "Upload" with button "Choose File" | weak: generated id `…_s_po_1_6` | After upload a table row: cell **"2600001B_048_1.pdf"** + cell **"close"** (removes it: **danger**) |
-| Documents | "Upload" with button "Choose File" | weak: generated id `…_s_1_6` | A second, separate upload. The walkthrough used **PO Documents** |
-| Sale Office | combobox | | **Prompt Engineering Pty Ltd** |
-| Delivery Office | combobox | weak | Choose... |
-| Note | textbox (no name) | weak: `[id="p_<digits>"] textarea` | **Empty in the walkthrough.** The SOP says Note = email body |
+| PO Number | textbox (no name) | label anchor: the input in the block holding "PO Number" | **Empty** when the sub-form opens (row 24); `2600001B/048` |
+| PO Contact | combobox (no name) | label anchor: the select in the block holding "PO Contact" | Choose... |
+| **PO Documents** | "Upload" with button "Choose File" (the file input) | label anchor: the file input in the block holding "PO Documents" | After upload a table row: cell **"2600001B_048_1.pdf"** + cell **"close"** (removes it: **danger**). No table before an upload |
+| Documents | "Upload" with button "Choose File" (the file input) | label anchor: the file input in the block holding exactly "Documents" | A second, separate upload. The walkthrough used **PO Documents**. **Empty: no table at all** (M0b.2) |
+| Sale Office | combobox (no name) | label anchor: the select in the block holding "Sale Office" | **Prompt Engineering Pty Ltd** |
+| Delivery Office | combobox (no name) | label anchor: the select in the block holding "Delivery Office" | Choose... |
+| Note | textbox (no name) | label anchor: the textarea in the block holding "Note" | **Empty in the walkthrough.** The SOP says Note = email body |
+
+**Label anchors (M0b.2, 3 Nov 2026):** every field above sits in its own small block that holds only its label text and its control (for PO Documents also the upload table). The agent finds the **innermost** element in the `Create New Task` window holding the exact label text and the control, then the control inside it (`_container` / `_field` in `mysys/booking.py`). Label texts are matched exactly, so "Documents" never matches "PO Documents". Playwright's own `generate-locator` still offers only `nth`, `:nth-child` or generated ids (`[id="<digits>.<digits>_s_po_1_6"]`, `[id="p_<digits>.<digits>"]`) for all of them: never used.
+**The upload is saved only by Submit:** with the PDF in PO Documents and the form not yet submitted, the project's Documents tab showed no new copy; after Submit it did (row 19). Abandoning the form leaves nothing behind.
+**After Submit** a hidden textbox holding the Note text is left at the end of the page, outside every window. Reads stay scoped to their window, so it is never read.
 
 **Read back before Submit:** Creator = Perth Scheduling; Compaction Test ticked and **nothing else ticked**; PO Number; the file name in the PO Documents table; Note = email body; Task Client = Same as Project. Any mismatch → close the browser context (`WRITE_NOT_STARTED`).
 
@@ -197,7 +203,8 @@ Ticking **- Compaction Test** opens a sub-form under it. (**Creator** isn't in t
 
 The Create New Task window closes. On the project, a new task: header **"(tsk_200001) | Compaction Test"** with **Cancel** and **Hold**; details: Lodged By **Agent 1 (MySys Only)**, Task Creator **Perth Scheduling**, today's date, Office **Prompt Engineering Pty Ltd**, Turn Around Time "0 Days", Days to Complete "2 Days", a due date, a price, Status **New Project**.
 
-**Read back:** a new Compaction Test task on this project, Task Creator = Perth Scheduling, and its task number (needed for Hold). **PO number and document aren't shown in this table:** open the task to read them back (open item).
+**Read back:** a new Compaction Test task on this project, Task Creator = Perth Scheduling, and its task number (needed for Hold). **PO number and document aren't shown in this table:** they are read on the task detail screen and the project's Documents tab (row 19).
+The project window's **"-- Select Task --"** select gains the option **"(tsk_200001) [Compaction Test]"** (one option per task, cancelled ones too).
 
 ### Row 11 · Hold Task dialog
 
@@ -205,7 +212,7 @@ The task row's **Hold** opens window **"Hold Task"** with heading **"Hold Task: 
 
 | Field | Role / name | Default |
 |---|---|---|
-| Confirm | button "Hold", top right beside the heading | Two "Hold" buttons are now on the page (this one and the task row's). Playwright could only tell them apart by generated id: **scope to the dialog with heading "Hold Task: tsk_200001"** |
+| Confirm | button "Hold", top right beside the heading | Two "Hold" buttons are now on the page (this one and the task row's). Playwright could only tell them apart by generated id (`[id="p_<digits>"]`). **Anchor (M0b.2):** the window's own title is a plain heading "Hold Task"; inside it, the button "Hold" (exact) and the heading "Hold Task: tsk_200001" are the only two things in one small block. The confirm is the button "Hold" in the innermost element holding that heading and a "Hold" button |
 | Active task after selected task complete | combobox | Choose... |
 | Active task after this task changed task owner | combobox | Choose... |
 | Reminder Email Setting | checkbox **"Send me a reminder email every days"** + spinbutton | **Ticked, with 0** ("0 days = no email reminders") |
@@ -228,7 +235,7 @@ The dialog closes. The task's header row now has **Cancel** and **Un-Hold**; Tur
 
 ### Row 13 · Link to Project
 
-On the Note: **Link to Project** → search the project → select. (The search and result screens weren't captured; only the result.)
+On the Note: **Link to Project** → search the project → select (the search and select screens: row 20).
 
 After linking, in the Note window:
 - "Link to Project" is replaced by button **"pln_10001"**, button **"Change Project"** (danger) and a second **"Unlink"** (danger). Both Unlinks now share the name: `getByRole('button', { name: 'Unlink' })` matches two.
@@ -325,7 +332,57 @@ The Note was assigned to Agent 1 (one Assign, Send Email unticked). Page reloade
 ### Rows 21–23 · not mapped in M0b.1
 
 - **Rows 21–22** (a Note with no attachment, one with two PDFs) were dropped for the MVP (decisions, 25 Oct 2026): no such Notes were made. `SPEC.md` → Attachment and download sets the rule without them: exactly one "Download document" link whose URL `file_name` ends `.pdf`, else skip.
-- **Row 23** (does an open Note window refresh its Assignee after someone else reassigns it) moves to **M0b.2**, before task 3.6. The Note Pool search by Note ID under All Pools is mapped in row 27.
+- **Row 23** (does an open Note window refresh its Assignee after someone else reassigns it) moved to **M0b.2**, before task 3.6: mapped below. The Note Pool search by Note ID under All Pools is mapped in row 27.
+
+## Slice M0b.2: task detail, Link to Project, PO prefill, assignee refresh (3 Nov 2026)
+
+Joey clicked in the Playwright window, logged in as the agent, and booked one trial PO by hand up to Hold and Link to Project; Claude observed only. Fake values as above (`tsk_200001` the new task, `tsk_200000` an older one).
+
+### Row 23 · Does an open Note window refresh its Assignee?
+
+**No.** With Note `300001` open in the Playwright window, Joey assigned it to himself from his own browser (his browser showed him as assignee and a new log line). About 30 s later the Playwright window still read the old "Assignee:", the old newest log line, and the old Assignee in the Note Pool row behind it. Tried twice (from Agent Pool, and from the agent). An open window and the Note Pool list show only what they loaded; the assignee check reads a fresh Note Pool after a reload (`SPEC.md` → Assignee check).
+
+### Row 24 · Is PO Number prefilled?
+
+**No.** After ticking **- Compaction Test**, the sub-form's PO Number was empty. The agent fills it and reads it back (row 09).
+
+### Row 19 · The task detail screen
+
+**Opening it:** the new task's **details row** (the second row, under "(tsk_200001) | Compaction Test") opens the task when clicked, e.g. its Task Creator cell. The project window's select (row 10) also navigates: choosing **"-- Select Task --"** in it went from the task back to the project. A click on the header row is never needed (it holds **Cancel** and **Hold**).
+
+**It opens in the same floating window**, not a new one: the window's heading changes from "pln_10001 B1 Homes <address>" to **"TSK_200001 PLN_10001 B1 Homes <address>"** (upper case), and its taskbar entry with it. The select now reads "(tsk_200001) [Compaction Test]", and links "pln_10001" and "tsk_200001" sit above it.
+
+| Area | What it shows | Notes |
+|---|---|---|
+| Section heading **"tsk_200001 [Compaction Test]"** | A list of label + value pairs (each label a bold `strong`, like the project's): Created, Turn Around Time, Due Date, Complete Date, Complete By, Certify By, **Lodged By:** `Agent 1 (MySys Only)`, Office, Delivery Office `---`, Price, PO Contact (link `---`), **PO Number:** `2600001B/048`; then bold **Notes** and the Note text: `Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf` | **The W2 read-back for PO number and Note** |
+| Section "Client" | **Project Company:** link B1 Homes; **Task Creator:** link Perth Scheduling | |
+| Section "Active Stage" | Due date, "Unassigned", button **"Complete"**, "Report Analysis", button "Assign Logs (0)" | **Complete is danger** |
+| Tab buttons | Certify Form (shown first), Stage Table, Communication, Documents, Result, Log, Timesheet, Dev Comm, AP Check | The agent's account; a person's account shows more tabs |
+| Certify Form | button **"Save"**, Engineer Signature select, Certify Date with "Edit", Merge Result checkbox (ticked), Invoice Statement, Note to Senior Analyst; "Client Documents (0)", "Certified Documents (0)", "Internal Documents (0)", each with an Upload; Preview Merged Doc, Select Library Documents | **Every control here is danger**: the agent only reads the left side |
+| Documents tab | The same three document areas, all **(0)** | **The PO PDF is not on the task** |
+
+**Where the PO PDF is:** the **project's** Documents tab (project window → button "Documents"). It lists documents in sections: a heading "pln_10001" (the project's own, "No Document Found"), then one heading **"tsk_…"** per task with "Document Actions" and either "No Document Found" or a table:
+
+| Column | For the new task |
+|---|---|
+| (checkbox) | Unticked: never touched |
+| Type | **Purchase Order** |
+| File | **2600001B_048_1.pdf** plus a link "file_download <size>" |
+| Document | Purchase Order |
+| Note | empty |
+| Creator | **Agent 1 (MySys Only)** |
+| Create Date | today, with the time |
+| (actions) | cell "edit" ("Edit") and cell **"close" ("Delete")**: **danger**, on the denylist (close) |
+
+Every earlier booking's task has its own section with its own copy, so the read-back is the section headed by the **new** task number: exactly one row, Type Purchase Order, File starting with the PDF's file name. The tab also has a "Search/filter" box and two selects: not used. The project's **Tasks** button brings the task table back.
+
+### Row 20 · Link to Project: search and select
+
+1. On the Note (assigned to the agent), **Link to Project** opens a floating window, heading **"Choose Project"**, with its own taskbar entry and textboxes **"Search/filter"**, **"After..."**, **"Before..."**. No results until a search runs.
+2. Search/filter = `pln_10001`, then **Enter**: a table with columns "#", Client Ref No, Create Date, Creator, Project Name, Client, Site Address, Postcode, and **one row**: cells `pln_10001`, `2600001B`, a date, `<project creator>`, (empty), `B1 Homes`, `Sample Lane Sampleville`, `6000`.
+3. Clicking the **cell "pln_10001"** links the Note: Choose Project closes by itself (window and taskbar entry gone), and the Note window shows button **"pln_10001"**, **"Change Project"** and a second **"Unlink"** (row 13). Status reads "Pending by <user>" (the last person to set the status), so the read-back is "starts with Pending".
+
+**The agent's target:** `getByRole('cell', { name: 'pln_10001', exact: true })` inside the Choose Project window. **Never the row:** the row's accessible name is the whole row text, **Site Address included** (Playwright offered `getByRole('row', { name: 'pln_10001 2600001B …' })`), so a project on a "… Close" street would trip the denylist's `close` and refuse every run. The cell's name is only the pln.
 
 ---
 
@@ -346,12 +403,12 @@ The Note was assigned to Agent 1 (one Assign, Send Email unticked). Page reloade
 ## Open items
 
 1. ~~Duplicate Notes per PO~~ **Done:** the first copy processed is booked, any other skips `DUPLICATE_TASK` (`SPEC.md` → MySys screen rules → Note Pool).
-2. **Read back PO number and document after Submit:** they aren't in the project's task table; the task detail screen is mapped in **slice M0b**. Until then the MVP's duplicate check counts any non-Cancelled Compaction Test task.
-3. **Note field and upload:** Note = the Note's body (`SPEC.md` → MySys screen rules). Upload: SPEC uses **PO Documents**, as in the walkthrough; PO admin to confirm (`SPEC.md` open question 11).
-4. **Creator** ~~and PO Number~~: one Creator field (row 08), set to Perth Scheduling. Whether PO Number is prefilled: **slice M0b** (the agent's fill replaces any prefill anyway).
-5. **Link to Project search screens** (row 13) weren't captured: **slice M0b**.
+2. ~~Read back PO number and document after Submit~~ **Done (M0b.2, row 19):** PO number and Note on the task detail screen, the PDF in the project's Documents tab under the new task's section. The MVP's duplicate check still counts any non-Cancelled Compaction Test task (it doesn't open each task).
+3. **Note field and upload:** Note = the Note's body (`SPEC.md` → MySys screen rules). Upload: SPEC uses **PO Documents**, as in the walkthrough; PO admin to confirm (`SPEC.md` open question 11). The upload is saved only by Submit (M0b.2).
+4. ~~Creator and PO Number~~ **Done:** one Creator field (row 08), set to Perth Scheduling; PO Number is not prefilled (row 24).
+5. ~~Link to Project search screens~~ **Done (M0b.2, row 20).**
 6. **Note-to-task link:** the Note links to the project only (Task `---`). That's what `SPEC.md` S4 checks.
 7. ~~Denylist additions~~ **Done:** Pending, Undo Cancellation, Un-Hold and Change Project are in the spec's denylist (v1.5) and `SPEC.md` → Never (v1.9).
-8. **Weak locators to anchor on labels:** ~~Assigned Pool / Status / Locked filters, the Note window's user and pool lists, Projects search~~ (done in M0b.1, row 26); still open for **slice M0b.2**: Creator, Multiple Units, PO Number, PO Contact, Delivery Office, Note, both Choose File inputs, the Hold confirm button.
+8. ~~Weak locators to anchor on labels~~ **Done:** the filters, Note window lists and Projects search in M0b.1 (row 26); Creator, Multiple Units, PO Number, PO Contact, Sale Office, Delivery Office, Note and both Choose File inputs by their label block (rows 08–09), the Hold confirm by its heading block (row 11), in M0b.2. None needs `nth` or a generated id.
 9. **Live:** pool, title, Locked filter, whether a Resolve button exists, and which Projects search column ends with `/048` (3–4 results per internal number on live; Stage 3B).
-10. ~~Notes with no attachment or two attachments~~ **Done without mapping:** the attachment rule in `SPEC.md` (decisions, 25 Oct 2026). Whether an open Note window refreshes its Assignee (row 23): **slice M0b.2**, before task 3.6.
+10. ~~Notes with no attachment or two attachments~~ **Done without mapping:** the attachment rule in `SPEC.md` (decisions, 25 Oct 2026). An open Note window does not refresh its Assignee (row 23, M0b.2).
