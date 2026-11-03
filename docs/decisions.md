@@ -19,6 +19,23 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
 - **3 Nov 2026: M0b.2 mapped** (rows 19, 20, 23, 24; entry below). Every screen the MVP books through is now mapped.
 - **3 Nov 2026: assignee check and stale-Note stop built** (task 3.6; entry below).
+- **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
+
+## 3 Nov 2026 - M4 gate: doubt review of the booker design (fresh session, before 4.1)
+
+A fresh-context adversarial review of 4.1-4.5 against the screen map, `SPEC.md`, `docs/specs/spec.md` §2 and §6, and the code the booker builds on. The must-fixes, now in `tasks/plan.md` (M4) and `SPEC.md` (MySys screen rules, Deferred table, Trial conditions):
+
+- **The Submit click is the partial-write line**, not "from W3 on": from the click on, every error is `PARTIAL_WRITE` and the Note is never returned to the pool (`docs/specs/spec.md` §6: "a failure at or after W2"). `AccuracyBreach` and `GuardRefusal` after Submit keep their own ALERT and also leave the Note with the agent.
+- **An accuracy breach leaves the Note with the agent**, so the stale-Note stop (D6) holds every later run: with no state between runs, that is the MVP's switch-off until Joey unloads the job. A Note linked to another pln at W4 is a wrong project: `ACCURACY_BREACH`.
+- **W1 reopens the project after its assignee check** (the check reloads, so the window from step 10 is always gone) and checks heading, Client Internal No. and the Compaction Test task numbers again before Create New Task; a task created meanwhile → `WRITE_NOT_STARTED`.
+- **The duplicate check reads a settled task table:** the rows render after the window shows, so an early read can look like "no tasks". Two equal reads in a row, matching the window's "-- Select Task --" options, else `UNEXPECTED_SCREEN`. Applies at step 10 (`project_lookup`) and at the W1 reopen.
+- **W2's task detail** is opened from the details row right after the new task's own header row and must show the new task number, else `PARTIAL_WRITE`. Its new allowlist entries are new action names in `guard.py` (Joey merges that PR).
+- **Committing clicks are made once**, never through the retrying open helpers. The booker never calls `booking.save_snapshot` (page text on the run machine's disk) or `_link_choice`'s fallbacks (W4's target is the cell only).
+- **4.5 routing and tests:** `NoteTaken` at W1 → untouched line, no ALERT, next Note in a fresh context with its own `Controls`; `KillSwitch` at W1/W2 → returned, exit 0, as decide-only. Offline tests for both, and for errors after Submit.
+- **Tests:** W-step teardowns return the Note only while it is Pending, unlinked and with the agent (after W4/W5 the reset does it); W5's "gone from Pending" is the Note ID search with no equal row (not `find_note_again`, which raises); the Hold-dialog `guard.vet()` refusal moves to 4.2's test, the last point where the dialog can be opened and left unconfirmed.
+- **Accepted, not changed:** the run cap is checked only between Notes (a Note killed by the wrapper mid-booking stays with the agent, and D6 catches it); more than 50 Pending Notes stops every run (already carried; test-site resets and S5 copies should keep the count down); the stale-Note read is Pending-only (3.6 entry).
+- **Loosens?** No: every change adds a stop or keeps a Note with the agent. Nothing new acts in MySys beyond what 4.2 already planned.
+- Carried in: `tasks/plan.md` (Architecture decisions, M4 intro, 4.1-4.5), `SPEC.md` (Deferred table, MySys screen rules → Duplicate check, W1, W2, W4, W5; Trial conditions).
 
 ## 3 Nov 2026 - Assignee check and stale-Note stop (Joey, task 3.6)
 
