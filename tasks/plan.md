@@ -537,7 +537,7 @@ Each W-step test books **only as far as its step** on the test site and leaves t
 **Description:** `po-agent run --site test`: PROCEED → booker; partial writes and accuracy breaches handled the MVP way.
 **Needs:** 4.4.
 **Acceptance:**
-- PROCEED → W1–W5 → `NOTE` outcome `booked` with `task_id`. A skip → back to the pool. `PartialWrite` → `ALERT PARTIAL_WRITE`, Note left assigned to the agent, run stops (exit 1). `AccuracyBreach` → `ALERT ACCURACY_BREACH`, exit 3. `WriteNotStarted` → Note back to the pool, run stops (exit 1).
+- PROCEED → W1–W5 → `NOTE` outcome `booked` with `task_id`. A skip → back to the pool. `PartialWrite` → `ALERT PARTIAL_WRITE`, Note left assigned to the agent, run stops (exit 1). `AccuracyBreach` → `ALERT ACCURACY_BREACH`, exit 3. `WriteNotStarted` → Note back to the pool, run stops (exit 1). Any other error from W3 on (W2 has submitted the task), including an `UnexpectedScreen` from the W4 assignee check (search failed, Note not found once), is handled as `PartialWrite`: never returned to the pool, where it would look unbooked (decisions, 3 Nov 2026, 3.6 review).
 - `run` without `--decide-only` now books (it no longer refuses, 1.6).
 - Seam 2 (testsite, after a reset): the 3 trial POs are booked to S4. An immediate rerun changes nothing (SPEC → Reruns).
 - Two cases need Notes only a person can create. `test_run_book.py` has a second test that runs only after Joey has placed a fresh copy of 2609034B and a non-`/048` Note in the Agent Pool. Its precondition fixture checks both are there, and skips with a clear message if they aren't. The fresh copy → `DUPLICATE_TASK`, back in the Agent Pool, no new task (S5). The non-`/048` Note stays untouched.
