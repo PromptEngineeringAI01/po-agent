@@ -429,7 +429,7 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 
 Task sessions build on Opus; the second review runs on **Opus in a fresh sub-agent**, so it doesn't share the builder's context or assumptions. It needs no other account, and the code stays with Anthropic. Fable 5.1, a different model, would share fewer blind spots, but on Joey's plan it needs usage credits (2 Nov 2026), so it is used only if Joey buys them. A model from another lab would catch more; add one later if Joey gets a second plan.
 
-**Run it:** the advisor starts a reviewer sub-agent with model `opus`, read-only (no edits, no commits, no pushes), pointed at the task's worktree, with the prompt below. It returns the findings to the advisor, which sends them to the task session for triage.
+**Run it:** the advisor starts the `pr-reviewer` sub-agent (`.claude/agents/pr-reviewer.md`: model `opus`, tools Read, Grep, Glob and Bash for `git diff` and `git log` only; no edits, no commits, no pushes), with the task's worktree path and task number. Its definition holds the prompt below, plus one check: a write that trusts the agent's own report instead of reading MySys back. It returns the findings to the advisor, which sends them to the task session for triage.
 
 **Data rule:** the reviewer reads **only the task worktree** (worktrees hold tracked files only, so no `private/`, `logs/` or `state/`). Never point it at the main checkout, `private/`, captures or logs, and never paste real data into its prompt.
 
