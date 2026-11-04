@@ -15,6 +15,7 @@ Hand-off pack for the engineer building the PO Agent (B1 Homes `/048` compaction
 | `roadmap.md` | Phases 0–6 with exit checks (MVP is phase 1), the CEO gate, go-live blockers, rollback triggers. |
 | `ADR-001-po-agent-architecture.md` | Why hybrid (two readers, script clicks) was chosen over the alternatives. **Accepted.** |
 | `ADR-002-po-agent-hosting.md` | Where the agent runs. **Accepted** (CEO decision 3, 15 Oct 2026): the office Mac Mini, for the trial and production. |
+| `ADR-003-more-clients.md` | How the agent takes on clients beyond B1 Homes, including one found by its PDF. **Proposed** (4 Nov 2026); nothing built until a second client is real. |
 
 **Source of truth for decisions:** `docs/decisions.md`. **Intent:** `docs/intent.md`. **Build runbook:** `docs/workflow.md`.
 
