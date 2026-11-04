@@ -21,7 +21,7 @@ Build the MVP PO Agent so that it books the 3 trial POs (2609017B → pln_66935,
 - **The PO PDF on disk (D2).** Chromium writes every download to disk, so "in memory only" isn't possible with `expect_download`. The browser is launched with `downloads_path` set to a run-scoped directory under the system temp dir (`po-agent-dl-<run_id>`); in Playwright this is a **launch** option, not a context option, and without it downloads land in Playwright's own `playwright-artifacts-*` temp dir, which the cleanup below would miss. The driver reads the file into memory and deletes it straight after the download. The directory is removed in a `finally` block, and every run removes leftover `po-agent-dl-*` directories before login. W1 uploads from the in-memory bytes (`set_input_files` with a file payload), never from a path. The Mac Mini's disk is FileVault-encrypted.
 - **Host-agnostic `src/`.** Nothing in `src/` is tied to macOS. Everything Mac-specific lives in `scripts/macmini-run.sh` and the plist.
 - **Typed errors → exit codes** in `cli.py`: 0 finished · 1 stopped (unexpected screen, failed write, partial write, guard refusal) · 2 config, secrets or login · 3 accuracy breach. The errors live in a new `core/errors.py` (not listed in SPEC → Project Structure; see Doc drift).
-- **`UNEXPECTED_SCREEN` stops the run.** The decision engine may return `Skip(UNEXPECTED_SCREEN)` (e.g. the project window's Client Internal No. doesn't match), and the driver may raise `UnexpectedScreen`. The run loop treats both the same way: return the Note to the pool through the normal path, then stop the run (exit 1), as SPEC → In the MVP §8 requires.
+- **`UNEXPECTED_SCREEN` stops the run.** The decision engine may return `Skip(UNEXPECTED_SCREEN)` (e.g. the project window's Client Internal No. doesn't match), and the driver may raise `UnexpectedScreen`. The run loop treats both the same way: return the Note to the pool through the normal path, then stop the run (exit 1), as SPEC → In the MVP §8 requires. That holds only before the Submit click: from the click on, every error is a partial write and the Note is never returned (4.2, 4.5).
 - **The booker accepts only a `Proceed` decision object** made by the decision engine. This is type-checked, and a test asserts that no module other than `b1/decision.py` constructs `Proceed`, so no code path reaches Create New Task without passing every §2 check. `Proceed` is frozen and names what it's for (`note_id`, internal number, pln), so the booker can refuse to apply it to any other Note or project (4.1). Offline tests get their `Proceed` from `decide()` on fixtures, never by building one.
 - **Run controls come before the first write (D1).** The kill switch, Perth window, run cap, assignee check and the stale-Note stop (D6) are built in M3 (3.5, 3.6), before any booking code. Every W step starts with `controls.before_write(note_id, step)`: it re-reads `enabled` every time, and runs the assignee check only before W1 and W4 (D7), so W1 → W2 → W3 never leave the project window. Together with the `Proceed` type, this is what Must never #7 needs.
 - **Order before a Note-window write:** `before_write` → untick Send Email Notification → read it back unticked → the one committing click. The assignee check can leave and reopen the Note window, and the box is ticked again every time the window opens (screen map row 02), so unticking before `before_write` isn't enough.
@@ -481,32 +481,36 @@ Then Claude writes rows 21–23 and 25–28 into the screen map and SPEC.
 
 **Start from the demo (production, 29 Oct 2026):** `src/po_agent/mysys/booking.py` holds the steps the demo proved on the test site. M4 reuses them behind `book()`, which takes only a `Proceed` from the decision engine, has no Enter prompt, runs `before_write` and reads back after every write. A doubt-driven review of the booker design (fresh session) comes before 4.1.
 
-Each W-step test books **only as far as its step** on the test site and leaves the task for Joey to cancel (reset). Its teardown returns the Note to the pool in a fresh context. W-step tests run one at a time, with a reset between them (Cross-cutting rules). The booker's `book()` takes an optional `stop_after` step for these tests (Open question 8). Every test gets its `Proceed` by running all checks on a trial PO first. Every W step starts with `controls.before_write(note_id, step)` (3.5, 3.6); only W1's and W4's run the assignee check (D7).
+**From the M4 gate review (decisions, 3 Nov 2026, M4 gate):** the booker reuses the demo's steps but never calls `booking.save_snapshot` (it writes page text, real data, under `private/` on whatever machine runs it), and never `_link_choice`'s link/button/text fallbacks (W4's target is the cell only). A committing click (Submit, the Hold confirm, the Choose Project cell, Solved, each Assign) is made **once** through `guard.act`, never through the retrying `_open` / `_open_retried`, which are for opening and refreshing clicks only.
+
+Each W-step test books **only as far as its step** on the test site and leaves the task for Joey to cancel (reset). Its teardown returns the Note to the pool in a fresh context only while the Note is Pending, unlinked and with the agent (after W1-W3); after W4 or W5 it leaves the Note for Joey's reset (a linked Note in the pool is never eligible, and a Solved Note isn't found under Status Pending). W-step tests run one at a time, with a reset between them (Cross-cutting rules). The booker's `book()` takes an optional `stop_after` step for these tests (Open question 8). Every test gets its `Proceed` by running all checks on a trial PO first. Every W step starts with `controls.before_write(note_id, step)` (3.5, 3.6); only W1's and W4's run the assignee check (D7).
 
 ### 4.1 W1: fill Create New Task and read it back · step
 
 **Description:** Open the project, then Create New Task: Creator, Compaction Test, PO Number, PO Documents upload and Note, with the full pre-Submit read-back.
-**Needs:** M3, M0b.2 (PO prefill, row 24; the Create New Task anchors from open item 8); PO Documents confirmed as the upload area with the PO admin (SPEC open question 11, "confirm before M4").
+**Needs:** M3, M0b.2 (PO prefill, row 24; the Create New Task anchors from open item 8); PO Documents vs Documents is a go-live gate, not a 4.1 blocker (SPEC open question 11; decisions, 3 Nov 2026, 4.1).
 **Acceptance:**
-- `book()` accepts only a `Proceed` (type-checked). Before anything else it checks that the `Proceed` is for this Note and project: its `note_id` matches the Note being worked on (the run loop passes it) and its pln matches the project window's heading; otherwise `WriteNotStarted`. It uses the project window 3.2 opened if it's still open, as mapped in row 28, rather than opening a second one. The window is scoped by the heading `Create New Task`. Creator (label "Creator", Client section) = Perth Scheduling; tick `- Compaction Test` (exact name); PO Number (label-anchored; empty when the sub-form opens, row 24); upload to **PO Documents** (never Documents) from the in-memory PDF bytes (D2); Note (label-anchored textarea) = the email body as plain text. `field_by_label` lives in `driver.py`.
-- Read back before Submit, per SPEC → W1: Creator; Compaction Test is the only ticked checkbox in the window; Task Client "Same as Project"; Task Name empty; PO Number; exactly one PO Documents row with the PDF's file name; the Documents area empty (no table, row 09); Note; Sale Office; PO Contact and Delivery Office "Choose...". Any mismatch → close the browser context, `WriteNotStarted`.
+- `book()` accepts only a `Proceed` (type-checked). Before anything else it checks that the `Proceed` is for this Note and project: its `note_id` matches the Note being worked on (the run loop passes it); otherwise `WriteNotStarted`. Then, in this order: `before_write(note_id, "W1")` (its assignee check reloads `base_url`, so the project window 3.2 opened is always gone); reopen the project by its pln (Projects search on the internal number, the row `match_project()` chooses must be the `Proceed`'s pln, opened by its `pln_…` link); on the reopened window, the heading starts with the pln, Client Internal No. passes the match rule, and the Compaction Test task numbers equal the `Proceed`'s set from step 10 (a task created meanwhile → `WriteNotStarted`, nothing written); only then Create New Task. Any mismatch → `WriteNotStarted`.
+- **Settled task table** (step 10 and the W1 reopen): the window shows before its task rows render (row 10, live S6), so an empty read can't be told from "no tasks". The task table is read until two reads in a row are equal and its Compaction Test numbers equal the `[Compaction Test]` options of the window's "-- Select Task --" select (one option per task, cancelled ones too, row 10); else after 15 s `UnexpectedScreen`. `project_lookup` (3.2) uses the same read, so the duplicate check never runs on a half-rendered table. The window is scoped by the heading `Create New Task`. Creator (label "Creator", Client section) = Perth Scheduling; tick `- Compaction Test` (exact name); PO Number (label-anchored; empty when the sub-form opens, row 24); upload to **PO Documents** (never Documents) from the in-memory PDF bytes (D2); Note (label-anchored textarea) = the email body as plain text. `field_by_label` lives in `driver.py`.
+- Read back before Submit, per SPEC → W1: Creator; Compaction Test is the only ticked checkbox in the window; Task Client "Same as Project"; Task Name empty; PO Number; exactly one PO Documents row with the PDF's file name; the Documents area holds no file row (no table, row 09); Note; Sale Office; PO Contact and Delivery Office "Choose...". Any mismatch → close the browser context, `WriteNotStarted`.
 - Every field is found by its exact label inside the `Create New Task` window (rows 08-09: each sits in its own label block), never by `nth` or a generated id.
 - The testsite test stops after W1 and closes the context. The project then has no new task and no new document (the upload is saved only by Submit, M0b.2).
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k booker_w1` (2609017B).
-**Files:** `src/po_agent/b1/booker.py`, `src/po_agent/mysys/driver.py`, `tests/seam2/test_booker_w1.py`. **Scope:** S.
+**Files:** `src/po_agent/b1/booker.py`, `src/po_agent/mysys/driver.py`, `tests/seam2/test_booker_w1.py`, `tests/test_task_table_offline.py` (local HTML: rows rendering late, an empty table with a non-empty select). **Scope:** S.
 
 ### 4.2 W2: Submit and read back on the task detail screen · step
 
 **Description:** Submit, find the one new task, and read back PO number, document and Note on its detail screen (M0b row 19).
 **Needs:** 4.1.
 **Acceptance:**
+- **The Submit click is the partial-write line.** `book()` marks the booking submitted just before the Submit click; from then on **every** exception out of the booker (the click itself failing, `UnexpectedScreen` from a W2 read, a timeout) is raised as `PartialWrite`, except `AccuracyBreach` and `GuardRefusal`, which keep their own type and are also never returned to the pool (4.5). `controls.NOT_SUBMITTED` stays right for `before_write`, which runs before the click.
 - After Submit, wait up to 15 s for the Create New Task window to close and the project's task table to show a Compaction Test number not in the set recorded at step 10. The new task is the **one** such number. Its details row shows Lodged By the agent, Task Creator Perth Scheduling and Status "New Project" or "Inspection Analysis" (row 07: it can move on by itself). No new task, more than one, or the form still open after 15 s → `PartialWrite`. A Submit error (row 17) isn't mapped, so the state is unknown and Joey checks it by hand.
-- Task detail (row 19): click a cell of the new task's details row (never the header row with Cancel and Hold); the task opens in the project's window, heading `TSK_<n> PLN_<n> …`. Read PO Number, Lodged By and the Notes text (= email body) in the `tsk_<n> [Compaction Test]` section, and Task Creator in the Client section; click nothing there. Then "-- Select Task --" in the window's select (back to the project), the project's **Documents** button, and in the section headed `tsk_<n>` exactly one row: Type Purchase Order, File starting with the PDF's file name; then the **Tasks** button for W3. A wrong value → `AccuracyBreach`. A screen not as mapped → `PartialWrite`. New read-only allowlist entries for these clicks and the select (SPEC → Guard additions).
-- The testsite test stops after W2. Joey cancels the task afterwards.
+- Task detail (row 19): click the Task Creator cell (the cell row 19 mapped) of the new task's details row, found as the row right after the header row whose cell is exactly `(tsk_<n>) | Compaction Test` (anchored on the new task number, never on position alone or on a cell text that older tasks share); never the header row with Cancel and Hold. The task opens in the project's window: its heading must start `TSK_<n> ` and its section be headed `tsk_<n> [Compaction Test]` for the **new** number, else `PartialWrite` (an older task with the same values must never pass the read-back). Read PO Number, Lodged By and the Notes text (= email body) in the `tsk_<n> [Compaction Test]` section, and Task Creator in the Client section; click nothing there. Then "-- Select Task --" in the window's select (back to the project), the project's **Documents** button, and in the section headed `tsk_<n>` exactly one row: Type Purchase Order, File starting with the PDF's file name; then the **Tasks** button for W3. A wrong value → `AccuracyBreach`. A screen not as mapped → `PartialWrite`. New read-only allowlist entries for these clicks and the select (SPEC → Guard additions), each its own action name (never an existing name reused for a new target), in `guard.py`, so the PR is Joey's to merge (CLAUDE.md Must never #9).
+- The testsite test stops after W2. Then it opens the new task's Hold dialog (`open_hold`, which changes nothing), calls `guard.vet()` (never `act()`) on a Related Tasks checkbox and asserts it refuses (D3), reads it still unticked, and closes the context without confirming. Joey cancels the task afterwards.
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k booker_w2`; reset.
-**Files:** `src/po_agent/b1/booker.py`, `src/po_agent/mysys/driver.py`, `tests/seam2/test_booker_w2.py`. **Scope:** S.
+**Files:** `src/po_agent/b1/booker.py`, `src/po_agent/mysys/driver.py`, `src/po_agent/mysys/guard.py`, `tests/test_guard.py`, `tests/seam2/test_booker_w2.py`. **Scope:** S.
 
 ### 4.3 W3: Hold · step
 
@@ -515,7 +519,7 @@ Each W-step test books **only as far as its step** on the test site and leaves t
 **Acceptance:**
 - **Hold** is pressed only in the new task's header row. The dialog is scoped by the heading `Hold Task: <new task no>`. Type the note; before confirming, read: the heading names the new task; every Related Tasks checkbox and Select-all are unticked; Reset turn around time is unticked; "every … days" is ticked with 0 and "at this date" is unticked; the note text is exact. Anything else → close the context, `PartialWrite`. Confirm with the dialog's own Hold.
 - Read back: the task's row shows **Un-Hold**, and its Status starts "On-hold" and contains the note.
-- The testsite test also calls `guard.vet()` (never `act()`) on a Related Tasks checkbox in the open dialog and asserts it refuses (D3). Afterwards the checkbox still reads unticked; then the test closes the context.
+- The `guard.vet()` refusal on a Related Tasks checkbox (D3) is in 4.2's test, where the dialog can be opened and left unconfirmed; once a task is on hold its row shows Un-Hold, so W3's test can't reopen the dialog.
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k booker_w3`; reset.
 **Files:** `src/po_agent/b1/booker.py`, `src/po_agent/mysys/driver.py`, `tests/seam2/test_booker_w3.py`. **Scope:** S.
@@ -525,8 +529,8 @@ Each W-step test books **only as far as its step** on the test site and leaves t
 **Description:** Link the Note to the pln through the search and select screens (M0b row 20), then press Solved.
 **Needs:** 4.3, M0b.2 (row 20), M0b.1 (row 25).
 **Acceptance:**
-- Back to the Note window as mapped in row 25. Before each Note-window write, in this order: `before_write`, untick Send Email Notification, read it back unticked, then the one committing click (Architecture decisions). For W4 the read-back is repeated after the search and select screens, just before the final select. W4: Link to Project → Choose Project (row 20): its Search/filter = the pln, Enter, then the **cell** named exactly the pln (never the row: its name holds the Site Address, which could contain "Close"); Choose Project closes by itself. Read back: the Note's project button reads the pln, and Status is still Pending.
-- W5: Status buttons → **Solved**. Read back: "Solved by Agent 1 (MySys Only)", a "Status changed … Pending to Solved" log line, Solved disabled, and the Note gone from the Pending list, checked with Assigned Pool = All Pools and Search/filter = the Note ID (under Agent Pool it's hidden anyway).
+- Back to the Note window as mapped in row 25. Before each Note-window write, in this order: `before_write`, untick Send Email Notification, read it back unticked, then the one committing click (Architecture decisions). For W4 the read-back is repeated after the search and select screens, just before the final select. W4: Link to Project → Choose Project (row 20): its Search/filter = the pln, Enter, then the **cell** named exactly the pln (never the row: its name holds the Site Address, which could contain "Close"); Choose Project closes by itself. Read back: the Note's project button reads the pln, and Status is still Pending. A project button reading another pln is a wrong project → `AccuracyBreach` (`docs/specs/spec.md` §6), not `PartialWrite`.
+- W5: Status buttons → **Solved**. Read back: "Solved by Agent 1 (MySys Only)", a "Status changed … Pending to Solved" log line, Solved disabled, and the Note gone from the Pending list, checked with Assigned Pool = All Pools and Search/filter = the Note ID (under Agent Pool it's hidden anyway) through `search_note`, with the Status filter read back as Pending and **no** row whose ID cell equals the Note ID (`find_note_again` raises when the Note is gone, so it isn't used here).
 - Pending, Discard, Change Project and Unlink are never targeted (the guard refuses them anyway).
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k booker_w4_w5` (one full booking); reset.
@@ -537,11 +541,11 @@ Each W-step test books **only as far as its step** on the test site and leaves t
 **Description:** `po-agent run --site test`: PROCEED → booker; partial writes and accuracy breaches handled the MVP way.
 **Needs:** 4.4.
 **Acceptance:**
-- PROCEED → W1–W5 → `NOTE` outcome `booked` with `task_id`. A skip → back to the pool. `PartialWrite` → `ALERT PARTIAL_WRITE`, Note left assigned to the agent, run stops (exit 1). `AccuracyBreach` → `ALERT ACCURACY_BREACH`, exit 3. `WriteNotStarted` → Note back to the pool, run stops (exit 1). Any other error from W3 on (W2 has submitted the task) is handled as `PartialWrite`: never returned to the pool, where it would look unbooked (decisions, 3 Nov 2026, 3.6 review). `NoteTaken` from the W1 check → close that browser context, `NOTE` `"outcome": "untouched", "reason": "NOTE_TAKEN"`, go on with the next Note in a fresh context; `controls.assignee_check` is built per browser context (it holds that context's page).
+- PROCEED → W1–W5 → `NOTE` outcome `booked` with `task_id`. A skip → back to the pool. `PartialWrite` → `ALERT PARTIAL_WRITE`, Note left assigned to the agent, run stops (exit 1). `AccuracyBreach` → `ALERT ACCURACY_BREACH`, Note left assigned to the agent (so the stale-Note stop, D6, holds every later run until Joey clears it: the MVP's switch-off), exit 3. `WriteNotStarted` → Note back to the pool, run stops (exit 1). Any other error once the Submit click has started (4.2) is handled as `PartialWrite`: never returned to the pool, where it would look unbooked (decisions, 3 Nov 2026, 3.6 review and M4 gate). A `GuardRefusal` after Submit keeps `ALERT GUARD_REFUSAL` (5.1 and S7 count it) and is likewise never returned. `NoteTaken` from the W1 check → close that browser context, `NOTE` `"outcome": "untouched", "reason": "NOTE_TAKEN"`, no ALERT, go on with the next Note in a fresh context; `controls.assignee_check`, `Controls` and `note_downloads` are built per browser context (the check holds that context's page). `KillSwitch` at W1 or W2 → as decide-only: one return in a fresh context, `INFO`, exit 0; at W3 on `before_write` already raises `PartialWrite`.
 - `run` without `--decide-only` now books (it no longer refuses, 1.6).
 - Seam 2 (testsite, after a reset): the 3 trial POs are booked to S4. An immediate rerun changes nothing (SPEC → Reruns).
 - Two cases need Notes only a person can create. `test_run_book.py` has a second test that runs only after Joey has placed a fresh copy of 2609034B and a non-`/048` Note in the Agent Pool. Its precondition fixture checks both are there, and skips with a clear message if they aren't. The fresh copy → `DUPLICATE_TASK`, back in the Agent Pool, no new task (S5). The non-`/048` Note stays untouched.
-- The offline loop test covers the partial-write, accuracy-breach and write-not-started paths with a fake driver.
+- The offline loop test covers, with a fake driver: partial write (including an `UnexpectedScreen` raised after the Submit click), accuracy breach and guard refusal after Submit (no return attempted), write-not-started (returned), `NoteTaken` at W1 (untouched line, the next Note runs in a fresh context), and `KillSwitch` at W1 (returned, exit 0).
 
 **Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam2 -m testsite -k run_book`; reset. **By hand:** Joey runs `--headed --slow-mo 500` and assigns the Note to himself from his own browser mid-run → the agent stops on that Note without writing (taken before the W1 check) or alerts `PARTIAL_WRITE` at the W4 check (taken during W1–W3).
 **Files:** `src/po_agent/core/run.py`, `src/po_agent/cli.py`, `tests/seam2/test_run_book.py`, `tests/seam2/test_run_loop_offline.py`. **Scope:** S–M.
@@ -636,9 +640,9 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 | P1 Docs catch-up | - | README, workflow status, SPEC (Projects search on Enter, Production), this plan, todo, decisions | PR merged |
 | P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. No fake-PDF generator (Joey, 29 Oct 2026, at 2.1) | Checkpoint M2: `false PROCEED: 0` in seam 1 and the real-PO run |
 | P3 Run controls and decide-only | 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4 | 3.2 reuses the demo's Projects search (Enter, `submit_project_search`). 3.6 needs M0b.2 row 23 | Checkpoint M3; decide-only green on the laptop and the Mac Mini |
-| P4 Real booker | M0b.2, doubt-driven design review, then 4.1-4.5 | Built from `mysys/booking.py` (Phase M4 intro). PO Documents confirmed with the PO admin first (SPEC open question 11) | Checkpoint M4 without 4.6; seam 2 booking cases green |
-| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job loaded | 1.10 also confirms the Mac Mini login and Keychain. Replaces M6's checks: S1-S8 on the scheduled job | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5) |
-| P6 Go live | New tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
+| P4 Real booker | M0b.2, doubt-driven design review, then 4.1-4.5 | Built from `mysys/booking.py` (Phase M4 intro). PO Documents vs Documents is confirmed with the PO admin before go-live (gate 2, SPEC open question 11) | Checkpoint M4 without 4.6; seam 2 booking cases green |
+| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2, then the hourly job loaded; 7.6 runs through the week | 1.10 also confirms the Mac Mini login and Keychain. Replaces M6's checks: S1-S8 on the scheduled job. 7.1 and 7.2 go in before the week starts, so a week that stopped silently can't pass as "zero wrong bookings" | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5), every alert in it triaged (7.6) |
+| P6 Go live | 7.3, 7.4, 7.5 (gate 6), then new tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
 
 **Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator (Joey, 29 Oct 2026); `po-agent demo` stays as is.
 
@@ -648,8 +652,82 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 3. CEO sign-off for going live, and the backlog cut-off date (which older Notes the agent may touch).
 4. Accounts: a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
 5. A week of hourly test-site runs with zero wrong bookings (P5).
+6. Production operations in place (4 Nov 2026): 7.1-7.5 merged and each proven on the Mac Mini, and the P5 week's alerts triaged (7.6).
 
 **Live order** (P6, each step with its own dated decisions entry): read-only `spike` on live, then `run --decide-only` on live, then `run` booking one PO per run, watched, then full hourly runs.
+
+### Production operations (7.1-7.7, added 4 Nov 2026)
+
+Unattended runs need what a watched demo didn't: someone told when the job stops, a way to see why a run failed, control over what code reaches the Mac Mini, and a loop that turns each failure into a test. Each task that changes what the agent prints or logs gets its own dated decisions entry and SPEC change when it is built (CLAUDE.md Conventions).
+
+#### 7.1 Heartbeat · step (asks first: the service)
+
+**Description:** Today an alert issue opens only when a run starts and fails. A job that never runs (FileVault screen after a power cut, job unloaded, a hung Keychain dialog) sends nothing; `docs/macmini-setup.md` left the heartbeat to v1.
+**Needs:** 1.9. **Before:** the P5 week.
+**Acceptance:**
+- The wrapper sends one ping at the end of every run, whatever the exit code. The ping carries no PO data: at most the exit code and `run_id`.
+- If no ping arrives for 2 hours inside the schedule (Monday-Friday, 07:07-17:07 Perth), Joey is emailed. Outside the schedule nothing alerts.
+- Joey picks the service first (recommended: an external dead-man's-switch service such as healthchecks.io, free tier; the alternative is a scheduled GitHub Action that reads the latest alert or ping). Its URL is a secret (`PO_AGENT_*` or Keychain), never in the repo.
+- Stub-command tests: a run that exits 0, 1, 2 or 3 pings once; a failed `git pull` still pings.
+**Verify:** `uv run scripts/check.py`; on the Mac Mini, unload the job for 2 hours inside the schedule and see the email.
+**Files:** `scripts/macmini-run.sh`, `docs/macmini-setup.md`, the 1.9 wrapper tests. **Scope:** S.
+
+#### 7.2 Silent-skip alert · step (asks first: the rule)
+
+**Description:** A MySys screen change makes every eligible Note skip as `UNEXPECTED_SCREEN`. Each skip is safe and returns the Note, so no alert opens and POs quietly stop being booked.
+**Needs:** 5.1. **Before:** the P5 week.
+**Acceptance:**
+- A run with at least one eligible Note where every eligible Note ends `UNEXPECTED_SCREEN` prints one `ALERT` line (name and exit code decided with Joey; recommended `ALERT ALL_SKIPPED`, exit 1), so the wrapper opens the alert issue. Within one run only: the agent keeps no state between runs.
+- Business skips (`NOT_B1`, `DUPLICATE_TASK`, ...) don't count; a run with no eligible Note doesn't alert.
+- Offline tests for: all `UNEXPECTED_SCREEN`; one booked and one `UNEXPECTED_SCREEN`; all business skips; no eligible Note.
+**Verify:** `uv run scripts/check.py`.
+**Files:** `src/po_agent/core/run.py`, `src/po_agent/core/output.py`, `SPEC.md` (stdout contract), a test file. **Scope:** S.
+
+#### 7.3 Safe trace on the Mac Mini · step (high risk: data)
+
+**Description:** The Mac Mini never passes `--detailed-log`, so a live `PARTIAL_WRITE` leaves only its `ALERT` line. Add a production trace made only of allowlisted fields.
+**Needs:** 5.1. **Before:** go-live (gate 6).
+**Acceptance:**
+- Each event has only: `run_id`, time, `note_id`, step (`W1`-`W5`, step 0-11), check or control name (the guard's mapped name, never page text), outcome (pass, fail, skip reason, error type) and duration. Anything else is dropped when the event is written, not filtered later.
+- Written to `~/Library/Logs/po-agent/trace/<date>.jsonl` on the Mac Mini, kept 90 days, files older than that deleted at run start.
+- A test raises errors and runs reads whose values hold fake PDF text, an address and a Note body, and asserts none of it reaches the trace.
+**Verify:** `uv run scripts/check.py`; one decide-only run on the Mac Mini, with its trace read by Joey.
+**Files:** `src/po_agent/core/runlog.py` (or a new `trace.py`), `src/po_agent/cli.py`, `scripts/macmini-run.sh`, `SPEC.md`, a test file. **Scope:** M.
+
+#### 7.4 Release pinning · step (asks first: the kill-switch path)
+
+**Description:** The wrapper pulls `main` every run, so every merge deploys within the hour. On live, the Mac Mini runs a `production` tag instead, which only Joey moves, after the new commit has run on the test site.
+**Needs:** 1.9. **Before:** go-live (gate 6).
+**Acceptance:**
+- The wrapper fetches, checks out the `production` tag and runs that; a failed fetch or a missing tag runs nothing and alerts, as a failed pull does today.
+- `enabled = false` still stops the next run without a tag move: the wrapper reads it from `origin/main` (recommended) before it runs the tagged code.
+- Joey moves the tag by hand (`git tag -f production <sha>`, then push the tag); Claude never moves or pushes it.
+- Stub-command tests: tag present, tag missing, fetch fails, `enabled = false` on `main` with an old tag.
+**Verify:** `uv run scripts/check.py`; on the Mac Mini, a merge to `main` doesn't change the next run until the tag moves.
+**Files:** `scripts/macmini-run.sh`, `docs/macmini-setup.md`, `docs/workflow.md` (Ground rules: merging no longer deploys), the 1.9 wrapper tests. **Scope:** S.
+
+#### 7.5 Ops runbook · docs
+
+**Description:** SPEC defines every `ALERT`, but not what a person does when one arrives. The backup admin (gate 4) must be able to follow it without Joey.
+**Needs:** 7.1-7.4 written. **Before:** go-live (gate 6).
+**Acceptance:** `docs/ops-runbook.md` has one short entry per alert (`PARTIAL_WRITE`, `ACCURACY_BREACH` and the `STOP` file, `GUARD_REFUSAL`, `UNEXPECTED_SCREEN`, `LOGIN_FAILED`, `CONFIG`, 7.2's alert, a missed heartbeat): what it means, how to finish or undo it by hand in MySys, how to restart, and who is told. No real data.
+**Verify:** the backup admin reads it; Joey walks one `PARTIAL_WRITE` through it on the test site.
+**Files:** `docs/ops-runbook.md`. **Scope:** S.
+
+#### 7.6 Alert triage loop · from the P5 week
+
+**Description:** Every failure becomes a test. Each `po-agent-alert` issue (alert lines only, no PO data) is triaged by a Claude session from the issue text and, on the laptop, the run's trace.
+**Needs:** 5.1; 7.3 once built. **Runs:** from the start of the P5 week, then on live.
+**Acceptance:**
+- Each alert issue is closed with one of: expected skip (why), a new seam-1 or seam-2 case (its PR), a bug fix (its PR, test first), or a dated decisions entry.
+- Weekly, Joey reads one line: runs, bookings, skips by reason, alerts. On live the skip rate is the quality figure to watch.
+- Real data stays in `private/` and MySys: a case from a live PO is added to the real-PO set in `private/`, never to a committed fixture.
+**Files:** a triage skill in `.claude/skills/` (Claude may write it). **Scope:** S.
+
+#### 7.7 Dev workflow, by hand (Joey)
+
+- A read-only second-model reviewer as `.claude/agents/pr-reviewer.md` (model `opus`; prompt from `docs/workflow.md` Appendix C), so read-only is enforced by its tools, not only by the prompt; Appendix C then points to it.
+- `/verify-pr` ticks the task in `tasks/todo.md` after it merges, so the task list can't fall behind `main`.
 
 ---
 
@@ -657,7 +735,7 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| A merge to `main` deploys to the Mac Mini (the wrapper pulls every run) while the job is loaded | High | D1: run controls and assignee check before any booking code; job unloaded after S1 and loaded only for 4.6 and from M6; plain `run` refuses until 4.5; a failed pull runs nothing |
+| A merge to `main` deploys to the Mac Mini (the wrapper pulls every run) while the job is loaded | High | D1: run controls and assignee check before any booking code; job unloaded after S1 and loaded only for 4.6 and from M6; plain `run` refuses until 4.5; a failed pull runs nothing; before go-live the Mac Mini runs a `production` tag that only Joey moves (7.4) |
 | Moving between MySys windows isn't mapped (Note → project → Hold → back to the Note) | High | M0b.1 rows 25–28 before M3; "Finding a Note again" rule; a Note already assigned is re-found with All Pools + exact ID; D7 cuts the Note Pool trips to two per booking and keeps W1–W3 in the project window |
 | Denylist refuses a safe action (a "… Close" street in a target's text; a dropdown option) and blocks every run | Med | D5 for dropdowns; M0b.2 row 20 names a W4 target without the address; a refusal opens an alert issue, so Joey sees it on the first run |
 | Trial PDF left on the Mac Mini's disk after a crash or kill | Med | D2: read into memory and delete at once; `finally` cleanup; leftovers removed at every run start; FileVault |

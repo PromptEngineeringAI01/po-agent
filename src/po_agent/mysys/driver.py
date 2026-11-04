@@ -36,15 +36,21 @@ from playwright.sync_api import Error as PlaywrightError
 from pydantic import ValidationError
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.decision import Site, match_project
+from po_agent.b1.decision import Site, check_project, match_project
 from po_agent.b1.models import (
     CompactionTask,
     MySysLookup,
     NotePoolRow,
+    Proceed,
     SearchRow,
     Skip,
 )
-from po_agent.core.errors import LoginFailed, PartialWrite, UnexpectedScreen
+from po_agent.core.errors import (
+    LoginFailed,
+    PartialWrite,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
 from po_agent.core.runlog import RunLog
 from po_agent.mysys.guard import ActionGuard
 
@@ -385,6 +391,25 @@ def _labelled(window: Locator, label: str) -> str:
     # str.split() splits on any Unicode whitespace, the non-breaking space too.
     value = " ".join(text.split()).removeprefix(" ".join(label.split())).strip()
     return value.removesuffix("Unlink").strip()
+
+
+def label_block(window: Locator, label: str, control: str) -> Locator:
+    """The innermost element in `window` holding the exact label text and a
+    `control` (CSS), e.g. the "PO Number" block and its input (rows 08-09:
+    every Create New Task field sits in its own label block). Built from the
+    page root: a has_not locator is evaluated inside each candidate."""
+    page = window.page
+    found = (
+        page.locator("*")
+        .filter(has=page.get_by_text(label, exact=True))
+        .filter(has=page.locator(control))
+    )
+    return window.locator("*").and_(found.filter(has_not=found))
+
+
+def field_by_label(window: Locator, label: str, control: str) -> Locator:
+    """The `control` in its label block: never `nth` or a generated id."""
+    return label_block(window, label, control).locator(control)
 
 
 def _shows(locator: Locator, timeout: int | None = None) -> bool:
@@ -831,7 +856,61 @@ def note_downloads(page: Page, folder: Path) -> Iterator[None]:
                 path.unlink(missing_ok=True)
 
 
-# Project reads (rows 06, 07, 25, 26)
+# Project reads (rows 06, 07, 10, 25, 26)
+
+SELECT_TASK = "-- Select Task --"
+TASK_OPTION = re.compile(r"^\((tsk_\d+)\) \[Compaction Test\]$")
+
+
+def task_rows(window: Locator) -> list[list[str]]:
+    """The Tasks table's rows as cell texts (header and details rows)."""
+    try:
+        return [
+            [c.strip() for c in row.locator("td").all_inner_texts()]
+            for row in window.locator("tbody tr").all()
+        ]
+    except PlaywrightError:
+        raise UnexpectedScreen("task table not readable") from None
+
+
+def _task_options(window: Locator) -> set[str]:
+    """The Compaction Test numbers in the window's "-- Select Task --" select
+    (one option per task, cancelled ones too, row 10)."""
+    placeholder = window.page.locator("option").filter(has_text=_exact(SELECT_TASK))
+    select = window.locator("select").filter(has=placeholder)
+    if select.count() != 1:
+        raise UnexpectedScreen("task select not found once")
+    options = set()
+    for text in select.locator("option").all_inner_texts():
+        match = TASK_OPTION.fullmatch(" ".join(text.split()))
+        if match:
+            options.add(match.group(1))
+    return options
+
+
+def settled_tasks(window: Locator) -> dict[str, str]:
+    """Task number -> Status of every Compaction Test task, from a settled
+    table: the window shows before its task rows render (row 10, live S6),
+    so an empty read can't be told from "no tasks". Read until two reads in
+    a row are equal and match the select's options, else after 15 s
+    UnexpectedScreen (decisions, 3 Nov 2026, M4 gate)."""
+    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
+    last = None
+    while True:
+        try:
+            tasks = rules.compaction_tasks(task_rows(window))
+            whole = set(tasks) == _task_options(window)
+        except (PartialWrite, UnexpectedScreen, PlaywrightError):
+            tasks, whole = None, False  # a half-rendered row
+        if whole:
+            if tasks == last:
+                return tasks
+            last = tasks
+        else:
+            last = None
+        if time.monotonic() >= deadline:
+            raise UnexpectedScreen("task table did not settle")
+        window.page.wait_for_timeout(POLL_MS)
 
 
 def project_lookup(
@@ -843,11 +922,64 @@ def project_lookup(
     internal_no: str,
     site: Site,
 ) -> MySysLookup:
+    """Steps 8-10's reads (see _lookup_and_window)."""
+    lookup, _ = _lookup_and_window(
+        guard, page, base_url, username, password, internal_no, site
+    )
+    return lookup
+
+
+def reopen_project(
+    guard: ActionGuard,
+    page: Page,
+    base_url: str,
+    username: str,
+    password: str,
+    proceed: Proceed,
+    site: Site,
+) -> Locator:
+    """W1's reopen (the assignee check reloaded, so step 10's window is
+    gone): the same reads as step 10, and the project must still be the
+    one decided: the match is the Proceed's pln, Client Internal No. passes
+    the match rule and the settled Compaction Test tasks are the Proceed's
+    (none created meanwhile). Any mismatch -> WriteNotStarted."""
+    lookup, window = _lookup_and_window(
+        guard,
+        page,
+        base_url,
+        username,
+        password,
+        proceed.internal_no,
+        site,
+        decided_pln=proceed.pln,
+    )
+    if window is None or check_project(lookup, proceed.internal_no, site) != (
+        proceed.pln
+    ):
+        raise WriteNotStarted("project not as decided", step="W1")
+    if {task.task_no for task in lookup.tasks} != set(proceed.existing_task_nos):
+        raise WriteNotStarted("project tasks changed since step 10", step="W1")
+    return window
+
+
+def _lookup_and_window(
+    guard: ActionGuard,
+    page: Page,
+    base_url: str,
+    username: str,
+    password: str,
+    internal_no: str,
+    site: Site,
+    *,
+    decided_pln: str | None = None,
+) -> tuple[MySysLookup, Locator | None]:
     """Steps 8-10's reads: reload (the Note window would cover the results,
     row 25), Project -> Projects, the demo's search (Enter), every row on
     page 1; match_project() chooses the row, opened by its pln link; then its
-    Client Internal No., Address and Compaction Test tasks. With no single
-    match nothing is opened and the project fields stay empty."""
+    Client Internal No., Address and settled Compaction Test tasks. With no
+    single match nothing is opened, the project fields stay empty and the
+    window is None. With `decided_pln` (W1's reopen), a match that isn't it
+    is WriteNotStarted before anything is opened."""
     from po_agent.mysys import booking  # booking imports this module
 
     reload_home(guard, page, base_url, username, password)
@@ -867,13 +999,12 @@ def project_lookup(
     more_pages = pages > 1
     pln = match_project(search_rows, more_pages, internal_no, site)
     if isinstance(pln, Skip):
-        return MySysLookup(search_rows=search_rows, more_pages=more_pages)
+        return MySysLookup(search_rows=search_rows, more_pages=more_pages), None
+    if decided_pln is not None and pln != decided_pln:
+        raise WriteNotStarted("project not as decided", step="W1")
     project = booking.open_project(guard, page, panel, pln)
-    try:
-        tasks = rules.compaction_tasks(booking.task_rows(project))
-    except PartialWrite:  # a read, before any write
-        raise UnexpectedScreen("task row not recognised") from None
-    return MySysLookup(
+    tasks = settled_tasks(project)
+    lookup = MySysLookup(
         search_rows=search_rows,
         more_pages=more_pages,
         project_internal_no=booking.client_internal_no(project),
@@ -883,3 +1014,4 @@ def project_lookup(
             for task_no, status in tasks.items()
         ),
     )
+    return lookup, project

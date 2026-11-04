@@ -12,12 +12,12 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the unticked tasks in this order; numbers and acceptance criteria are unchanged.
 
-- [ ] **P1** Docs catch-up and the Production sections (this PR) · Claude writes, Joey merges
-- [ ] **P2** Decide: 2.1-2.6
+- [x] **P1** (done: PR #31) Docs catch-up and the Production sections · Claude writes, Joey merges
+- [x] **P2** (done: PRs #33-#45) Decide: 2.1-2.6
 - [ ] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
 - [ ] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
-- [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job; a week of hourly runs with zero wrong bookings
-- [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week): live spike, then decide-only, then one booking per run, watched · tasks written then
+- [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2, then the hourly job; a week of hourly runs with zero wrong bookings, every alert triaged (7.6)
+- [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week; production operations 7.1-7.6): live spike, then decide-only, then one booking per run, watched · tasks written then
 
 ## Freeze — before any build
 
@@ -52,12 +52,12 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 ## M2 — decision seam (S3)
 
 - [x] **2.1** Seam-1 models (`more_pages`; frozen `Proceed` with `note_id`, internal no., pln, PDF name + bytes, existing task numbers) + 3 fake POs as text + all mutations (`cases.toml`); no PDF generator (Joey, 29 Oct 2026) · auto
-- [ ] **2.2** Deterministic reader + steps 2a–4 (`NOTE_ALREADY_LINKED`, `NO_PDF`, `MULTIPLE_PDFS`, `PDF_UNREADABLE`, `NOT_B1`, `NOT_COMPACTION`, `PO_MISMATCH`) · auto
-- [ ] **2.3** `match_project()` + strict duplicate check (Cancelled toggle); `Skip(UNEXPECTED_SCREEN)`; deterministic-only → `ADDRESS_UNVERIFIABLE` · auto
-- [ ] **2.4** Address verify-not-extract + agreement, stubbed Claude; `false PROCEED: 0` · auto · pauses: address rules
-- [ ] **2.5** (replaced 2 Nov 2026: no Claude reader) Second code reader (pypdf) + address check fed by MySys; `decide()` code only; `false PROCEED: 0` · step · pauses: failing tests
+- [x] **2.2** (done: PR #34) Deterministic reader + steps 2a–4 (`NOTE_ALREADY_LINKED`, `NO_PDF`, `MULTIPLE_PDFS`, `PDF_UNREADABLE`, `NOT_B1`, `NOT_COMPACTION`, `PO_MISMATCH`) · auto
+- [x] **2.3** (done: PR #36) `match_project()` + strict duplicate check (Cancelled toggle); `Skip(UNEXPECTED_SCREEN)`; deterministic-only → `ADDRESS_UNVERIFIABLE` · auto
+- [x] **2.4** (done: PR #39) Address verify-not-extract + agreement, stubbed Claude; `false PROCEED: 0` · auto · pauses: address rules
+- [x] **2.5** (done: PR #43) (replaced 2 Nov 2026: no Claude reader) Second code reader (pypdf) + address check fed by MySys; `decide()` code only; `false PROCEED: 0` · step · pauses: failing tests
 - [x] **2.5b** (done, 2 Nov 2026) Remove the Claude settings from config, CLI and secrets (`reader_mode`, model ID, prices, `anthropic_api_key`) · step
-- [ ] **2.6** Real-PO seam (`-m real_data`, both code readers); no prices · auto · pauses: laptop runs. The S3 evidence comes after 3.2 (Joey, 2 Nov 2026): trial lookups from 3.2's helper, the 3 recent real POs recorded by Joey
+- [x] **2.6** (done: PR #45) Real-PO seam (`-m real_data`, both code readers); no prices · auto · pauses: laptop runs. The S3 evidence comes after 3.2 (Joey, 2 Nov 2026): trial lookups from 3.2's helper, the 3 recent real POs recorded by Joey
 
 **Checkpoint M2:** check green; seam 1 `false PROCEED: 0`; review. After 3.2: real-PO `false PROCEED: 0`, clean-PO skips reviewed. **Gate for M3:** M0b.1 merged (already needed by 1.8); reset.
 
@@ -65,18 +65,18 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 
 **Milestone A** (decisions, 25 Oct 2026): 1.4, 1.6, 1.7, M0b.1, 1.8, 1.9, 1.10; M2 (2.1–2.6); M3's 3.1, 3.2, 3.3, 3.5, then 3.4, then the decide-only demo to the CEO. 3.6 comes after the demo, before M4.
 
-- [ ] **3.1** Take a Note and hand it back (untick + read back, assign to agent, step 2a, assign to pool; anchored lists; runlog format incl. `assignee_check`) · step
-- [ ] **3.2** Attachment count, download (`downloads_path` at launch; file read into memory and deleted at once), project search via `match_project()`, project reads → `MySysLookup`; laptop-only helper writes each trial PO's lookup into `private/fixtures/cases.toml` (never committed) · step
-- [ ] **3.3** `run --decide-only` loop with NOTE lines; offline loop test + seam-2 `decide_only` · step
-- [ ] **3.5** Kill switch (start + `before_write` every step), Perth window, run cap · step
-- [ ] **3.6** Assignee check (All Pools + exact Note ID) before W1 and W4 only (D7); stale-Note stop at run start (D6) · step · after the Milestone A demo, before M4
+- [x] **3.1** (done: PR #46) Take a Note and hand it back (untick + read back, assign to agent, step 2a, assign to pool; anchored lists; runlog format incl. `assignee_check`) · step
+- [x] **3.2** (done: PR #47) Attachment count, download (`downloads_path` at launch; file read into memory and deleted at once), project search via `match_project()`, project reads → `MySysLookup`; laptop-only helper writes each trial PO's lookup into `private/fixtures/cases.toml` (never committed) · step
+- [x] **3.3** (done: PR #48) `run --decide-only` loop with NOTE lines; offline loop test + seam-2 `decide_only` · step
+- [x] **3.5** (done: PR #49) Kill switch (start + `before_write` every step), Perth window, run cap · step
+- [x] **3.6** (done: PRs #51-#52) Assignee check (All Pools + exact Note ID) before W1 and W4 only (D7); stale-Note stop at run start (D6) · step · after the Milestone A demo, before M4
 - [ ] **3.4** Decide-only on the laptop (headed), then on the Mac Mini (decision 2: yes, 25 Oct 2026); for the Milestone A demo, the job may be loaded in decide-only mode · by hand
 
 **Checkpoint Milestone A:** check green; seam-2 decide-only green; Mac Mini decide-only green; demo to the CEO. **Checkpoint M3:** 3.6 merged; seam-2 assignee green; Mac Mini decide-only green; review. **Gate for M4:** M0b.2 merged; doubt-driven review of the booker design (fresh session); reset.
 
 ## M4 — first booking
 
-- [ ] **4.1** W1 (needs PO Documents confirmed with the PO admin, SPEC open question 11): `Proceed` matches this Note and pln; Create New Task fill (upload from bytes) + full pre-Submit read-back (`stop_after=W1`) · step
+- [x] **4.1** (done: PR #54) W1 (PO Documents on the test site; live is go-live gate 2, decisions 3 Nov 2026): `Proceed` matches this Note and pln; Create New Task fill (upload from bytes) + full pre-Submit read-back (`stop_after=W1`) · step
 - [ ] **4.2** W2: Submit, wait for one new task, task-detail read-back (`PartialWrite` / `AccuracyBreach`) · step
 - [ ] **4.3** W3: Hold with every dialog check read, no checkbox touched; `guard.vet()` refuses a Hold checkbox · step
 - [ ] **4.4** W4 Link to Project + W5 Solved; `before_write` → untick → read back → click, read back again before W4's final select · step
@@ -91,6 +91,16 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **5.2** Seam-2 safety cases (`guard.vet()` refuses Discard, non-`/048` untouched, Send Email untick after the latest assignee check, from the log); full seam 2 green as the fixed sequence of runs with resets in `tests/seam2/README.md` · step
 
 **Checkpoint M5:** check green; full seam 2 green; manual mid-run takeover (4.5) done; review + security review; docs drift checked.
+
+## Production operations (added 4 Nov 2026; plan -> Phase P -> Production operations)
+
+- [ ] **7.1** Heartbeat: one ping per run, email after 2 hours without one inside the schedule · step · asks first: the service · before the P5 week
+- [ ] **7.2** Silent-skip alert: every eligible Note `UNEXPECTED_SCREEN` → one ALERT · step · asks first: the rule · before the P5 week
+- [ ] **7.3** Safe trace on the Mac Mini: allowlisted fields only, 90 days · step · before go-live
+- [ ] **7.4** Release pinning: the Mac Mini runs the `production` tag; `enabled` still read from `main` · step · before go-live
+- [ ] **7.5** `docs/ops-runbook.md`: what to do for each alert · docs · before go-live
+- [ ] **7.6** Alert triage loop: every alert issue closed as expected skip, new case, fix or decision · from the P5 week
+- [ ] **7.7** Dev workflow: `.claude/agents/pr-reviewer.md`; `/verify-pr` ticks todo.md after a merge · by hand (Joey)
 
 ## Demo - shown 28 Oct 2026 (decisions, 27-28 Oct 2026)
 

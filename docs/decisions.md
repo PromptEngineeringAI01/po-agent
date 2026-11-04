@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 3 Nov 2026, production)
+# PO Agent - decision log (updated 4 Nov 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -19,6 +19,43 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **2 Nov 2026: Claude reader dropped.** The agent reads with two code readers and checks the address against MySys, so it costs nothing per PO (entry below). Joey informs the CEO, who approved the two-reader design with Claude as one reader (decision 1).
 - **3 Nov 2026: M0b.2 mapped** (rows 19, 20, 23, 24; entry below). Every screen the MVP books through is now mapped.
 - **3 Nov 2026: assignee check and stale-Note stop built** (task 3.6; entry below).
+- **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
+- **3 Nov 2026: W1 built** (task 4.1; entry below).
+- **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
+- **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
+
+## 4 Nov 2026 - Production operations: go-live gate 6 (Joey)
+
+- **Why:** a watched demo needed none of this; an unattended hourly job does. Today nobody is told if the job stops running, a skip caused by a MySys screen change opens no alert, the Mac Mini keeps no detail about a failed run, and every merge to `main` deploys within the hour.
+- **Planned, not built:** heartbeat (7.1) and the silent-skip alert (7.2) before the P5 week; a trace of allowlisted fields only on the Mac Mini (7.3), the Mac Mini running a `production` tag that only Joey moves (7.4) and `docs/ops-runbook.md` (7.5) before go-live; every alert issue triaged into an expected skip, a new case, a fix or a decision from the P5 week on (7.6); two dev-workflow changes Joey makes by hand in `.claude/` (7.7).
+- **Open choices, asked at the task:** the heartbeat service (7.1), the alert's name and exit code (7.2), and where the wrapper reads `enabled` once it runs a tag (7.4). 7.2 and 7.3 change the run output or what is logged, so each gets its own entry when built.
+- **Loosens?** No: it adds a go-live gate and changes no behaviour yet.
+- Carried in: `SPEC.md` (Production: steps 5 and 6, gate 6), `tasks/plan.md` (Phase P, gate 6, Production operations, the merge-deploys risk), `tasks/todo.md`.
+
+## 3 Nov 2026 - W1: Create New Task filled and read back (Joey, task 4.1)
+
+- **PO Documents or Documents** is a go-live gate (gate 2, the PO admin's live answer), not a 4.1 blocker: the test site uses PO Documents, as the walkthrough did (Joey, 3 Nov 2026). SPEC open question 11 now reads "confirm before go-live".
+- **What W1 does:** `book()` takes only a `Proceed` for the Note in hand (else `TypeError` / `WriteNotStarted` before anything), runs `before_write(note_id, "W1")`, reopens the project as step 10 does and stops with `WriteNotStarted` if the search's match isn't the Proceed's pln (checked before the project is opened), Client Internal No. fails the match rule, or the settled Compaction Test tasks differ from step 10's. Then Create New Task is filled by label and read back; any problem once the form is open closes the browser context (nothing is saved: the upload is saved only by Submit) and is `WriteNotStarted`. In 4.1 `book()` accepts only `stop_after="W1"`; nothing calls it outside seam 2 until 4.5.
+- **The Documents read-back** is "no file row" (an empty table counts as empty); the test site shows no table at all (row 09). It is what the demo's read-back already checked.
+- **Settled task table** built as planned (M4 gate entry); `project_lookup` uses it.
+- **Loosens?** No: every new check is a stop before Submit, and nothing new acts in MySys (no guard change).
+- Carried in: `SPEC.md` (W1 read-back wording, open question 11), `tasks/plan.md` (4.1 Needs and read-back, P4 row).
+
+## 3 Nov 2026 - M4 gate: doubt review of the booker design (fresh session, before 4.1)
+
+A fresh-context adversarial review of 4.1-4.5 against the screen map, `SPEC.md`, `docs/specs/spec.md` §2 and §6, and the code the booker builds on. The must-fixes, now in `tasks/plan.md` (M4) and `SPEC.md` (MySys screen rules, Deferred table, Trial conditions):
+
+- **The Submit click is the partial-write line**, not "from W3 on": from the click on, every error is `PARTIAL_WRITE` and the Note is never returned to the pool (`docs/specs/spec.md` §6: "a failure at or after W2"). `AccuracyBreach` and `GuardRefusal` after Submit keep their own ALERT and also leave the Note with the agent.
+- **An accuracy breach leaves the Note with the agent**, so the stale-Note stop (D6) holds every later run: with no state between runs, that is the MVP's switch-off until Joey unloads the job. A Note linked to another pln at W4 is a wrong project: `ACCURACY_BREACH`.
+- **W1 reopens the project after its assignee check** (the check reloads, so the window from step 10 is always gone) and checks heading, Client Internal No. and the Compaction Test task numbers again before Create New Task; a task created meanwhile → `WRITE_NOT_STARTED`.
+- **The duplicate check reads a settled task table:** the rows render after the window shows, so an early read can look like "no tasks". Two equal reads in a row, matching the window's "-- Select Task --" options, else `UNEXPECTED_SCREEN`. Applies at step 10 (`project_lookup`) and at the W1 reopen.
+- **W2's task detail** is opened from the details row right after the new task's own header row and must show the new task number, else `PARTIAL_WRITE`. Its new allowlist entries are new action names in `guard.py` (Joey merges that PR).
+- **Committing clicks are made once**, never through the retrying open helpers. The booker never calls `booking.save_snapshot` (page text on the run machine's disk) or `_link_choice`'s fallbacks (W4's target is the cell only).
+- **4.5 routing and tests:** `NoteTaken` at W1 → untouched line, no ALERT, next Note in a fresh context with its own `Controls`; `KillSwitch` at W1/W2 → returned, exit 0, as decide-only. Offline tests for both, and for errors after Submit.
+- **Tests:** W-step teardowns return the Note only while it is Pending, unlinked and with the agent (after W4/W5 the reset does it); W5's "gone from Pending" is the Note ID search with no equal row (not `find_note_again`, which raises); the Hold-dialog `guard.vet()` refusal moves to 4.2's test, the last point where the dialog can be opened and left unconfirmed.
+- **Accepted, not changed:** the run cap is checked only between Notes (a Note killed by the wrapper mid-booking stays with the agent, and D6 catches it); more than 50 Pending Notes stops every run (already carried; test-site resets and S5 copies should keep the count down); the stale-Note read is Pending-only (3.6 entry).
+- **Loosens?** No: every change adds a stop or keeps a Note with the agent. Nothing new acts in MySys beyond what 4.2 already planned.
+- Carried in: `tasks/plan.md` (Architecture decisions, M4 intro, 4.1-4.5), `SPEC.md` (Deferred table, MySys screen rules → Duplicate check, W1, W2, W4, W5; Trial conditions).
 
 ## 3 Nov 2026 - Assignee check and stale-Note stop (Joey, task 3.6)
 
@@ -482,8 +519,13 @@ The MVP's goal is to show the agent runs by itself on the office Mac Mini agains
 
 ## Still open
 
-- **CEO decision 2:** confirm Joey's "yes" (Claude may read real client data). Blocks go-live. (Decision 3 was made on 15 Oct 2026: the office Mac Mini.)
-- Test-site checks before the first write: C1 and C3 answered on 16 Oct 2026 (entries above); MFA not seen, **password expiry still to confirm** with the MySys admin — `SPEC.md` open questions 1–3.
-- CEO/IT OK on the private GitHub repo (the Mac Mini pulls the code from it).
-- Backlog reading confirmation (and age cut-off).
-- Alert channel for Joey for v1 (email or Teams webhook).
+Updated 4 Nov 2026; the go-live gates in `SPEC.md` -> Production are the full list.
+
+- **PO admin's live answers** (gate 2): PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column ends `/048` (open question 10); whether the agent account's password expires (open question 3; MFA not seen).
+- **CEO go-live sign-off and the backlog cut-off date** (gate 3): which older Notes the agent may touch.
+- **Accounts** (gate 4): a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
+- **Heartbeat service** (task 7.1): Joey picks it before the P5 week.
+- ~~CEO decision 2~~ **Answered 25 Oct 2026:** delegated to Joey, who said yes (entry above). Since 2 Nov 2026 no model reads the PDFs.
+- ~~CEO/IT OK on the private GitHub repo~~ **Answered 25 Oct 2026:** the repo is public so the CEO can read it; no real client data in it.
+- ~~Alert channel for v1~~ **Answered:** a GitHub issue with the `po-agent-alert` label, which emails Joey (`docs/macmini-setup.md`).
+- ~~Test-site checks C1 and C3~~ **Answered 16 Oct 2026** (entries above).
