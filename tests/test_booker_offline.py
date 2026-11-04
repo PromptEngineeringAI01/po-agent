@@ -1,13 +1,15 @@
 # ruff: noqa: E501 - the fake page HTML and JS read better unwrapped
-"""The booker's W1 (task 4.1) and W2 (task 4.2), offline: Create New Task
-filled and read back; then Submit and the read-back on the task detail
-screen and the project's Documents tab.
+"""The booker's W1 (task 4.1), W2 (task 4.2) and W3 (task 4.3), offline:
+Create New Task filled and read back; then Submit and the read-back on the
+task detail screen and the project's Documents tab; then Hold.
 
 Headless Chromium on a fake MySys, a local HTML file that is base_url (no
 site is touched): the Project menu, the Projects panel (Enter runs the search), the
 project window and the Create New Task form, as mapped in docs/screen-map.md
 rows 06-09, 24 and 26; after Submit the new task's rows (row 10), its detail
-screen in the same window and the project's Documents tab (row 19). The assignee check runs for real inside
+screen in the same window and the project's Documents tab (row 19); the
+Hold Task dialog and the row after Hold (rows 11-12, laid out as the 16 Oct
+capture). The assignee check runs for real inside
 `Controls.before_write`; only `driver.search_note` (the Note Pool search) is
 faked, as in tests/test_assignee_offline.py. The `Proceed` comes from
 `decide()` on seam 1's p1-clean case with a fake PDF from seam 1's
@@ -32,6 +34,16 @@ faked, as in tests/test_assignee_offline.py. The `Proceed` comes from
   the project, the new task's Documents section (one Purchase Order row,
   the PDF's file), then Tasks. A wrong value is AccuracyBreach; a screen not
   as mapped is PartialWrite.
+- W3 (4.3): `before_write(note_id, "W3")` (no assignee check, D7; a kill
+  switch here is already PartialWrite, 3.5) -> Hold in the new task's own
+  header row -> the dialog headed `Hold Task: <new task>` -> the note typed,
+  no checkbox touched -> every check read before confirming: the Related
+  Tasks boxes and Select-all (hidden ones too), Reset turn around time and
+  "at this date" unticked, "every ... days" ticked with 0, the note exact.
+  Anything else closes the browser context and is PartialWrite, the
+  dialog's Hold never pressed. Confirm once -> the row shows Un-Hold and a
+  Status starting "On-hold" with the note. Every error from W3 closes the
+  context and carries step W3.
 """
 
 import importlib.util
@@ -123,6 +135,20 @@ DETAIL = {
     "task_creator": "Perth Scheduling",
 }
 PO_ROW = ("Purchase Order", FILE)
+# Row 11: the Hold Task dialog as mapped. `ticked` names the boxes that
+# start ticked besides the reminder: related_0, related_hidden (a row the
+# table hides), select_all, reset, at_date. After its Hold: `closes`, `holds`
+# (the row then shows Un-Hold) and `status` (None: "On-hold Notes: <note>").
+HOLD_DIALOG: dict[str, object] = {
+    "heading": None,
+    "ticked": [],
+    "reminder": True,
+    "days": "0",
+    "noteSuffix": "",
+    "closes": True,
+    "holds": True,
+    "status": None,
+}
 
 
 def task_rows(tasks: list[tuple[str, str]]) -> str:
@@ -146,6 +172,7 @@ def fake_mysys(
     detail: dict[str, str] | None = None,
     documents: tuple[tuple[str, str], ...] | None = (PO_ROW,),
     documents_buttons: int = 1,
+    hold: dict[str, object] | None = None,
 ) -> str:
     """base_url after login: the Project menu, the Projects panel (hidden
     until Projects is chosen), the project window and Create New Task.
@@ -158,7 +185,11 @@ def fake_mysys(
     holds its own copy of the PDF; the first new task's holds `documents`
     (None: no section); Create New Task is then hidden, as live (it shows
     on the Tasks tab only). Every task's detail screen shows the same values,
-    so only the task number tells them apart."""
+    so only the task number tells them apart.
+
+    W3: a new task's Hold opens the Hold Task dialog as mapped (row 11),
+    changed by `hold` (HOLD_DIALOG's keys); its Hold closes it and puts the
+    task on hold with the typed note (row 12)."""
     options = "".join(
         f"<option>({task}) [Compaction Test]</option>" for task, _ in tasks
     )
@@ -172,6 +203,7 @@ def fake_mysys(
             "documents": documents,
             "olderFile": FILE,
             "agent": AGENT,
+            "hold": {**HOLD_DIALOG, **(hold or {})},
         }
     )
     documents_button = "<button onclick=\"show('documents')\">Documents</button>"
@@ -224,6 +256,7 @@ def fake_mysys(
   </div>
   <button onclick="submitTask()">Submit</button>
 </div>{CLOSE}</div>
+<div id="hold" hidden></div>
 <script>
 const FAKE = {data};
 const PROJECT_HEADING = '{PLN} B1 Homes Sample Lane, Sampleville WA 6000';
@@ -252,7 +285,7 @@ function submitTask() {{
     for (const task of FAKE.newTasks) {{
       document.getElementById('task_rows').insertAdjacentHTML('beforeend',
         '<tr><td><div><span>(' + task + ') | Compaction Test</span><div><button>Cancel</button>'
-        + '<button>Hold</button></div></div></td></tr>'
+        + '<button onclick="openHold(\\'' + task + '\\')">Hold</button></div></div></td></tr>'
         + '<tr><td>' + FAKE.agent + '</td><td onclick="openTask(\\'' + task + '\\')">'
         + FAKE.rowCreator + '</td><td>New Project</td></tr>');
       const option = document.createElement('option');
@@ -319,6 +352,53 @@ function show(view) {{
     }}
   }}
   docs.innerHTML = html;
+}}
+function box(id, label) {{
+  const ticked = FAKE.hold.ticked.includes(id) ? ' checked' : '';
+  return '<input type="checkbox" id="' + id + '"' + (label ? ' aria-label="' + label + '"' : '') + ticked + '>';
+}}
+function openHold(task) {{
+  document.body.dataset.held = task;
+  const h = FAKE.hold;
+  const reminder = h.reminder ? ' checked' : '';
+  const related = ['tsk_300001', 'tsk_300002'].map((t, i) =>
+    '<tr><td>' + box('related_' + i) + '</td><td>' + t + ' Compaction Test</td><td>Active</td></tr>').join('')
+    + '<tr hidden><td>' + box('related_hidden') + '</td><td>tsk_300003 Compaction Test</td><td>Active</td></tr>';
+  const dialog = document.getElementById('hold');
+  dialog.innerHTML = '<div><h3>Hold Task</h3><div>'
+    + '<div><button onclick="confirmHold(\\'' + task + '\\')">Hold</button><h3>Hold Task: ' + (h.heading || task) + '</h3></div>'
+    + '<div><div>Active task after selected task complete</div><select><option selected>Choose...</option></select></div>'
+    + '<div><div>Reminder Email Setting</div><div>'
+    + '<div><input type="checkbox" aria-label="Send me a reminder email every days"' + reminder + '> Send me a reminder email every '
+    + '<input type="number" value="' + h.days + '"> days (0 days = no email reminders)</div>'
+    + '<div>' + box('at_date', 'Send me a reminder email at this date:') + ' Send me a reminder email at this date: <input disabled></div></div></div>'
+    + '<div><div>Reset turn around time</div>' + box('reset') + '</div>'
+    + '<div><div>Note</div><input aria-label="Note" id="hold_note"></div>'
+    + '<div><div>Related Tasks</div><div><p>There are 3 related jobs with the same sales type/ suburb/ estate. Select jobs to hold together.</p>'
+    + '<table><thead><tr><th>' + box('select_all') + '</th><th>Task</th><th>Status</th></tr></thead><tbody>' + related + '</tbody></table></div></div>'
+    + '</div></div>{CLOSE}';
+  if (h.noteSuffix) document.getElementById('hold_note').addEventListener('input',
+    (event) => {{ if (!event.target.value.endsWith(h.noteSuffix)) event.target.value += h.noteSuffix; }});
+  dialog.hidden = false;
+}}
+function confirmHold(task) {{
+  const h = FAKE.hold;
+  document.body.dataset.confirmed = (Number(document.body.dataset.confirmed || 0) + 1).toString();
+  const note = document.getElementById('hold_note').value;
+  if (!h.closes) return;
+  const dialog = document.getElementById('hold');
+  dialog.innerHTML = '';
+  dialog.hidden = true;
+  if (!h.holds) return;
+  for (const span of document.querySelectorAll('#task_rows span')) {{
+    if (span.textContent !== '(' + task + ') | Compaction Test') continue;
+    const header = span.closest('tr');
+    for (const button of header.querySelectorAll('button')) {{
+      if (button.textContent === 'Hold') button.outerHTML = '<button>Un-Hold</button>';
+    }}
+    const cells = header.nextElementSibling.querySelectorAll('td');
+    cells[cells.length - 1].textContent = h.status === null ? 'On-hold Notes: ' + note : h.status;
+  }}
 }}
 </script>"""
 
@@ -637,3 +717,136 @@ def test_the_kill_switch_at_w2_closes_the_context_and_submits_nothing(
     assert caught.value.step == "W2"
     assert "submit_task" not in actions(guard)
     assert served[0].is_closed()
+
+
+# W3 (task 4.3): Hold, every dialog check read before confirming (row 11),
+# then the read-back on the task's row (row 12).
+
+W3 = ["open_hold", "set_hold_note", "confirm_hold"]
+
+
+def confirmed(page: Page) -> int:
+    return int(page.locator("body").get_attribute("data-confirmed") or 0)
+
+
+def test_w3_holds_the_new_task_once_and_reads_it_back(serve, guard, search):
+    served = serve(tasks=[CANCELLED])
+    page = served[0]
+
+    task_no = run_book(served, guard, proceed_for_p1(), stop_after="W3")
+
+    assert task_no == NEW_TASK
+    # No assignee check at W3 (D7), and no checkbox action anywhere.
+    assert search.actions_before == [0]
+    assert actions(guard) == REOPEN + FILL + W2 + W3
+    # Hold was the new task's own, and the dialog's Hold pressed once.
+    assert page.locator("body").get_attribute("data-held") == NEW_TASK
+    assert confirmed(page) == 1
+
+
+@pytest.mark.parametrize(
+    "hold",
+    [
+        # The dialog names another task.
+        {"heading": CANCELLED[0]},
+        {"ticked": ["related_0"]},
+        # A related task the table doesn't show would still be held with it.
+        {"ticked": ["related_hidden"]},
+        {"ticked": ["select_all"]},
+        {"ticked": ["reset"]},
+        {"ticked": ["at_date"]},
+        {"reminder": False},
+        {"days": "7"},
+        # The Note box doesn't keep the text as typed.
+        {"noteSuffix": " X"},
+    ],
+    ids=[
+        "other-heading",
+        "related-ticked",
+        "hidden-related-ticked",
+        "select-all-ticked",
+        "reset-ticked",
+        "at-date-ticked",
+        "reminder-unticked",
+        "reminder-days",
+        "note-not-exact",
+    ],
+)
+def test_a_hold_dialog_not_as_mapped_closes_the_context_and_is_never_confirmed(
+    serve, guard, search, monkeypatch, hold
+):
+    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    served = serve(tasks=[CANCELLED], hold=hold)
+    page = served[0]
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W3")
+
+    assert caught.value.step == "W3"
+    assert "confirm_hold" not in actions(guard)
+    assert page.is_closed()
+
+
+@pytest.mark.parametrize(
+    "hold",
+    [
+        {"closes": False},
+        # Nothing changed: the row still shows Hold.
+        {"holds": False},
+        {"status": "On-hold"},
+        {"status": "New Project"},
+    ],
+    ids=[
+        "dialog-stays-open",
+        "no-un-hold",
+        "status-without-note",
+        "status-not-on-hold",
+    ],
+)
+def test_after_the_hold_confirm_a_read_back_not_as_mapped_is_a_partial_write(
+    serve, guard, search, monkeypatch, hold
+):
+    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    served = serve(tasks=[CANCELLED], hold=hold)
+    page = served[0]
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W3")
+
+    assert caught.value.step == "W3"
+    # Made once, never retried.
+    assert actions(guard).count("confirm_hold") == 1
+    assert page.is_closed()
+
+
+def test_the_kill_switch_at_w3_is_a_partial_write_and_nothing_is_held(
+    serve, guard, search, tmp_path
+):
+    # The switch goes off as W2 ends (its Tasks click), before W3's check.
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    toml = (CONFIG_DIR / "test.toml").read_text("utf-8")
+    (config_dir / "test.toml").write_text(toml, "utf-8")
+    served = serve(tasks=[CANCELLED])
+    page = served[0]
+
+    def switch_off() -> None:
+        off = toml.replace("enabled = true", "enabled = false")
+        (config_dir / "test.toml").write_text(off, "utf-8")
+
+    page.expose_function("switchOff", switch_off)
+    page.add_init_script(
+        "document.addEventListener('click', (event) => {"
+        " if (event.target.textContent === 'Tasks') window.switchOff(); }, true);"
+    )
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(
+            served, guard, proceed_for_p1(), stop_after="W3", config_dir=config_dir
+        )
+
+    assert caught.value.step == "W3"
+    assert actions(guard)[-1] == "open_project_tasks"
+    assert "open_hold" not in actions(guard)
