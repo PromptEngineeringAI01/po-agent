@@ -54,6 +54,7 @@ Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_fi
 - No em dash in added lines: `git diff origin/main...origin/<headRefName> | grep '^+' | grep -c '—'` must be 0.
 - If the PR changes what the agent does in MySys or prints in run output, or loosens a safety control: a dated `docs/decisions.md` entry is in the PR, with `SPEC.md` and `tasks/plan.md` updated in the same commit.
 - Real data: only the 3 trial POs' internal numbers, PO numbers and test-site plns may appear. No addresses, client names or PDF text.
+- A PR that builds a task in `tasks/todo.md` ticks that task (`- [x] **<N>**`; the PR number is welcome but not required, since the tick is made before the PR exists); a missing tick is Important, so the list can't fall behind `main`.
 - The PR has Intent, What changed, Risk and Testing. The risk level is at least what docs/workflow.md step 5 gives for the files changed (Important if it's understated). Medium/high: the second-model findings and the must-fix triage are in the PR. High: the fresh-session /code-review is there too.
 
 ## 5. Local check
@@ -84,10 +85,10 @@ Merge only if all of these hold; otherwise report and ask Joey:
 - The PR doesn't touch `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, and doesn't loosen a safety control. Those PRs stay Joey's to merge.
 
 ```bash
-gh pr merge $ARGUMENTS --merge
+gh pr merge $ARGUMENTS --merge --match-head-commit <headRefOid>
 ```
 
-Only that form, as the whole command (nothing before or after it, no `bash -c`): never squash, rebase, `--admin`, `--auto` or `--delete-branch` (the hook blocks them). Then `git -C <repo> pull -q` on `main` if the main checkout is on `main` with no tracked changes, and say "merged" in the report.
+`<headRefOid>` is the full 40-character commit from step 6, so GitHub refuses the merge if anything was pushed after the check. Only that form, as the whole command (nothing before or after it, no `bash -c`): never squash, rebase, `--admin`, `--auto` or `--delete-branch` (the hook blocks them). Then `git -C <repo> pull -q` on `main` if the main checkout is on `main` with no tracked changes, and say "merged" in the report.
 
 ## 8. Report
 

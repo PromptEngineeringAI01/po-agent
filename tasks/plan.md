@@ -726,8 +726,8 @@ Unattended runs need what a watched demo didn't: someone told when the job stops
 
 #### 7.7 Dev workflow, by hand (Joey)
 
-- A read-only second-model reviewer as `.claude/agents/pr-reviewer.md` (model `opus`; prompt from `docs/workflow.md` Appendix C), so read-only is enforced by its tools, not only by the prompt; Appendix C then points to it.
-- `/verify-pr` ticks the task in `tasks/todo.md` after it merges, so the task list can't fall behind `main`.
+- A read-only second-model reviewer as `.claude/agents/pr-reviewer.md` (model `opus`; prompt from `docs/workflow.md` Appendix C), with no Edit or Write tool; its prompt limits Bash to `git diff` and `git log`, with `guard_bash` as the backstop; Appendix C then points to it.
+- `/verify-pr` treats a task PR that doesn't tick its task in `tasks/todo.md` as Important, so the task list can't fall behind `main` (it can't tick after the merge: that would be a commit to `main`).
 
 ---
 

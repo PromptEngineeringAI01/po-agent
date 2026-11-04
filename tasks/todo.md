@@ -100,7 +100,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **7.4** Release pinning: the Mac Mini runs the `production` tag; `enabled` still read from `main` · step · before go-live
 - [ ] **7.5** `docs/ops-runbook.md`: what to do for each alert · docs · before go-live
 - [ ] **7.6** Alert triage loop: every alert issue closed as expected skip, new case, fix or decision · from the P5 week
-- [ ] **7.7** Dev workflow: `.claude/agents/pr-reviewer.md`; `/verify-pr` ticks todo.md after a merge · by hand (Joey)
+- [x] **7.7** (done: PR #59) Dev workflow: `.claude/agents/pr-reviewer.md`; `/verify-pr` requires the todo tick · by hand (Joey)
 
 ## Demo - shown 28 Oct 2026 (decisions, 27-28 Oct 2026)
 

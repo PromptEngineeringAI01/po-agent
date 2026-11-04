@@ -27,6 +27,8 @@ HOOK_NAMES = ("protect_paths", "guard_bash", "format_python")
 LIVE_HOST = "prompt.mysys.com.au"
 TEST_URL = "https://test-prompt.mysys.com.au/index.php?option=com_cweb"
 FAKE_KEY = "sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKEFAKE"
+FAKE_SHA = "0123456789abcdef0123456789abcdef01234567"
+PIN = "--match-head-commit"  # the commit /verify-pr checked
 
 
 @pytest.fixture(autouse=True)
@@ -150,6 +152,33 @@ BASH_BLOCKED = {
     "gh pr merge delete branch": "gh pr merge 11 --merge --delete-branch",
     "gh pr merge no number": "gh pr merge --merge",
     "gh pr merge no method": "gh pr merge 11",
+    # the merge must pin the commit /verify-pr checked
+    "gh pr merge without the verified commit": "gh pr merge 11 --merge",
+    "gh.exe pr merge without the verified commit": "gh.exe pr merge 40 --merge",
+    "gh pr merge with a short commit": f"gh pr merge 11 --merge {PIN} abc1234",
+    "gh pr merge with a non-hex commit": f"gh pr merge 11 --merge {PIN} {'g' * 40}",
+    "gh pr merge with a commit then a flag": (
+        f"gh pr merge 11 --merge {PIN} {FAKE_SHA} --admin"
+    ),
+    "gh pr merge with the commit before --merge": (
+        f"gh pr merge 11 {PIN} {FAKE_SHA} --merge"
+    ),
+    # the shell runs each line alone, so a pin on its own line pins nothing
+    "gh pr merge with the commit on the next line": (
+        f"gh pr merge 11 --merge\n{PIN} {FAKE_SHA}"
+    ),
+    "gh pr merge with the commit after a CR": (
+        f"gh pr merge 11 --merge\r{PIN} {FAKE_SHA}"
+    ),
+    # a merge through the API never says "pr merge"
+    "gh api REST merge": (
+        "gh api -X PUT repos/PromptEngineeringAI01/po-agent/pulls/59/merge"
+        " -f merge_method=squash"
+    ),
+    "gh api GraphQL merge": (
+        "gh api graphql -f query='mutation { mergePullRequest(input: {}) "
+        "{ clientMutationId } }'"
+    ),
     "gh pr merge after a safe command": "git status && gh pr merge 11 --squash",
     "gh pr merge inside bash -c": "bash -c 'gh pr merge 11 --admin'",
     # the allowed merge is the whole command, nothing around it (PR #41 review)
@@ -212,9 +241,9 @@ BASH_ALLOWED = {
     "push a branch": "git push -u origin m1-1.2-hooks",
     "push a branch whose name starts with main": "git push -u origin main-fix",
     "gh pr create": 'gh pr create --title "feat: hooks" --body x',
-    "gh pr merge with a merge commit": "gh pr merge 11 --merge",
-    "gh pr merge with gh.exe": "gh.exe pr merge 40 --merge",
-    "gh pr merge with spaces around": "  gh pr merge 11 --merge  ",
+    "gh pr merge with a merge commit": f"gh pr merge 11 --merge {PIN} {FAKE_SHA}",
+    "gh pr merge with gh.exe": f"gh.exe pr merge 40 --merge {PIN} {FAKE_SHA}",
+    "gh pr merge with spaces around": f"  gh pr merge 11 --merge {PIN} {FAKE_SHA}  ",
     "rm one file": "rm build/tmp.txt",
     "rm -r without force": "rm -r build",
     "set -euo pipefail": "set -euo pipefail; uv run ruff check .",
