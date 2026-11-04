@@ -163,6 +163,22 @@ BASH_BLOCKED = {
     "gh pr merge with the commit before --merge": (
         f"gh pr merge 11 {PIN} {FAKE_SHA} --merge"
     ),
+    # the shell runs each line alone, so a pin on its own line pins nothing
+    "gh pr merge with the commit on the next line": (
+        f"gh pr merge 11 --merge\n{PIN} {FAKE_SHA}"
+    ),
+    "gh pr merge with the commit after a CR": (
+        f"gh pr merge 11 --merge\r{PIN} {FAKE_SHA}"
+    ),
+    # a merge through the API never says "pr merge"
+    "gh api REST merge": (
+        "gh api -X PUT repos/PromptEngineeringAI01/po-agent/pulls/59/merge"
+        " -f merge_method=squash"
+    ),
+    "gh api GraphQL merge": (
+        "gh api graphql -f query='mutation { mergePullRequest(input: {}) "
+        "{ clientMutationId } }'"
+    ),
     "gh pr merge after a safe command": "git status && gh pr merge 11 --squash",
     "gh pr merge inside bash -c": "bash -c 'gh pr merge 11 --admin'",
     # the allowed merge is the whole command, nothing around it (PR #41 review)
