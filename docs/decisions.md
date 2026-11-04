@@ -519,8 +519,13 @@ The MVP's goal is to show the agent runs by itself on the office Mac Mini agains
 
 ## Still open
 
-- **CEO decision 2:** confirm Joey's "yes" (Claude may read real client data). Blocks go-live. (Decision 3 was made on 15 Oct 2026: the office Mac Mini.)
-- Test-site checks before the first write: C1 and C3 answered on 16 Oct 2026 (entries above); MFA not seen, **password expiry still to confirm** with the MySys admin — `SPEC.md` open questions 1–3.
-- CEO/IT OK on the private GitHub repo (the Mac Mini pulls the code from it).
-- Backlog reading confirmation (and age cut-off).
-- Alert channel for Joey for v1 (email or Teams webhook).
+Updated 4 Nov 2026; the go-live gates in `SPEC.md` -> Production are the full list.
+
+- **PO admin's live answers** (gate 2): PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column ends `/048` (open question 10); whether the agent account's password expires (open question 3; MFA not seen).
+- **CEO go-live sign-off and the backlog cut-off date** (gate 3): which older Notes the agent may touch.
+- **Accounts** (gate 4): a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
+- **Heartbeat service** (task 7.1): Joey picks it before the P5 week.
+- ~~CEO decision 2~~ **Answered 25 Oct 2026:** delegated to Joey, who said yes (entry above). Since 2 Nov 2026 no model reads the PDFs.
+- ~~CEO/IT OK on the private GitHub repo~~ **Answered 25 Oct 2026:** the repo is public so the CEO can read it; no real client data in it.
+- ~~Alert channel for v1~~ **Answered:** a GitHub issue with the `po-agent-alert` label, which emails Joey (`docs/macmini-setup.md`).
+- ~~Test-site checks C1 and C3~~ **Answered 16 Oct 2026** (entries above).
