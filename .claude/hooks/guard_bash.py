@@ -58,11 +58,19 @@ TEXT_RULES = [
         "an alias could hide a forbidden merge (Must never #9)",
         re.compile(r"\bgh(\.exe)?\s+alias\b", re.IGNORECASE),
     ),
+    (
+        "API merge",
+        "a merge through the GitHub API skips the pinned form (Must never #9)",
+        re.compile(r"pulls/\d+/merge\b|\bmergePullRequest\b", re.IGNORECASE),
+    ),
 ]
 # The one merge Claude may run, as the whole command (decisions, 2 Nov 2026),
 # pinned to the full commit /verify-pr checked so a later push can't slip in.
+# Spaces and tabs only: the shell runs each line alone, so a pin on a second
+# line would pin nothing.
 ALLOWED_MERGE = re.compile(
-    r"gh(\.exe)?\s+pr\s+merge\s+\d+\s+--merge\s+--match-head-commit\s+[0-9a-f]{40}"
+    r"gh(\.exe)?[ \t]+pr[ \t]+merge[ \t]+\d+[ \t]+--merge"
+    r"[ \t]+--match-head-commit[ \t]+[0-9a-f]{40}"
 )
 
 # Tokens made only of these end a simple command (`;`, `&&`, `|`, `(`, ...).

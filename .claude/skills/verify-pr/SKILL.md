@@ -54,7 +54,7 @@ Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_fi
 - No em dash in added lines: `git diff origin/main...origin/<headRefName> | grep '^+' | grep -c '—'` must be 0.
 - If the PR changes what the agent does in MySys or prints in run output, or loosens a safety control: a dated `docs/decisions.md` entry is in the PR, with `SPEC.md` and `tasks/plan.md` updated in the same commit.
 - Real data: only the 3 trial POs' internal numbers, PO numbers and test-site plns may appear. No addresses, client names or PDF text.
-- A PR that builds a task in `tasks/todo.md` ticks that task, with its PR number (`- [x] **<N>** (done: PR #<n>)`); a missing tick is Important, so the list can't fall behind `main`.
+- A PR that builds a task in `tasks/todo.md` ticks that task (`- [x] **<N>**`; the PR number is welcome but not required, since the tick is made before the PR exists); a missing tick is Important, so the list can't fall behind `main`.
 - The PR has Intent, What changed, Risk and Testing. The risk level is at least what docs/workflow.md step 5 gives for the files changed (Important if it's understated). Medium/high: the second-model findings and the must-fix triage are in the PR. High: the fresh-session /code-review is there too.
 
 ## 5. Local check
