@@ -341,3 +341,16 @@ def test_a_read_back_mismatch_closes_the_browser_context_and_does_not_submit(
     assert "set_task_note" in actions(guard)
     assert "submit_task" not in actions(guard)
     assert page.is_closed()
+
+
+def test_a_task_cancelled_at_step_10_and_live_again_is_write_not_started(
+    serve, guard, search
+):
+    # Same task number as step 10, but no longer Cancelled (Undo
+    # Cancellation meanwhile): booking now would make a duplicate.
+    served = serve(tasks=[(CANCELLED[0], "New Project")])
+
+    with pytest.raises(WriteNotStarted):
+        run_book(served, guard, proceed_for_p1())
+
+    assert "open_create_new_task" not in actions(guard)

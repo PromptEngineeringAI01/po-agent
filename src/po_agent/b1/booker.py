@@ -70,7 +70,10 @@ def _w1(
             proceed.pdf_bytes,
         )
     except Exception as error:
-        page.context.close()  # abandons the form: nothing is saved
+        try:
+            page.context.close()  # abandons the form: nothing is saved
+        except Exception:  # noqa: BLE001 - e.g. a dead event loop
+            pass  # the original error below is the one that counts
         if isinstance(error, GuardRefusal | WriteNotStarted):
             raise
         raise WriteNotStarted(

@@ -891,24 +891,32 @@ def _task_options(window: Locator) -> set[str]:
 def settled_tasks(window: Locator) -> dict[str, str]:
     """Task number -> Status of every Compaction Test task, from a settled
     table: the window shows before its task rows render (row 10, live S6),
-    so an empty read can't be told from "no tasks". Read until two reads in
-    a row are equal and match the select's options, else after 15 s
-    UnexpectedScreen (decisions, 3 Nov 2026, M4 gate)."""
+    so an empty read can't be told from "no tasks". Tasks count once two
+    reads in a row are equal and match the select's options (decisions, 3
+    Nov 2026, M4 gate). The rows and the options render together and an
+    empty project shows nothing else (probe, 4 Nov 2026), so "no tasks"
+    counts only when every read for the full 15 s is empty. Otherwise after
+    15 s UnexpectedScreen."""
     deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
     last = None
+    empty_throughout = True
     while True:
         try:
             tasks = rules.compaction_tasks(task_rows(window))
             whole = set(tasks) == _task_options(window)
         except (PartialWrite, UnexpectedScreen, PlaywrightError):
             tasks, whole = None, False  # a half-rendered row
-        if whole:
+        if whole and tasks:
             if tasks == last:
                 return tasks
             last = tasks
         else:
             last = None
+        if not (whole and not tasks):
+            empty_throughout = False
         if time.monotonic() >= deadline:
+            if empty_throughout:
+                return {}
             raise UnexpectedScreen("task table did not settle")
         window.page.wait_for_timeout(POLL_MS)
 
@@ -958,6 +966,10 @@ def reopen_project(
     ):
         raise WriteNotStarted("project not as decided", step="W1")
     if {task.task_no for task in lookup.tasks} != set(proceed.existing_task_nos):
+        raise WriteNotStarted("project tasks changed since step 10", step="W1")
+    # Step 10 passed, so each was Cancelled; one live again (Undo
+    # Cancellation meanwhile) would make this booking a duplicate.
+    if rules.live_tasks({task.task_no: task.status for task in lookup.tasks}):
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
     return window
 

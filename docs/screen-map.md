@@ -206,6 +206,8 @@ The Create New Task window closes. On the project, a new task: header **"(tsk_20
 **Read back:** a new Compaction Test task on this project, Task Creator = Perth Scheduling, and its task number (needed for Hold). **PO number and document aren't shown in this table:** they are read on the task detail screen and the project's Documents tab (row 19).
 The project window's **"-- Select Task --"** select gains the option **"(tsk_200001) [Compaction Test]"** (one option per task, cancelled ones too).
 
+**When the task table renders** (read-only probe through the guarded driver, 4 Nov 2026, counts only, two trial projects, twice each): the project window shows with its task table, every task row and every `[Compaction Test]` option of the select **together**, about 0.6-1 s after the `pln_...` click; no read in between (every 50 ms) showed the window without them. A project with no tasks shows the table's header row only (no body rows), the placeholder option only, and no "no record" text, unchanged for 20 s. So nothing on the page tells "no tasks" from "not rendered yet": the agent counts an empty table as no tasks only after it has stayed empty for its full 15 s wait (`SPEC.md` -> Duplicate check).
+
 ### Row 11 · Hold Task dialog
 
 The task row's **Hold** opens window **"Hold Task"** with heading **"Hold Task: tsk_200001"**.
