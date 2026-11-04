@@ -22,8 +22,20 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
 - **3 Nov 2026: W1 built** (task 4.1; entry below).
 - **4 Nov 2026: W1 review fixes** (task 4.1 follow-up; entry below).
+- **4 Nov 2026: W2 built** (task 4.2; entry below).
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
+
+## 4 Nov 2026 - W2: Submit and the read-back on the task detail screen (Joey, task 4.2)
+
+- **What W2 does:** `before_write(note_id, "W2")` (no assignee check, D7; a kill switch or unreadable config here closes the browser context, so the filled form is abandoned and nothing is submitted), then Submit, made once. From the Submit click on, every error is `PARTIAL_WRITE`, except `ACCURACY_BREACH` and `GUARD_REFUSAL`, which keep their type; each carries `step=W2`. The run loop (4.5) tells an error after the click by its type and step together: `PARTIAL_WRITE`, `ACCURACY_BREACH` or `GUARD_REFUSAL` with step W2 (a `KillSwitch` or config error from W2's `before_write` also says W2, but comes before the click).
+- **The new task:** the form must close, then the settled task table (the step-10 read) must show exactly one Compaction Test number not in step 10's set, with Status New Project or Inspection Analysis, within 15 s. None, more than one (the accepted residual from 4 Nov, W1 review fixes) or the form still open -> `PARTIAL_WRITE`.
+- **Read-back (row 19):** the new task's details row (found from its own header row) must show Lodged By the agent and Task Creator Perth Scheduling; its Task Creator cell opens the detail screen, whose heading must start `TSK_<n> ` and whose section `tsk_<n> [Compaction Test]` must show PO Number, Lodged By and Notes = the email body; the Client section shows Task Creator. Then "-- Select Task --", the project's Documents: the new task's section must hold exactly one row, Type Purchase Order, File starting with the PDF's name; then Tasks. A wrong value (on the details row, the detail screen, or the document: none, two, wrong type or file) -> `ACCURACY_BREACH`; a screen not as mapped (another task's screen, no Documents section) -> `PARTIAL_WRITE`.
+- **Guard:** four new read-only actions, each pinned to its one target (Joey, 4 Nov 2026): `open_new_task_detail` (a table cell only), `back_to_project` (the select, only the option "-- Select Task --"), `open_project_documents` and `open_project_tasks` (the button named exactly "Documents" / "Tasks"). Any other target is refused before the page is touched. The unused `search_task` and `open_task_detail` stay as they were.
+- **`book()`** now takes `agent` (for Lodged By) and returns the new task number after W2.
+- **Seam 2 finding (4 Nov 2026):** the first run stopped with `PARTIAL_WRITE` at the Documents read-back after a real Submit: Create New Task shows on the project's Tasks tab only, so the window found by heading + Create New Task vanished on the Documents tab. A read-only probe (Joey's choice: opening clicks only, counts and fixed errors only) showed the detail screen read-back passing live. The Documents and Tasks steps now find the window by its heading and the Tasks button; the offline fake hides Create New Task on Documents, as live. The stop itself behaved as designed: `PARTIAL_WRITE`, nothing returned to the pool.
+- **Loosens?** The guard allows four new actions, all read-only clicks or a select back to the project, and each narrower than an ordinary allowlist entry. W2 itself is the first write, as planned. This PR is Joey's to merge (guard.py).
+- Carried in: `SPEC.md` (Guard additions, W2 after Submit), `tasks/plan.md` (4.2).
 
 ## 4 Nov 2026 - Production operations: go-live gate 6 (Joey)
 

@@ -26,7 +26,12 @@ from playwright.sync_api import Locator, Page
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.core import output
-from po_agent.core.errors import PartialWrite, UnexpectedScreen, WriteNotStarted
+from po_agent.core.errors import (
+    AccuracyBreach,
+    PartialWrite,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -680,6 +685,188 @@ def wait_new_task(form: Locator, project: Locator, before: set[str]) -> str:
             if time.monotonic() >= deadline:
                 raise
         project.page.wait_for_timeout(POLL_MS)
+
+
+# W2: the new task and its read-back (rows 10, 19)
+
+
+def new_task_after_submit(form: Locator, project: Locator, before: set[str]) -> str:
+    """Row 10: the form closes, then the settled task table (as at step 10)
+    shows exactly one Compaction Test number not in `before`, with Status New
+    Project or Inspection Analysis, within 15 s (one settled read may add up
+    to its own 15 s). None, more than one (rows that arrived after step 10's
+    wait, decisions 4 Nov 2026) or the form still open -> PartialWrite."""
+    if not _gone(form):
+        raise PartialWrite("Create New Task did not close")
+    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
+    problem = "NO_NEW_TASK"
+    while True:
+        try:
+            tasks = driver.settled_tasks(project)
+        except UnexpectedScreen:
+            tasks = None
+        if tasks is not None:
+            new = [task for task in tasks if task not in before]
+            if len(new) > 1:
+                raise PartialWrite("more than one new task", reason="NO_NEW_TASK")
+            if len(new) == 1:
+                if tasks[new[0]] in NEW_TASK_STATUSES:
+                    return new[0]
+                problem = "TASK_STATUS"  # the Status cell can fill in later
+        if time.monotonic() >= deadline:
+            raise PartialWrite("new task not found", reason=problem)
+        project.page.wait_for_timeout(POLL_MS)
+
+
+def _details_row(project: Locator, task_no: str) -> Locator:
+    """The row right after the task's own header row: anchored on the task
+    number, never on a value older tasks share."""
+    header = _task_header(project, task_no)
+    if header.count() != 1:
+        raise UnexpectedScreen("task row not found once")
+    return header.locator("xpath=following-sibling::tr[1]")
+
+
+def check_new_task_row(project: Locator, task_no: str, agent: str) -> Locator:
+    """Row 10: the new task's details row shows Lodged By the agent and Task
+    Creator Perth Scheduling (the first two columns); returns that row."""
+    details = _details_row(project, task_no)
+    try:
+        cells = [c.strip() for c in details.locator("td").all_inner_texts()]
+    except PlaywrightError:
+        raise UnexpectedScreen("task row not readable") from None
+    if len(cells) < 3:
+        raise UnexpectedScreen("task row not recognised")
+    if cells[0] != agent:
+        raise AccuracyBreach("new task not as booked", field="lodged_by")
+    if cells[1] != CREATOR:
+        raise AccuracyBreach("new task not as booked", field="task_creator")
+    return details
+
+
+def _section(window: Locator, heading: Locator, content: Locator) -> Locator:
+    """The innermost visible element in `window` holding `heading` and
+    `content` (both page-level locators)."""
+    found = window.page.locator("*").filter(has=heading).filter(has=content)
+    return window.locator("*").and_(found.filter(has_not=found)).visible
+
+
+def _bold(page: Page, label: str) -> Locator:
+    return page.locator("strong").filter(has_text=driver._label_pattern(label))
+
+
+def task_detail_window(page: Page, task_no: str) -> Locator:
+    """Row 19: the project window showing the task: its heading `TSK_<n> `
+    and its section `tsk_<n> [Compaction Test]`, for this number only."""
+    number = task_no.removeprefix("tsk_")
+    return _innermost(
+        page,
+        page.get_by_role("heading", name=re.compile(rf"^TSK_{number} ")),
+        page.get_by_role("heading", name=f"{task_no} [Compaction Test]", exact=True),
+    )
+
+
+def open_task_detail(guard: ActionGuard, project: Locator, details: Locator) -> None:
+    """The Task Creator cell of the new task's details row (never its header
+    row, which holds Cancel and Hold)."""
+    cell = details.get_by_role("cell", name=CREATOR, exact=True)
+    guard.act("open_new_task_detail", project, cell)
+
+
+def check_task_detail(
+    page: Page, task_no: str, po_number: str, body: str, agent: str
+) -> Locator:
+    """Row 19: the screen must name the new task, else PartialWrite; then
+    PO Number, Lodged By and Notes in its `tsk_<n> [Compaction Test]`
+    section and Task Creator in the Client section. Nothing here is
+    clicked. Returns the window."""
+    window = task_detail_window(page, task_no)
+    if not _shows(window, LOAD_TIMEOUT_MS):
+        raise PartialWrite("task detail not as mapped")
+    task = _section(
+        window,
+        page.get_by_role("heading", name=f"{task_no} [Compaction Test]", exact=True),
+        _bold(page, "PO Number:"),
+    )
+    client = _section(
+        window,
+        page.get_by_role("heading", name="Client", exact=True),
+        _bold(page, "Task Creator:"),
+    )
+    values = {
+        "po_number": (_labelled(task, "PO Number:"), po_number),
+        "lodged_by": (_labelled(task, "Lodged By:"), agent),
+        "notes": (_labelled(task, "Notes"), " ".join(body.split())),
+        "task_creator": (_labelled(client, "Task Creator:"), CREATOR),
+    }
+    for name, (read, wanted) in values.items():
+        if read != wanted:
+            raise AccuracyBreach("task detail not as booked", field=name)
+    return window
+
+
+def back_to_project(
+    guard: ActionGuard, page: Page, window: Locator, pln: str
+) -> Locator:
+    """Chooses "-- Select Task --" in the window's select: the project again."""
+    placeholder = page.locator("option").filter(has_text=_exact(driver.SELECT_TASK))
+    select = window.locator("select").filter(has=placeholder)
+    guard.act("back_to_project", window, select, driver.SELECT_TASK)
+    project = project_window(page, pln)
+    if not _shows(project, LOAD_TIMEOUT_MS):
+        raise PartialWrite("project window did not come back")
+    return project
+
+
+def project_tabs_window(page: Page, pln: str) -> Locator:
+    """The project window on any of its tabs: Create New Task shows on the
+    Tasks tab only (seam 2, 4 Nov 2026), so the Documents tab is found by the
+    heading and the Tasks button."""
+    heading = page.get_by_role("heading", name=re.compile(rf"^{re.escape(pln)} "))
+    tasks = page.get_by_role("button", name="Tasks", exact=True)
+    return _innermost(page, heading, tasks)
+
+
+def check_project_document(
+    guard: ActionGuard, page: Page, pln: str, task_no: str, file_name: str
+) -> Locator:
+    """Row 19: the project's Documents tab, the section headed by the new
+    task number (older tasks have their own copies): exactly one row, Type
+    Purchase Order, File starting with the PDF's file name. No section ->
+    PartialWrite; "No Document Found" or any other row -> AccuracyBreach.
+    Then the Tasks button, back to the task table for W3; returns the
+    project window."""
+    window = project_tabs_window(page, pln)
+    documents = window.get_by_role("button", name="Documents", exact=True)
+    guard.act("open_project_documents", window, documents)
+    none = page.get_by_text("No Document Found", exact=True)
+    section = _section(
+        window,
+        page.get_by_role("heading", name=task_no, exact=True),
+        page.locator("table").or_(none),
+    )
+    if not _shows(section, LOAD_TIMEOUT_MS):
+        raise PartialWrite("project documents not as mapped")
+    try:
+        rows = [
+            [c.strip() for c in row.locator("td").all_inner_texts()]
+            for row in section.locator("tr").filter(has=page.locator("td")).all()
+        ]
+    except PlaywrightError:
+        raise UnexpectedScreen("project documents not readable") from None
+    if len(rows) != 1:
+        raise AccuracyBreach("document not as booked", field="documents")
+    (cells,) = rows
+    if len(cells) < 3 or cells[1] != "Purchase Order":
+        raise AccuracyBreach("document not as booked", field="document_type")
+    if not cells[2].startswith(file_name):
+        raise AccuracyBreach("document not as booked", field="document_file")
+    tasks = window.get_by_role("button", name="Tasks", exact=True)
+    guard.act("open_project_tasks", window, tasks)
+    project = project_window(page, pln)
+    if not _shows(_task_header(project, task_no), LOAD_TIMEOUT_MS):
+        raise PartialWrite("task table did not come back")
+    return project
 
 
 # Hold (rows 11-12)

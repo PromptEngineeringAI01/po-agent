@@ -77,7 +77,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 ## M4 — first booking
 
 - [x] **4.1** (done: PR #54) W1 (PO Documents on the test site; live is go-live gate 2, decisions 3 Nov 2026): `Proceed` matches this Note and pln; Create New Task fill (upload from bytes) + full pre-Submit read-back (`stop_after=W1`) · step
-- [ ] **4.2** W2: Submit, wait for one new task, task-detail read-back (`PartialWrite` / `AccuracyBreach`) · step
+- [x] **4.2** (done: PR #60) W2: Submit, wait for one new task, task-detail read-back (`PartialWrite` / `AccuracyBreach`) · step
 - [ ] **4.3** W3: Hold with every dialog check read, no checkbox touched; `guard.vet()` refuses a Hold checkbox · step
 - [ ] **4.4** W4 Link to Project + W5 Solved; `before_write` → untick → read back → click, read back again before W4's final select · step
 - [ ] **4.5** `run` mode end to end; seam 2: 3 trial POs booked (S4), rerun changes nothing, 2609034B copy skips (S5); manual mid-run takeover (stop before W1, or `PARTIAL_WRITE` at W4) · step

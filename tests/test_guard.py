@@ -120,6 +120,11 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "mark_solved": "click",
         "search_task": "fill",
         "open_task_detail": "click",
+        # W2's read-only clicks and select (row 19; task 4.2)
+        "open_new_task_detail": "click",
+        "back_to_project": "select",
+        "open_project_documents": "click",
+        "open_project_tasks": "click",
     }
 
 
@@ -843,3 +848,114 @@ def test_move_may_land_on_the_projects_empty_list_line(page, guard):
     status = page.get_by_text("No record found.", exact=True)
     verdict = guard.vet("move_pointer_off_menu", page.locator("body"), status)
     assert isinstance(verdict, Allowed)
+
+
+# Task 4.2 (row 19): W2's read-only actions each act on their one target
+# only: the details-row click on a table cell, the select only back to
+# "-- Select Task --", and the project's Documents and Tasks buttons by
+# exact name. Anything else is refused before the page is touched.
+
+DETAIL_PAGE = """
+<section><h2>pln_10001 B1 Homes Sample Lane, Sampleville WA 6000</h2>
+  <select onchange="this.dataset.changed = 'yes'">
+    <option selected>-- Select Task --</option>
+    <option>(tsk_200002) [Compaction Test]</option>
+  </select>
+  <button onclick="this.dataset.clicked='yes'">Tasks</button>
+  <button onclick="this.dataset.clicked='yes'">Documents</button>
+  <button onclick="this.dataset.clicked='yes'">Notes</button>
+  <table><tbody><tr>
+    <td>Agent 1 (MySys Only)</td>
+    <td onclick="this.dataset.clicked='yes'">Perth Scheduling</td>
+  </tr></tbody></table>
+</section>
+"""
+
+
+@pytest.mark.parametrize(
+    ("action", "locate", "value"),
+    [
+        (
+            "open_new_task_detail",
+            lambda p: p.get_by_role("cell", name="Perth Scheduling", exact=True),
+            None,
+        ),
+        ("back_to_project", lambda p: p.locator("select"), "-- Select Task --"),
+        (
+            "open_project_documents",
+            lambda p: p.get_by_role("button", name="Documents", exact=True),
+            None,
+        ),
+        (
+            "open_project_tasks",
+            lambda p: p.get_by_role("button", name="Tasks", exact=True),
+            None,
+        ),
+    ],
+    ids=["details-cell", "select-back", "documents", "tasks"],
+)
+def test_w2_actions_are_allowed_on_their_target(page, guard, action, locate, value):
+    page.set_content(DETAIL_PAGE)
+    verdict = guard.vet(action, page.locator("section"), locate(page), value)
+    assert isinstance(verdict, Allowed)
+
+
+@pytest.mark.parametrize(
+    ("action", "locate", "value", "reason"),
+    [
+        # The details-row click is a cell, never a button, link or row.
+        (
+            "open_new_task_detail",
+            lambda p: p.get_by_role("button", name="Notes", exact=True),
+            None,
+            Refusal.WRONG_ELEMENT,
+        ),
+        (
+            "open_new_task_detail",
+            lambda p: p.get_by_role("row"),
+            None,
+            Refusal.WRONG_ELEMENT,
+        ),
+        # The select only goes back to the project, never to a task.
+        (
+            "back_to_project",
+            lambda p: p.locator("select"),
+            "(tsk_200002) [Compaction Test]",
+            Refusal.VALUE_MISMATCH,
+        ),
+        # The project's Documents and Tasks buttons by exact name only.
+        (
+            "open_project_documents",
+            lambda p: p.get_by_role("button", name="Notes", exact=True),
+            None,
+            Refusal.WRONG_ELEMENT,
+        ),
+        (
+            "open_project_documents",
+            lambda p: p.get_by_role("cell", name="Perth Scheduling", exact=True),
+            None,
+            Refusal.WRONG_ELEMENT,
+        ),
+        (
+            "open_project_tasks",
+            lambda p: p.get_by_role("button", name="Documents", exact=True),
+            None,
+            Refusal.WRONG_ELEMENT,
+        ),
+    ],
+    ids=[
+        "detail-on-button",
+        "detail-on-row",
+        "select-to-a-task",
+        "documents-on-notes",
+        "documents-on-cell",
+        "tasks-on-documents",
+    ],
+)
+def test_w2_actions_on_any_other_target_are_refused_without_acting(
+    page, guard, action, locate, value, reason
+):
+    page.set_content(DETAIL_PAGE)
+    target = locate(page)
+    assert refusal(guard, action, page.locator("section"), target, value) == reason
+    assert page.locator("[data-clicked], [data-changed]").count() == 0
