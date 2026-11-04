@@ -137,10 +137,16 @@ DETAIL = {
 PO_ROW = ("Purchase Order", FILE)
 # Row 11: the Hold Task dialog as mapped. `ticked` names the boxes that
 # start ticked besides the reminder: related_0, related_hidden (a row the
-# table hides), select_all, reset, at_date. After its Hold: `closes`, `holds`
+# table hides), select_all, reset, at_date. `jobs` is the count the Related
+# Tasks text states (the table has 3 rows); `related_outside` puts Related
+# Tasks in the window but outside the heading and Note block; `extra_hold`
+# adds a second Hold button to that block. After its Hold: `closes`, `holds`
 # (the row then shows Un-Hold) and `status` (None: "On-hold Notes: <note>").
 HOLD_DIALOG: dict[str, object] = {
     "heading": None,
+    "jobs": 3,
+    "relatedOutside": False,
+    "extraHold": False,
     "ticked": [],
     "reminder": True,
     "days": "0",
@@ -366,6 +372,8 @@ function openHold(task) {{
   const related = ['tsk_300001', 'tsk_300002'].map((t, i) =>
     '<tr><td>' + box('related_' + i) + '</td><td>' + t + ' Compaction Test</td><td>Active</td></tr>').join('')
     + '<tr hidden><td>' + box('related_hidden') + '</td><td>tsk_300003 Compaction Test</td><td>Active</td></tr>';
+  const block = '<div><div>Related Tasks</div><div><p>There are ' + h.jobs + ' related jobs with the same sales type/ suburb/ estate. Select jobs to hold together.</p>'
+    + '<table><thead><tr><th>' + box('select_all') + '</th><th>Task</th><th>Status</th></tr></thead><tbody>' + related + '</tbody></table></div></div>';
   const dialog = document.getElementById('hold');
   dialog.innerHTML = '<div><h3>Hold Task</h3><div>'
     + '<div><button onclick="confirmHold(\\'' + task + '\\')">Hold</button><h3>Hold Task: ' + (h.heading || task) + '</h3></div>'
@@ -376,9 +384,9 @@ function openHold(task) {{
     + '<div>' + box('at_date', 'Send me a reminder email at this date:') + ' Send me a reminder email at this date: <input disabled></div></div></div>'
     + '<div><div>Reset turn around time</div>' + box('reset') + '</div>'
     + '<div><div>Note</div><input aria-label="Note" id="hold_note"></div>'
-    + '<div><div>Related Tasks</div><div><p>There are 3 related jobs with the same sales type/ suburb/ estate. Select jobs to hold together.</p>'
-    + '<table><thead><tr><th>' + box('select_all') + '</th><th>Task</th><th>Status</th></tr></thead><tbody>' + related + '</tbody></table></div></div>'
-    + '</div></div>{CLOSE}';
+    + (h.extraHold ? '<div><button>Hold</button></div>' : '')
+    + (h.relatedOutside ? '' : block)
+    + '</div>' + (h.relatedOutside ? block : '') + '</div>{CLOSE}';
   if (h.noteSuffix) document.getElementById('hold_note').addEventListener('input',
     (event) => {{ if (!event.target.value.endsWith(h.noteSuffix)) event.target.value += h.noteSuffix; }});
   dialog.hidden = false;
@@ -761,6 +769,10 @@ def test_w3_holds_the_new_task_once_and_reads_it_back(serve, guard, search):
         {"days": "7"},
         # The Note box doesn't keep the text as typed.
         {"noteSuffix": " X"},
+        # More related jobs than rows: paged, or not all loaded yet.
+        {"jobs": 60},
+        # Related Tasks outside the block the ticked boxes are counted in.
+        {"relatedOutside": True},
     ],
     ids=[
         "other-heading",
@@ -772,6 +784,8 @@ def test_w3_holds_the_new_task_once_and_reads_it_back(serve, guard, search):
         "reminder-unticked",
         "reminder-days",
         "note-not-exact",
+        "related-rows-missing",
+        "related-outside-scope",
     ],
 )
 def test_a_hold_dialog_not_as_mapped_closes_the_context_and_is_never_confirmed(
@@ -849,3 +863,22 @@ def test_the_kill_switch_at_w3_is_a_partial_write_and_nothing_is_held(
     assert caught.value.step == "W3"
     assert actions(guard)[-1] == "open_project_tasks"
     assert "open_hold" not in actions(guard)
+    assert page.is_closed()
+
+
+def test_a_guard_refusal_at_w3_keeps_its_type_and_closes_the_context(
+    serve, guard, search
+):
+    # A second Hold button in the dialog: the confirm is ambiguous.
+    served = serve(tasks=[CANCELLED], hold={"extraHold": True})
+    page = served[0]
+
+    with pytest.raises(GuardRefusal) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W3")
+
+    assert caught.value.reason == Refusal.TARGET_AMBIGUOUS
+    assert caught.value.step == "W3"
+    # Refused, so never pressed.
+    assert guard.history[-1] == ("confirm_hold", Refusal.TARGET_AMBIGUOUS)
+    assert ("confirm_hold", "done") not in guard.history
+    assert page.is_closed()

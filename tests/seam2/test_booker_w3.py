@@ -5,10 +5,10 @@ test finds its Note, takes it, and gets its `Proceed` by running every check
 (`run._decide`, as decide-only does). Then `book(..., stop_after="W3")`: W1,
 W2, then Hold in the new task's own header row, every Hold dialog check read
 before its own Hold is pressed once, and the row read back with Un-Hold and
-an On-hold Status holding the note. No checkbox is touched (no checkbox
-action in the history). The D3 refusal on a Hold checkbox is in 4.2's test:
-once the task is on hold its row shows Un-Hold, so the dialog can't be
-reopened here.
+an On-hold Status holding the note. No checkbox is touched in W3 (its
+actions are only open_hold, set_hold_note and confirm_hold). The D3
+refusal on a Hold checkbox is in 4.2's test: once the task is on hold its
+row shows Un-Hold, so the dialog can't be reopened here.
 
 Joey cancels the task afterwards (reset; an On Hold task offers Cancel
 directly). The teardown returns the Note to the pool in a fresh context
