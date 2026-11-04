@@ -135,9 +135,9 @@ def _w2(
         window = booking.check_task_detail(
             page, task_no, proceed.po_number, proceed.email_body, agent
         )
-        project = booking.back_to_project(guard, page, window, proceed.pln)
+        booking.back_to_project(guard, page, window, proceed.pln)
         booking.check_project_document(
-            guard, page, project, task_no, proceed.pdf_file_name
+            guard, page, proceed.pln, task_no, proceed.pdf_file_name
         )
         return task_no
     except GuardRefusal as error:
