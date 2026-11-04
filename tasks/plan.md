@@ -641,8 +641,8 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 | P2 Decide | 2.1-2.6 | Review stops at 2.2-2.5 (CLAUDE.md). Lean fakes: rule checks on fake text; real PDFs on the laptop only (`-m real_data`); most skip cases from the MySys side. No fake-PDF generator (Joey, 29 Oct 2026, at 2.1) | Checkpoint M2: `false PROCEED: 0` in seam 1 and the real-PO run |
 | P3 Run controls and decide-only | 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4 | 3.2 reuses the demo's Projects search (Enter, `submit_project_search`). 3.6 needs M0b.2 row 23 | Checkpoint M3; decide-only green on the laptop and the Mac Mini |
 | P4 Real booker | M0b.2, doubt-driven design review, then 4.1-4.5 | Built from `mysys/booking.py` (Phase M4 intro). PO Documents vs Documents is confirmed with the PO admin before go-live (gate 2, SPEC open question 11) | Checkpoint M4 without 4.6; seam 2 booking cases green |
-| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job loaded | 1.10 also confirms the Mac Mini login and Keychain. Replaces M6's checks: S1-S8 on the scheduled job | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5) |
-| P6 Go live | New tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
+| P5 Unattended on the test site | 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2, then the hourly job loaded; 7.6 runs through the week | 1.10 also confirms the Mac Mini login and Keychain. Replaces M6's checks: S1-S8 on the scheduled job. 7.1 and 7.2 go in before the week starts, so a week that stopped silently can't pass as "zero wrong bookings" | **A week of hourly test-site runs on the Mac Mini with zero wrong bookings** (go-live gate 5), every alert in it triaged (7.6) |
+| P6 Go live | 7.3, 7.4, 7.5 (gate 6), then new tasks, written when gates 1-4 are in | Live config and secrets; Must never #3 changed by Joey with the CEO's sign-off; the real-PO seam on 10-20 real POs | Live order below done, one PO per run watched, then full hourly runs |
 
 **Out of production scope:** no schedule change (Monday-Friday, hourly 07:07-17:07 Perth); no Grok Bot; no fake-PDF generator (Joey, 29 Oct 2026); `po-agent demo` stays as is.
 
@@ -652,8 +652,82 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 3. CEO sign-off for going live, and the backlog cut-off date (which older Notes the agent may touch).
 4. Accounts: a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
 5. A week of hourly test-site runs with zero wrong bookings (P5).
+6. Production operations in place (4 Nov 2026): 7.1-7.5 merged and each proven on the Mac Mini, and the P5 week's alerts triaged (7.6).
 
 **Live order** (P6, each step with its own dated decisions entry): read-only `spike` on live, then `run --decide-only` on live, then `run` booking one PO per run, watched, then full hourly runs.
+
+### Production operations (7.1-7.7, added 4 Nov 2026)
+
+Unattended runs need what a watched demo didn't: someone told when the job stops, a way to see why a run failed, control over what code reaches the Mac Mini, and a loop that turns each failure into a test. Each task that changes what the agent prints or logs gets its own dated decisions entry and SPEC change when it is built (CLAUDE.md Conventions).
+
+#### 7.1 Heartbeat · step (asks first: the service)
+
+**Description:** Today an alert issue opens only when a run starts and fails. A job that never runs (FileVault screen after a power cut, job unloaded, a hung Keychain dialog) sends nothing; `docs/macmini-setup.md` left the heartbeat to v1.
+**Needs:** 1.9. **Before:** the P5 week.
+**Acceptance:**
+- The wrapper sends one ping at the end of every run, whatever the exit code. The ping carries no PO data: at most the exit code and `run_id`.
+- If no ping arrives for 2 hours inside the schedule (Monday-Friday, 07:07-17:07 Perth), Joey is emailed. Outside the schedule nothing alerts.
+- Joey picks the service first (recommended: an external dead-man's-switch service such as healthchecks.io, free tier; the alternative is a scheduled GitHub Action that reads the latest alert or ping). Its URL is a secret (`PO_AGENT_*` or Keychain), never in the repo.
+- Stub-command tests: a run that exits 0, 1, 2 or 3 pings once; a failed `git pull` still pings.
+**Verify:** `uv run scripts/check.py`; on the Mac Mini, unload the job for 2 hours inside the schedule and see the email.
+**Files:** `scripts/macmini-run.sh`, `docs/macmini-setup.md`, the 1.9 wrapper tests. **Scope:** S.
+
+#### 7.2 Silent-skip alert · step (asks first: the rule)
+
+**Description:** A MySys screen change makes every eligible Note skip as `UNEXPECTED_SCREEN`. Each skip is safe and returns the Note, so no alert opens and POs quietly stop being booked.
+**Needs:** 5.1. **Before:** the P5 week.
+**Acceptance:**
+- A run with at least one eligible Note where every eligible Note ends `UNEXPECTED_SCREEN` prints one `ALERT` line (name and exit code decided with Joey; recommended `ALERT ALL_SKIPPED`, exit 1), so the wrapper opens the alert issue. Within one run only: the agent keeps no state between runs.
+- Business skips (`NOT_B1`, `DUPLICATE_TASK`, ...) don't count; a run with no eligible Note doesn't alert.
+- Offline tests for: all `UNEXPECTED_SCREEN`; one booked and one `UNEXPECTED_SCREEN`; all business skips; no eligible Note.
+**Verify:** `uv run scripts/check.py`.
+**Files:** `src/po_agent/core/run.py`, `src/po_agent/core/output.py`, `SPEC.md` (stdout contract), a test file. **Scope:** S.
+
+#### 7.3 Safe trace on the Mac Mini · step (high risk: data)
+
+**Description:** The Mac Mini never passes `--detailed-log`, so a live `PARTIAL_WRITE` leaves only its `ALERT` line. Add a production trace made only of allowlisted fields.
+**Needs:** 5.1. **Before:** go-live (gate 6).
+**Acceptance:**
+- Each event has only: `run_id`, time, `note_id`, step (`W1`-`W5`, step 0-11), check or control name (the guard's mapped name, never page text), outcome (pass, fail, skip reason, error type) and duration. Anything else is dropped when the event is written, not filtered later.
+- Written to `~/Library/Logs/po-agent/trace/<date>.jsonl` on the Mac Mini, kept 90 days, files older than that deleted at run start.
+- A test raises errors and runs reads whose values hold fake PDF text, an address and a Note body, and asserts none of it reaches the trace.
+**Verify:** `uv run scripts/check.py`; one decide-only run on the Mac Mini, with its trace read by Joey.
+**Files:** `src/po_agent/core/runlog.py` (or a new `trace.py`), `src/po_agent/cli.py`, `scripts/macmini-run.sh`, `SPEC.md`, a test file. **Scope:** M.
+
+#### 7.4 Release pinning · step (asks first: the kill-switch path)
+
+**Description:** The wrapper pulls `main` every run, so every merge deploys within the hour. On live, the Mac Mini runs a `production` tag instead, which only Joey moves, after the new commit has run on the test site.
+**Needs:** 1.9. **Before:** go-live (gate 6).
+**Acceptance:**
+- The wrapper fetches, checks out the `production` tag and runs that; a failed fetch or a missing tag runs nothing and alerts, as a failed pull does today.
+- `enabled = false` still stops the next run without a tag move: the wrapper reads it from `origin/main` (recommended) before it runs the tagged code.
+- Joey moves the tag by hand (`git tag -f production <sha>`, then push the tag); Claude never moves or pushes it.
+- Stub-command tests: tag present, tag missing, fetch fails, `enabled = false` on `main` with an old tag.
+**Verify:** `uv run scripts/check.py`; on the Mac Mini, a merge to `main` doesn't change the next run until the tag moves.
+**Files:** `scripts/macmini-run.sh`, `docs/macmini-setup.md`, `docs/workflow.md` (Ground rules: merging no longer deploys), the 1.9 wrapper tests. **Scope:** S.
+
+#### 7.5 Ops runbook · docs
+
+**Description:** SPEC defines every `ALERT`, but not what a person does when one arrives. The backup admin (gate 4) must be able to follow it without Joey.
+**Needs:** 7.1-7.4 written. **Before:** go-live (gate 6).
+**Acceptance:** `docs/ops-runbook.md` has one short entry per alert (`PARTIAL_WRITE`, `ACCURACY_BREACH` and the `STOP` file, `GUARD_REFUSAL`, `UNEXPECTED_SCREEN`, `LOGIN_FAILED`, `CONFIG`, 7.2's alert, a missed heartbeat): what it means, how to finish or undo it by hand in MySys, how to restart, and who is told. No real data.
+**Verify:** the backup admin reads it; Joey walks one `PARTIAL_WRITE` through it on the test site.
+**Files:** `docs/ops-runbook.md`. **Scope:** S.
+
+#### 7.6 Alert triage loop · from the P5 week
+
+**Description:** Every failure becomes a test. Each `po-agent-alert` issue (alert lines only, no PO data) is triaged by a Claude session from the issue text and, on the laptop, the run's trace.
+**Needs:** 5.1; 7.3 once built. **Runs:** from the start of the P5 week, then on live.
+**Acceptance:**
+- Each alert issue is closed with one of: expected skip (why), a new seam-1 or seam-2 case (its PR), a bug fix (its PR, test first), or a dated decisions entry.
+- Weekly, Joey reads one line: runs, bookings, skips by reason, alerts. On live the skip rate is the quality figure to watch.
+- Real data stays in `private/` and MySys: a case from a live PO is added to the real-PO set in `private/`, never to a committed fixture.
+**Files:** a triage skill in `.claude/skills/` (Claude may write it). **Scope:** S.
+
+#### 7.7 Dev workflow, by hand (Joey)
+
+- A read-only second-model reviewer as `.claude/agents/pr-reviewer.md` (model `opus`; prompt from `docs/workflow.md` Appendix C), so read-only is enforced by its tools, not only by the prompt; Appendix C then points to it.
+- `/verify-pr` ticks the task in `tasks/todo.md` after it merges, so the task list can't fall behind `main`.
 
 ---
 
@@ -661,7 +735,7 @@ From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is 
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| A merge to `main` deploys to the Mac Mini (the wrapper pulls every run) while the job is loaded | High | D1: run controls and assignee check before any booking code; job unloaded after S1 and loaded only for 4.6 and from M6; plain `run` refuses until 4.5; a failed pull runs nothing |
+| A merge to `main` deploys to the Mac Mini (the wrapper pulls every run) while the job is loaded | High | D1: run controls and assignee check before any booking code; job unloaded after S1 and loaded only for 4.6 and from M6; plain `run` refuses until 4.5; a failed pull runs nothing; before go-live the Mac Mini runs a `production` tag that only Joey moves (7.4) |
 | Moving between MySys windows isn't mapped (Note → project → Hold → back to the Note) | High | M0b.1 rows 25–28 before M3; "Finding a Note again" rule; a Note already assigned is re-found with All Pools + exact ID; D7 cuts the Note Pool trips to two per booking and keeps W1–W3 in the project window |
 | Denylist refuses a safe action (a "… Close" street in a target's text; a dropdown option) and blocks every run | Med | D5 for dropdowns; M0b.2 row 20 names a W4 target without the address; a refusal opens an alert issue, so Joey sees it on the first run |
 | Trial PDF left on the Mac Mini's disk after a crash or kill | Med | D2: read into memory and delete at once; `finally` cleanup; leftovers removed at every run start; FileVault |

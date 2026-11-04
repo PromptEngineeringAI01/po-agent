@@ -16,8 +16,8 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **P2** Decide: 2.1-2.6
 - [ ] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
 - [ ] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
-- [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, then the hourly job; a week of hourly runs with zero wrong bookings
-- [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week): live spike, then decide-only, then one booking per run, watched · tasks written then
+- [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2, then the hourly job; a week of hourly runs with zero wrong bookings, every alert triaged (7.6)
+- [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week; production operations 7.1-7.6): live spike, then decide-only, then one booking per run, watched · tasks written then
 
 ## Freeze — before any build
 
@@ -91,6 +91,16 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **5.2** Seam-2 safety cases (`guard.vet()` refuses Discard, non-`/048` untouched, Send Email untick after the latest assignee check, from the log); full seam 2 green as the fixed sequence of runs with resets in `tests/seam2/README.md` · step
 
 **Checkpoint M5:** check green; full seam 2 green; manual mid-run takeover (4.5) done; review + security review; docs drift checked.
+
+## Production operations (added 4 Nov 2026; plan -> Phase P -> Production operations)
+
+- [ ] **7.1** Heartbeat: one ping per run, email after 2 hours without one inside the schedule · step · asks first: the service · before the P5 week
+- [ ] **7.2** Silent-skip alert: every eligible Note `UNEXPECTED_SCREEN` → one ALERT · step · asks first: the rule · before the P5 week
+- [ ] **7.3** Safe trace on the Mac Mini: allowlisted fields only, 90 days · step · before go-live
+- [ ] **7.4** Release pinning: the Mac Mini runs the `production` tag; `enabled` still read from `main` · step · before go-live
+- [ ] **7.5** `docs/ops-runbook.md`: what to do for each alert · docs · before go-live
+- [ ] **7.6** Alert triage loop: every alert issue closed as expected skip, new case, fix or decision · from the P5 week
+- [ ] **7.7** Dev workflow: `.claude/agents/pr-reviewer.md`; `/verify-pr` ticks todo.md after a merge · by hand (Joey)
 
 ## Demo - shown 28 Oct 2026 (decisions, 27-28 Oct 2026)
 
