@@ -156,12 +156,15 @@ PRESS_TARGETS = {
     "submit_link_search": "Search/filter",  # Choose Project's search
 }
 PRESS_KEY = "Enter"
-# W2's read-only clicks (row 19): the role, and the exact name (None: any),
-# of the one kind of element each may click.
+# W2's read-only clicks (row 19) and W4's select (row 20): the role, and the
+# exact name (None: any), of the one kind of element each may click.
 CLICK_TARGETS: dict[str, tuple[str, str | None]] = {
     "open_new_task_detail": ("cell", None),  # a cell of the details row
     "open_project_documents": ("button", "Documents"),
     "open_project_tasks": ("button", "Tasks"),
+    # W4's select (row 20): the result's pln cell, never its row (whose name
+    # holds the Site Address), a link or a button (Joey, 4 Nov 2026).
+    "link_select_project": ("cell", None),
 }
 # A SELECT action that may choose only this one option.
 SELECT_VALUES = {"back_to_project": "-- Select Task --"}

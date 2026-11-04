@@ -24,8 +24,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **4 Nov 2026: W1 review fixes** (task 4.1 follow-up; entry below).
 - **4 Nov 2026: W2 built** (task 4.2; entry below).
 - **4 Nov 2026: W3 built** (task 4.3; entry below).
+- **4 Nov 2026: W4 and W5 built** (task 4.4; entry below).
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
+
+## 4 Nov 2026 - W4 and W5: Link to Project and Solved (Joey, task 4.4)
+
+- **What W4 does:** `before_write(note_id, "W4")` runs the assignee check (D7; any failure is `PARTIAL_WRITE`, 3.6 review), then the Note is found again as row 25 maps it (reload, Note ID under All Pools, the row whose ID equals it, opened). That is a second reload after the check's own; it reuses the mapped path instead of the page the check leaves. Send Email Notification is unticked and read back, Link to Project, Choose Project's Search/filter = the pln with Enter, Send Email read back again, then the one cell named exactly the pln, clicked once through `guard.act`. Read back: the Note's only project button reads the pln (another pln -> `ACCURACY_BREACH`), Status still starts Pending.
+- **What W5 does:** `before_write(note_id, "W5")` (no assignee check, D7), Send Email read back unticked, Solved once; read back "Solved by <agent>", Solved disabled, one new log line, newest, "Status changed:" from Pending to Solved, then the Note ID search: the Status filter reads Pending, the list is one page and has no row whose ID equals the Note ID.
+- **Errors:** every W4/W5 error closes the browser context and carries its step: `PARTIAL_WRITE`, except `ACCURACY_BREACH` and `GUARD_REFUSAL`, which keep their type.
+- **Guard (Joey, 4 Nov 2026):** `link_select_project` now clicks only an element whose role is cell (`CLICK_TARGETS`), never a row, link or button. Tightens a control; the PR is Joey's to merge (guard.py). The demo's `link_project` uses the same cell-only select: `_link_choice`'s link, button and text fallbacks and its results snapshot are removed (M4 gate).
+- **Loosens?** No: W4 and W5 are the planned last writes; the cell pin and the extra read-backs add stops.
+- Carried in: `SPEC.md` (W4/W5 Built, Guard additions), `tasks/plan.md` (4.4).
 
 ## 4 Nov 2026 - W3: Hold (Joey, task 4.3)
 
