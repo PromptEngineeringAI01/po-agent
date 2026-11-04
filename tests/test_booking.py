@@ -859,3 +859,33 @@ def test_wait_new_task_reads_past_a_half_added_row(
     form = booking.task_form(page)
     booking.submit_task(guard, form)
     assert booking.wait_new_task(form, project, before) == "tsk_200009"
+
+
+def test_task_form_without_a_documents_block_does_not_submit(page, guard):
+    # Fail closed: a Documents area not found once is not "empty".
+    documents = (
+        '<div><div>Documents</div><div><span>Upload <input type="file" '
+        "onchange=\"addDoc(this, 'doc_rows')\"></span>\n"
+        '      <table><tbody id="doc_rows"></tbody></table></div></div>'
+    )
+    html = task_form_page()
+    assert documents in html
+    page.set_content(html.replace(documents, ""))
+    with pytest.raises(WriteNotStarted):
+        booking.fill_task_form(
+            guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+        )
+    assert "submit_task" not in actions(guard)
+
+
+def test_task_form_documents_with_only_a_header_row_reads_as_empty(page, guard):
+    # SPEC -> W1: the Documents area holds no file row; a header is not one.
+    empty = '<table><tbody id="doc_rows"></tbody></table>'
+    header = '<table><thead><tr><th>File</th></tr></thead><tbody id="doc_rows"></tbody></table>'
+    html = task_form_page()
+    assert empty in html
+    page.set_content(html.replace(empty, header))
+    booking.fill_task_form(
+        guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+    )
+    assert "upload_document" in actions(guard)
