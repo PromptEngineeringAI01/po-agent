@@ -1,6 +1,6 @@
 """The booker: W1-W5 with read-back (SPEC.md -> MySys screen rules;
-docs/specs/spec.md §6). Tasks 4.1-4.2 build W1 and W2; 4.3-4.4 add the
-later steps.
+docs/specs/spec.md §6). Tasks 4.1-4.3 build W1-W3; 4.4 adds the later
+steps.
 
 `book()` takes only a `Proceed` from the decision engine, for the Note in
 hand. It reuses the demo's proven steps (mysys/booking.py) but never its
@@ -24,6 +24,15 @@ PartialWrite, except AccuracyBreach and GuardRefusal, which keep their type;
 each carries step W2. With one of those three types, step W2 tells the run
 loop the task may exist (4.5: never returned to the pool); W2's
 `before_write` errors also say W2 but come before the click.
+
+W3: `before_write(note_id, "W3")` (no assignee check, D7; a kill switch here
+is already PartialWrite, 3.5) -> Hold in the new task's own header row -> the
+dialog headed `Hold Task: <new task>` -> the note typed, no checkbox touched
+-> every check read (row 11) -> the dialog's own Hold, once -> the row read
+back with Un-Hold and an On-hold Status holding the note (row 12). Every
+error closes the browser context (an open dialog is abandoned unconfirmed)
+and is PartialWrite, except AccuracyBreach and GuardRefusal, which keep their
+type; each carries step W3.
 """
 
 from playwright.sync_api import Locator, Page
@@ -41,7 +50,7 @@ from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard
 
 # The steps built so far; `stop_after` must name one of them.
-BUILT = ("W1", "W2")
+BUILT = ("W1", "W2", "W3")
 
 
 def book(
@@ -61,13 +70,17 @@ def book(
     if not isinstance(proceed, Proceed):
         raise TypeError("book() takes only a Proceed from decide()")
     if stop_after not in BUILT:
-        raise NotImplementedError("only W1 and W2 are built (tasks 4.1-4.2)")
+        raise NotImplementedError("only W1-W3 are built (tasks 4.1-4.3)")
     if proceed.note_id != note_id:
         raise WriteNotStarted("decision is for another Note", step="W1")
     project, form = _w1(proceed, guard, page, login, controls)
     if stop_after == "W1":
         return None
-    return _w2(proceed, guard, page, controls, agent, project, form)
+    task_no = _w2(proceed, guard, page, controls, agent, project, form)
+    if stop_after == "W2":
+        return task_no
+    _w3(proceed, guard, page, controls, task_no)
+    return task_no
 
 
 def _close_context(page: Page) -> None:
@@ -164,3 +177,46 @@ def _w2(
         raise PartialWrite(
             "task not read back after Submit", note_id=note_id, step="W2"
         ) from error
+
+
+def _w3(
+    proceed: Proceed,
+    guard: ActionGuard,
+    page: Page,
+    controls: Controls,
+    task_no: str,
+) -> None:
+    note_id = proceed.note_id
+    try:
+        controls.before_write(note_id, "W3")  # PartialWrite here (3.5)
+        project = booking.project_window(page, proceed.pln)
+        dialog = booking.open_hold(guard, page, project, task_no)
+        booking.fill_hold(guard, dialog)
+        booking.confirm_hold(guard, page, dialog)
+        booking.check_on_hold(project, task_no)
+    except Exception as error:
+        _close_context(page)  # an open Hold dialog is abandoned unconfirmed
+        if isinstance(error, GuardRefusal):
+            raise GuardRefusal(
+                "guard refused the action",
+                action=error.action,
+                reason=error.reason,
+                note_id=note_id,
+                step="W3",
+            ) from error
+        if isinstance(error, AccuracyBreach):
+            raise AccuracyBreach(
+                "wrong value on read-back",
+                field=error.field,
+                note_id=note_id,
+                step="W3",
+            ) from error
+        if isinstance(error, PoAgentError):
+            raise PartialWrite(
+                "task not held",
+                reason=error.reason,
+                field=error.field,
+                note_id=note_id,
+                step="W3",
+            ) from error
+        raise PartialWrite("task not held", note_id=note_id, step="W3") from error

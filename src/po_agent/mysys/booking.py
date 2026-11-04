@@ -898,13 +898,19 @@ def open_hold(
 
 
 def fill_hold(guard: ActionGuard, dialog: Locator) -> None:
-    """Types the hold note and touches no checkbox; then reads every check:
-    only the reminder ticked, with 0 days, and the note exact."""
+    """Types the hold note and touches no checkbox; then reads every check
+    (row 11): only the reminder ticked, hidden boxes counted too (a Related
+    Tasks row the table hides would still be held with it), so every Related
+    Tasks box, Select-all, Reset turn around time and "at this date" are
+    unticked; the reminder with 0 days; the note exact."""
     note = dialog.get_by_role("textbox", name="Note", exact=True)
     guard.act("set_hold_note", dialog, note, HOLD_NOTE)
     try:
         checks = {
-            "ticked": dialog.get_by_role("checkbox", checked=True).count() == 1,
+            "ticked": dialog.get_by_role(
+                "checkbox", checked=True, include_hidden=True
+            ).count()
+            == 1,
             "reminder": dialog.get_by_role(
                 "checkbox", name=REMINDER, exact=True
             ).is_checked(),
