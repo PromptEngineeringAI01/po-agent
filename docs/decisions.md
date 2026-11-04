@@ -23,8 +23,19 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **3 Nov 2026: W1 built** (task 4.1; entry below).
 - **4 Nov 2026: W1 review fixes** (task 4.1 follow-up; entry below).
 - **4 Nov 2026: W2 built** (task 4.2; entry below).
+- **4 Nov 2026: W3 built** (task 4.3; entry below).
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
+
+## 4 Nov 2026 - W3: Hold (Joey, task 4.3)
+
+- **What W3 does:** `before_write(note_id, "W3")` (no assignee check, D7; a kill switch or unreadable config here is already `PARTIAL_WRITE`, 3.5), then Hold in the new task's own header row (exact name, never Un-Hold), the dialog headed `Hold Task: <new task>`, the note typed, every check read, the dialog's own Hold pressed once through `guard.act`, and the row read back: Un-Hold, and a Status starting "On-hold" that holds the note. No checkbox is touched, and nothing is saved to disk.
+- **The dialog read counts hidden checkboxes too (Joey, 4 Nov 2026):** the read is "exactly one ticked box in the dialog, and it is the reminder", which covers every Related Tasks box, Select-all, Reset turn around time and "at this date"; it now includes hidden boxes, because a Related Tasks row the table hides would still be held with the task. If the test site has a hidden ticked box by design, W3 stops before the confirm and seam 2 shows it.
+- **Every related job is read (4.3 review):** the "There are N related jobs" text must be the only one on the page and inside the dialog's read, and its table must hold N row checkboxes plus Select-all; else `PARTIAL_WRITE` before the confirm. A Related Tasks table that is paged, still loading or outside the read can't hide a ticked job. With no such text (row 11 always shows it) the ticked-box count alone applies. The row-11 captures show 58 jobs and 59 boxes, unpaged, inside the dialog block.
+- **Errors:** every W3 error closes the browser context (an open dialog is abandoned unconfirmed) and carries `step=W3`: `PARTIAL_WRITE`, except `ACCURACY_BREACH` and `GUARD_REFUSAL`, which keep their type. A Status without the note after Hold is `PARTIAL_WRITE`, as in the demo: `docs/specs/spec.md` §6 names a wrong project, PO number or PDF as an accuracy breach.
+- **Guard:** no change; `open_hold`, `set_hold_note` and `confirm_hold` already existed.
+- **Loosens?** No: W3 is the planned second write, and the hidden-box count adds a stop before it.
+- Carried in: `SPEC.md` (W3), `tasks/plan.md` (4.3).
 
 ## 4 Nov 2026 - W2: Submit and the read-back on the task detail screen (Joey, task 4.2)
 
