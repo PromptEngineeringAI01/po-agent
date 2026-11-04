@@ -21,8 +21,9 @@ new Compaction Test task (row 10) -> its detail screen, opened from its own
 details row and read back (row 19) -> back to the project, its Documents
 section for the new task -> Tasks. From the Submit click on, every error is
 PartialWrite, except AccuracyBreach and GuardRefusal, which keep their type;
-each carries step W2, which tells the run loop the task may exist (4.5:
-never returned to the pool).
+each carries step W2. With one of those three types, step W2 tells the run
+loop the task may exist (4.5: never returned to the pool); W2's
+`before_write` errors also say W2 but come before the click.
 """
 
 from playwright.sync_api import Locator, Page
