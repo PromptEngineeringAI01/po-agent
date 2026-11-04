@@ -156,7 +156,8 @@ def fake_mysys(
     project window (`opens_as`: another task number instead); "-- Select
     Task --" goes back. Documents lists a section per task: an older task's
     holds its own copy of the PDF; the first new task's holds `documents`
-    (None: no section). Every task's detail screen shows the same values,
+    (None: no section); Create New Task is then hidden, as live (it shows
+    on the Tasks tab only). Every task's detail screen shows the same values,
     so only the task number tells them apart."""
     options = "".join(
         f"<option>({task}) [Compaction Test]</option>" for task, _ in tasks
@@ -198,7 +199,7 @@ def fake_mysys(
   <div id="task_view" hidden></div>
   <div id="project_tabs">
     <button onclick="show('tasks')">Tasks</button>{documents_button * documents_buttons}<button>Notes</button>
-    <button onclick="document.getElementById('form').hidden = false">Create New Task</button>
+    <button id="create" onclick="document.getElementById('form').hidden = false">Create New Task</button>
   </div>
   <div id="tasks"><table><tbody id="task_rows">{task_rows(tasks)}</tbody></table></div>
   <div id="documents" hidden></div>
@@ -302,6 +303,8 @@ function docSection(task, rows) {{
 }}
 function show(view) {{
   document.getElementById('tasks').hidden = view !== 'tasks';
+  // Live (seam 2, 4 Nov 2026): Create New Task shows on the Tasks tab only.
+  document.getElementById('create').hidden = view !== 'tasks';
   const docs = document.getElementById('documents');
   docs.hidden = view !== 'documents';
   if (view !== 'documents') return;
