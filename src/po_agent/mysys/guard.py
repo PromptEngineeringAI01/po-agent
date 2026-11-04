@@ -91,6 +91,11 @@ ALLOWLIST: dict[str, Kind] = {
     # Task detail (read-only screen)
     "search_task": Kind.FILL,
     "open_task_detail": Kind.CLICK,
+    # W2's read-back (row 19, task 4.2): each pinned to its one target below.
+    "open_new_task_detail": Kind.CLICK,
+    "back_to_project": Kind.SELECT,
+    "open_project_documents": Kind.CLICK,
+    "open_project_tasks": Kind.CLICK,
 }
 
 # Matched lowercased, as substrings: "cancel" also catches "Undo Cancellation",
@@ -151,6 +156,15 @@ PRESS_TARGETS = {
     "submit_link_search": "Search/filter",  # Choose Project's search
 }
 PRESS_KEY = "Enter"
+# W2's read-only clicks (row 19): the role, and the exact name (None: any),
+# of the one kind of element each may click.
+CLICK_TARGETS: dict[str, tuple[str, str | None]] = {
+    "open_new_task_detail": ("cell", None),  # a cell of the details row
+    "open_project_documents": ("button", "Documents"),
+    "open_project_tasks": ("button", "Tasks"),
+}
+# A SELECT action that may choose only this one option.
+SELECT_VALUES = {"back_to_project": "-- Select Task --"}
 # A MOVE's only target: a list's status line, its footer or its empty text.
 MOVE_TARGET = re.compile(
     r"Page \d+ of \d+\s*\(\d+ Items?\)|No record (?:could be )?found\."
@@ -158,7 +172,9 @@ MOVE_TARGET = re.compile(
 MOVE_ROLES = frozenset({"generic", "listitem", "paragraph", "text"})
 
 
-def _value_fits(kind: Kind, value: Value) -> bool:
+def _value_fits(action: str, kind: Kind, value: Value) -> bool:
+    if action in SELECT_VALUES:
+        return value == SELECT_VALUES[action]
     if kind == Kind.PRESS:
         return value == PRESS_KEY
     if kind in (Kind.CLICK, Kind.CHECK, Kind.UNCHECK, Kind.MOVE):
@@ -192,7 +208,9 @@ class ActionGuard:
 
         Reads the page only. Checks, in order: the action is allowlisted and
         the value fits it; the scope is exactly one visible window; the target
-        is exactly one visible element, inside that window; the element's own
+        is exactly one visible element, inside that window; a pinned action's
+        element has its one role and name (PRESS_TARGETS, CLICK_TARGETS); the
+        element's own
         name and text (for a select: its name plus the chosen option) miss the
         denylist; it isn't the Pending button; it isn't a checkbox while a
         Hold Task window is open.
@@ -210,7 +228,7 @@ class ActionGuard:
         kind = ALLOWLIST.get(action)
         if kind is None:
             return Refused(Refusal.UNKNOWN_ACTION)
-        if not _value_fits(kind, value):
+        if not _value_fits(action, kind, value):
             return Refused(Refusal.VALUE_MISMATCH)
 
         # Locator.visible matches visible elements only, checked when used:
@@ -248,6 +266,10 @@ class ActionGuard:
         role, name = head.group(1), head.group(2) or ""
         if kind == Kind.PRESS and (role != "textbox" or name != PRESS_TARGETS[action]):
             return Refused(Refusal.WRONG_ELEMENT)
+        if action in CLICK_TARGETS:
+            want_role, want_name = CLICK_TARGETS[action]
+            if role != want_role or want_name not in (None, name):
+                return Refused(Refusal.WRONG_ELEMENT)
         if kind == Kind.MOVE and (
             role not in MOVE_ROLES
             or not MOVE_TARGET.fullmatch(
