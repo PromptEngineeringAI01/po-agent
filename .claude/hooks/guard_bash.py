@@ -49,7 +49,8 @@ TEXT_RULES = [
     ),
     (
         "gh pr merge",
-        "only `gh pr merge <n> --merge`, alone, after /verify-pr (Must never #9)",
+        "only `gh pr merge <n> --merge --match-head-commit <sha>`, alone, "
+        "after /verify-pr (Must never #9)",
         re.compile(r"\bpr\s+merge\b", re.IGNORECASE),
     ),
     (
@@ -58,8 +59,11 @@ TEXT_RULES = [
         re.compile(r"\bgh(\.exe)?\s+alias\b", re.IGNORECASE),
     ),
 ]
-# The one merge Claude may run, as the whole command (decisions, 2 Nov 2026).
-ALLOWED_MERGE = re.compile(r"gh(\.exe)?\s+pr\s+merge\s+\d+\s+--merge")
+# The one merge Claude may run, as the whole command (decisions, 2 Nov 2026),
+# pinned to the full commit /verify-pr checked so a later push can't slip in.
+ALLOWED_MERGE = re.compile(
+    r"gh(\.exe)?\s+pr\s+merge\s+\d+\s+--merge\s+--match-head-commit\s+[0-9a-f]{40}"
+)
 
 # Tokens made only of these end a simple command (`;`, `&&`, `|`, `(`, ...).
 SEPARATOR_CHARS = set(";&|()`")
