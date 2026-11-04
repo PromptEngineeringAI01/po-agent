@@ -22,6 +22,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
 - **3 Nov 2026: W1 built** (task 4.1; entry below).
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
+- **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
 
 ## 4 Nov 2026 - Production operations: go-live gate 6 (Joey)
 
