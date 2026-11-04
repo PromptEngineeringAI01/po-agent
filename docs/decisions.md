@@ -41,9 +41,9 @@ From the post-merge reviews of PR #54 (second-model review and a fresh /code-rev
 - **The W1 reopen refuses a task that is live again:** every task found must still be Cancelled (step 10 passed with each Cancelled), so an Undo Cancellation in between is `WRITE_NOT_STARTED`, not a duplicate booking.
 - **The Documents read-back fails closed:** the Documents block must be found once and hold no file cell; a header row is not a file row.
 - **Closing the context never hides the error:** if the close itself fails, the original error (e.g. a `GuardRefusal`) is raised.
-- **Accepted, not changed:** a screen error during the W1 reopen stays `UNEXPECTED_SCREEN` (nothing is filled yet); a re-raised `WRITE_NOT_STARTED` keeps the step it had; a closed context ends the run, so `settled_tasks` retrying it for 15 s is harmless; `po-agent demo` keeps its own duplicate check (Phase P: the demo stays as is).
+- **Accepted, not changed:** a screen error during the W1 reopen stays `UNEXPECTED_SCREEN` (nothing is filled yet); a re-raised `WRITE_NOT_STARTED` keeps the step it had; a closed context ends the run, so `settled_tasks` retrying it for 15 s is harmless; `po-agent demo` keeps its own duplicate check (Phase P: the demo stays as is). Residual risk: task rows that arrive only after 15 s, at both step 10 and the W1 reopen, still read as no tasks; W2's read-back would then see two new tasks and raise `PARTIAL_WRITE`, after the write.
 - **Loosens?** No: each change adds a stop or a wait before Create New Task.
-- Carried in: `SPEC.md` (Duplicate check), `docs/screen-map.md` (row 10).
+- Carried in: `SPEC.md` (Duplicate check), `docs/screen-map.md` (row 10), `tasks/plan.md` (4.1, Settled task table).
 
 ## 3 Nov 2026 - W1: Create New Task filled and read back (Joey, task 4.1)
 
