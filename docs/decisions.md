@@ -21,6 +21,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **3 Nov 2026: assignee check and stale-Note stop built** (task 3.6; entry below).
 - **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
 - **3 Nov 2026: W1 built** (task 4.1; entry below).
+- **4 Nov 2026: W1 review fixes** (task 4.1 follow-up; entry below).
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
 
@@ -31,6 +32,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Open choices, asked at the task:** the heartbeat service (7.1), the alert's name and exit code (7.2), and where the wrapper reads `enabled` once it runs a tag (7.4). 7.2 and 7.3 change the run output or what is logged, so each gets its own entry when built.
 - **Loosens?** No: it adds a go-live gate and changes no behaviour yet.
 - Carried in: `SPEC.md` (Production: steps 5 and 6, gate 6), `tasks/plan.md` (Phase P, gate 6, Production operations, the merge-deploys risk), `tasks/todo.md`.
+
+## 4 Nov 2026 - W1 review fixes (Joey, task 4.1 follow-up)
+
+From the post-merge reviews of PR #54 (second-model review and a fresh /code-review):
+
+- **An empty task table counts as no tasks only after the full 15 s wait.** A read-only probe (Joey's choice: a scratch script through the guarded driver, opening clicks only, counts only) showed the rows and the select's options render together with the window, and an empty project shows nothing else (screen map row 10). Two early empty reads could have read a project with a task as having none, and booked a duplicate. Tasks still count once two equal reads match the options. A project with no tasks now costs 15 s at step 10 and again at the W1 reopen.
+- **The W1 reopen refuses a task that is live again:** every task found must still be Cancelled (step 10 passed with each Cancelled), so an Undo Cancellation in between is `WRITE_NOT_STARTED`, not a duplicate booking.
+- **The Documents read-back fails closed:** the Documents block must be found once and hold no file cell; a header row is not a file row.
+- **Closing the context never hides the error:** if the close itself fails, the original error (e.g. a `GuardRefusal`) is raised.
+- **Accepted, not changed:** a screen error during the W1 reopen stays `UNEXPECTED_SCREEN` (nothing is filled yet); a re-raised `WRITE_NOT_STARTED` keeps the step it had; a closed context ends the run, so `settled_tasks` retrying it for 15 s is harmless; `po-agent demo` keeps its own duplicate check (Phase P: the demo stays as is).
+- **Loosens?** No: each change adds a stop or a wait before Create New Task.
+- Carried in: `SPEC.md` (Duplicate check), `docs/screen-map.md` (row 10).
 
 ## 3 Nov 2026 - W1: Create New Task filled and read back (Joey, task 4.1)
 

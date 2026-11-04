@@ -15,6 +15,7 @@ browser context, which abandons the form (the upload is saved only by
 Submit, M0b.2), and is WriteNotStarted.
 """
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page
 
 from po_agent.b1.models import Proceed
@@ -70,7 +71,10 @@ def _w1(
             proceed.pdf_bytes,
         )
     except Exception as error:
-        page.context.close()  # abandons the form: nothing is saved
+        try:
+            page.context.close()  # abandons the form: nothing is saved
+        except PlaywrightError:
+            pass  # the original error below is the one that counts
         if isinstance(error, GuardRefusal | WriteNotStarted):
             raise
         raise WriteNotStarted(
