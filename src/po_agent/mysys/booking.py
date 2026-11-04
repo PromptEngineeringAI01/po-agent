@@ -46,6 +46,8 @@ OPEN_TRIES = driver.OPEN_TRIES
 CREATOR = "Perth Scheduling"
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
 REMINDER = "Send me a reminder email every days"
+# Row 11: "There are 58 related jobs with the same sales type/ suburb/ ...".
+RELATED_JOBS = re.compile(r"^There are (\d+) related jobs\b")
 OFFICE = "Prompt Engineering Pty Ltd"
 NOT_CHOSEN = "Choose..."
 SELECT_USER = driver.SELECT_USER
@@ -897,12 +899,32 @@ def open_hold(
     return dialog
 
 
+def _related_rows_read(dialog: Locator) -> bool:
+    """Related Tasks (row 11): the "There are N related jobs" text is the
+    only one on the page and inside `dialog`, and the dialog's table holds N
+    row checkboxes plus Select-all (hidden ones too), so no related job is
+    paged out, still loading or outside the ticked-box read. No such text
+    (row 11 always shows it): the ticked-box count alone applies."""
+    stated = dialog.page.get_by_text(RELATED_JOBS).visible
+    if stated.count() == 0:
+        return True
+    if stated.count() != 1 or dialog.get_by_text(RELATED_JOBS).count() != 1:
+        return False
+    match = RELATED_JOBS.search(stated.inner_text().strip())
+    if match is None:
+        return False
+    table = dialog.get_by_role("table")
+    boxes = table.get_by_role("checkbox", include_hidden=True).count()
+    return boxes == int(match.group(1)) + 1
+
+
 def fill_hold(guard: ActionGuard, dialog: Locator) -> None:
     """Types the hold note and touches no checkbox; then reads every check
     (row 11): only the reminder ticked, hidden boxes counted too (a Related
     Tasks row the table hides would still be held with it), so every Related
     Tasks box, Select-all, Reset turn around time and "at this date" are
-    unticked; the reminder with 0 days; the note exact."""
+    unticked; every related job read (`_related_rows_read`); the reminder
+    with 0 days; the note exact."""
     note = dialog.get_by_role("textbox", name="Note", exact=True)
     guard.act("set_hold_note", dialog, note, HOLD_NOTE)
     try:
@@ -911,6 +933,7 @@ def fill_hold(guard: ActionGuard, dialog: Locator) -> None:
                 "checkbox", checked=True, include_hidden=True
             ).count()
             == 1,
+            "related": _related_rows_read(dialog),
             "reminder": dialog.get_by_role(
                 "checkbox", name=REMINDER, exact=True
             ).is_checked(),
