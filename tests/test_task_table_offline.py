@@ -93,3 +93,25 @@ def test_a_project_with_no_tasks_reads_as_none(page):
     window = booking.project_window(page, "pln_10001")
 
     assert driver.settled_tasks(window) == {}
+
+
+def test_an_empty_table_counts_as_no_tasks_only_after_the_full_wait(page, monkeypatch):
+    # Probe, 4 Nov 2026: the table, its rows and the select's options render
+    # together, so two equal empty reads early on prove nothing. Here both
+    # arrive 1.5 s after the window shows: they must still be read.
+    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 3000)
+    late = f"""<script>setTimeout(() => {{
+      document.getElementById('tasks').innerHTML = `{ROWS}`;
+      const select = document.querySelector('select');
+      for (const task of {list(BOTH)}) {{
+        const option = document.createElement('option');
+        option.textContent = '(' + task + ') [Compaction Test]';
+        select.appendChild(option);
+      }}
+    }}, 1500)</script>"""
+    page.set_content(project_page(options=(), rows="", late_ms=None) + late)
+    window = booking.project_window(page, "pln_10001")
+
+    tasks = driver.settled_tasks(window)
+
+    assert tasks == {"tsk_200001": "Cancelled", "tsk_200002": "New Project"}

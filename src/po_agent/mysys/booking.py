@@ -618,6 +618,8 @@ def check_task_form(form: Locator, po_number: str, body: str, file_name: str) ->
     po_docs = _container(form, "PO Documents", 'input[type="file"]')
     if not _shows(po_docs.get_by_text(file_name, exact=True), LOAD_TIMEOUT_MS):
         raise WriteNotStarted("task form not as expected", field="po_documents")
+    # No file row (a header row is not one); not found once is not empty.
+    documents = _container(form, "Documents", 'input[type="file"]')
     try:
         checks = {
             "creator": _chosen(_field(form, "Creator", "select")) == CREATOR,
@@ -633,10 +635,8 @@ def check_task_form(form: Locator, po_number: str, body: str, file_name: str) ->
             == "",
             "po_number": _field(form, "PO Number", "input").input_value() == po_number,
             "po_documents": po_docs.locator("tr").count() == 1,
-            "documents": _container(form, "Documents", 'input[type="file"]')
-            .locator("tr")
-            .count()
-            == 0,
+            "documents": documents.count() == 1
+            and documents.locator("td").count() == 0,
             "note": _field(form, "Note", "textarea").input_value() == body,
             "sale_office": _chosen(_field(form, "Sale Office", "select")) == OFFICE,
             "po_contact": _chosen(_field(form, "PO Contact", "select")) == NOT_CHOSEN,
