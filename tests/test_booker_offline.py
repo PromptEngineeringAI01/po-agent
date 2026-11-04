@@ -52,7 +52,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, ConsoleMessage, Page, sync_playwright
 
 from po_agent.b1 import booker
 from po_agent.b1 import reader_rules as rules
@@ -335,6 +335,8 @@ function docSection(task, rows) {{
   return '<div><div><h3>' + task + '</h3><div>Document Actions</div></div>' + body + '</div>';
 }}
 function show(view) {{
+  // Tells the kill-switch test that W2 has ended (its Tasks click).
+  if (view === 'tasks') console.log('tasks tab');
   document.getElementById('tasks').hidden = view !== 'tasks';
   // Live (seam 2, 4 Nov 2026): Create New Task shows on the Tasks tab only.
   document.getElementById('create').hidden = view !== 'tasks';
@@ -832,15 +834,12 @@ def test_the_kill_switch_at_w3_is_a_partial_write_and_nothing_is_held(
     served = serve(tasks=[CANCELLED])
     page = served[0]
 
-    def switch_off() -> None:
-        off = toml.replace("enabled = true", "enabled = false")
-        (config_dir / "test.toml").write_text(off, "utf-8")
+    def switch_off(message: ConsoleMessage) -> None:
+        if message.text == "tasks tab":
+            off = toml.replace("enabled = true", "enabled = false")
+            (config_dir / "test.toml").write_text(off, "utf-8")
 
-    page.expose_function("switchOff", switch_off)
-    page.add_init_script(
-        "document.addEventListener('click', (event) => {"
-        " if (event.target.textContent === 'Tasks') window.switchOff(); }, true);"
-    )
+    page.on("console", switch_off)
 
     with pytest.raises(PartialWrite) as caught:
         run_book(
