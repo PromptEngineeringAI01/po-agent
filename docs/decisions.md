@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 3 Nov 2026, production)
+# PO Agent - decision log (updated 4 Nov 2026, production)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -21,6 +21,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **3 Nov 2026: assignee check and stale-Note stop built** (task 3.6; entry below).
 - **3 Nov 2026: M4 gate review** of the booker design (4.1-4.5; entry below).
 - **3 Nov 2026: W1 built** (task 4.1; entry below).
+- **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
+
+## 4 Nov 2026 - Production operations: go-live gate 6 (Joey)
+
+- **Why:** a watched demo needed none of this; an unattended hourly job does. Today nobody is told if the job stops running, a skip caused by a MySys screen change opens no alert, the Mac Mini keeps no detail about a failed run, and every merge to `main` deploys within the hour.
+- **Planned, not built:** heartbeat (7.1) and the silent-skip alert (7.2) before the P5 week; a trace of allowlisted fields only on the Mac Mini (7.3), the Mac Mini running a `production` tag that only Joey moves (7.4) and `docs/ops-runbook.md` (7.5) before go-live; every alert issue triaged into an expected skip, a new case, a fix or a decision from the P5 week on (7.6); two dev-workflow changes Joey makes by hand in `.claude/` (7.7).
+- **Open choices, asked at the task:** the heartbeat service (7.1), the alert's name and exit code (7.2), and where the wrapper reads `enabled` once it runs a tag (7.4). 7.2 and 7.3 change the run output or what is logged, so each gets its own entry when built.
+- **Loosens?** No: it adds a go-live gate and changes no behaviour yet.
+- Carried in: `SPEC.md` (Production: steps 5 and 6, gate 6), `tasks/plan.md` (Phase P, gate 6, Production operations, the merge-deploys risk), `tasks/todo.md`.
 
 ## 3 Nov 2026 - W1: Create New Task filled and read back (Joey, task 4.1)
 
