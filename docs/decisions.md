@@ -29,6 +29,17 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
 - **5 Nov 2026: run mode built** (task 4.5; entry below). Plain `run` books.
 - **5 Nov 2026: a lighter build process** (entry below).
+- **5 Nov 2026: M4 security pass, three Nits fixed** (entry below).
+
+## 5 Nov 2026 - M4 security pass: three Nits fixed (Joey)
+
+A read-only security pass over the booker and run loop found no Important issue and five Nits. Joey chose to fix #2, #4 and #5 now; #1 is covered by "one agent at a time" (D7) and #3 goes into task 7.2.
+
+- **#2, Ctrl+C after Submit:** from the Submit click on, a `KeyboardInterrupt` or any other non-`Exception` error is `PARTIAL_WRITE` with its step, like every other error there: the ALERT names the Note, RUN_SUMMARY's `partial` counts it, the Note stays with the agent and the run stops (exit 1). It used to be `ALERT UNEXPECTED_SCREEN` with `partial` 0. Before the click, Ctrl+C is unchanged (no return attempt, `UNEXPECTED_SCREEN` "Note not returned to the pool"). SIGTERM/SIGKILL from the wrapper's 20-minute limit stays out of scope: the wrapper alerts on a non-zero exit and the stale-Note stop holds the next run.
+- **#4, a demo line in a real run:** the opening clicks' retry (`booking._open`, reached from `run` via `open_project`) no longer prints `INFO  demo: page blocked, retrying`; it is silent, like the driver's own retry. The line is removed from the INFO templates, so neither `run` nor `demo` prints it.
+- **#5, the Note ID check in `book()`:** the run loop now passes the ID of the Note it holds, not the decision's own, so a decision for another Note is `WriteNotStarted` before W1. No change in what a normal run does or prints.
+- **Loosens?** No: #2 reports more errors as partial writes, #4 prints less, #5 makes a check real.
+- Carried in: `SPEC.md` (v1.27, Run output and the Submit rule).
 
 ## 5 Nov 2026 - A lighter build process (Joey)
 

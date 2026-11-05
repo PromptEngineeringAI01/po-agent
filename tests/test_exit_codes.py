@@ -25,10 +25,17 @@ import pytest
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
+from po_agent.b1.models import Proceed
 from po_agent.core import run
-from po_agent.core.config import CONFIG_DIR
-from po_agent.core.errors import AccuracyBreach, LoginFailed, UnexpectedScreen
+from po_agent.core.config import CONFIG_DIR, load_config
+from po_agent.core.errors import (
+    AccuracyBreach,
+    LoginFailed,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
 from po_agent.mysys import booking
+from po_agent.mysys.guard import ActionGuard
 
 _spec = importlib.util.spec_from_file_location(
     "seam2_fake_mysys_for_exit_codes",
@@ -38,6 +45,7 @@ fake_mysys = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fake_mysys)
 FakeNote = fake_mysys.FakeNote
 POOL = fake_mysys.POOL
+AGENT = fake_mysys.AGENT
 
 # Stand-ins for what a page or Playwright message can quote: PDF text and a
 # job address. Neither may reach stdout or stderr.
@@ -287,3 +295,68 @@ def test_run_summary_is_last_even_when_the_crash_hits_the_cleanup(env, mysys, ca
     assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300001")
     assert "not returned to the pool" in alert["detail"]
     assert summary_of(lines)["exit_code"] == 1
+
+
+# --- M4 security pass Nits (5 Nov 2026) ---------------------------------------------
+
+CTRL_C = [
+    # (the fake MySys call Ctrl+C hits, ALERT kind, step, partial)
+    ("fill", "UNEXPECTED_SCREEN", None, 0),  # W1: before the Submit click
+    ("new_task", "PARTIAL_WRITE", "W2", 1),
+    ("confirm_hold", "PARTIAL_WRITE", "W3", 1),
+    ("gone", "PARTIAL_WRITE", "W5", 1),
+]
+
+
+@pytest.mark.parametrize(
+    ("where", "kind", "step", "partial"), CTRL_C, ids=[c[0] for c in CTRL_C]
+)
+def test_ctrl_c_from_the_submit_click_on_is_a_partial_write(
+    env, mysys, capsys, where, kind, step, partial
+):
+    # Nit 2: a KeyboardInterrupt (not an Exception) after Submit is reported
+    # like any other error there; before Submit it stays a stop with no
+    # return attempt.
+    fake = mysys(two_notes(fail_at=where, fail_with=KeyboardInterrupt))
+
+    code = book_run()
+
+    lines = lines_of(capsys)
+    assert code == 1
+    ((alert_kind, alert),) = alerts_of(lines)
+    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300001", step)
+    summary = summary_of(lines)
+    assert (summary["partial"], summary["exit_code"]) == (partial, 1)
+    assert fake.notes["300001"].assignee == AGENT  # never returned
+    assert not any(c.endswith(" 300002") for c in fake.calls)
+
+
+def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path):
+    # Nit 5: the run loop passes the Note it holds, not the decision's own
+    # Note ID, so a decision for another Note never reaches W1.
+    fake = mysys(two_notes())
+    config_dir = tmp_path / "config"
+    other = Proceed(
+        note_id="300002",
+        internal_no="2600002B",
+        pln="pln_10002",
+        po_number="2600002B/048",
+        email_body="fake body",
+        pdf_file_name="2600002B_048_1.pdf",
+        pdf_bytes=b"%PDF-fake",
+        existing_task_nos=(),
+    )
+
+    with pytest.raises(WriteNotStarted) as error:
+        run._book(
+            ActionGuard(),
+            fake_mysys.FakePage(fake.calls),
+            load_config("test", config_dir),
+            ("https://fake.test", "fake-user", "fake-password"),
+            other,
+            config_dir,
+            note_id="300001",
+        )
+
+    assert error.value.step == "W1"
+    assert fake.calls == []  # nothing read or written in MySys
