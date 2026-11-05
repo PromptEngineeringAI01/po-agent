@@ -889,3 +889,22 @@ def test_task_form_documents_with_only_a_header_row_reads_as_empty(page, guard):
         guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
     )
     assert "upload_document" in actions(guard)
+
+
+# An opening click retried after a block prints nothing: it runs inside a
+# real `run` too (via open_project), where no "demo:" line belongs (M4
+# security pass, Nit 4).
+
+BLOCKED_BRIEFLY_PAGE = """
+<div id="cover" style="position: fixed; inset: 0; z-index: 10"></div>
+<button onclick="this.dataset.clicked = 'yes'">Refresh</button>
+<script>setTimeout(() => document.getElementById("cover").remove(), 2500)</script>
+"""
+
+
+def test_an_opening_click_retried_after_a_block_prints_nothing(page, guard, capsys):
+    page.set_content(BLOCKED_BRIEFLY_PAGE)
+    refresh = page.get_by_role("button", name="Refresh", exact=True)
+    booking._open(guard, "refresh_note_pool", page.locator("body"), refresh)
+    assert refresh.get_attribute("data-clicked") == "yes"  # retried, then clicked
+    assert capsys.readouterr().out == ""
