@@ -1,6 +1,5 @@
 """The booker: W1-W5 with read-back (SPEC.md -> MySys screen rules;
-docs/specs/spec.md §6). Tasks 4.1-4.3 build W1-W3; 4.4 adds the later
-steps.
+docs/specs/spec.md §6). Tasks 4.1-4.4 build them.
 
 `book()` takes only a `Proceed` from the decision engine, for the Note in
 hand. It reuses the demo's proven steps (mysys/booking.py) but never its
@@ -33,7 +32,26 @@ back with Un-Hold and an On-hold Status holding the note (row 12). Every
 error closes the browser context (an open dialog is abandoned unconfirmed)
 and is PartialWrite, except AccuracyBreach and GuardRefusal, which keep their
 type; each carries step W3.
+
+W4: `before_write(note_id, "W4")` (the assignee check, D7: any failure is
+PartialWrite) -> back to the Note window as row 25 maps it (reload, the Note
+ID under All Pools, the row whose ID equals it, opened: Send Email is ticked
+again) -> Send Email unticked and read back -> Link to Project -> Choose
+Project: the pln searched (Enter) -> Send Email read back again -> the one
+cell named exactly the pln, once (row 20) -> the project button reads the
+pln (another pln: AccuracyBreach) and Status still starts Pending.
+
+W5: `before_write(note_id, "W5")` (no assignee check, D7) -> Send Email
+read back unticked -> Solved, once -> "Solved by <agent>", Solved disabled,
+a new "Status changed ... Pending to Solved" log line (row 14) -> the Note
+ID searched again under Status Pending: no row whose ID equals it.
+
+W4 and W5 errors close the browser context and carry their step:
+PartialWrite, except AccuracyBreach and GuardRefusal, which keep their type.
+Pending, Discard, Change Project and Unlink are never targeted.
 """
+
+from typing import NoReturn
 
 from playwright.sync_api import Locator, Page
 
@@ -50,7 +68,7 @@ from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard
 
 # The steps built so far; `stop_after` must name one of them.
-BUILT = ("W1", "W2", "W3")
+BUILT = ("W1", "W2", "W3", "W4", "W5")
 
 
 def book(
@@ -70,7 +88,7 @@ def book(
     if not isinstance(proceed, Proceed):
         raise TypeError("book() takes only a Proceed from decide()")
     if stop_after not in BUILT:
-        raise NotImplementedError("only W1-W3 are built (tasks 4.1-4.3)")
+        raise ValueError("stop_after must be W1-W5")
     if proceed.note_id != note_id:
         raise WriteNotStarted("decision is for another Note", step="W1")
     project, form = _w1(proceed, guard, page, login, controls)
@@ -80,6 +98,12 @@ def book(
     if stop_after == "W2":
         return task_no
     _w3(proceed, guard, page, controls, task_no)
+    if stop_after == "W3":
+        return task_no
+    window = _w4(proceed, guard, page, login, controls)
+    if stop_after == "W4":
+        return task_no
+    _w5(proceed, guard, page, login, controls, agent, window)
     return task_no
 
 
@@ -220,3 +244,76 @@ def _w3(
                 step="W3",
             ) from error
         raise PartialWrite("task not held", note_id=note_id, step="W3") from error
+
+
+def _stop_after_submit(
+    page: Page, error: Exception, note_id: str, step: str
+) -> NoReturn:
+    """W4 and W5: closes the browser context (an open Choose Project is
+    abandoned unselected), then raises the error with its step:
+    PartialWrite, except AccuracyBreach and GuardRefusal, which keep their
+    type. A PartialWrite that already names the step (before_write's) is
+    raised as it is."""
+    _close_context(page)
+    if isinstance(error, PartialWrite) and error.step == step:
+        raise error
+    if isinstance(error, GuardRefusal):
+        raise GuardRefusal(
+            "guard refused the action",
+            action=error.action,
+            reason=error.reason,
+            note_id=note_id,
+            step=step,
+        ) from error
+    if isinstance(error, AccuracyBreach):
+        raise AccuracyBreach(
+            "wrong value on read-back", field=error.field, note_id=note_id, step=step
+        ) from error
+    if isinstance(error, PoAgentError):
+        raise PartialWrite(
+            "Note not linked and solved",
+            reason=error.reason,
+            field=error.field,
+            note_id=note_id,
+            step=step,
+        ) from error
+    raise PartialWrite(
+        "Note not linked and solved", note_id=note_id, step=step
+    ) from error
+
+
+def _w4(
+    proceed: Proceed,
+    guard: ActionGuard,
+    page: Page,
+    login: tuple[str, str, str],
+    controls: Controls,
+) -> Locator:
+    note_id = proceed.note_id
+    try:
+        controls.before_write(note_id, "W4")  # the assignee check (D7)
+        window = driver.find_note_again(guard, page, *login, note_id)  # row 25
+        booking.link_project(guard, page, window, proceed.pln)
+        return window
+    except Exception as error:
+        _stop_after_submit(page, error, note_id, "W4")
+
+
+def _w5(
+    proceed: Proceed,
+    guard: ActionGuard,
+    page: Page,
+    login: tuple[str, str, str],
+    controls: Controls,
+    agent: str,
+    window: Locator,
+) -> None:
+    note_id = proceed.note_id
+    try:
+        controls.before_write(note_id, "W5")  # no assignee check (D7)
+        before = driver.log_line_count(window)
+        booking.mark_solved(guard, window, agent)
+        booking.check_solved_log(window, before)
+        driver.gone_from_pending(guard, page, *login, note_id)
+    except Exception as error:
+        _stop_after_submit(page, error, note_id, "W5")

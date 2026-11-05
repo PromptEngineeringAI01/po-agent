@@ -9,9 +9,8 @@ minimised copy or a hidden twin is never in scope. Fields with no accessible
 name are found by their visible label inside their window (open item 8);
 never by generated id or position.
 
-Not mapped (screen-map open item 5): the Link to Project search screens. The
-demo snapshots the page right after "Link to Project" so they can be mapped;
-a wrong guess here is a guard refusal or a timeout, never a wrong click.
+Link to Project selects the result's pln cell only (row 20; the guard
+allows nothing else); the --probe-link snapshots stay for mapping.
 
 Reads that fail become a fixed `UnexpectedScreen` (or `WriteNotStarted` /
 `PartialWrite` for a failed check), never a Playwright message or page text.
@@ -326,22 +325,20 @@ def _still_open(picker: Locator, page: Page, step: str, snapshots: bool) -> None
         raise UnexpectedScreen("Choose Project not open")
 
 
-def _link_choice(picker: Locator, pln: str) -> Locator:
-    """The one result naming the pln: a link, button, cell or text. The
-    results were not seen live yet: the demo snapshots them (S8-link-results)."""
-    candidates = (
-        picker.get_by_role("link", name=pln, exact=True),
-        picker.get_by_role("button", name=pln, exact=True),
-        picker.get_by_role("cell", name=pln, exact=True),
-        picker.get_by_text(pln, exact=True),
-    )
-    if not _shows(candidates[-1].first, LINK_TIMEOUT_MS):
+def _pln_cell(picker: Locator, pln: str) -> Locator:
+    """Row 20: the one result cell named exactly the pln (up to 60 s for the
+    results). Never the row: its name holds the Site Address, which could
+    contain "Close" (M4 gate: no link, button or text fallback)."""
+    cell = picker.get_by_role("cell", name=pln, exact=True)
+    if not _shows(cell.first, LINK_TIMEOUT_MS):
         raise UnexpectedScreen("project not listed in Choose Project")
-    save_snapshot(picker.page, "S8-link-results")
-    for choice in candidates:
-        if choice.visible.count() == 1:
-            return choice
-    raise UnexpectedScreen("project not listed once in Choose Project")
+    try:
+        listed = cell.visible.count()
+    except PlaywrightError:
+        raise UnexpectedScreen("Choose Project results not readable") from None
+    if listed != 1:
+        raise UnexpectedScreen("project not listed once in Choose Project")
+    return cell
 
 
 def _search_choose_project(
@@ -355,7 +352,8 @@ def _search_choose_project(
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
     if not _shows(picker, LINK_TIMEOUT_MS):
-        save_snapshot(page, "S8-link-opened")
+        if snapshots:  # --probe-link only: the booker never writes page text
+            save_snapshot(page, "S8-link-opened")
         raise UnexpectedScreen("Link to Project search did not show")
     _still_open(picker, page, "1-opened", snapshots)
     search = picker.get_by_role("textbox", name="Search/filter", exact=True)
@@ -379,19 +377,46 @@ def probe_link(guard: ActionGuard, page: Page, window: Locator, pln: str) -> Non
 
 
 def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
-    """Step 8: Link to Project -> Choose Project: search the pln, run the
-    search (a click on the window's heading moves focus, as the Note Pool's
-    search runs when focus leaves the box), select the pln; read back the
-    Note's project button and a Status that still starts "Pending" (live it
-    reads "Pending by <agent>")."""
+    """Step 8 / W4: Send Email unticked and read back, Link to Project ->
+    Choose Project: search the pln (Enter), Send Email read back again (it
+    ticks itself whenever a Note window opens, row 02), then the pln cell,
+    once; read back the Note's project button and a Status that still starts
+    "Pending" (live it reads "Pending by <user>"). Another pln on the button
+    is a wrong project: AccuracyBreach (docs/specs/spec.md §6)."""
     picker = _search_choose_project(guard, page, window, pln, snapshots=False)
-    choice = _link_choice(picker, pln)
-    _email_unticked(window)
-    guard.act("link_select_project", picker, choice)
-    if not _shows(window.get_by_role("button", name=pln, exact=True), LOAD_TIMEOUT_MS):
+    cell = _pln_cell(picker, pln)
+    _email_unticked(window)  # right before the committing select
+    guard.act("link_select_project", picker, cell)
+    project = window.get_by_role("button", name=driver.PROJECT_BUTTON)
+    if not _shows(project.first, LOAD_TIMEOUT_MS):
         raise PartialWrite("project link did not read back")
+    try:
+        shown = [name.strip() for name in project.all_inner_texts()]
+    except PlaywrightError:
+        raise PartialWrite("project link did not read back") from None
+    if shown != [pln]:
+        raise AccuracyBreach("Note linked to another project", field="project")
     if not read_status(window).startswith("Pending"):
         raise PartialWrite("Note status not Pending after linking")
+
+
+def _solved_log_line(window: Locator, before: int) -> bool:
+    """One more log line than `before`, the newest "Status changed: ..."
+    from Pending to Solved (row 14)."""
+    lines = driver._log_lines(window)
+    if lines.count() != before + 1:
+        return False
+    newest = lines.first
+    said = " ".join(newest.locator("em").inner_text().split())
+    states = [" ".join(s.split()) for s in newest.locator("strong").all_inner_texts()]
+    return "Status changed:" in said and states == ["Pending", "Solved"]
+
+
+def check_solved_log(window: Locator, before: int) -> None:
+    """W5's log read-back, polled for up to 15 s; `before` is the line count
+    read before Solved."""
+    if not driver._polls(window, lambda: _solved_log_line(window, before)):
+        raise PartialWrite("Solved log line did not read back")
 
 
 # Projects (rows 06, 07, 16, 25, 26)

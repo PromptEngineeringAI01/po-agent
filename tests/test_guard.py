@@ -959,3 +959,46 @@ def test_w2_actions_on_any_other_target_are_refused_without_acting(
     target = locate(page)
     assert refusal(guard, action, page.locator("section"), target, value) == reason
     assert page.locator("[data-clicked], [data-changed]").count() == 0
+
+
+# Task 4.4 (row 20): W4's select in Choose Project is the result's pln cell
+# only, never the row (its name holds the Site Address), a link or a button
+# (Joey, 4 Nov 2026).
+
+CHOOSE_PAGE = """
+<section><h3>Choose Project</h3>
+  <table><tbody><tr onclick="this.dataset.clicked='yes'">
+    <td onclick="this.dataset.clicked='yes'">pln_10001</td>
+    <td><a href="#" onclick="this.dataset.clicked='yes'">pln_10002</a></td>
+    <td><button onclick="this.dataset.clicked='yes'">pln_10003</button></td>
+    <td>Sample Lane Sampleville</td>
+  </tr></tbody></table>
+</section>
+"""
+
+
+def test_link_select_is_allowed_on_the_pln_cell(page, guard):
+    page.set_content(CHOOSE_PAGE)
+    cell = page.get_by_role("cell", name="pln_10001", exact=True)
+    verdict = guard.vet("link_select_project", page.locator("section"), cell)
+    assert isinstance(verdict, Allowed)
+
+
+@pytest.mark.parametrize(
+    "locate",
+    [
+        lambda p: p.get_by_role("row"),
+        lambda p: p.get_by_role("link", name="pln_10002", exact=True),
+        lambda p: p.get_by_role("button", name="pln_10003", exact=True),
+    ],
+    ids=["row", "link", "button"],
+)
+def test_link_select_on_anything_but_a_cell_is_refused_without_acting(
+    page, guard, locate
+):
+    page.set_content(CHOOSE_PAGE)
+    scope = page.locator("section")
+    assert refusal(guard, "link_select_project", scope, locate(page)) == (
+        Refusal.WRONG_ELEMENT
+    )
+    assert page.locator("[data-clicked]").count() == 0

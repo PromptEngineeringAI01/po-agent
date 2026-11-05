@@ -44,6 +44,19 @@ faked, as in tests/test_assignee_offline.py. The `Proceed` comes from
   dialog's Hold never pressed. Confirm once -> the row shows Un-Hold and a
   Status starting "On-hold" with the note. Every error from W3 closes the
   context and carries step W3.
+- W4 (4.4): `before_write(note_id, "W4")` runs the assignee check (D7) ->
+  back to the Note window by "Finding a Note again" (row 25) -> Send Email
+  unticked and read back -> Link to Project -> Choose Project: the pln
+  searched with Enter -> Send Email read back again -> the one cell named
+  exactly the pln, clicked once (never the row: its Site Address holds
+  "Close") -> the project button reads the pln and Status still starts
+  Pending. W5: `before_write(note_id, "W5")` (no assignee check) -> Send
+  Email read back -> Solved once -> "Solved by <agent>", a new "Status
+  changed ... Pending to Solved" log line, Solved disabled, and the Note
+  ID search (Status filter read back Pending) with no row whose ID equals
+  the Note ID. Every W4/W5 error closes the context and is PartialWrite
+  with its step, except AccuracyBreach (another pln on the project button)
+  and GuardRefusal, which keep their type.
 """
 
 import importlib.util
@@ -394,6 +407,8 @@ function openHold(task) {{
 function confirmHold(task) {{
   const h = FAKE.hold;
   document.body.dataset.confirmed = (Number(document.body.dataset.confirmed || 0) + 1).toString();
+  // Tells the W4 kill-switch test that the hold is confirmed.
+  console.log('held');
   const note = document.getElementById('hold_note').value;
   if (!h.closes) return;
   const dialog = document.getElementById('hold');
@@ -882,3 +897,409 @@ def test_a_guard_refusal_at_w3_keeps_its_type_and_closes_the_context(
     assert guard.history[-1] == ("confirm_hold", Refusal.TARGET_AMBIGUOUS)
     assert ("confirm_hold", "done") not in guard.history
     assert page.is_closed()
+
+
+# W4 and W5 (task 4.4): back to the Note window (row 25), Link to Project
+# through Choose Project (row 20), then Solved (row 14).
+
+W4 = [
+    "open_note",
+    "untick_send_email_notification",
+    "link_to_project",
+    "link_search_project",
+    "submit_link_search",
+    "link_select_project",
+]
+W5 = ["mark_solved"]
+PERSON = "Fake Person"
+# Row 20: the one result row's Site Address. A "... Close" street: the row's
+# own name would trip the denylist, so only the pln cell can be clicked.
+SITE = "1 Sample Close Sampleville"
+# The Note window as reopened (rows 02, 13, 14, 20), changed by `note`:
+# `results` is the pln cell of each Choose Project result row; `linksTo` the
+# project button the select shows; `reticks` ticks Send Email Notification
+# again when the search runs; `extraLink` / `extraSolved` add a second Link
+# to Project / Solved button; after Solved: `solvedStatus`, `solvedLog` (a
+# new "Status changed" line) and `solvedDisables` (Solved off, Pending on).
+NOTE_WINDOW: dict[str, object] = {
+    "results": [PLN],
+    "linksTo": PLN,
+    "statusAfterLink": f"Pending by {AGENT}",
+    "reticks": False,
+    "extraLink": False,
+    "extraSolved": False,
+    "pickerOpens": True,
+    "solvedStatus": f"Solved by {AGENT}",
+    "solvedLog": True,
+    "solvedDisables": True,
+}
+
+
+def pool_row(note_id: str, assignee: str, project: str = "---") -> NotePoolRow:
+    return NotePoolRow(
+        note_id=note_id, subject_note="fake", project=project, assignee=assignee
+    )
+
+
+def note_pool_page(
+    rows: tuple[NotePoolRow, ...], status_filter: str, note: dict[str, object]
+) -> str:
+    """base_url reloaded (row 25): the Note Pool with the Note ID searched,
+    listing `rows`, and the Note window behind the Note's ID cell, opened
+    fresh (Send Email Notification ticked, row 02)."""
+    n = {**NOTE_WINDOW, **note}
+    listed = "".join(
+        f"<tr><td onclick=\"document.getElementById('note').hidden = false\">{row.note_id}</td>"
+        f"<td>{row.subject_note}</td><td>{row.project}</td><td>{row.assignee}</td></tr>"
+        for row in rows
+    )
+    status = "".join(
+        f"<option{' selected' if s == status_filter else ''}>{s}</option>"
+        for s in ("Pending", "Solved", "Discard")
+    )
+    footer = (
+        f"<div>Page 1 of 1({len(rows)} Items)</div>"
+        if rows
+        else "<div>No record could be found.</div>"
+    )
+    extra_link = "<button>Link to Project</button>" if n["extraLink"] else ""
+    extra_solved = "<div><button>Solved</button></div>" if n["extraSolved"] else ""
+    return f"""
+<ul><li><span>Project</span><ul hidden><li>Note Pool</li><li>Projects</li></ul></li></ul>
+<div>
+  <button>New Note</button><input aria-label="Search/filter" value="{NOTE_ID}">
+  <select name="filter_allocation_pool_id"><option selected>All Pools</option><option>Agent Pool</option></select>
+  <select name="filter_status">{status}</select>
+  <select name="filter_lock_status"><option selected>All</option><option>Locked</option></select>
+  <button>Refresh</button>
+  <table><thead><tr><th>ID</th><th>Subject/Note</th><th>Project</th><th>Assignee</th></tr></thead>
+    <tbody>{listed}</tbody></table>
+  {footer}
+</div>
+<div id="note" hidden><div>
+  <h3>Note {NOTE_ID} - created on 12 Oct 2026</h3>
+  <div>
+    <h3>[B1 Homes] Order 2600001B/048</h3>
+    <div><strong>Assignee:</strong> <span>{AGENT}</span> <button>Unlink</button></div>
+    <div role="group" aria-label="Status buttons">
+      <button id="pending" disabled>Pending</button><button id="solved" onclick="solve()">Solved</button><button>Discard</button>
+    </div>{extra_solved}
+    <select><option>--Select User--</option><option selected>{AGENT}</option></select>
+    <select><option selected>--Select Pool--</option><option>Agent Pool</option></select>
+    <button>Assign</button>
+    <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"> Send Email Notification</span>
+    <span id="link"><button onclick="openPicker()">Link to Project</button>{extra_link}</span>
+    <ul><li><strong>Status:</strong> <span id="status">Pending by {PERSON}</span></li></ul>
+    <div><h4>Logs</h4><ul id="logs">
+      <li><em>04 Nov 2026 09:00 User Assigned: (By {AGENT})</em> From <strong>Agent Pool</strong> to <strong>{AGENT}</strong><hr></li>
+    </ul></div>
+  </div>
+</div>{CLOSE}</div>
+<div id="picker"></div>
+<script>
+const NOTE = {json.dumps(n)};
+function count(name) {{
+  document.body.dataset[name] = (Number(document.body.dataset[name] || 0) + 1).toString();
+}}
+function emailed() {{
+  if (document.getElementById('email').checked) document.body.dataset.emailed = 'yes';
+}}
+function openPicker() {{
+  if (!NOTE.pickerOpens) return;
+  setTimeout(() => {{
+    document.getElementById('picker').innerHTML = '<div><div><h3>Choose Project</h3>'
+      + '<input aria-label="Search/filter" onkeydown="linkKey(event, this.value)">'
+      + '<input aria-label="After..."><input aria-label="Before...">'
+      + '<table><tbody id="results"></tbody></table></div>{CLOSE}</div>';
+  }}, 300);
+}}
+function linkKey(event, text) {{
+  if (event.key !== 'Enter') return;
+  if (NOTE.reticks) document.getElementById('email').checked = true;
+  if (text !== '{PLN}') return;
+  setTimeout(() => {{
+    document.getElementById('results').innerHTML = NOTE.results.map((pln) =>
+      '<tr><td onclick="pick()">' + pln + '</td><td>2600001B</td><td>01/11/2026</td>'
+      + '<td>&lt;project creator&gt;</td><td></td><td>B1 Homes</td><td>{SITE}</td><td>6000</td></tr>').join('');
+  }}, 300);
+}}
+function pick() {{
+  count('picked');
+  emailed();
+  // Tells the W5 kill-switch test that the Note is linked.
+  console.log('linked');
+  document.getElementById('picker').innerHTML = '';
+  setTimeout(() => {{
+    document.getElementById('link').innerHTML = '<button>' + NOTE.linksTo
+      + '</button><button>Change Project</button><button>Unlink</button>';
+    document.getElementById('status').textContent = NOTE.statusAfterLink;
+  }}, 300);
+}}
+function solve() {{
+  count('solved');
+  emailed();
+  setTimeout(() => {{
+    document.getElementById('status').textContent = NOTE.solvedStatus;
+    if (NOTE.solvedLog) {{
+      const li = document.createElement('li');
+      li.innerHTML = '<em>04 Nov 2026 09:05 Status changed: (By {AGENT})</em> From <strong>Pending</strong> to <strong>Solved</strong><hr>';
+      document.getElementById('logs').prepend(li);
+    }}
+    if (NOTE.solvedDisables) {{
+      document.getElementById('solved').disabled = true;
+      document.getElementById('pending').disabled = false;
+    }}
+  }}, 300);
+}}
+</script>"""
+
+
+class FakeNotePool:
+    """`driver.search_note` through W5. The first call is W1's assignee
+    check, as FakeSearch. Every later call (W4's check, W4's way back to the
+    Note, W5's read-back) reloads base_url, as live: the page becomes
+    `note_pool_page`, the Note listed with `w4_assignee` until Solved was
+    pressed, then `after_solved`. Before each reload it keeps what the page
+    recorded (`seen`: picked, solved, emailed). Records how many guard
+    actions had run at each call."""
+
+    def __init__(
+        self,
+        guard: ActionGuard,
+        *,
+        w4_assignee: str = AGENT,
+        # A Note whose ID only contains the Note ID: not the Note.
+        after_solved: tuple[NotePoolRow, ...] = (pool_row(f"{NOTE_ID}2", PERSON),),
+        status_filter: str = "Pending",
+        note: dict[str, object] | None = None,
+    ) -> None:
+        self.guard = guard
+        self.w4_assignee = w4_assignee
+        self.after_solved = after_solved
+        self.status_filter = status_filter
+        self.note = note or {}
+        self.actions_before: list[int] = []
+        self.seen: dict[str, str] = {}
+
+    def __call__(self, guard, page, base_url, username, password, note_id):
+        self.actions_before.append(len(self.guard.history))
+        if len(self.actions_before) == 1:
+            rows = (pool_row(note_id, AGENT),)
+            return "panel", driver.NotePoolList(rows=rows, total=1, pages=1)
+        for name in ("picked", "solved", "emailed"):
+            value = page.locator("body").get_attribute(f"data-{name}")
+            if value is not None:
+                self.seen[name] = value
+        if "solved" in self.seen:
+            rows = self.after_solved
+        else:
+            rows = (pool_row(note_id, self.w4_assignee),)
+        page.set_content(note_pool_page(rows, self.status_filter, self.note))
+        listing = driver.NotePoolList(rows=rows, total=len(rows), pages=1)
+        return driver.note_pool_panel(page), listing
+
+
+@pytest.fixture
+def short_waits(monkeypatch) -> None:
+    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(booking, "LINK_TIMEOUT_MS", 2000)
+
+
+def through_w5(monkeypatch, guard: ActionGuard, **fake: object) -> FakeNotePool:
+    pool = FakeNotePool(guard, **fake)  # type: ignore[arg-type]
+    monkeypatch.setattr(driver, "search_note", pool)
+    return pool
+
+
+BEFORE_W4 = REOPEN + FILL + W2 + W3
+
+
+def test_w4_w5_link_the_pln_cell_mark_solved_and_read_back(serve, guard, monkeypatch):
+    pool = through_w5(monkeypatch, guard)
+    served = serve(tasks=[CANCELLED])
+
+    task_no = run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert task_no == NEW_TASK
+    assert actions(guard) == BEFORE_W4 + W4 + W5
+    # W1's check; W4's check before any W4 action, then the way back to the
+    # Note (row 25); no check at W5 (D7), then W5's read-back after Solved.
+    w4 = len(BEFORE_W4)
+    assert pool.actions_before == [0, w4, w4, w4 + len(W4) + len(W5)]
+    # The cell, once (the row would have been refused); Solved once; no
+    # notification sent by either.
+    assert pool.seen == {"picked": "1", "solved": "1"}
+
+
+@pytest.mark.parametrize(
+    "fake",
+    [
+        # Someone took the Note during W1-W3 (D7): caught at the W4 check.
+        {"w4_assignee": PERSON},
+        # No cell named exactly the pln (a longer pln only contains it).
+        {"note": {"results": ["pln_100011"]}},
+        {"note": {"results": [PLN, PLN]}},
+        # The box ticks itself again: read back just before the select.
+        {"note": {"reticks": True}},
+    ],
+    ids=["note-taken", "no-pln-cell", "two-pln-cells", "email-ticked-again"],
+)
+def test_before_the_link_select_a_screen_not_as_mapped_links_nothing(
+    serve, guard, monkeypatch, short_waits, fake
+):
+    through_w5(monkeypatch, guard, **fake)
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.step == "W4"
+    assert "link_select_project" not in actions(guard)
+    assert served[0].is_closed()
+
+
+def test_a_choose_project_that_never_opens_saves_no_page_snapshot(
+    serve, guard, monkeypatch, short_waits, tmp_path
+):
+    # The booker never writes page text to disk (decisions, 3 Nov 2026, M4
+    # gate): the demo's snapshot on a missing Choose Project is demo only.
+    snapshots = tmp_path / "captures"
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", snapshots)
+    through_w5(monkeypatch, guard, note={"pickerOpens": False})
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.step == "W4"
+    assert actions(guard)[-1] == "link_to_project"
+    assert not snapshots.exists()
+    assert served[0].is_closed()
+
+
+def test_after_the_link_select_a_status_not_pending_is_a_partial_write(
+    serve, guard, monkeypatch, short_waits
+):
+    through_w5(monkeypatch, guard, note={"statusAfterLink": f"Solved by {PERSON}"})
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.step == "W4"
+    assert actions(guard).count("link_select_project") == 1
+    assert "mark_solved" not in actions(guard)
+    assert served[0].is_closed()
+
+
+def test_a_project_button_with_another_pln_is_an_accuracy_breach(
+    serve, guard, monkeypatch, short_waits
+):
+    through_w5(monkeypatch, guard, note={"linksTo": "pln_10009"})
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(AccuracyBreach) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.step == "W4"
+    assert "mark_solved" not in actions(guard)
+    assert served[0].is_closed()
+
+
+@pytest.mark.parametrize(
+    "fake",
+    [
+        {"note": {"solvedStatus": f"Solved by {PERSON}"}},
+        {"note": {"solvedLog": False}},
+        {"note": {"solvedDisables": False}},
+        # Still listed under Pending: the row's ID equals the Note ID.
+        {"after_solved": (pool_row(NOTE_ID, AGENT, PLN),)},
+        # Searched under another Status: an empty list proves nothing.
+        {"status_filter": "Solved"},
+    ],
+    ids=[
+        "solved-by-someone-else",
+        "no-log-line",
+        "solved-still-enabled",
+        "still-pending",
+        "status-filter-not-pending",
+    ],
+)
+def test_after_solved_a_read_back_not_as_mapped_is_a_partial_write(
+    serve, guard, monkeypatch, short_waits, fake
+):
+    through_w5(monkeypatch, guard, **fake)
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.step == "W5"
+    # Made once, never retried.
+    assert actions(guard).count("mark_solved") == 1
+    assert served[0].is_closed()
+
+
+@pytest.mark.parametrize(
+    ("message", "step", "last", "never"),
+    [
+        ("held", "W4", "confirm_hold", "open_note"),
+        ("linked", "W5", "link_select_project", "mark_solved"),
+    ],
+)
+def test_the_kill_switch_at_w4_or_w5_is_a_partial_write(
+    serve, guard, monkeypatch, tmp_path, message, step, last, never
+):
+    # The switch goes off once the previous write is made, before the step's
+    # before_write; W5's before_write still reads it, with no assignee check.
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    toml = (CONFIG_DIR / "test.toml").read_text("utf-8")
+    (config_dir / "test.toml").write_text(toml, "utf-8")
+    pool = through_w5(monkeypatch, guard)
+    served = serve(tasks=[CANCELLED])
+    page = served[0]
+
+    def switch_off(console: ConsoleMessage) -> None:
+        if console.text == message:
+            off = toml.replace("enabled = true", "enabled = false")
+            (config_dir / "test.toml").write_text(off, "utf-8")
+
+    page.on("console", switch_off)
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(
+            served, guard, proceed_for_p1(), stop_after="W5", config_dir=config_dir
+        )
+
+    assert caught.value.step == step
+    assert actions(guard)[-1] == last
+    assert never not in actions(guard)
+    # The switch is read before W4's assignee check.
+    assert len(pool.actions_before) == (1 if step == "W4" else 3)
+    assert page.is_closed()
+
+
+@pytest.mark.parametrize(
+    ("note", "action", "step"),
+    [
+        ({"extraLink": True}, "link_to_project", "W4"),
+        ({"extraSolved": True}, "mark_solved", "W5"),
+    ],
+)
+def test_a_guard_refusal_at_w4_or_w5_keeps_its_type_and_closes_the_context(
+    serve, guard, monkeypatch, short_waits, note, action, step
+):
+    # A second button of the same name: the click is ambiguous.
+    through_w5(monkeypatch, guard, note=note)
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(GuardRefusal) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.reason == Refusal.TARGET_AMBIGUOUS
+    assert caught.value.step == step
+    # Refused, so never pressed.
+    assert guard.history[-1] == (action, Refusal.TARGET_AMBIGUOUS)
+    assert served[0].is_closed()

@@ -546,6 +546,29 @@ def find_note_again(
     return open_note(guard, page, panel, note_id)
 
 
+def gone_from_pending(
+    guard: ActionGuard,
+    page: Page,
+    base_url: str,
+    username: str,
+    password: str,
+    note_id: str,
+) -> None:
+    """W5's last read-back (row 14): search_note, the Status filter read
+    back at Pending (never chosen: it lists Discard), and no row whose ID
+    cell equals the Note ID. Not find_note_again, which needs the Note."""
+    panel, listing = search_note(guard, page, base_url, username, password, note_id)
+    try:
+        status = _chosen(panel, "filter_status")
+    except PlaywrightError:
+        raise UnexpectedScreen("Note Pool filters not readable") from None
+    if status != FILTER_DEFAULTS["filter_status"]:
+        raise UnexpectedScreen("Note Pool not filtered on Pending", note_id=note_id)
+    # Only page 1 is read: a second page could still hold the Note.
+    if listing.pages != 1 or any(row.note_id == note_id for row in listing.rows):
+        raise UnexpectedScreen("Note still Pending after Solved", note_id=note_id)
+
+
 def exact_row(listing: NotePoolList, note_id: str) -> NotePoolRow | None:
     """The one row whose ID cell equals the Note ID, else None (none, or the
     same ID twice): the search matches substrings, so 300001 also lists
