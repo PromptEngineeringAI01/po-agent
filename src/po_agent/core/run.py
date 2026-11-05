@@ -55,6 +55,7 @@ from po_agent.core.config import Config
 from po_agent.core.errors import (
     AccuracyBreach,
     GuardRefusal,
+    MorePages,
     PartialWrite,
     PoAgentError,
     UnexpectedScreen,
@@ -106,7 +107,10 @@ def oldest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote,
 def _read_eligible(
     guard: ActionGuard, panel: Locator, config: Config, summary: output.RunSummary
 ) -> tuple[EligibleNote, ...]:
-    """The run's one Note Pool read: step 0 on every row, counts printed."""
+    """The run's one Note Pool read: step 0 on every row, counts printed.
+    A second page is never read, so it stops the run before any Note is
+    taken: MorePages, ALERT MORE_PAGES, exit 1 (7.2; decisions, 5 Nov
+    2026). In run modes the stale-Note read, a superset, stops first."""
     listing = driver.read_note_pool(guard, panel)
     found = eligible_notes(listing.rows, config.title_rule, config.pool_name)
     summary.seen = len(listing.rows)
@@ -117,10 +121,7 @@ def _read_eligible(
         eligible=len(found),
     )
     if listing.pages > 1:
-        output.info(
-            "note pool has more pages: only page 1 of {pages} read",
-            pages=listing.pages,
-        )
+        raise MorePages("Note Pool has more pages: page 2 not read")
     return found
 
 

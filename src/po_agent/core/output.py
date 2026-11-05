@@ -28,7 +28,6 @@ InfoMessage = Literal[
     "logged in",
     "note pool filters set",
     "note pool read: {rows} rows, {eligible} eligible",
-    "note pool has more pages: only page 1 of {pages} read",
     "kill switch on: run not started",
     "kill switch on: run stopped",
     "outside the run window: run not started",
@@ -64,6 +63,7 @@ AlertKind = Literal[
     "ACCURACY_BREACH",
     "GUARD_REFUSAL",
     "UNEXPECTED_SCREEN",
+    "MORE_PAGES",
     "LOGIN_FAILED",
     "CONFIG",
 ]

@@ -58,6 +58,14 @@ class UnexpectedScreen(PoAgentError):
     exit_code = 1
 
 
+class MorePages(UnexpectedScreen):
+    """The Note Pool has a second page, which is never read: ALERT
+    MORE_PAGES, exit 1, before any Note is taken (7.2; decisions, 5 Nov
+    2026)."""
+
+    exit_code = 1
+
+
 class WriteNotStarted(PoAgentError):
     exit_code = 1
 
