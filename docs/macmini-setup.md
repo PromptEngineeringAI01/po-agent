@@ -128,16 +128,16 @@ They go into `poagent`'s login Keychain (keyring service `po-agent`; names as `S
 
 ## 8. The scheduled job (launchd)
 
-**The wrapper** `scripts/macmini-run.sh <run|spike|decide-only>` (in the repo from M1) does, in order:
+**The wrapper** `scripts/macmini-run.sh <run|spike|decide-only>` (any other argument: usage message, exit 2, nothing run) does, in order:
 
 1. `git pull --ff-only` on `main` in `~/po-agent`, so `enabled = false` on `main` still stops the next run.
-2. `uv sync --locked`, then `uv run playwright install chromium` (a no-op unless Playwright moved in `uv.lock`).
-   **If step 1 or 2 fails, the agent doesn't run** (stale code would ignore `enabled = false` on `main`): the wrapper writes a fixed line to `runs.log` and opens the alert issue (exit code 2).
-3. Runs the agent with `--site test` and never `--detailed-log`: mode `run` → `uv run po-agent run`, `spike` → `uv run po-agent spike`, `decide-only` → `uv run po-agent run --decide-only`. It has a 20-minute hard limit. macOS has no GNU `timeout`, so the wrapper implements it, starting the agent in its own process group and killing the whole group (Python and Chromium) at the limit, so nothing is left to overlap the next run.
-4. Appends the run's stdout (the stdout contract only: no PDF text, addresses or Note bodies) to `~/Library/Logs/po-agent/runs.log`, with a timestamp line per run. The agent's stderr goes to `/dev/null`: the agent writes nothing there by design, and a crash's text could quote page content.
-5. If the run printed an `ALERT` line or exited non-zero: `gh issue create --label po-agent-alert`, titled `po-agent alert <run_id, or "no run_id">`, whose body is only the `ALERT` lines and the exit code. GitHub emails Joey.
+2. `uv sync --locked`, then `uv run playwright install chromium` (a no-op unless Playwright moved in `uv.lock`). Their own output goes to `launchd.log`.
+   **If step 1 or 2 fails, the agent doesn't run** (stale code would ignore `enabled = false` on `main`): the wrapper writes `wrapper: setup failed (<step>), agent not run` to `runs.log` and opens the alert issue (exit code 2).
+3. Runs the agent with `--site test` and never `--detailed-log`: mode `run` → `uv run po-agent run`, `spike` → `uv run po-agent spike`, `decide-only` → `uv run po-agent run --decide-only`. It has a 20-minute hard limit. macOS has no GNU `timeout` or `setsid`, so the wrapper implements it: bash job control (`set -m`) starts the agent in its own process group, and the wrapper kills the whole group (uv, Python and Playwright's driver; SIGTERM, then SIGKILL 10 seconds later) at the limit, when the agent ends and when the wrapper itself is stopped. Playwright starts Chromium detached, in a group of its own, so the wrapper then also kills every Playwright browser of `poagent` (`pkill -KILL -u <uid> -f ms-playwright/`, logged as `wrapper: leftover Playwright browser killed` when it finds one). Nothing is left to overlap the next run. A run killed at the limit exits 1 and adds `wrapper: agent killed at the 1200s limit` to `runs.log`.
+4. Appends the run's stdout (the stdout contract only: no PDF text, addresses or Note bodies) to `~/Library/Logs/po-agent/runs.log`, after a timestamp line per run (`=== <time> macmini-run.sh <mode> ===`). The agent's stderr goes to `/dev/null`: the agent writes nothing there by design, and a crash's text could quote page content.
+5. If the run printed an `ALERT` line or exited non-zero: `gh issue create --label po-agent-alert`, titled `po-agent alert <run_id, or "no run_id">`, whose body is only the `ALERT` lines, the wrapper's own fixed line (failed setup or time limit) if there is one, and `exit code: <n>`. GitHub emails Joey. If `gh` fails, `runs.log` gets `wrapper: alert issue not opened`.
 
-It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`) because launchd starts jobs with a minimal environment, with an optional `MACMINI_RUN_PATH_PREFIX` in front so the wrapper's tests can use stub commands.
+It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`, then the system folders) because launchd starts jobs with a minimal environment, with an optional `MACMINI_RUN_PATH_PREFIX` in front so the wrapper's tests (`tests/test_macmini_wrapper.py`) can use stub commands. The tests also shorten the limit with `MACMINI_RUN_LIMIT_S`; the Mac Mini never sets either.
 
 **The job** is a LaunchAgent in `poagent`'s own session (not a LaunchDaemon: keyring needs the login Keychain, which is only unlocked while `poagent` is logged in). Label `au.com.prompteng.po-agent`; the plist is in the repo as `scripts/au.com.prompteng.po-agent.plist`:
 

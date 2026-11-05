@@ -44,7 +44,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **1.6** Output contract, `run_id`, `po-agent` CLI (exit 2 on config/secrets; plain `run` refuses until 4.5; catch-all; nothing on stderr; download-dir sweep) · step
 - [x] **1.7** Eligibility, step 0 (test + live title rules, Project `---`, Assignee = pool) · step
 - [x] **1.8** Spike: guarded login, Note Pool filters read back (Search empty), list read once, RUN_SUMMARY (seam-2 `spike`); seam-2 failure reports scrubbed to the exception type; explicit `-m testsite` errors on missing secrets · step · needs M0b.1 merged
-- [ ] **1.9** `scripts/macmini-run.sh` (mode mapping, stop on failed pull, process-group kill, stderr dropped) + launchd plist, with stub-command tests · step
+- [x] **1.9** `scripts/macmini-run.sh` (mode mapping, stop on failed pull, process-group kill, stderr dropped) + launchd plist, with stub-command tests · step
 - [ ] **1.10** Laptop secrets, guardrail prompts, Mac Mini setup, spike as `poagent` (S1), then **unload the job** · by hand
 
 **Checkpoint M1:** check green, CI green on `main` (S2); guardrails behave; laptop spike eligible = 3; Mac Mini S1; job unloaded; review + security review; Joey OK.
