@@ -196,7 +196,7 @@ def test_modes_map_to_the_cli(box, mode, agent_call):
     result = box.run(mode)
 
     assert result.returncode == 0
-    assert box.calls()[-1] == agent_call
+    assert box.calls()[-3:] == [agent_call, *PING_CALLS]
 
 
 @pytest.mark.parametrize("args", (("demo",), ("",), (), ("run", "--detailed-log")))
