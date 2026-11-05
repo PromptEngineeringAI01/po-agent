@@ -151,6 +151,9 @@ def spike(
 class _Progress:
     note_id: str | None = None  # the Note being worked on
     taken: bool = False  # it may be assigned to the agent
+    # The booker's own error once it is past the Submit click, kept where it
+    # was raised: a later cleanup error must not hide it (4.5 review).
+    submitted: BaseException | None = None
 
 
 class _Browser:
@@ -174,8 +177,12 @@ class _Browser:
 
     def close(self) -> None:
         browser, self._open = self._open, None
-        if browser is not None:
+        if browser is None:
+            return
+        try:
             browser.__exit__(None, None, None)
+        except Exception:  # noqa: BLE001 - e.g. Chromium already gone
+            pass  # a failed close never hides the error that stopped the run
 
     def fresh(self) -> Page:
         self.close()
@@ -288,8 +295,11 @@ def _note_loop(
                     summary.booked += 1
         finally:
             browser.close()
-    except BaseException as error:
-        submitted = _submitted(error)
+    except BaseException as caught:
+        # Past the Submit click, the booker's own error is the one reported,
+        # whatever a cleanup raised after it.
+        error = progress.submitted or caught
+        submitted = progress.submitted is not None or _submitted(error)
         if submitted:
             summary.partial += 1
         # The return first: nothing else in here may stop it. Ctrl+C or a
@@ -319,7 +329,9 @@ def _note_loop(
                 ) from error
             if error.note_id is None:
                 error.note_id = identifier(progress.note_id)
-            raise
+            # The booker's, even when a cleanup raised after it; its own
+            # cause (or `from None`) is kept for the traceback.
+            raise error from error.__cause__
         if isinstance(error, controls.KillSwitch) and returned:
             output.info("kill switch on: run stopped")
             return 0
@@ -378,9 +390,17 @@ def _one_note(
     if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
     if config_dir is not None and isinstance(decision, Proceed):
-        task_no = _book(guard, page, config, login, decision, config_dir)
-        log.flush(note_id=note_id, step="W5")
+        try:
+            task_no = _book(guard, page, config, login, decision, config_dir)
+        except BaseException as error:
+            if _submitted(error):
+                progress.submitted = error
+            raise
         progress.taken = False  # booked: linked and Solved, never returned
+        try:
+            log.flush(note_id=note_id, step="W5")
+        except OSError:
+            pass  # the NOTE line still goes out
         return output.Note(
             note_id=note_id,
             outcome="booked",
@@ -434,7 +454,9 @@ def _book(
         stop_after="W5",
     )
     if task_no is None:  # stop_after W5 always returns it
-        raise PartialWrite("no task number after W5", note_id=proceed.note_id)
+        raise PartialWrite(
+            "no task number after W5", note_id=proceed.note_id, step="W5"
+        )
     return task_no
 
 
