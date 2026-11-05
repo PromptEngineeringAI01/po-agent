@@ -2,7 +2,7 @@
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
-After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` and `tasks/plan.md` changes. Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
 
 ## Status
 
@@ -28,6 +28,21 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
 - **5 Nov 2026: run mode built** (task 4.5; entry below). Plain `run` books.
+- **5 Nov 2026: a lighter build process** (entry below).
+
+## 5 Nov 2026 - A lighter build process (Joey)
+
+Joey: the process is heavier than this project needs. He can't judge test code, so stopping for his review slows the work without adding safety. The rule: keep what protects MySys and real data, and what costs Claude but not Joey; drop the steps that cost Joey's time.
+
+- **No review stop for tests.** Every remaining task writes its tests first, commits them as `test:` and carries on. Claude asks Joey only for a behaviour choice that is his (as in 4.5: what the run prints for a stopped Note), in plain words, one question at a time, with a recommendation. The PR's Intent opens with three to five plain-language lines on what changed and what the tests prove. Replaces the review-stop list of 24 Oct 2026 (1.2, 1.4, 2.2-2.5, M3, M4, 5.2).
+- **One review round, lighter by risk.** High: one second-model review; the fresh-session `/code-review` is dropped. Medium: `/agent-skills:review`. Low: `check.py` and `/verify-pr` only.
+- **By-hand checks only where they belong:** the by-hand tasks (4.6, M6) and the test-site reset. A case an offline or seam-2 test covers isn't checked by hand again (e.g. 4.5's mid-run takeover, S5 before M6).
+- **`/goal` is optional** for the code half (offline only; still never against the test site).
+- **Less doc ceremony:** a behaviour change needs this log's entry plus the `SPEC.md` lines it changes; `tasks/plan.md` gets no "Built" paragraph per task, only the tick in `tasks/todo.md`.
+- **Reports to Joey** are in Traditional Chinese (code and repo text stay English).
+- **Kept, unchanged:** Must never 1-9 (the guard, test site only, no secrets or real data out, nothing returned after Submit, the merge rules), `check.py` and CI, `/verify-pr` before every merge, tests first in their own `test:` commit (Claude's cost, and `/verify-pr` uses it for Must never #8), and the test-site rules (one agent at a time, reset first, no retry loops against MySys).
+- **Loosens?** Yes, review steps (not a safety control in the code). Joey's to merge, since the matching `CLAUDE.md` TDD line and `.claude/skills/verify-pr/` step 4 change with it and are his to edit.
+- Carried in: `docs/workflow.md` (Production build loop), `tasks/plan.md` (Cross-cutting rules, TDD), `.claude/skills/start-task/SKILL.md` (the brief). Joey edits `CLAUDE.md` (TDD) and `.claude/skills/verify-pr/SKILL.md` by hand.
 
 ## 5 Nov 2026 - Run mode: book end to end (Joey, task 4.5)
 

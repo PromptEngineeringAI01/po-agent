@@ -38,7 +38,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 ## TDD
 
 - Write the failing test first, run it, and show it fails for the expected reason.
-- STOP for my review before writing code only on 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2 (the guard, the hooks, the decision engine and readers, anything that acts in MySys). After I approve, commit the test, then write the code. On every other task, commit the test and carry on.
+- Don't stop for my review of the tests: commit the test and carry on. Ask me only for a behaviour choice that is mine, in plain words, with your recommendation (decisions, 5 Nov 2026, lighter process).
 - Test changes go in their own commit.
 
 ## Conventions
@@ -48,7 +48,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 - Secrets: env var `PO_AGENT_<NAME>` first, else keyring service `po-agent`; names `anthropic_api_key`, `mysys_test_username`, `mysys_test_password`. Never use the name `ANTHROPIC_API_KEY`, except in `tests/test_config_secrets.py`, which sets it to prove it's ignored (decisions, 16 Oct 2026, D4).
 - Branch per task from up-to-date `main`; one task per session; Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - `.claude/settings.json` ships with permission rules (incl. the Playwright CLI deny list); M1 adds the hooks. From M1 on, files in `.claude/` are changed only by Joey, by hand, except `.claude/skills/` (not `skills/verify-pr/`), which Claude may edit (decisions, 2 Nov 2026).
-- A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control (the guard, the hooks, the repo-data check, CI, a Must-never rule), needs a dated entry in `docs/decisions.md`, plus `SPEC.md` and `tasks/plan.md`, in the same commit. Tightening a dev-tooling rule needs only a clear commit message.
+- A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control (the guard, the hooks, the repo-data check, CI, a Must-never rule), needs a dated entry in `docs/decisions.md`, plus the `SPEC.md` lines it changes, in the same commit. Tightening a dev-tooling rule needs only a clear commit message.
 - New text uses a plain dash "-", not the em dash "—".
 - Never hand-edit `uv.lock` or other generated files; change them only through their tool (uv).
 - An unrelated failure you notice (lint, a flaky test): report it, don't fix it in this task.
