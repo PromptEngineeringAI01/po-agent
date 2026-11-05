@@ -928,6 +928,7 @@ NOTE_WINDOW: dict[str, object] = {
     "reticks": False,
     "extraLink": False,
     "extraSolved": False,
+    "pickerOpens": True,
     "solvedStatus": f"Solved by {AGENT}",
     "solvedLog": True,
     "solvedDisables": True,
@@ -1004,6 +1005,7 @@ function emailed() {{
   if (document.getElementById('email').checked) document.body.dataset.emailed = 'yes';
 }}
 function openPicker() {{
+  if (!NOTE.pickerOpens) return;
   setTimeout(() => {{
     document.getElementById('picker').innerHTML = '<div><div><h3>Choose Project</h3>'
       + '<input aria-label="Search/filter" onkeydown="linkKey(event, this.value)">'
@@ -1154,6 +1156,25 @@ def test_before_the_link_select_a_screen_not_as_mapped_links_nothing(
 
     assert caught.value.step == "W4"
     assert "link_select_project" not in actions(guard)
+    assert served[0].is_closed()
+
+
+def test_a_choose_project_that_never_opens_saves_no_page_snapshot(
+    serve, guard, monkeypatch, short_waits, tmp_path
+):
+    # The booker never writes page text to disk (decisions, 3 Nov 2026, M4
+    # gate): the demo's snapshot on a missing Choose Project is demo only.
+    snapshots = tmp_path / "captures"
+    monkeypatch.setattr(booking, "SNAPSHOT_DIR", snapshots)
+    through_w5(monkeypatch, guard, note={"pickerOpens": False})
+    served = serve(tasks=[CANCELLED])
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5")
+
+    assert caught.value.step == "W4"
+    assert actions(guard)[-1] == "link_to_project"
+    assert not snapshots.exists()
     assert served[0].is_closed()
 
 
