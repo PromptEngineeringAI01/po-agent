@@ -854,10 +854,15 @@ def test_a_note_taken_at_the_w1_check_is_untouched_and_the_next_runs_in_a_new_co
     assert calls_for(fake, "300001")[-2:] == ["lookup", "check"]
     assert "return 300001" not in fake.calls
     assert fake.notes["300001"].assignee == PERSON
-    # Its browser context closed, then a fresh one for the next Note.
+    # Its browser context closed, then a fresh one for the next Note. The
+    # sync API holds one browser per thread, so the old one closes first.
     checked = fake.calls.index("check 300001")
-    assert fake.calls[checked + 1 : checked + 3] == ["context_closed", "open_browser"]
-    assert fake.calls.index("find_again 300002") > checked + 2
+    assert fake.calls[checked + 1 : checked + 4] == [
+        "context_closed",
+        "closed",
+        "open_browser",
+    ]
+    assert fake.calls.index("find_again 300002") > checked + 3
     assert fake.notes["300002"].assignee == POOL
     first, second = notes_of(lines)
     assert (first["note_id"], first["outcome"], first["reason"]) == (
