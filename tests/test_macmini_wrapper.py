@@ -58,9 +58,11 @@ exit 1
 # Each `gh <a> <b> ...` call's arguments go to gh.<a>-<b>.args. The heartbeat
 # ping (`issue list`, then `issue edit`) fails with STUB_PING_EXIT; `issue
 # list` prints STUB_HEARTBEAT_ISSUE (default 7), the open heartbeat issue.
+# STUB_GH_HANG makes every call hang (exec, so the kill reaches the sleep).
 STUB_GH = """#!/bin/bash
 echo "gh $1 $2" >> "$STUB_DIR/calls"
 printf '%s\\0' "$@" > "$STUB_DIR/gh.$1-$2.args"
+if [ -n "${STUB_GH_HANG:-}" ]; then exec sleep 300; fi
 if [ "$2" = list ] || [ "$2" = edit ]; then
   [ "${STUB_PING_EXIT:-0}" = 0 ] || exit "$STUB_PING_EXIT"
 fi
@@ -344,6 +346,22 @@ def test_failed_ping_keeps_the_exit_code(box, exit_code, failing):
     assert result.returncode == exit_code
     assert box.gh_args("issue-edit") is None
     assert "wrapper: heartbeat not sent" in box.runs_log().splitlines()
+
+
+def test_hung_gh_is_killed_and_keeps_the_exit_code(box):
+    # A hung gh must not hold the wrapper: launchd skips every later run
+    # while it is still running.
+    box.agent([INFO], 1)
+
+    start = time.monotonic()
+    result = box.run("run", timeout=60, STUB_GH_HANG="1", MACMINI_RUN_GH_LIMIT_S="2")
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 30
+    assert result.returncode == 1
+    log = box.runs_log().splitlines()
+    assert "wrapper: alert issue not opened" in log
+    assert "wrapper: heartbeat not sent" in log
 
 
 def test_plist_schedules_55_weekday_runs():
