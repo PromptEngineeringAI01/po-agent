@@ -260,3 +260,53 @@ def test_files_older_than_90_days_are_deleted_at_run_start(mysys, capsys, tmp_pa
     assert kept.exists() and other.exists()
     assert not old.exists()
     assert trace_file(tmp_path).exists()
+
+
+# --- the trace never stops a run (7.3 review) -------------------------------------
+
+
+def test_opening_guard_actions_are_traced_at_step_0_without_a_note(
+    env, mysys, capsys, tmp_path
+):
+    fake = mysys({})
+    login = fake.login
+
+    def guarded_login(guard, page, username, password):
+        login(guard, page, username, password)
+        guard.history.append(("login_submit", "done"))  # as guard.act records it
+
+    env.setattr(run.driver, "login", guarded_login)
+
+    assert cli.main(["run", "--site", "test", "--decide-only"]) == 0
+
+    stdout_of(capsys)
+    assert (None, "0", "login_submit", "pass") in named(events_of(tmp_path))
+
+
+def test_a_trace_that_cannot_be_set_up_or_written_leaves_the_run_unchanged(
+    env, mysys, capsys, tmp_path
+):
+    parent = tmp_path / "po-agent"
+    is_dir = Path.is_dir
+
+    def unsearchable(self):
+        if self == parent:
+            raise PermissionError("fake: parent not searchable")
+        return is_dir(self)
+
+    mysys({})
+    with env.context() as patch:
+        patch.setattr(Path, "is_dir", unsearchable)
+        assert cli.main(["run", "--site", "test", "--decide-only"]) == 0
+    first = stdout_of(capsys)
+
+    # An undeletable old file and an unwritable day file: no trace, same run.
+    folder = parent / "trace"
+    (folder / "2026-01-01.jsonl").mkdir(parents=True)
+    trace_file(tmp_path).mkdir()
+    assert cli.main(["run", "--site", "test", "--decide-only"]) == 0
+    second = stdout_of(capsys)
+
+    for lines in (first, second):
+        assert not [x for x in lines if x.startswith("ALERT")]
+        assert json.loads(lines[-1].removeprefix("RUN_SUMMARY "))["exit_code"] == 0
