@@ -14,6 +14,12 @@
 #    goes to /dev/null (a crash's text could quote page content).
 # 4. On any ALERT line or a non-zero exit, opens a GitHub issue labelled
 #    po-agent-alert whose body is only the ALERT lines and the exit code.
+# 5. At the end of every run, whatever the exit code (a failed setup and a
+#    killed agent too), pings: the body of the one open issue labelled
+#    po-agent-heartbeat becomes the time, the exit code and the run_id. The
+#    heartbeat workflow (.github/workflows/heartbeat.yml) opens an alert when
+#    no ping arrives for 2 hours inside the schedule. A failed ping only logs
+#    a fixed line; it never changes the exit code.
 #
 # Written for macOS's /bin/bash 3.2: no GNU timeout, no setsid.
 
@@ -45,11 +51,11 @@ case "$1" in
   *) usage ;;
 esac
 MODE="$1"
+OUT=""
+AGENT_PID=""
+run_id="" # from the agent's RUN_SUMMARY line, if it printed one
 
 cd "$(dirname "$0")/.." || exit 2
-mkdir -p "$LOG_DIR" || exit 2
-OUT="$(mktemp "${TMPDIR:-/tmp}/po-agent-run.XXXXXX")" || exit 2
-AGENT_PID=""
 
 log() {
   echo "$1" >> "$RUNS_LOG"
@@ -92,12 +98,40 @@ stop_group() {
   return 0
 }
 
+# The ping (step 5). gh finds the repo from this checkout's remote, as for
+# the alert issue. No PO data: only the time, $1 (the exit code) and run_id.
+heartbeat() {
+  local issue
+  issue="$(gh issue list --label po-agent-heartbeat --state open --limit 1 \
+    --json number --jq '.[0].number' 2> /dev/null)" || issue=""
+  case "$issue" in
+    "" | *[!0-9]*) issue="" ;;
+  esac
+  if [ -z "$issue" ] || ! gh issue edit "$issue" --body "last run: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
+exit code: $1
+run_id: ${run_id:-none}" > /dev/null 2>&1; then
+    log "wrapper: heartbeat not sent"
+  fi
+}
+
 cleanup() {
   stop_group
-  rm -f "$OUT"
+  [ -z "$OUT" ] || rm -f "$OUT"
 }
-trap cleanup EXIT
+
+# Every exit from here on (setup failure, agent exit, time limit, a signal)
+# cleans up, then pings, then exits with the run's own code.
+on_exit() {
+  local code=$?
+  cleanup
+  heartbeat "$code"
+  exit "$code"
+}
+trap on_exit EXIT
 trap 'exit 1' INT TERM HUP
+
+mkdir -p "$LOG_DIR" || exit 2
+OUT="$(mktemp "${TMPDIR:-/tmp}/po-agent-run.XXXXXX")" || exit 2
 
 log "=== $(date '+%Y-%m-%dT%H:%M:%S%z') macmini-run.sh $MODE ==="
 
@@ -148,8 +182,8 @@ if [ "$timed_out" -eq 1 ]; then
   log "$note"
 fi
 
+run_id="$(sed -n 's/^RUN_SUMMARY {"run_id": "\([0-9]\{8\}T[0-9]\{6\}Z-[0-9a-f]\{4\}\)".*/\1/p' "$OUT" | tail -n 1)"
 if [ "$code" -ne 0 ] || grep -q '^ALERT ' "$OUT"; then
-  run_id="$(sed -n 's/^RUN_SUMMARY {"run_id": "\([0-9]\{8\}T[0-9]\{6\}Z-[0-9a-f]\{4\}\)".*/\1/p' "$OUT" | tail -n 1)"
   open_issue "${run_id:-no run_id}" "$code" "$note"
 fi
 exit "$code"

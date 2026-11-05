@@ -29,6 +29,7 @@ The office Mac Mini is model **A3238**: the 2024 Mac mini with the **M4** chip, 
 - [ ] The repo is on GitHub (private) and `main` has M1's code.
 - [ ] The test-site agent account username and password, and confirmation that it has no MFA (SPEC open question 3).
 - [ ] A GitHub label for alerts. On your laptop: `gh label create po-agent-alert --color B60205`
+- [ ] The heartbeat issue (task 7.1, section 8), once. On your laptop: `gh label create po-agent-heartbeat --color 0E8A16`, then `gh issue create --label po-agent-heartbeat --title "po-agent heartbeat" --body "no run yet"`. Keep it open, and keep it the only open issue with that label. Unsubscribe from it on GitHub, so its updates don't notify you.
 - [ ] A **fine-grained GitHub token** for the Mac Mini: github.com → Settings → Developer settings → Fine-grained tokens → **Generate**. Name `po-agent-macmini`; resource owner `PromptEngineeringAI01`; **only** the `po-agent` repository; permissions **Contents: Read-only**, **Issues: Read and write** (Metadata: Read-only is added automatically); expiry 90 days (diarise the renewal).
 - [ ] A place in the company password manager for: the `poagent` macOS password, the backup admin's password and the FileVault recovery key.
 
@@ -136,6 +137,9 @@ They go into `poagent`'s login Keychain (keyring service `po-agent`; names as `S
 3. Runs the agent with `--site test` and never `--detailed-log`: mode `run` → `uv run po-agent run`, `spike` → `uv run po-agent spike`, `decide-only` → `uv run po-agent run --decide-only`. It has a 20-minute hard limit. macOS has no GNU `timeout` or `setsid`, so the wrapper implements it: bash job control (`set -m`) starts the agent in its own process group, and the wrapper kills the whole group (uv, Python and Playwright's driver; SIGTERM, then SIGKILL 10 seconds later) at the limit, when the agent ends and when the wrapper itself is stopped. Playwright starts Chromium detached, in a group of its own, so the wrapper then also kills every Playwright browser of `poagent` (`pkill -KILL -u <uid> -f ms-playwright/`, logged as `wrapper: leftover Playwright browser killed` when it finds one). Nothing is left to overlap the next run. A run killed at the limit exits 1 and adds `wrapper: agent killed at the 1200s limit` to `runs.log`.
 4. Appends the run's stdout (the stdout contract only: no PDF text, addresses or Note bodies) to `~/Library/Logs/po-agent/runs.log`, after a timestamp line per run (`=== <time> macmini-run.sh <mode> ===`). The agent's stderr goes to `/dev/null`: the agent writes nothing there by design, and a crash's text could quote page content.
 5. If the run printed an `ALERT` line or exited non-zero: `gh issue create --label po-agent-alert`, titled `po-agent alert <run_id, or "no run_id">`, whose body is only the `ALERT` lines, the wrapper's own fixed line (failed setup or time limit) if there is one, and `exit code: <n>`. GitHub emails Joey. If `gh` fails, `runs.log` gets `wrapper: alert issue not opened`.
+6. **The heartbeat ping** (task 7.1), at the end of every run, whatever the exit code: a failed setup, a run killed at the limit and a stopped wrapper ping too. The wrapper finds the one open issue labelled `po-agent-heartbeat` (section 1) and replaces its body with three lines: `last run: <UTC time>`, `exit code: <n>`, `run_id: <run_id, or "none">`. No PO data, no git push, no new secret (the same `gh` token). If the ping fails, `runs.log` gets `wrapper: heartbeat not sent`, and the run's exit code doesn't change.
+
+**The missed-heartbeat check** is a scheduled GitHub Action (`.github/workflows/heartbeat.yml`, running `scripts/heartbeat_check.py`; Joey's choice, 5 Nov 2026), so it still works when the Mac Mini is off. Every 30 minutes on weekdays it reads when the heartbeat issue was last updated (GitHub's clock) and, if that is more than 2 hours ago and those 2 hours lie inside one weekday's 07:07-17:07 Perth, opens an issue labelled `po-agent-alert` titled `po-agent heartbeat missed` (GitHub emails Joey). So it checks from 09:07 to 19:07 Perth only: nothing alerts at night, at the weekend or in the first two runs of a day, and a missed 17:07 run is still caught. It opens no second one while that issue is open: **close it once runs are back**, or the next miss stays silent. It uses only the workflow's own `GITHUB_TOKEN` (`issues: write`, `contents: read`). GitHub disables scheduled workflows in a repo with no activity for 60 days: if it shows as disabled in the Actions tab, enable it again. To test it by hand: Actions → heartbeat → Run workflow.
 
 It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`, then the system folders) because launchd starts jobs with a minimal environment, with an optional `MACMINI_RUN_PATH_PREFIX` in front so the wrapper's tests (`tests/test_macmini_wrapper.py`) can use stub commands. The tests also shorten the limit with `MACMINI_RUN_LIMIT_S`; the Mac Mini never sets either.
 
@@ -174,6 +178,7 @@ launchctl print gui/$(id -u)/au.com.prompteng.po-agent | head -30    # state, la
 | Pull and sync | No git or `uv sync` errors in `launchd.log` |
 | The run | Ends with one `RUN_SUMMARY {…}` line with `"exit_code": 0`; no PDF text or addresses in the log |
 | Alerts | If any `ALERT` line or non-zero exit: an issue labelled `po-agent-alert` exists, and GitHub emailed you |
+| Heartbeat | The `po-agent-heartbeat` issue's body shows the last run's time and exit code; no `wrapper: heartbeat not sent` in `runs.log` |
 | Schedule | On a weekday, a `RUN_SUMMARY` at about 07:07, 08:07 … 17:07 and none outside |
 
 There is **no state between runs** in the MVP (`SPEC.md` assumption 5): the agent reads nothing from earlier runs. `runs.log` is only the record for Joey; copy the `RUN_SUMMARY` and `NOTE` lines you need for the CEO note from it.
@@ -186,7 +191,7 @@ After a power cut or any restart, the Mac Mini powers back on and **waits at the
 2. Lock the screen: Control-Command-Q. The session keeps running while locked. (System Settings → Lock Screen: require the password **immediately** after the display turns off.)
 3. Check the next run appears in `runs.log`.
 
-Missed runs only delay POs: the Notes stay in the pool, where the admin can handle them. During the trial Joey checks `runs.log` each weekday morning; v1 adds a heartbeat.
+Missed runs only delay POs: the Notes stay in the pool, where the admin can handle them. If nobody logs in, the missed-heartbeat check (section 8) emails Joey once 2 hours inside the schedule pass without a run.
 
 ## 11. Stop it
 

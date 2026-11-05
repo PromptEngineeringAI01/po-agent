@@ -1,0 +1,32 @@
+# Missed-heartbeat check (plan task 7.1; docs/macmini-setup.md section 8).
+# The Mac Mini's wrapper pings by editing the open po-agent-heartbeat issue
+# at the end of every run; scripts/heartbeat_check.py opens one po-agent-alert
+# issue (GitHub emails Joey) when no ping has come for more than 2 hours
+# inside the schedule. It computes the age from timestamps, so a late or
+# skipped firing only delays the check. No secrets but the automatic
+# GITHUB_TOKEN; scheduled workflows run on main only.
+name: heartbeat
+on:
+  schedule:
+    # Every 30 minutes, 01:07-11:37 UTC Monday-Friday = 09:07-19:37 Perth
+    # (UTC+8, no DST), the hours a missed run can be seen in. The script
+    # decides the exact window, so firings outside it do nothing.
+    - cron: "7,37 1-11 * * 1-5"
+  workflow_dispatch: # run it by hand from the Actions tab
+permissions:
+  contents: read # checkout, for the script
+  issues: write # read the heartbeat issue, open the alert
+concurrency:
+  group: heartbeat # two checks at once can't open two alerts
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/heartbeat_check.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}

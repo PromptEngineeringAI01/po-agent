@@ -30,6 +30,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **5 Nov 2026: run mode built** (task 4.5; entry below). Plain `run` books.
 - **5 Nov 2026: a lighter build process** (entry below).
 - **5 Nov 2026: M4 security pass, three Nits fixed** (entry below).
+- **5 Nov 2026: heartbeat built** (task 7.1; entry below): a scheduled GitHub Action, not healthchecks.io.
+
+## 5 Nov 2026 - Heartbeat: a scheduled GitHub Action (Joey, task 7.1)
+
+- **Choice:** Joey picked a scheduled GitHub Action over healthchecks.io: no new account and no new secret; the Mac Mini's `gh` token already opens alert issues.
+- **What changes:** at the end of every run, whatever the exit code, the wrapper replaces the body of the one open `po-agent-heartbeat` issue with the time, the exit code and the `run_id` (no PO data); a failed ping logs `wrapper: heartbeat not sent` and leaves the exit code alone. `.github/workflows/heartbeat.yml` runs `scripts/heartbeat_check.py` every 30 minutes on weekdays with only `GITHUB_TOKEN` (`issues: write`, `contents: read`). It opens one `po-agent-alert` issue, `po-agent heartbeat missed`, when the issue's `updatedAt` is more than 2 hours old and those 2 hours lie inside one weekday's 07:07-17:07 Perth; never a second while one is open. Details: `docs/macmini-setup.md` sections 1 and 8.
+- **Run output?** Unchanged: the agent prints nothing new, so `SPEC.md` is unchanged. The new lines are the wrapper's and the workflow's.
+- **Loosens?** No: it adds an alert.
 
 ## 5 Nov 2026 - M4 security pass: three Nits fixed (Joey)
 
@@ -606,7 +614,7 @@ Updated 4 Nov 2026; the go-live gates in `SPEC.md` -> Production are the full li
 - **PO admin's live answers** (gate 2): PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column ends `/048` (open question 10); whether the agent account's password expires (open question 3; MFA not seen).
 - **CEO go-live sign-off and the backlog cut-off date** (gate 3): which older Notes the agent may touch.
 - **Accounts** (gate 4): a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
-- **Heartbeat service** (task 7.1): Joey picks it before the P5 week.
+- ~~Heartbeat service~~ **Answered 5 Nov 2026:** a scheduled GitHub Action (entry above).
 - ~~CEO decision 2~~ **Answered 25 Oct 2026:** delegated to Joey, who said yes (entry above). Since 2 Nov 2026 no model reads the PDFs.
 - ~~CEO/IT OK on the private GitHub repo~~ **Answered 25 Oct 2026:** the repo is public so the CEO can read it; no real client data in it.
 - ~~Alert channel for v1~~ **Answered:** a GitHub issue with the `po-agent-alert` label, which emails Joey (`docs/macmini-setup.md`).
