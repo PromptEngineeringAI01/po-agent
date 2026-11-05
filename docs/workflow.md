@@ -73,7 +73,7 @@ Not used: `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`
 |---|---|
 | Code | GitHub repo `PromptEngineeringAI01/po-agent`, **public** so the CEO can read it: never put anything in it you wouldn't publish. The Mac Mini pulls `main` before every run, so **merging is deploying**. |
 | Plan and tasks | `tasks/plan.md`, `tasks/todo.md`. Tasks run in order, one per branch and session. |
-| Changes after the freeze | A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control, needs a dated `docs/decisions.md` entry plus `SPEC.md` and `tasks/plan.md`, in the same commit. Tightening a dev-tooling rule needs only a clear commit message. |
+| Changes after the freeze | A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control, needs a dated `docs/decisions.md` entry plus the `SPEC.md` lines it changes, in the same commit; `tasks/plan.md` gets no "Built" paragraph per task, only the tick in `tasks/todo.md` (5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message. |
 | Hooks | Created in M1 (task 1.2), then changed only by Joey, by hand. |
 | Evals | The seam 1 fixture set, plus the real-PO set on the laptop. Every bug adds a fixture. |
 | Real client data | `private/` on the laptop only (git-ignored). The 3 trial POs also live on the test site; the Mac Mini reads them from there, in memory. |
@@ -151,7 +151,9 @@ Update docs/screen-map.md (the rows I just mapped, fake values only) and SPEC.md
 
 ### Production build loop (from task 2.3, 30 Oct 2026)
 
-The advisor chat runs the steps below; Joey answers review stops and merges. Steps 1-10 underneath still say what each step must achieve.
+The advisor chat runs the steps below; Joey answers the behaviour choices that are his and merges what the rules reserve for him. Steps 1-10 underneath still say what each step must achieve.
+
+**Lighter process (Joey, 5 Nov 2026; decisions, 5 Nov 2026, lighter process):** no review stop for tests, one review round, `/goal` optional, by-hand checks only in the by-hand tasks, plain-language reports in Traditional Chinese. The safety rules stay: Must never 1-9, the guard, `check.py` and CI, `/verify-pr` before a merge, tests first in their own `test:` commit, and the test-site rules (one agent at a time, reset first, no retry loops against MySys).
 
 Joey talks to one chat, the advisor. It starts each task session, relays his answers, verifies PRs and keeps the list of decisions waiting on him. Joey doesn't need to read the task sessions' tool calls; he reads their reports and the PR.
 
@@ -159,31 +161,30 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 2. **Research and plan before code.** The session reads the task in `tasks/plan.md`, the code it builds on and the SPEC lines, then restates in a few lines what it will change and how it will prove it. Any open design choice goes to Joey **one question at a time**, each with the agent's recommendation (the `interview-me` skill when there are several). Decisions go into the PR's Intent section, not only the chat. If the design talk was long, the session compacts before coding with a line saying what to keep ("keep: the decisions, the files, the test plan").
 3. **Tests first,** within a test budget:
    - The fewest tests that pin the task's acceptance criteria and its Must-never points. No test that restates the implementation, and no mocking of our own code; fakes only at the edges (MySys pages, the clock), as the seams already do.
-   - On a review-stop task (2.2-2.5, M3, M4, 5.2) the session stops; the advisor brings Joey a short summary: what each test pins down, and any test that looks like padding or mocks too much. Joey approves; the session commits them as `test:`.
+   - The session commits the tests as `test:` and carries on: no review stop (5 Nov 2026). It stops for Joey only when the tests force a behaviour choice that is his (e.g. what the run prints for a stopped Note), asked in plain words, one question at a time, with a recommendation.
    - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it.
    - When Claude makes the same kind of mistake twice: one targeted regression test plus a line under **Lessons** in `CLAUDE.md` (Joey commits that line).
-4. **Code with `/goal`** (offline code only): the session sets a goal such as `uv run scripts/check.py prints "check: all passed", the seam-1 cases for task <N> pass, no file under tests/ changed since the test: commit, or stop after 20 rounds`. A separate model judges each round from the evidence printed in the chat.
-   - Never `/goal` before Joey approves the tests on a review-stop task: the loop would run past the stop.
+4. **Code** until `uv run scripts/check.py` prints "check: all passed", the task's tests pass and nothing under `tests/` changed since the `test:` commit. `/goal` is optional (offline code only).
    - Never `/goal` on anything that touches the test site (seam 2, decide-only, booking): no retry loops against MySys. Those runs stay one at a time, watched.
 5. **Evidence and risk.** Before review, the session writes the PR description with four sections:
-   - **Intent:** the task, the SPEC slice, and the decisions made with Joey.
+   - **Intent:** the task, the SPEC slice, and the decisions made with Joey. It opens with three to five plain-language lines for Joey: what changed and what the tests prove.
    - **What changed:** each file and why; which commits touch tests (`test:` only); anything near a Must-never rule.
-   - **Risk: low, medium or high,** with one line on why. **High:** anything in `mysys/` or the booker, the guard, hooks or CI, the readers or decision engine, the address rules, the model ID or prompt, anything that writes to MySys (that is, every review-stop task). **Medium:** any other change under `src/` or `scripts/`. **Low:** docs, tests-only and tooling that doesn't touch a safety control. When unsure, pick the higher level.
+   - **Risk: low, medium or high,** with one line on why. **High:** anything in `mysys/` or the booker, the guard, hooks or CI, the readers or decision engine, the address rules, the model ID or prompt, anything that writes to MySys. **Medium:** any other change under `src/` or `scripts/`. **Low:** docs, tests-only and tooling that doesn't touch a safety control. When unsure, pick the higher level.
    - **Testing:** the evidence, pasted: the tail of `uv run scripts/check.py`, the seam-1 counts, and where they apply `false PROCEED: 0` and the seam-2 or decide-only stdout. Only the stdout contract goes in; never screenshots, captures, PDF text, addresses or Note bodies (Must never #6).
 6. **Review, once, by risk:**
 
    | Risk | Review |
    |---|---|
-   | Low | `/agent-skills:review` in the session. Nothing else. |
-   | Medium | The same, plus one **second-model review** (Appendix C). |
-   | High | The second-model review plus `/code-review` in a fresh Opus session; the advisor merges the two lists, dropping duplicates. M4 keeps the doubt review below. |
+   | Low | None beyond `check.py` and `/verify-pr`. |
+   | Medium | `/agent-skills:review` in the session. |
+   | High | One **second-model review** (Appendix C). No fresh-session `/code-review` (5 Nov 2026). |
 
    - The reviewers rate every finding on two scales, 1-5: **harm** if it happens and **likelihood**. Anything that could break a Must-never rule or write a wrong value to MySys is a must-fix, however unlikely.
    - The session that wrote the code answers each finding in one line: **must-fix or overthinking**, and why. It fixes the must-fixes once and adds the triage table to the PR.
    - No second review round unless the fixes were large. Reviewers asked to find bugs always find something, so repeated rounds add noise, not safety.
    - The second-model review runs from a fresh, short context (a sub-agent of the advisor), not from the builder's long one: cheaper, and it doesn't inherit the builder's blind spots.
-7. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, the check, CI on the latest commit, and the four PR sections with the right risk level and, for medium and high, the review triage. If it passes with no Important finding and CI is green on the latest commit, the advisor merges it with `gh pr merge <n> --merge --match-head-commit <sha>` (a merge commit) and tells Joey in one line. Anything Important, a red check, or a PR that touches `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py` or loosens a safety control: the advisor stops and asks Joey instead.
-8. **Reports to Joey** (from task sessions and the advisor) open with a one-line recap of what this session is about, use plain words (no shorthand from deep in the code), ask **one question at a time**, and end with the next action. When Joey asks "where are we?", the advisor lists the sessions in flight, the PRs waiting, and the open decisions.
+7. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, the check, CI on the latest commit, and the four PR sections with the right risk level and, for high, the review triage. If it passes with no Important finding and CI is green on the latest commit, the advisor merges it with `gh pr merge <n> --merge --match-head-commit <sha>` (a merge commit) and tells Joey in one line. Anything Important, a red check, or a PR that touches `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py` or loosens a safety control: the advisor stops and asks Joey instead.
+8. **Reports to Joey** (from task sessions and the advisor) are in Traditional Chinese (code and repo text stay English), open with a one-line recap of what this session is about, use plain words (no shorthand from deep in the code), ask **one question at a time**, and end with the next action. A by-hand check (a mid-run takeover, placing extra Notes) is asked of Joey only in the by-hand tasks (4.6, M6) or when no offline or seam-2 test covers the case. When Joey asks "where are we?", the advisor lists the sessions in flight, the PRs waiting, and the open decisions.
 9. **Rules that matter are enforced, not just written.** Agents drift from `CLAUDE.md` as their context grows. A rule Claude has broken twice gets a Lessons line and, if it guards safety, a hook, a check or a `/verify-pr` step (Joey edits `.claude/`).
 
 1. **Branch** from up-to-date `main`, one branch per task (e.g. `m1-1.2-hooks`):

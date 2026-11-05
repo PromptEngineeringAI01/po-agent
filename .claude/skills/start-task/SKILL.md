@@ -1,6 +1,6 @@
 ---
 name: start-task
-description: Start the next PO Agent build task as a linked session in its own worktree, with the standard brief (review stop, /goal for the code half, Must-never points). Use when Joey says "start <N>", "start the next one", "next" after a merge, or "/start-task <N>".
+description: Start the next PO Agent build task as a linked session in its own worktree, with the standard brief (tests first, no review stop, Must-never points). Use when Joey says "start <N>", "start the next one", "next" after a merge, or "/start-task <N>".
 argument-hint: <task number, e.g. 2.4> (optional: the next unchecked task)
 ---
 
@@ -41,37 +41,33 @@ Task: <N> in tasks/plan.md (<title>), using /agent-skills:build for this one tas
 Key points: <3-6 lines from the task's acceptance and any carried-over notes from the previous PR's review>.
 
 Tests: the fewest that pin the acceptance criteria and Must-never points; no mocking our own code; fakes only at MySys, the Anthropic API and the clock.
-Reports: open with a one-line recap, use plain words, ask one question at a time, end with the next action.
+Reports to Joey: in Traditional Chinese (code and repo text stay English), open with a one-line recap, use plain words, ask one question at a time, end with the next action. Ask him for a by-hand check only when no offline or seam-2 test covers the case.
 
 The agent is for B1 Homes only. No PDF generator.
 
 Workflow (docs/workflow.md, Production build loop):
-1. <REVIEW STOP or COMMIT-AND-CARRY-ON, see below>
-2. Code half with /goal: `uv run scripts/check.py prints "check: all passed", the <N> tests pass, git diff <test commit>..HEAD -- tests/ is empty, or stop after 20 rounds`. Commit as feat: (fix: for a bug). If the change alters what the agent does in MySys or prints in run output, or loosens a safety control, add a dated docs/decisions.md entry plus the SPEC.md and tasks/plan.md lines in the same commit.
-3. Write the PR description with Intent, What changed, Risk (low/medium/high, with the reason) and Testing (paste the check tail and seam output; never screenshots or real data), per docs/workflow.md Production build loop step 5.
-4. Review once, by risk (step 6): low = /agent-skills:review; medium = also a second-model review (Appendix C; the advisor runs it on your worktree); high = also a fresh-session /code-review. Answer each finding "must-fix or overthinking" in one line, fix the must-fixes once, and put the triage in the PR.
+1. Write the failing tests, show they fail for the expected reason, commit them as test:, and carry on (no review stop). Stop and ask Joey only for a behaviour choice that is his, in plain words, with your recommendation.
+2. Code until `uv run scripts/check.py` prints "check: all passed", the <N> tests pass and `git diff <test commit>..HEAD -- tests/` is empty (/goal optional, offline only). Commit as feat: (fix: for a bug). If the change alters what the agent does in MySys or prints in run output, or loosens a safety control, add a dated docs/decisions.md entry plus the SPEC.md lines in the same commit; tick the task in tasks/todo.md.
+3. Write the PR description with Intent (opening with 3-5 plain-language lines for Joey), What changed, Risk (low/medium/high, with the reason) and Testing (paste the check tail and seam output; never screenshots or real data), per docs/workflow.md Production build loop step 5.
+4. Review once, by risk (step 6): low = none; medium = /agent-skills:review; high = one second-model review (Appendix C; the advisor runs it on your worktree). Answer each finding "must-fix or overthinking" in one line, fix the must-fixes once, and put the triage in the PR.
 5. Push, open a PR to main (don't merge), report the URL. The advisor verifies it with /verify-pr.
 ```
 
-Step 1 of the workflow:
-- **Review-stop tasks** (2.2-2.5, 3.1-3.6, 4.1-4.5, 5.2): `Write the failing tests, run them, show they fail for the expected reason, then STOP and report to Joey: what the tests pin down and any choice he must confirm. Don't commit or write code until he approves. Never use /goal before that approval.`
-- **Other tasks:** `Write the failing tests, show they fail for the expected reason, commit them as test:, and carry on.`
-
-Add when they apply:
+No task has a review stop since 5 Nov 2026 (decisions, lighter process). Add when they apply:
 - **Ask-first points** from the task (address rules 2.4, prompt and model ID 2.5, prices 2.6, any new dependency): `Stop and ask Joey before <point>.`
 - **Touches readers, prompt, model ID or address rules:** `Run the live-Claude seam (uv run pytest tests/seam1 -m live_claude) after Joey OKs it and show false PROCEED: 0.`
 - **Touches the test site** (`mysys/`, the booker, seam 2, decide-only): `No /goal for anything that touches the test site: run seam 2 once, watched, and report the result. Reset the test site first per docs/demo-runbook.md (Joey does the reset).`
 - **Real data** (`-m real_data`, `private/`): `Laptop only. Nothing from private/ goes into a committed file or the PR.`
 
-**`background`** (80+ characters): the project in one line, the production order, which tasks are merged, and "this session does <N> only; an advisor relays Joey's review, verifies your PR and merges it once it passes."
+**`background`** (80+ characters): the project in one line, the production order, which tasks are merged, and "this session does <N> only; an advisor relays Joey's answers, verifies your PR and merges it once it passes."
 
 ## 4. Report
 
-One line to Joey: the task, the session link `[title](#<session id>)`, and when he'll hear next (the review stop, or the PR). Then end the turn; don't poll.
+One line to Joey: the task, the session link `[title](#<session id>)`, and when he'll hear next (a choice that is his, or the PR). Then end the turn; don't poll.
 
 ## When the session reports
 
-- **Review stop:** read its report (`list_events`), check the tests fail for the right reason, and bring Joey a short summary: what the tests pin down, each choice with your view, your recommendation. Relay his answer with `SendMessage`.
-- **Second-model review** (medium and high risk): start a read-only reviewer sub-agent with model `opus` on the task's worktree, with the prompt in `docs/workflow.md` Appendix C; send its findings to the task session for triage.
+- **A choice for Joey:** bring it to him in plain Traditional Chinese, one question, with your recommendation. Relay his answer with `SendMessage`.
+- **Second-model review** (high risk only): start a read-only reviewer sub-agent with model `opus` on the task's worktree, with the prompt in `docs/workflow.md` Appendix C; send its findings to the task session for triage.
 - **PR:** run `/verify-pr <n>`.
 - **Blocked by a hook:** don't let it work around the hook (`cp`, a different tool). Report it to Joey; hooks are his.
