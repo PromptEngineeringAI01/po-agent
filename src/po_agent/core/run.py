@@ -73,8 +73,9 @@ NOTE_TAKEN = "NOTE_TAKEN"
 # error) also say W2 but are other types and come before the click.
 SUBMITTED_STEPS = ("W2", "W3", "W4", "W5")
 SUBMITTED_TYPES = (PartialWrite, AccuracyBreach, GuardRefusal)
-# Past W2's click every booker error is one of SUBMITTED_TYPES; any other
-# error that names one of these steps is still a partial write.
+# Past W2's click every booker error is one of SUBMITTED_TYPES (Ctrl+C
+# included); any other error that names one of these steps is still a
+# partial write.
 AFTER_W2 = ("W3", "W4", "W5")
 
 
@@ -202,7 +203,7 @@ def _submitted(error: BaseException) -> bool:
     step = getattr(error, "step", None)
     if isinstance(error, SUBMITTED_TYPES):
         return step in SUBMITTED_STEPS
-    return isinstance(error, Exception) and step in AFTER_W2
+    return step in AFTER_W2
 
 
 def decide_only(
@@ -391,7 +392,9 @@ def _one_note(
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
     if config_dir is not None and isinstance(decision, Proceed):
         try:
-            task_no = _book(guard, page, config, login, decision, config_dir)
+            task_no = _book(
+                guard, page, config, login, decision, config_dir, note_id=note_id
+            )
         except BaseException as error:
             if _submitted(error):
                 progress.submitted = error
@@ -439,13 +442,17 @@ def _book(
     login: tuple[str, str, str],
     proceed: Proceed,
     config_dir: Path,
+    *,
+    note_id: str,
 ) -> str:
-    """W1-W5 for this browser context: the assignee check holds its page."""
+    """W1-W5 for this browser context: the assignee check holds its page.
+    `note_id` is the Note the run holds: a decision for another Note is
+    WriteNotStarted before W1."""
     check = controls.assignee_check(guard, page, login, config.agent_user_name)
     gate = controls.Controls("test", config_dir, check)  # test site only
     task_no = booker.book(
         proceed,
-        note_id=proceed.note_id,
+        note_id=note_id,
         guard=guard,
         page=page,
         login=login,
@@ -454,9 +461,7 @@ def _book(
         stop_after="W5",
     )
     if task_no is None:  # stop_after W5 always returns it
-        raise PartialWrite(
-            "no task number after W5", note_id=proceed.note_id, step="W5"
-        )
+        raise PartialWrite("no task number after W5", note_id=note_id, step="W5")
     return task_no
 
 

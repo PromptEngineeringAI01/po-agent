@@ -24,7 +24,6 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, Page
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.core import output
 from po_agent.core.errors import (
     AccuracyBreach,
     PartialWrite,
@@ -108,7 +107,8 @@ def _open(guard: ActionGuard, action: str, scope: Locator, target: Locator) -> N
     """An opening, searching or refreshing click (it changes nothing in
     MySys), tried OPEN_TRIES times in case the page is still covered (see
     leave_menu). Playwright never clicks while the target is covered, so a
-    retry can't act twice. A guard refusal is never retried."""
+    retry can't act twice. A guard refusal is never retried. Silent: it runs
+    inside `run` too (open_project), where no demo line belongs."""
     for attempt in range(OPEN_TRIES):
         try:
             guard.act(action, scope, target)
@@ -116,7 +116,6 @@ def _open(guard: ActionGuard, action: str, scope: Locator, target: Locator) -> N
         except UnexpectedScreen:
             if attempt == OPEN_TRIES - 1:
                 raise
-            output.info("demo: page blocked, retrying")
 
 
 def open_note(guard: ActionGuard, page: Page, panel: Locator, note_id: str) -> Locator:

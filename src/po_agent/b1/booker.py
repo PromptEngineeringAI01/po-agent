@@ -19,10 +19,11 @@ the context, nothing submitted) -> Submit, the partial-write line -> the one
 new Compaction Test task (row 10) -> its detail screen, opened from its own
 details row and read back (row 19) -> back to the project, its Documents
 section for the new task -> Tasks. From the Submit click on, every error is
-PartialWrite, except AccuracyBreach and GuardRefusal, which keep their type;
-each carries step W2. With one of those three types, step W2 tells the run
-loop the task may exist (4.5: never returned to the pool); W2's
-`before_write` errors also say W2 but come before the click.
+PartialWrite (a Ctrl+C or other BaseException too), except AccuracyBreach
+and GuardRefusal, which keep their type; each carries step W2. With one
+of those three types, step W2 tells the run loop the task may exist (4.5:
+never returned to the pool); W2's `before_write` errors also say W2 but
+come before the click.
 
 W3: `before_write(note_id, "W3")` (no assignee check, D7; a kill switch here
 is already PartialWrite, 3.5) -> Hold in the new task's own header row -> the
@@ -197,7 +198,7 @@ def _w2(
             note_id=note_id,
             step="W2",
         ) from error
-    except Exception as error:
+    except BaseException as error:  # Ctrl+C too: the task may exist
         raise PartialWrite(
             "task not read back after Submit", note_id=note_id, step="W2"
         ) from error
@@ -218,7 +219,7 @@ def _w3(
         booking.fill_hold(guard, dialog)
         booking.confirm_hold(guard, page, dialog)
         booking.check_on_hold(project, task_no)
-    except Exception as error:
+    except BaseException as error:  # Ctrl+C too
         _close_context(page)  # an open Hold dialog is abandoned unconfirmed
         if isinstance(error, GuardRefusal):
             raise GuardRefusal(
@@ -247,7 +248,7 @@ def _w3(
 
 
 def _stop_after_submit(
-    page: Page, error: Exception, note_id: str, step: str
+    page: Page, error: BaseException, note_id: str, step: str
 ) -> NoReturn:
     """W4 and W5: closes the browser context (an open Choose Project is
     abandoned unselected), then raises the error with its step:
@@ -295,7 +296,7 @@ def _w4(
         window = driver.find_note_again(guard, page, *login, note_id)  # row 25
         booking.link_project(guard, page, window, proceed.pln)
         return window
-    except Exception as error:
+    except BaseException as error:  # Ctrl+C too
         _stop_after_submit(page, error, note_id, "W4")
 
 
@@ -315,5 +316,5 @@ def _w5(
         booking.mark_solved(guard, window, agent)
         booking.check_solved_log(window, before)
         driver.gone_from_pending(guard, page, *login, note_id)
-    except Exception as error:
+    except BaseException as error:  # Ctrl+C too
         _stop_after_submit(page, error, note_id, "W5")
