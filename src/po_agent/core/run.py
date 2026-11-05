@@ -63,6 +63,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.runlog import RunLog
 from po_agent.core.secrets import SecretName
+from po_agent.core.trace import Trace
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -214,11 +215,15 @@ def decide_only(
     summary: output.RunSummary,
     downloads: Path,
     logs: Path | None,
+    trace: Trace | None = None,
 ) -> int:
     """The decide-only run. `downloads` is the run's po-agent-dl-<run_id>
     folder (D2), removed at the end; `logs` is set only with --detailed-log.
-    The error event goes to the run log here; cli.py writes its traceback."""
-    return _note_loop(config, credentials, options, summary, downloads, logs, None)
+    The error event goes to the run log here; cli.py writes its traceback.
+    `trace` gets the run log's events (7.3)."""
+    return _note_loop(
+        config, credentials, options, summary, downloads, logs, None, trace
+    )
 
 
 def book_run(
@@ -229,11 +234,12 @@ def book_run(
     downloads: Path,
     logs: Path | None,
     config_dir: Path,
+    trace: Trace | None = None,
 ) -> int:
     """The run that books (4.5): as decide-only, but a PROCEED is booked.
     `config_dir` is where `before_write` re-reads the kill switch."""
     return _note_loop(
-        config, credentials, options, summary, downloads, logs, config_dir
+        config, credentials, options, summary, downloads, logs, config_dir, trace
     )
 
 
@@ -245,10 +251,11 @@ def _note_loop(
     downloads: Path,
     logs: Path | None,
     config_dir: Path | None,
+    trace: Trace | None,
 ) -> int:
     """`config_dir` None: decide-only, nothing booked."""
     guard = ActionGuard()
-    log = RunLog(summary.run_id, guard, logs)
+    log = RunLog(summary.run_id, guard, logs, trace)
     login = (
         str(config.base_url),
         credentials["mysys_test_username"],

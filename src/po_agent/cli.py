@@ -18,6 +18,10 @@ and becomes ALERT UNEXPECTED_SCREEN with a fixed detail, exit 1. Nothing goes
 to stderr, because an exception's text can quote page content: the traceback
 goes to logs/ only with --detailed-log, else nowhere.
 
+The safe trace (7.3) starts right after config is loaded, when config sets
+`trace_dir` (core/trace.py): the run log's events, then one run_end event
+(pass, or the reported error's type). It is a file, never stdout.
+
 Order: run_id (before anything can fail), command line, leftover download
 folders swept (D2), config, the kill switch and the Perth window (3.5:
 exit 0, nothing launched), secrets, then the mode. Config and secret
@@ -35,6 +39,7 @@ import time
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from po_agent.core import controls, demo, output, run, secrets
 from po_agent.core.config import CONFIG_DIR, Config, load_config
@@ -51,9 +56,13 @@ from po_agent.core.errors import (
     identifier,
 )
 from po_agent.core.secrets import SecretName
+from po_agent.core.trace import Trace
 
 LOGS_DIR = Path(__file__).resolve().parents[2] / "logs"
 DOWNLOAD_PREFIX = "po-agent-dl-"
+# The run's safe trace by run_id, set by main() for the length of the run, so
+# start() keeps its signature.
+_TRACES: dict[str, Trace] = {}
 UNEXPECTED_DETAIL = "unexpected error"
 
 # A subclass maps like its nearest listed base. WriteNotStarted has no ALERT
@@ -147,7 +156,9 @@ def start(
     summary: output.RunSummary,
 ) -> int:
     """The mode's entry point and its exit code; it fills the summary's
-    counts. The Note loop's run log goes to logs/ only with --detailed-log."""
+    counts. The Note loop's run log goes to logs/ only with --detailed-log,
+    and to the run's trace always."""
+    trace = _TRACES.get(summary.run_id)
     if mode == "spike":
         return run.spike(config, credentials, options, summary)
     downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
@@ -156,23 +167,40 @@ def start(
     logs = LOGS_DIR if options.detailed_log else None
     if mode == "run":
         return run.book_run(
-            config, credentials, options, summary, downloads, logs, CONFIG_DIR
+            config, credentials, options, summary, downloads, logs, CONFIG_DIR, trace
         )
-    return run.decide_only(config, credentials, options, summary, downloads, logs)
+    return run.decide_only(
+        config, credentials, options, summary, downloads, logs, trace
+    )
 
 
 def _demo_read_only(options: argparse.Namespace) -> bool:
     return options.until_check or options.probe_link
 
 
+def _start_trace(trace: Trace, config: Config) -> None:
+    """Today's file is named by the run window's date (Perth). The trace
+    never stops a run: if this fails, the run goes on without it."""
+    try:
+        directory = Path(config.trace_dir).expanduser() if config.trace_dir else None
+        today = controls.now().astimezone(ZoneInfo(config.run_window.tz)).date()
+    except Exception:  # noqa: BLE001 - e.g. no home folder, unknown time zone
+        return
+    trace.start(directory, today)
+
+
 def _run(
-    mode: output.Mode, options: argparse.Namespace, summary: output.RunSummary
+    mode: output.Mode,
+    options: argparse.Namespace,
+    summary: output.RunSummary,
+    trace: Trace,
 ) -> int:
     sweep_download_dirs()
     if mode == "demo" and not _demo_read_only(options) and not options.headed:
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")
     config = load_config(options.site, CONFIG_DIR)
+    _start_trace(trace, config)
     if not config.enabled:
         output.info("kill switch on: run not started")
         return 0
@@ -231,7 +259,9 @@ def _report(error: BaseException, run_id: str, detailed_log: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     started = time.monotonic()
     summary = output.RunSummary(run_id=new_run_id())
+    trace = _TRACES[summary.run_id] = Trace(summary.run_id)
     detailed_log = False
+    failure: BaseException | None = None
     try:
         options = _parser().parse_args(argv)
         detailed_log = options.detailed_log
@@ -240,9 +270,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         summary.mode = mode
         summary.site = "test" if options.site == "test" else None
-        exit_code = _run(mode, options, summary)
+        exit_code = _run(mode, options, summary, trace)
     except BaseException as error:  # the catch-all: nothing reaches stderr
+        failure = error
         exit_code = _report(error, summary.run_id, detailed_log)
+    trace.end(failure)
+    del _TRACES[summary.run_id]
     summary.duration_s = round(time.monotonic() - started)
     summary.exit_code = exit_code
     output.run_summary(summary)

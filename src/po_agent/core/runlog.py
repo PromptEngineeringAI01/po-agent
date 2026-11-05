@@ -10,6 +10,10 @@ is written as "<redacted>".
 Guard actions come from `guard.history` and are written, in order, before
 the next event, so the log keeps the order 5.2 checks (Send Email read back
 unticked after the last change and before each Assign).
+
+Every event but the traceback also goes to the safe trace (core/trace.py,
+task 7.3), with or without --detailed-log: its name and pass/fail, the skip
+reason or the error type, never more.
 """
 
 import json
@@ -18,6 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from po_agent.core.errors import identifier
+from po_agent.core.trace import Trace
 from po_agent.mysys.guard import ActionGuard
 
 EVENTS = (
@@ -32,12 +37,20 @@ NAME_KEYS = ("action", "field", "type", "reason")
 
 
 class RunLog:
-    """Writes nothing when `directory` is None (no --detailed-log)."""
+    """Writes no file when `directory` is None (no --detailed-log); `trace`
+    gets every event but the traceback either way."""
 
-    def __init__(self, run_id: str, guard: ActionGuard, directory: Path | None) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        guard: ActionGuard,
+        directory: Path | None,
+        trace: Trace | None = None,
+    ) -> None:
         self.run_id = run_id
         self.guard = guard
         self.path = directory / f"{run_id}.jsonl" if directory is not None else None
+        self.trace = trace
         self._written = 0  # guard.history entries already written
 
     def event(
@@ -86,6 +99,8 @@ class RunLog:
         ok: bool,
         extra: dict[str, str | None],
     ) -> None:
+        if self.trace is not None and event != "traceback":
+            self._trace(event, note_id, step, ok, extra)
         if self.path is None:
             return
         line = {
@@ -100,3 +115,25 @@ class RunLog:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a", encoding="utf-8") as file:
             file.write(json.dumps(line) + "\n")
+
+    def _trace(
+        self,
+        event: str,
+        note_id: str | None,
+        step: str | None,
+        ok: bool,
+        extra: dict[str, str | None],
+    ) -> None:
+        assert self.trace is not None
+        outcome = "pass" if ok else "fail"
+        if event == "guard_action":
+            name = extra["action"]
+        elif event == "read_back":
+            name = f"read_back.{extra['field']}"
+        elif event == "skip":
+            name, outcome = "decision", extra["reason"]
+        elif event == "error":
+            name, outcome = "error", extra["type"]
+        else:
+            name = event
+        self.trace.event(note_id=note_id, step=step, name=name, outcome=outcome)
