@@ -276,6 +276,12 @@ def _note_loop(
             driver.set_note_pool_filters(guard, panel, config.pool_name)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, config, summary)
+            try:
+                # The opening guard actions (login, Note Pool, filters):
+                # step 0, no Note, even when no Note follows (7.3 review).
+                log.flush(note_id=None, step="0")
+            except OSError:
+                pass  # the run goes on
             ordered = oldest_first(found, len(found))
             for done, note in enumerate(ordered):
                 if controls.cap_reached(config, started, done):

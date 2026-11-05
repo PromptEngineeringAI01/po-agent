@@ -169,6 +169,8 @@ launchctl print gui/$(id -u)/au.com.prompteng.po-agent | head -30    # state, la
 
 `tail -50 ~/Library/Logs/po-agent/runs.log`. A clean `launchctl` state only means the job started.
 
+**The safe trace** (7.3): every run also writes `~/Library/Logs/po-agent/trace/<YYYY-MM-DD>.jsonl` (Perth date), allowlisted fields only (run_id, time, Note ID, step, check or control name, outcome, duration; no page text). Files older than 90 days are deleted at the next run start. Read it after an alert: `grep <run_id> ~/Library/Logs/po-agent/trace/<date>.jsonl`.
+
 | Check | Healthy |
 |---|---|
 | Pull and sync | No git or `uv sync` errors in `launchd.log` |

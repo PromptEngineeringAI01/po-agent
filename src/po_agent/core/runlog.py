@@ -126,14 +126,17 @@ class RunLog:
     ) -> None:
         assert self.trace is not None
         outcome = "pass" if ok else "fail"
+        # .get: a missing name key is written as null, never a KeyError.
+        name: str | None
         if event == "guard_action":
-            name = extra["action"]
+            name = extra.get("action")
         elif event == "read_back":
-            name = f"read_back.{extra['field']}"
+            field = extra.get("field")
+            name = f"read_back.{field}" if field else None
         elif event == "skip":
-            name, outcome = "decision", extra["reason"]
+            name, outcome = "decision", extra.get("reason")
         elif event == "error":
-            name, outcome = "error", extra["type"]
+            name, outcome = "error", extra.get("type")
         else:
             name = event
         self.trace.event(note_id=note_id, step=step, name=name, outcome=outcome)

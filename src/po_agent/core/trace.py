@@ -142,10 +142,13 @@ class Trace:
 
     def start(self, directory: Path | None, today: date) -> None:
         """Deletes the files older than RETENTION_DAYS, then writes to
-        today's file. No folder, or no parent folder: no trace."""
-        if directory is None or not directory.parent.is_dir():
+        today's file. No folder, no parent folder, or one that can't be
+        read: no trace, and the run goes on."""
+        if directory is None:
             return
         try:
+            if not directory.parent.is_dir():
+                return
             directory.mkdir(exist_ok=True)
             _delete_old(directory, today)
         except OSError:
@@ -202,4 +205,7 @@ def _delete_old(directory: Path, today: date) -> None:
         except ValueError:
             continue
         if day < oldest:
-            path.unlink()
+            try:
+                path.unlink()
+            except OSError:
+                continue  # one stuck file doesn't stop the trace
