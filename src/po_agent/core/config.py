@@ -60,6 +60,9 @@ class Config(_Section):
     max_notes_per_run: int = Field(gt=0)
     max_run_minutes: int = Field(gt=0)
     run_window: RunWindow
+    # The safe trace's folder (7.3); "~" is the user's home. Written only
+    # when its parent folder exists (core/trace.py).
+    trace_dir: str | None = Field(None, min_length=1)
 
     # https://docs.pydantic.dev/latest/concepts/validators/#field-after-validator
     @field_validator("base_url", mode="after")
