@@ -48,6 +48,12 @@ if [ "$1" = sync ]; then exit "${STUB_SYNC_EXIT:-0}"; fi
 if [ "$1" = run ] && [ "$2" = playwright ]; then exit "${STUB_PLAYWRIGHT_EXIT:-0}"; fi
 exit 0
 """
+# Playwright starts Chromium detached (its own process group), so the group
+# kill can't reach it; the wrapper also kills this user's Playwright browsers.
+STUB_PKILL = """#!/bin/bash
+echo "pkill $*" >> "$STUB_DIR/pkill.calls"
+exit 1
+"""
 STUB_GH = """#!/bin/bash
 echo "gh" >> "$STUB_DIR/calls"
 printf '%s\\0' "$@" > "$STUB_DIR/gh.args"
@@ -82,7 +88,12 @@ class Box:
         shutil.copy(WRAPPER, self.repo / "scripts" / "macmini-run.sh")
         self.stubs = tmp / "stubs"
         self.stubs.mkdir()
-        for name, body in (("git", STUB_GIT), ("uv", STUB_UV), ("gh", STUB_GH)):
+        for name, body in (
+            ("git", STUB_GIT),
+            ("uv", STUB_UV),
+            ("gh", STUB_GH),
+            ("pkill", STUB_PKILL),
+        ):
             stub = self.stubs / name
             stub.write_text(body, newline="\n")
             stub.chmod(0o755)
@@ -248,6 +259,19 @@ def test_hung_agent_is_killed_with_its_children(box, tmp_path):
     assert title == "po-agent alert no run_id"
     assert INFO not in body
     assert f"exit code: {result.returncode}" in body.splitlines()
+
+
+def test_hung_agent_also_kills_detached_playwright_browsers(box):
+    box.agent_script(f"echo '{INFO}'\nsleep 300\n")
+
+    box.run("run", timeout=60, MACMINI_RUN_LIMIT_S="2")
+
+    calls = (box.stubs / "pkill.calls").read_text().splitlines()
+    assert len(calls) >= 1
+    args = calls[-1].split()
+    assert args[:2] == ["pkill", "-KILL"]
+    assert args[args.index("-f") + 1] == "ms-playwright/"
+    assert "-u" in args
 
 
 def test_plist_schedules_55_weekday_runs():
