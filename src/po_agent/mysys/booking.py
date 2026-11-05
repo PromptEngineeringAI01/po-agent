@@ -352,7 +352,8 @@ def _search_choose_project(
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
     if not _shows(picker, LINK_TIMEOUT_MS):
-        save_snapshot(page, "S8-link-opened")
+        if snapshots:  # --probe-link only: the booker never writes page text
+            save_snapshot(page, "S8-link-opened")
         raise UnexpectedScreen("Link to Project search did not show")
     _still_open(picker, page, "1-opened", snapshots)
     search = picker.get_by_role("textbox", name="Search/filter", exact=True)
