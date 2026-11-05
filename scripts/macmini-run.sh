@@ -35,6 +35,7 @@ export PATH
 
 LIMIT_S="${MACMINI_RUN_LIMIT_S:-1200}" # 20 minutes; the tests shorten it
 GRACE_S=10                              # SIGTERM, then SIGKILL after this
+GH_LIMIT_S="${MACMINI_RUN_GH_LIMIT_S:-60}" # per gh call; the tests shorten it
 LOG_DIR="$HOME/Library/Logs/po-agent"
 RUNS_LOG="$LOG_DIR/runs.log"
 
@@ -61,6 +62,25 @@ log() {
   echo "$1" >> "$RUNS_LOG"
 }
 
+# gh with a GH_LIMIT_S time limit (no GNU timeout on macOS): a hung gh would
+# keep this wrapper running, and launchd skips every later run while it does.
+# Returns gh's exit code, or 1 if it was killed at the limit.
+gh_limited() {
+  local pid waited=0
+  gh "$@" &
+  pid=$!
+  while kill -0 "$pid" 2> /dev/null; do
+    if [ "$waited" -ge "$GH_LIMIT_S" ]; then
+      kill -KILL "$pid" 2> /dev/null
+      wait "$pid" 2> /dev/null
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  wait "$pid"
+}
+
 # $1 = run_id or "no run_id", $2 = exit code, $3 = an optional fixed wrapper
 # line. The body is the ALERT lines from $OUT, that line and the exit code.
 open_issue() {
@@ -72,7 +92,7 @@ open_issue() {
   fi
   body="${body:+$body
 }exit code: $2"
-  if ! gh issue create --label po-agent-alert --title "po-agent alert $1" \
+  if ! gh_limited issue create --label po-agent-alert --title "po-agent alert $1" \
     --body "$body" > /dev/null 2>&1; then
     log "wrapper: alert issue not opened"
   fi
@@ -102,12 +122,12 @@ stop_group() {
 # the alert issue. No PO data: only the time, $1 (the exit code) and run_id.
 heartbeat() {
   local issue
-  issue="$(gh issue list --label po-agent-heartbeat --state open --limit 1 \
+  issue="$(gh_limited issue list --label po-agent-heartbeat --state open --limit 1 \
     --json number --jq '.[0].number' 2> /dev/null)" || issue=""
   case "$issue" in
     "" | *[!0-9]*) issue="" ;;
   esac
-  if [ -z "$issue" ] || ! gh issue edit "$issue" --body "last run: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
+  if [ -z "$issue" ] || ! gh_limited issue edit "$issue" --body "last run: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
 exit code: $1
 run_id: ${run_id:-none}" > /dev/null 2>&1; then
     log "wrapper: heartbeat not sent"
@@ -120,9 +140,11 @@ cleanup() {
 }
 
 # Every exit from here on (setup failure, agent exit, time limit, a signal)
-# cleans up, then pings, then exits with the run's own code.
+# cleans up, then pings, then exits with the run's own code. A second signal
+# during this must not skip the ping, so signals are ignored from here.
 on_exit() {
   local code=$?
+  trap '' INT TERM HUP
   cleanup
   heartbeat "$code"
   exit "$code"
