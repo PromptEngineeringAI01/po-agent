@@ -18,7 +18,8 @@ seam2/test_run_loop_offline.py), which records every call. Values are fake.
   All (the test site's Assigned User list has no agent; decisions, 3 Nov
   2026): a row with the agent as Assignee -> ALERT UNEXPECTED_SCREEN with
   its note_id, no Note opened, exit 1, even with more pages. A second page
-  can't be read, so it stops the same way. `spike` skips the read.
+  can't be read, so it stops before any Note too: ALERT MORE_PAGES, exit 1
+  (7.2; decisions, 5 Nov 2026). `spike` skips the read.
 """
 
 import importlib.util
@@ -252,9 +253,8 @@ def test_a_second_page_in_the_stale_note_read_stops_before_any_note(mysys, capsy
     assert code == 1
     assert "read" not in fake.calls
     assert not [c for c in fake.calls if c.startswith(("find_again", "take"))]
-    assert [x.split()[1] for x in lines if x.startswith("ALERT ")] == [
-        "UNEXPECTED_SCREEN"
-    ]
+    # 7.2 (decisions, 5 Nov 2026): its own ALERT kind, still exit 1.
+    assert [x.split()[1] for x in lines if x.startswith("ALERT ")] == ["MORE_PAGES"]
 
 
 def test_with_no_note_left_with_the_agent_decide_only_goes_on(mysys, capsys):
