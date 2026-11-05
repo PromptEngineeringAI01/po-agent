@@ -27,6 +27,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **4 Nov 2026: W4 and W5 built** (task 4.4; entry below).
 - **4 Nov 2026: production operations planned** as go-live gate 6 (tasks 7.1-7.7; entry below).
 - **4 Nov 2026: ADR-003 proposed** (`docs/specs/ADR-003-more-clients.md`): two more clients later, one rules package each behind a seam extracted when the second client is real; a read-only peek for a client known only from its PDF; no LLM framework. Nothing changes until then.
+- **5 Nov 2026: run mode built** (task 4.5; entry below). Plain `run` books.
 - **5 Nov 2026: a lighter build process** (entry below).
 
 ## 5 Nov 2026 - A lighter build process (Joey)
@@ -42,6 +43,15 @@ Joey: the process is heavier than this project needs. He can't judge test code, 
 - **Kept, unchanged:** Must never 1-9 (the guard, test site only, no secrets or real data out, nothing returned after Submit, the merge rules), `check.py` and CI, `/verify-pr` before every merge, tests first in their own `test:` commit (Claude's cost, and `/verify-pr` uses it for Must never #8), and the test-site rules (one agent at a time, reset first, no retry loops against MySys).
 - **Loosens?** Yes, review steps (not a safety control in the code). Joey's to merge, since the matching `CLAUDE.md` TDD line and `.claude/skills/verify-pr/` step 4 change with it and are his to edit.
 - Carried in: `docs/workflow.md` (Production build loop), `tasks/plan.md` (Cross-cutting rules, TDD), `.claude/skills/start-task/SKILL.md` (the brief). Joey edits `CLAUDE.md` (TDD) and `.claude/skills/verify-pr/SKILL.md` by hand.
+
+## 5 Nov 2026 - Run mode: book end to end (Joey, task 4.5)
+
+- **What changes:** `po-agent run --site test` no longer refuses (1.6, D1). It is decide-only's loop, but a PROCEED goes to `book()` W1-W5 with `Controls` and the assignee check built for the browser context in use; the Note is then linked and Solved, never returned, and the NOTE line is `"outcome": "booked"` with `po_number`, `pln` and `task_id`. A skip still goes back to the pool. `run --decide-only` is unchanged.
+- **Before the Submit click:** `WriteNotStarted` (and any other error) -> one return in a fresh browser, then the run stops (exit 1, `ALERT UNEXPECTED_SCREEN`). `KillSwitch` at W1 or W2 -> the same return, `INFO kill switch on: run stopped`, exit 0. `NoteTaken` at the W1 check -> that browser context is closed, `"outcome": "untouched", "reason": "NOTE_TAKEN"`, no ALERT, and the next Note runs in a fresh browser (Playwright's sync API holds one browser per thread, so the old one closes first).
+- **From the Submit click on:** an error is told by type and step together: `PartialWrite`, `AccuracyBreach` or `GuardRefusal` with step W2-W5 (W2's `before_write` errors also say W2 but are a `KillSwitch` or config error). The Note is never returned to the pool, where it would look unbooked: `ALERT PARTIAL_WRITE` (exit 1), `ACCURACY_BREACH` (exit 3) or `GUARD_REFUSAL` (exit 1) names it, and the stale-Note stop (D6) holds every later run until Joey clears it. Any other error naming W3-W5 is raised as `PartialWrite`. A Note someone linked during W1-W3 surfaces at W4 as `GUARD_REFUSAL` and is likewise never returned (4.4 review).
+- **Run output (Joey, 5 Nov 2026):** a Note stopped after Submit has no NOTE line (as decide-only's stopped Note, 2 Nov 2026, 3.3); RUN_SUMMARY's `partial` counts it. `"outcome": "partial"` stays in the contract but isn't printed in the MVP.
+- **Loosens?** It is the planned first unattended write path (D1 lifted at 4.5 as planned). Every write still goes through the booker's checks, `before_write` and the guard; the Mac Mini job stays unloaded until 4.6.
+- Carried in: `SPEC.md` (v1.26, Run output), `tasks/plan.md` (4.5 Built).
 
 ## 4 Nov 2026 - W4 and W5: Link to Project and Solved (Joey, task 4.4)
 

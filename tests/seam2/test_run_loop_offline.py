@@ -1,4 +1,5 @@
-"""The decide-only Note loop in core/run.py (task 3.3), offline.
+"""The Note loop in core/run.py, offline: decide-only (task 3.3) and run
+mode, which books (task 4.5).
 
 Not `testsite`: the driver is a fake of MySys, so nothing opens a browser;
 the decision engine and both PDF readers run for real on a fake PDF built
@@ -11,6 +12,13 @@ each: find it (reload, exact ID) -> its assignee is the pool -> take -> 2a ->
 attachments -> download -> decide -> back to the pool -> one NOTE line.
 Nothing is booked. An error while the agent holds a Note -> one return in a
 fresh browser context, then the run stops (exit 1). Values are fake.
+
+`po-agent run --site test` (4.5) runs the same loop, but a PROCEED goes to
+the real booker (`book()`, W1-W5) instead of back to the pool. Its MySys
+steps (`mysys/driver.py`, `mysys/booking.py`) are faked here too; the real
+`Controls.before_write` re-reads the kill switch from the test's config file
+and runs the real assignee check over the fake Note Pool search. From the
+Submit click on, a Note is never returned to the pool.
 """
 
 import importlib.util
@@ -20,6 +28,7 @@ from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 import keyring
 import pytest
@@ -29,8 +38,8 @@ from po_agent import cli
 from po_agent.b1.models import MySysLookup, NotePoolRow
 from po_agent.core import run
 from po_agent.core.config import CONFIG_DIR
-from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import driver
+from po_agent.core.errors import AccuracyBreach, GuardRefusal, UnexpectedScreen
+from po_agent.mysys import booking, driver
 
 _spec = importlib.util.spec_from_file_location(
     "seam1_cases_for_run_loop",
@@ -62,7 +71,15 @@ class FakeNote:
     fail_at: str | None = None  # a call name that raises `fail_with`
     fail_with: type[BaseException] = UnexpectedScreen
     person_takes_at: str | None = None  # a call during which a person takes it
+    kill_at: str | None = None  # a call during which `enabled` is set false
     taken: int = 0
+
+
+class FakePage:
+    """The page `open_browser` yields; closing its context is recorded."""
+
+    def __init__(self, calls: list[str]) -> None:
+        self.context = SimpleNamespace(close=lambda: calls.append("context_closed"))
 
 
 @dataclass
@@ -70,9 +87,15 @@ class FakeMySys:
     notes: dict[str, FakeNote]
     rows: tuple[NotePoolRow, ...]
     fail_return: bool = False
+    close_fails: bool = False  # closing a browser raises (Chromium gone)
+    break_log_at: str | None = None  # a call after which the run log can't be written
+    logs_dir: Path | None = None
     # What the stale-Note read (3.6) lists on page 1 of `agent_pages`.
     agent_rows: tuple[NotePoolRow, ...] = ()
     agent_pages: int = 1
+    config_dir: Path | None = None  # the run's config, for `kill_at`
+    task_no: str = "tsk_200002"  # the task the fake Submit creates
+    current: str | None = None  # the Note last named in a call
     calls: list[str] = field(default_factory=list)
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
@@ -83,9 +106,16 @@ class FakeMySys:
 
     def _call(self, name: str, note_id: str | None = None) -> None:
         self.calls.append(f"{name} {note_id}" if note_id else name)
+        if note_id:
+            self.current = note_id
         note = self.notes.get(note_id) if note_id else None
         if note and note.person_takes_at == name:
             note.assignee = PERSON
+        if note and note.kill_at == name:
+            toml = self.config_dir / "test.toml"
+            text = toml.read_text("utf-8")
+            assert "enabled = true" in text
+            toml.write_text(text.replace("enabled = true", "enabled = false"), "utf-8")
         if note and note.fail_at == name:
             if note.fail_with is UnexpectedScreen:
                 raise UnexpectedScreen("fake failure", note_id=note_id)
@@ -96,9 +126,11 @@ class FakeMySys:
         self.calls.append("open_browser")
         self.downloads.append(downloads)
         try:
-            yield "page"
+            yield FakePage(self.calls)
         finally:
             self.calls.append("closed")
+            if self.close_fails:
+                raise RuntimeError("fake close failure")
 
     def go_home(self, page, base_url):
         self.calls.append("go_home")
@@ -183,6 +215,92 @@ class FakeMySys:
             raise UnexpectedScreen("fake return failure", note_id=note_id)
         note.assignee = pool
 
+    # --- the booker's MySys steps (4.5), named after the Note in hand ------------
+
+    def _step(self, name: str) -> None:
+        self._call(name, self.current)
+
+    def search_note(self, guard, page, base_url, username, password, note_id):
+        # The assignee check before W1 and W4 (controls.assignee_check).
+        self._call("check", note_id)
+        note = self.notes[note_id]
+        rows = (row(note_id, note.internal_no, assignee=note.assignee),)
+        return "panel", driver.NotePoolList(rows=rows, total=1, pages=1)
+
+    def reopen_project(self, guard, page, base_url, username, password, proceed, site):
+        self._call("reopen", proceed.note_id)
+        return "project"
+
+    def open_task_form(self, guard, page, project):
+        self._step("form")
+        return "form"
+
+    def fill_task_form(self, guard, form, po_number, body, file_name, data):
+        self._step("fill")
+
+    def submit_task(self, guard, form):
+        self._step("submit")
+
+    def new_task_after_submit(self, form, project, before):
+        self._step("new_task")
+        return self.task_no
+
+    def check_new_task_row(self, project, task_no, agent):
+        self._step("task_row")
+        return "details"
+
+    def open_task_detail(self, guard, project, details):
+        self._step("open_detail")
+
+    def check_task_detail(self, page, task_no, po_number, body, agent):
+        self._step("detail")
+        return "detail-window"
+
+    def back_to_project(self, guard, page, window, pln):
+        self._step("back")
+
+    def check_project_document(self, guard, page, pln, task_no, file_name):
+        self._step("document")
+
+    def project_window(self, page, pln):
+        self._step("project_window")
+        return "project"
+
+    def open_hold(self, guard, page, project, task_no):
+        self._step("open_hold")
+        return "dialog"
+
+    def fill_hold(self, guard, dialog):
+        self._step("fill_hold")
+
+    def confirm_hold(self, guard, page, dialog):
+        self._step("confirm_hold")
+
+    def check_on_hold(self, project, task_no):
+        self._step("on_hold")
+
+    def link_project(self, guard, page, window, pln):
+        self._step("link")
+
+    def log_line_count(self, window):
+        self._step("log_count")
+        return 0
+
+    def mark_solved(self, guard, window, agent):
+        self._step("solved")
+        guard.history.append(("mark_solved", "done"))  # as guard.act records it
+
+    def check_solved_log(self, window, before):
+        self._step("solved_log")
+
+    def gone_from_pending(self, guard, page, base_url, username, password, note_id):
+        self._call("gone", note_id)
+        if self.break_log_at == "gone":
+            # The run log becomes a folder: the next write raises OSError.
+            (log,) = self.logs_dir.glob("*.jsonl")
+            log.unlink()
+            log.mkdir()
+
 
 DRIVER_NAMES = (
     "open_browser",
@@ -203,6 +321,32 @@ DRIVER_NAMES = (
     "note_body",
     "project_lookup",
     "return_note",
+)
+# The booker's MySys steps (4.5).
+BOOKER_DRIVER_NAMES = (
+    "search_note",
+    "reopen_project",
+    "log_line_count",
+    "gone_from_pending",
+)
+BOOKING_NAMES = (
+    "open_task_form",
+    "fill_task_form",
+    "submit_task",
+    "new_task_after_submit",
+    "check_new_task_row",
+    "open_task_detail",
+    "check_task_detail",
+    "back_to_project",
+    "check_project_document",
+    "project_window",
+    "open_hold",
+    "fill_hold",
+    "confirm_hold",
+    "check_on_hold",
+    "link_project",
+    "mark_solved",
+    "check_solved_log",
 )
 
 
@@ -239,13 +383,21 @@ def env(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def mysys(env):
+def mysys(env, tmp_path):
     def install(notes: dict[str, FakeNote], rows=None, **kwargs) -> FakeMySys:
         rows = rows or tuple(row(n, note.internal_no) for n, note in notes.items())
-        fake = FakeMySys(notes=notes, rows=tuple(rows), **kwargs)
-        for name in DRIVER_NAMES:
+        fake = FakeMySys(
+            notes=notes,
+            rows=tuple(rows),
+            config_dir=tmp_path / "config",
+            logs_dir=tmp_path / "logs",
+            **kwargs,
+        )
+        for name in DRIVER_NAMES + BOOKER_DRIVER_NAMES:
             # raising=False: note_body moves into the driver in 3.3.
             env.setattr(run.driver, name, getattr(fake, name), raising=False)
+        for name in BOOKING_NAMES:
+            env.setattr(booking, name, getattr(fake, name))
         return fake
 
     return install
@@ -608,3 +760,303 @@ def test_without_detailed_log_nothing_is_written_to_logs(mysys, capsys, tmp_path
     assert decide_only() == 1
     output(capsys)
     assert not (tmp_path / "logs").exists()
+
+
+# --- run mode: book end to end (4.5) ---------------------------------------------
+
+W1_TO_W5 = [
+    "check",  # W1's assignee check (D7)
+    "reopen",
+    "form",
+    "fill",
+    "submit",  # the partial-write line
+    "new_task",
+    "task_row",
+    "open_detail",
+    "detail",
+    "back",
+    "document",
+    "project_window",
+    "open_hold",
+    "fill_hold",
+    "confirm_hold",
+    "on_hold",
+    "check",  # W4's assignee check (D7)
+    "find_again",
+    "link",
+    "log_count",
+    "solved",
+    "solved_log",
+    "gone",
+]
+
+
+def book_run(*extra: str) -> int:
+    return cli.main(["run", "--site", "test", *extra])
+
+
+def calls_for(fake: FakeMySys, note_id: str) -> list[str]:
+    return [c.split()[0] for c in fake.calls if c.endswith(f" {note_id}")]
+
+
+def test_run_books_a_proceed_w1_to_w5_and_returns_a_skip(mysys, capsys):
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B"),  # PROCEED
+            "300002": FakeNote("2600002B", names=()),  # NO_PDF
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 0
+    assert calls_for(fake, "300001") == [
+        "find_again",
+        "assignee",
+        "take",
+        "2a",
+        "names",
+        "download",
+        "body",
+        "lookup",
+        *W1_TO_W5,
+    ]
+    # Booked: never returned (the Note is linked and Solved, with the agent).
+    assert "return 300001" not in fake.calls
+    assert fake.notes["300001"].assignee == AGENT
+    assert fake.notes["300002"].assignee == POOL
+    assert "context_closed" not in fake.calls
+    zero = {"field": None, "tokens_in": 0, "tokens_out": 0, "cost_aud": 0.0}
+    booked, skipped = notes_of(lines)
+    assert booked == {
+        "note_id": "300001",
+        "outcome": "booked",
+        "reason": None,
+        "po_number": "2600001B/048",
+        "pln": "pln_10001",
+        "task_id": "tsk_200002",
+        **zero,
+    }
+    assert (skipped["note_id"], skipped["outcome"], skipped["reason"]) == (
+        "300002",
+        "skipped",
+        "NO_PDF",
+    )
+    assert alerts_of(lines) == []
+    summary = summary_of(lines)
+    assert summary["mode"] == "run"
+    assert (summary["booked"], summary["skipped"], summary["partial"]) == (1, 1, 0)
+    assert summary["exit_code"] == 0
+
+
+def test_a_note_taken_at_the_w1_check_is_untouched_and_the_next_runs_in_a_new_context(
+    mysys, capsys
+):
+    fake = mysys(
+        {
+            # A person takes it while the project is read (step 10).
+            "300001": FakeNote("2600001B", person_takes_at="lookup"),
+            "300002": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 0
+    # Nothing written for 300001, and it stays with the person.
+    assert calls_for(fake, "300001")[-2:] == ["lookup", "check"]
+    assert "return 300001" not in fake.calls
+    assert fake.notes["300001"].assignee == PERSON
+    # Its browser context closed, then a fresh one for the next Note. The
+    # sync API holds one browser per thread, so the old one closes first.
+    checked = fake.calls.index("check 300001")
+    assert fake.calls[checked + 1 : checked + 4] == [
+        "context_closed",
+        "closed",
+        "open_browser",
+    ]
+    assert fake.calls.index("find_again 300002") > checked + 3
+    assert fake.notes["300002"].assignee == POOL
+    first, second = notes_of(lines)
+    assert (first["note_id"], first["outcome"], first["reason"]) == (
+        "300001",
+        "untouched",
+        "NOTE_TAKEN",
+    )
+    assert (second["note_id"], second["reason"]) == ("300002", "NO_PDF")
+    assert alerts_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["skipped"], summary["exit_code"]) == (0, 1, 0)
+
+
+@pytest.mark.parametrize(
+    ("kill_at", "closed_by_booker"),
+    [("lookup", False), ("fill", True)],
+    ids=["before-w1", "before-w2"],
+)
+def test_a_kill_switch_at_w1_or_w2_returns_the_note_in_a_fresh_context_and_exits_0(
+    mysys, capsys, kill_at, closed_by_booker
+):
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B", kill_at=kill_at),
+            "300002": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 0
+    assert "submit 300001" not in fake.calls
+    assert ("context_closed" in fake.calls) is closed_by_booker
+    after = fake.calls[fake.calls.index("closed") :]
+    assert after == [
+        "closed",
+        "open_browser",
+        "find_again 300001",
+        "assignee 300001",
+        "return 300001",
+        "closed",
+    ]
+    assert fake.notes["300001"].assignee == POOL
+    assert "300002" not in opened(fake)
+    assert "INFO  kill switch on: run stopped" in lines
+    assert alerts_of(lines) == []
+    assert notes_of(lines) == []
+    assert summary_of(lines)["exit_code"] == 0
+
+
+def test_write_not_started_returns_the_note_in_a_fresh_context_and_stops(mysys, capsys):
+    # The Create New Task form not filled as read back (W1): nothing submitted.
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B", fail_at="fill"),
+            "300002": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 1
+    assert "submit 300001" not in fake.calls
+    after = fake.calls[fake.calls.index("context_closed") :]
+    assert after == [
+        "context_closed",
+        "closed",
+        "open_browser",
+        "find_again 300001",
+        "assignee 300001",
+        "return 300001",
+        "closed",
+    ]
+    assert fake.notes["300001"].assignee == POOL
+    assert "300002" not in opened(fake)
+    ((kind, alert),) = alerts_of(lines)
+    assert (kind, alert["note_id"], alert["step"]) == (
+        "UNEXPECTED_SCREEN",
+        "300001",
+        "W1",
+    )
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"], summary["exit_code"]) == (0, 0, 1)
+
+
+AFTER_SUBMIT = [
+    # (FakeNote changes, ALERT kind, step, exit code)
+    ({"fail_at": "submit", "fail_with": RuntimeError}, "PARTIAL_WRITE", "W2", 1),
+    ({"fail_at": "new_task"}, "PARTIAL_WRITE", "W2", 1),  # UnexpectedScreen
+    ({"fail_at": "detail", "fail_with": AccuracyBreach}, "ACCURACY_BREACH", "W2", 3),
+    ({"kill_at": "document"}, "PARTIAL_WRITE", "W3", 1),  # the kill switch at W3
+    ({"fail_at": "confirm_hold", "fail_with": RuntimeError}, "PARTIAL_WRITE", "W3", 1),
+    ({"person_takes_at": "on_hold"}, "PARTIAL_WRITE", "W4", 1),  # taken at W4
+    # A Note someone linked meanwhile: no Link to Project to press (4.4).
+    ({"fail_at": "link", "fail_with": GuardRefusal}, "GUARD_REFUSAL", "W4", 1),
+    ({"fail_at": "gone"}, "PARTIAL_WRITE", "W5", 1),  # UnexpectedScreen
+]
+
+
+@pytest.mark.parametrize(
+    ("changes", "kind", "step", "exit_code"),
+    AFTER_SUBMIT,
+    ids=[
+        "submit-click-fails",
+        "unexpected-screen-after-submit",
+        "accuracy-breach-w2",
+        "kill-switch-w3",
+        "hold-confirm-fails",
+        "note-taken-w4",
+        "guard-refusal-w4",
+        "not-gone-w5",
+    ],
+)
+def test_from_the_submit_click_on_the_note_is_never_returned_and_the_run_stops(
+    mysys, capsys, changes, kind, step, exit_code
+):
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B", **changes),
+            "300002": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == exit_code
+    assert "submit 300001" in fake.calls
+    # No return attempted: no fresh browser, no Assign back to the pool.
+    assert fake.calls.count("open_browser") == 1
+    assert not [c for c in fake.calls if c.startswith("return")]
+    assert fake.notes["300001"].assignee in (AGENT, PERSON)
+    assert "300002" not in opened(fake)  # the run stopped
+    ((alert_kind, alert),) = alerts_of(lines)
+    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300001", step)
+    assert notes_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"]) == (0, 1)
+    assert summary["exit_code"] == exit_code
+
+
+# --- run mode: what the run knows about Submit, not the last exception (4.5 review)
+
+
+def test_a_run_log_that_fails_after_w5_never_returns_the_booked_note(mysys, capsys):
+    # --detailed-log, and the log can't be written once the Note is Solved.
+    fake = mysys({"300001": FakeNote("2600001B")}, break_log_at="gone")
+
+    code = book_run("--detailed-log")
+
+    lines = output(capsys)
+    assert "gone 300001" in fake.calls
+    assert not [c for c in fake.calls if c.startswith("return")]
+    assert fake.calls.count("open_browser") == 1
+    (booked,) = notes_of(lines)
+    assert (booked["outcome"], booked["task_id"]) == ("booked", "tsk_200002")
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"], code) == (1, 0, 0)
+
+
+def test_a_failed_browser_close_after_submit_keeps_the_partial_write(mysys, capsys):
+    # The Hold confirm fails (W3), then closing the browser fails too.
+    fake = mysys(
+        {
+            "300001": FakeNote(
+                "2600001B", fail_at="confirm_hold", fail_with=RuntimeError
+            )
+        },
+        close_fails=True,
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 1
+    assert not [c for c in fake.calls if c.startswith("return")]
+    assert fake.calls.count("open_browser") == 1
+    ((kind, alert),) = alerts_of(lines)
+    assert (kind, alert["note_id"], alert["step"]) == ("PARTIAL_WRITE", "300001", "W3")
+    assert summary_of(lines)["partial"] == 1

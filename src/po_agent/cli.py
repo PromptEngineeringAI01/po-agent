@@ -19,9 +19,10 @@ to stderr, because an exception's text can quote page content: the traceback
 goes to logs/ only with --detailed-log, else nowhere.
 
 Order: run_id (before anything can fail), command line, leftover download
-folders swept (D2), run-mode refusal (D1, until 4.5), config, the kill
-switch and the Perth window (3.5: exit 0, nothing launched), secrets, then
-the mode. Config and secret problems exit 2 before any browser is launched.
+folders swept (D2), config, the kill switch and the Perth window (3.5:
+exit 0, nothing launched), secrets, then the mode. Config and secret
+problems exit 2 before any browser is launched. `run` books since 4.5 (its
+refusal until then, D1, is gone); `run --decide-only` books nothing.
 """
 
 import argparse
@@ -68,6 +69,7 @@ ALERT_KINDS: dict[type[PoAgentError], output.AlertKind] = {
 _MYSYS: tuple[SecretName, ...] = ("mysys_test_username", "mysys_test_password")
 SECRETS_FOR: dict[output.Mode, tuple[SecretName, ...]] = {
     "spike": _MYSYS,
+    "run": _MYSYS,
     "decide-only": _MYSYS,
     "demo": _MYSYS,
 }
@@ -143,13 +145,17 @@ def start(
     summary: output.RunSummary,
 ) -> int:
     """The mode's entry point and its exit code; it fills the summary's
-    counts. Decide-only's run log goes to logs/ only with --detailed-log."""
+    counts. The Note loop's run log goes to logs/ only with --detailed-log."""
     if mode == "spike":
         return run.spike(config, credentials, options, summary)
     downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
     if mode == "demo":
         return demo.run(config, credentials, options, summary, downloads)
     logs = LOGS_DIR if options.detailed_log else None
+    if mode == "run":
+        return run.book_run(
+            config, credentials, options, summary, downloads, logs, CONFIG_DIR
+        )
     return run.decide_only(config, credentials, options, summary, downloads, logs)
 
 
@@ -161,8 +167,6 @@ def _run(
     mode: output.Mode, options: argparse.Namespace, summary: output.RunSummary
 ) -> int:
     sweep_download_dirs()
-    if mode == "run":
-        raise ConfigError("run mode not built yet")
     if mode == "demo" and not _demo_read_only(options) and not options.headed:
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")

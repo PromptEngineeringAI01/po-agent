@@ -238,30 +238,23 @@ def test_spike_without_secrets_prints_alert_config_and_summary(env, started, cap
 
 
 @pytest.mark.parametrize(
-    "argv", [["run", "--site", "test", "--decide-only"], ["spike", "--site", "test"]]
+    "argv",
+    [
+        ["run", "--site", "test"],
+        ["run", "--site", "test", "--decide-only"],
+        ["spike", "--site", "test"],
+    ],
 )
 def test_modes_need_only_the_mysys_secrets(env, started, capsys, argv):
     # No Claude key since the Claude reader was dropped (decisions, 2 Nov 2026).
+    # Plain `run` books since 4.5: it no longer refuses (1.6, D1).
     set_secrets(env)
 
     assert cli.main(argv) == 0
     assert len(started) == 1
-    credentials = started[0][2]
+    mode, credentials = started[0][0], started[0][2]
+    assert mode == ("decide-only" if "--decide-only" in argv else argv[0])
     assert set(credentials) == {"mysys_test_username", "mysys_test_password"}
-
-
-def test_run_without_decide_only_refuses_until_4_5(env, started, capsys):
-    set_secrets(env)
-
-    code = cli.main(["run", "--site", "test"])
-
-    captured = capsys.readouterr()
-    assert code == 2
-    kind, alert = alert_of(captured)
-    assert kind == "CONFIG"
-    assert alert["detail"] == "run mode not built yet"
-    assert summary_of(captured)["mode"] == "run"
-    assert started == []
 
 
 def test_a_site_other_than_test_exits_2(env, started, capsys):
