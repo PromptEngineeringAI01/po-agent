@@ -31,6 +31,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **5 Nov 2026: a lighter build process** (entry below).
 - **5 Nov 2026: M4 security pass, three Nits fixed** (entry below).
 - **5 Nov 2026: heartbeat built** (task 7.1; entry below): a scheduled GitHub Action, not healthchecks.io.
+- **5 Nov 2026: silent-skip alert and more pages** (task 7.2, M4 Nit #3; entry below).
 
 ## 5 Nov 2026 - Heartbeat: a scheduled GitHub Action (Joey, task 7.1)
 
@@ -39,6 +40,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Alert email (Joey, 5 Nov 2026):** the Mac Mini opens `po-agent-alert` issues with Joey's own token, and GitHub doesn't email you about your own actions. `.github/workflows/alert-email.yml` (on `issues` opened or labeled, `issues: write` only, no checkout, only the issue number reaches the shell) has github-actions[bot] post one fixed comment on each such issue it didn't open itself, once per issue, so Joey is emailed as the author. The missed-heartbeat issue is opened by the bot, so GitHub emails Joey about it directly.
 - **Run output?** Unchanged: the agent prints nothing new, so `SPEC.md` is unchanged. The new lines are the wrapper's and the workflow's.
 - **Loosens?** No: it adds an alert.
+
+## 5 Nov 2026 - Silent-skip alert and more pages (task 7.2, Joey)
+
+- **Found while building 7.2:** both cases it was planned for already stop the run with an ALERT and exit 1, so the wrapper opens the alert issue.
+  - A MySys screen change can't make every Note skip quietly: the run stops on its **first** `UNEXPECTED_SCREEN` (the Note is returned, `ALERT UNEXPECTED_SCREEN`, exit 1), and a `Skip(UNEXPECTED_SCREEN)` from the decision engine is raised the same way. One booked Note then one `UNEXPECTED_SCREEN` also alerts. Only business skips (`NOT_B1`, `DUPLICATE_TASK`, ...) let the run go on, and they don't count.
+  - M4 Nit #3 was a misread: in `run` and `run --decide-only` a Note Pool second page never waits silently. The stale-Note read (D6; decisions, 3 Nov 2026) lists every Pending Note (All Users, All Pools, Locked/Unlocked All), a superset of the eligible read, so it has a second page whenever the eligible read does, and it already stopped the run (`UNEXPECTED_SCREEN`, exit 1) before any Note was taken. The `INFO` "more pages" line was reachable only in `spike`.
+- **Joey's choice:** no `ALL_SKIPPED` alert (it could never fire). A Note Pool second page gets its own ALERT kind, `MORE_PAGES` (fixed detail, no PO data), exit 1, before any Note is taken: from the stale-Note read in the run modes, and from the eligible read (after its counts line) in `spike` and as a backstop in the run modes. The `INFO` "note pool has more pages" template is removed. Page 1 is not processed when there are more pages: changing that would change D6, a larger safety decision.
+- **Exit code:** `MorePages` is a kind of `UnexpectedScreen`, exit 1. It stops the run, so no other typed error follows it in the same run.
+- **Tests:** offline, two pin the existing stop-on-first-failure (every eligible Note `UNEXPECTED_SCREEN`; one booked then one `UNEXPECTED_SCREEN`); `MORE_PAGES` from the stale read, the eligible read (`run`, `run --decide-only`) and `spike`. Two existing expectations changed with the rule: the stale read's second page was `UNEXPECTED_SCREEN`, spike's was an `INFO` line.
+- **Loosens?** No: the same runs stop with the same exit code; the ALERT names the cause, and `spike` now alerts too.
+- **Later:** `docs/ops-runbook.md` (7.5) covers `MORE_PAGES` and notes that `UNEXPECTED_SCREEN` is also the silent-skip signal. On live, more than 50 Pending Notes stops every run (as D6 already said): handled before go-live.
+- Carried in: `SPEC.md` (v1.28: Production paging, exit codes, Code style, the stdout contract, the stale-Note stop).
 
 ## 5 Nov 2026 - M4 security pass: three Nits fixed (Joey)
 

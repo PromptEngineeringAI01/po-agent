@@ -24,7 +24,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from playwright.sync_api import Locator, Page
 
 from po_agent.core.config import Config, RunWindow, load_config
-from po_agent.core.errors import ConfigError, PartialWrite, UnexpectedScreen
+from po_agent.core.errors import (
+    ConfigError,
+    MorePages,
+    PartialWrite,
+    UnexpectedScreen,
+)
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -79,8 +84,8 @@ class KillSwitch(Exception):
 def stale_note_stop(guard: ActionGuard, panel: Locator, agent: str) -> None:
     """A Pending Note still with the agent was left by an earlier run's
     partial write or failed return: the run takes no Note (D6). Only page 1
-    can be read, so a second page stops the run too (after page 1's rows,
-    so a stale Note there is named)."""
+    can be read, so a second page stops the run too, as MorePages (after
+    page 1's rows, so a stale Note there is named; 7.2)."""
     listing = driver.read_agent_notes(guard, panel, agent)
     for row in listing.rows:
         if row.assignee == agent:
@@ -89,7 +94,7 @@ def stale_note_stop(guard: ActionGuard, panel: Locator, agent: str) -> None:
                 note_id=row.note_id,
             )
     if listing.pages > 1:
-        raise UnexpectedScreen("Note Pool has more pages: stale-Note read incomplete")
+        raise MorePages("Note Pool has more pages: stale-Note read incomplete")
 
 
 class NoteTaken(Exception):

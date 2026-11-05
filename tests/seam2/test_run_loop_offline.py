@@ -93,6 +93,7 @@ class FakeMySys:
     # What the stale-Note read (3.6) lists on page 1 of `agent_pages`.
     agent_rows: tuple[NotePoolRow, ...] = ()
     agent_pages: int = 1
+    pool_pages: int = 1  # pages of the run's filtered Note Pool read
     config_dir: Path | None = None  # the run's config, for `kill_at`
     task_no: str = "tsk_200002"  # the task the fake Submit creates
     current: str | None = None  # the Note last named in a call
@@ -151,7 +152,9 @@ class FakeMySys:
     def read_note_pool(self, guard, panel):
         self.reads += 1
         self.calls.append("read")
-        return driver.NotePoolList(rows=self.rows, total=len(self.rows), pages=1)
+        return driver.NotePoolList(
+            rows=self.rows, total=len(self.rows), pages=self.pool_pages
+        )
 
     def read_agent_notes(self, guard, panel, agent):
         self.calls.append("agent_notes")
@@ -1060,3 +1063,66 @@ def test_a_failed_browser_close_after_submit_keeps_the_partial_write(mysys, caps
     ((kind, alert),) = alerts_of(lines)
     assert (kind, alert["note_id"], alert["step"]) == ("PARTIAL_WRITE", "300001", "W3")
     assert summary_of(lines)["partial"] == 1
+
+
+# --- 7.2: a silent skip can't happen; more pages alerts (decisions, 5 Nov 2026) ---
+
+
+def test_when_every_eligible_note_would_be_unexpected_screen_the_first_alerts(
+    mysys, capsys
+):
+    # The run stops on the first UNEXPECTED_SCREEN, so a MySys screen change
+    # can't skip every Note quietly: one ALERT, exit 1, the next Note untouched.
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B", fail_at="download"),
+            "300002": FakeNote("2600002B", fail_at="download"),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 1
+    assert opened(fake) == ["300001"]
+    assert [(kind, alert["note_id"]) for kind, alert in alerts_of(lines)] == [
+        ("UNEXPECTED_SCREEN", "300001")
+    ]
+    assert summary_of(lines)["exit_code"] == 1
+
+
+def test_one_booked_then_one_unexpected_screen_still_alerts(mysys, capsys):
+    fake = mysys(
+        {
+            "300001": FakeNote("2600001B"),  # PROCEED: booked
+            "300002": FakeNote("2600002B", fail_at="download"),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 1
+    assert [n["outcome"] for n in notes_of(lines)] == ["booked"]
+    assert [(kind, alert["note_id"]) for kind, alert in alerts_of(lines)] == [
+        ("UNEXPECTED_SCREEN", "300002")
+    ]
+    assert fake.notes["300002"].assignee == POOL
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["exit_code"]) == (1, 1)
+
+
+@pytest.mark.parametrize("command", [book_run, decide_only])
+def test_more_pages_in_the_eligible_read_alerts_before_any_note(mysys, capsys, command):
+    fake = mysys({"300001": FakeNote("2600001B")}, pool_pages=2)
+
+    code = command()
+
+    lines = output(capsys)
+    assert code == 1
+    assert opened(fake) == []
+    assert not [c for c in fake.calls if c.startswith("take")]
+    assert [kind for kind, _ in alerts_of(lines)] == ["MORE_PAGES"]
+    assert notes_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["seen"], summary["eligible"], summary["exit_code"]) == (1, 1, 1)

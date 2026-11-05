@@ -95,7 +95,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 ## Production operations (added 4 Nov 2026; plan -> Phase P -> Production operations)
 
 - [x] **7.1** Heartbeat: one ping per run, email after 2 hours without one inside the schedule · step · asks first: the service · before the P5 week
-- [ ] **7.2** Silent-skip alert: every eligible Note `UNEXPECTED_SCREEN` → one ALERT · step · asks first: the rule · before the P5 week
+- [x] **7.2** Silent-skip alert: every eligible Note `UNEXPECTED_SCREEN` → one ALERT · step · asks first: the rule · before the P5 week
 - [ ] **7.3** Safe trace on the Mac Mini: allowlisted fields only, 90 days · step · before go-live
 - [ ] **7.4** Release pinning: the Mac Mini runs the `production` tag; `enabled` still read from `main` · step · before go-live
 - [ ] **7.5** `docs/ops-runbook.md`: what to do for each alert · docs · before go-live

@@ -167,14 +167,21 @@ def test_spike_output_has_no_page_text(env, fake, capsys):
     assert "fake-password" not in out
 
 
-def test_more_pages_adds_an_info_line(env, fake, capsys):
+def test_more_pages_is_alert_more_pages_exit_1_after_the_counts(env, fake, capsys):
+    # 7.2 (decisions, 5 Nov 2026): a second page is never read, so it alerts.
     fake(driver.NotePoolList(rows=ROWS, total=60, pages=2))
 
-    cli.main(["spike", "--site", "test"])
+    code = cli.main(["spike", "--site", "test"])
 
-    assert "INFO  note pool has more pages: only page 1 of 2 read" in stdout_lines(
-        capsys
-    )
+    lines = stdout_lines(capsys)
+    assert code == 1
+    assert "INFO  note pool read: 5 rows, 2 eligible" in lines
+    assert not [x for x in lines if "more pages: only page 1" in x]
+    (alert,) = [x for x in lines if x.startswith("ALERT ")]
+    assert alert.startswith("ALERT MORE_PAGES ")
+    assert lines[-2] == alert
+    summary = summary_of(lines)
+    assert (summary["seen"], summary["eligible"], summary["exit_code"]) == (5, 2, 1)
 
 
 def test_a_failed_login_is_alert_login_failed_exit_2(env, fake, capsys):
