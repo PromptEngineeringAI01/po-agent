@@ -87,6 +87,9 @@ class FakeMySys:
     notes: dict[str, FakeNote]
     rows: tuple[NotePoolRow, ...]
     fail_return: bool = False
+    close_fails: bool = False  # closing a browser raises (Chromium gone)
+    break_log_at: str | None = None  # a call after which the run log can't be written
+    logs_dir: Path | None = None
     # What the stale-Note read (3.6) lists on page 1 of `agent_pages`.
     agent_rows: tuple[NotePoolRow, ...] = ()
     agent_pages: int = 1
@@ -126,6 +129,8 @@ class FakeMySys:
             yield FakePage(self.calls)
         finally:
             self.calls.append("closed")
+            if self.close_fails:
+                raise RuntimeError("fake close failure")
 
     def go_home(self, page, base_url):
         self.calls.append("go_home")
@@ -283,12 +288,18 @@ class FakeMySys:
 
     def mark_solved(self, guard, window, agent):
         self._step("solved")
+        guard.history.append(("mark_solved", "done"))  # as guard.act records it
 
     def check_solved_log(self, window, before):
         self._step("solved_log")
 
     def gone_from_pending(self, guard, page, base_url, username, password, note_id):
         self._call("gone", note_id)
+        if self.break_log_at == "gone":
+            # The run log becomes a folder: the next write raises OSError.
+            (log,) = self.logs_dir.glob("*.jsonl")
+            log.unlink()
+            log.mkdir()
 
 
 DRIVER_NAMES = (
@@ -376,7 +387,11 @@ def mysys(env, tmp_path):
     def install(notes: dict[str, FakeNote], rows=None, **kwargs) -> FakeMySys:
         rows = rows or tuple(row(n, note.internal_no) for n, note in notes.items())
         fake = FakeMySys(
-            notes=notes, rows=tuple(rows), config_dir=tmp_path / "config", **kwargs
+            notes=notes,
+            rows=tuple(rows),
+            config_dir=tmp_path / "config",
+            logs_dir=tmp_path / "logs",
+            **kwargs,
         )
         for name in DRIVER_NAMES + BOOKER_DRIVER_NAMES:
             # raising=False: note_body moves into the driver in 3.3.
@@ -1004,3 +1019,44 @@ def test_from_the_submit_click_on_the_note_is_never_returned_and_the_run_stops(
     summary = summary_of(lines)
     assert (summary["booked"], summary["partial"]) == (0, 1)
     assert summary["exit_code"] == exit_code
+
+
+# --- run mode: what the run knows about Submit, not the last exception (4.5 review)
+
+
+def test_a_run_log_that_fails_after_w5_never_returns_the_booked_note(mysys, capsys):
+    # --detailed-log, and the log can't be written once the Note is Solved.
+    fake = mysys({"300001": FakeNote("2600001B")}, break_log_at="gone")
+
+    code = book_run("--detailed-log")
+
+    lines = output(capsys)
+    assert "gone 300001" in fake.calls
+    assert not [c for c in fake.calls if c.startswith("return")]
+    assert fake.calls.count("open_browser") == 1
+    (booked,) = notes_of(lines)
+    assert (booked["outcome"], booked["task_id"]) == ("booked", "tsk_200002")
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"], code) == (1, 0, 0)
+
+
+def test_a_failed_browser_close_after_submit_keeps_the_partial_write(mysys, capsys):
+    # The Hold confirm fails (W3), then closing the browser fails too.
+    fake = mysys(
+        {
+            "300001": FakeNote(
+                "2600001B", fail_at="confirm_hold", fail_with=RuntimeError
+            )
+        },
+        close_fails=True,
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert code == 1
+    assert not [c for c in fake.calls if c.startswith("return")]
+    assert fake.calls.count("open_browser") == 1
+    ((kind, alert),) = alerts_of(lines)
+    assert (kind, alert["note_id"], alert["step"]) == ("PARTIAL_WRITE", "300001", "W3")
+    assert summary_of(lines)["partial"] == 1
