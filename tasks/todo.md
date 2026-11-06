@@ -14,8 +14,8 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 
 - [x] **P1** (done: PR #31) Docs catch-up and the Production sections · Claude writes, Joey merges
 - [x] **P2** (done: PRs #33-#45) Decide: 2.1-2.6
-- [ ] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
-- [ ] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
+- [x] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
+- [x] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
 - [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2, then the hourly job; a week of hourly runs with zero wrong bookings, every alert triaged (7.6)
 - [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week; production operations 7.1-7.6): live spike, then decide-only, then one booking per run, watched · tasks written then
 
@@ -45,7 +45,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **1.7** Eligibility, step 0 (test + live title rules, Project `---`, Assignee = pool) · step
 - [x] **1.8** Spike: guarded login, Note Pool filters read back (Search empty), list read once, RUN_SUMMARY (seam-2 `spike`); seam-2 failure reports scrubbed to the exception type; explicit `-m testsite` errors on missing secrets · step · needs M0b.1 merged
 - [x] **1.9** `scripts/macmini-run.sh` (mode mapping, stop on failed pull, process-group kill, stderr dropped) + launchd plist, with stub-command tests · step
-- [ ] **1.10** Laptop secrets, guardrail prompts, Mac Mini setup, spike as `poagent` (S1), then **unload the job** · by hand
+- [x] **1.10** (done: 6 Nov 2026; S1 spike run 20261106T045123Z-19d7; ADR-002 H2 waiver PR #72) Laptop secrets, guardrail prompts, Mac Mini setup, spike as `poagent` (S1), then **unload the job** · by hand
 
 **Checkpoint M1:** check green, CI green on `main` (S2); guardrails behave; laptop spike eligible = 3; Mac Mini S1; job unloaded; review + security review; Joey OK.
 
@@ -70,7 +70,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **3.3** (done: PR #48) `run --decide-only` loop with NOTE lines; offline loop test + seam-2 `decide_only` · step
 - [x] **3.5** (done: PR #49) Kill switch (start + `before_write` every step), Perth window, run cap · step
 - [x] **3.6** (done: PRs #51-#52) Assignee check (All Pools + exact Note ID) before W1 and W4 only (D7); stale-Note stop at run start (D6) · step · after the Milestone A demo, before M4
-- [ ] **3.4** Decide-only on the laptop (headed), then on the Mac Mini (decision 2: yes, 25 Oct 2026); for the Milestone A demo, the job may be loaded in decide-only mode · by hand
+- [x] **3.4** (done: 6 Nov 2026; laptop run 20261106T063859Z-1bd8, Mac Mini run 20261106T064611Z-dfd6, 3 of 3 DECIDE_ONLY) Decide-only on the laptop (headed), then on the Mac Mini (decision 2: yes, 25 Oct 2026); for the Milestone A demo, the job may be loaded in decide-only mode · by hand
 
 **Checkpoint Milestone A:** check green; seam-2 decide-only green; Mac Mini decide-only green; demo to the CEO. **Checkpoint M3:** 3.6 merged; seam-2 assignee green; Mac Mini decide-only green; review. **Gate for M4:** M0b.2 merged; doubt-driven review of the booker design (fresh session); reset.
 
@@ -81,7 +81,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **4.3** (done: PR #61) W3: Hold with every dialog check read, no checkbox touched; `guard.vet()` refuses a Hold checkbox · step
 - [x] **4.4** (done: PR #62) W4 Link to Project + W5 Solved; `before_write` → untick → read back → click, read back again before W4's final select · step
 - [x] **4.5** `run` mode end to end; seam 2: 3 trial POs booked (S4), rerun changes nothing, 2609034B copy skips (S5); manual mid-run takeover (stop before W1, or `PARTIAL_WRITE` at W4) · step
-- [ ] **4.6** First bookings from the Mac Mini, one trial PO per run (load job, then unload; no laptop runs meanwhile); then reset · by hand
+- [x] **4.6** (done: 6 Nov 2026; tsk_164306, tsk_164307, tsk_164309, exit 0, no ALERT; job unloaded, test site reset) First bookings from the Mac Mini, one trial PO per run (load job, then unload; no laptop runs meanwhile); then reset · by hand
 
 **Checkpoint M4:** check green; seam-2 booking cases green; Mac Mini bookings correct; review + security review; Joey OK.
 
