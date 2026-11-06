@@ -126,7 +126,7 @@ def test_vet_refuses_discard_in_an_open_trial_note_window_and_nothing_changes(
     assert not done & set(CHANGES)
 
 
-def test_a_full_run_unticks_send_email_after_the_latest_assignee_check_before_every_note_window_write(  # noqa: E501
+def test_full_run_unticks_send_email_after_the_latest_check_before_note_window_writes(
     config, login, check_note_pool_reset, capsys, tmp_path, monkeypatch
 ):
     before = read_pool(config, login)
