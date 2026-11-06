@@ -33,6 +33,31 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **5 Nov 2026: heartbeat built** (task 7.1; entry below): a scheduled GitHub Action, not healthchecks.io.
 - **5 Nov 2026: silent-skip alert and more pages** (task 7.2, M4 Nit #3; entry below).
 - **6 Nov 2026: Claude on the Mac Mini's `poagent` account, test site only** (ADR-002 gate H2 waived for the test site; entry below).
+- **6 Nov 2026: faster shipping** (decision batch, verify by CI, test-site queue, Must never #8 pre-authorised; entry below).
+
+## 6 Nov 2026 - Faster shipping: fewer waits on Joey (Joey)
+
+- **Why:** Joey asked whether cmux, Claude Code agent teams, git worktrees, QA automation or gstack would ship faster (the Claude Code power-user tips article). The slowest part is waiting for Joey: a task stopping to ask him, a seam-2 run waiting for his reset, his reserved merges. More parallel agents don't shorten that.
+- **Not adopted:**
+  - cmux: macOS only. Joey builds on Windows, where the Claude Desktop Code tab already runs parallel worktree sessions.
+  - Agent teams: experimental, and in-process teammates can't be resumed. The advisor plus linked worktree sessions already covers the work.
+  - gstack, for this repo:
+    - `/ship` and `/land-and-deploy` merge and deploy (Must never #9; a merge deploys to the Mac Mini).
+    - `/qa` and `/browse` click pages (Must never #1).
+    - It sends code to another provider for review by default.
+    - It installs hooks and needs `.claude/` changes (Joey's).
+    - Joey may use it in other projects.
+  - Git worktrees are already the build loop.
+- **Adopted:**
+  1. **Decision batch:** at the start of each phase or week, the advisor asks Joey every foreseeable choice for the next few tasks at once, records them here, and task briefs carry them under "Decided already" (`docs/workflow.md`, Production build loop step 0; `.claude/skills/start-task/SKILL.md`).
+  2. **Verify by CI:** CI runs `scripts/check.py` on the PR's head commit. `/verify-pr` takes that instead of re-running the check locally (12-55 minutes), unless the PR touches `scripts/check.py`, `.github/workflows/`, `pyproject.toml` or `uv.lock`. The skill is Joey's file: the advisor hands him the patch.
+  3. **Test-site queue:** seam-2 and decide-only runs from several tasks share one reset where their order allows. The advisor keeps the queue and asks Joey for one reset per batch (Production build loop step 10; plan Cross-cutting rules).
+  4. **Must never #8, pre-authorised case:** a `test:` commit may change an existing expected result without asking Joey when the PR says it is an intended behaviour change and carries the decisions entry that made it. `/verify-pr` checks both and quotes them. Everything else under #8 stays: never edit a test to make it pass. Joey changes the CLAUDE.md line by hand.
+  5. **Answer from the phone:** Remote Control for all sessions, so Joey can answer a waiting session from the Claude mobile app. It is disabled by the organisation's admin today (6 Nov 2026); until it is allowed, desktop banners (the default) are the signal. A desktop setting, no repo change.
+- **Who merges (Joey, 6 Nov 2026, later the same day):** Joey stops approving PRs one by one. Only PRs that touch the guard (`guard.py`, `guard_check.py`), the hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`) stay his to merge. Claude merges every other PR once `/verify-pr` passes, with the same pinned command. That includes PRs touching `scripts/check.py` or the verify-pr skill, and docs that loosen a rule, which still need their decisions entry. Must never #9 and the `/verify-pr` merge condition say so; the skill line is Joey's hand edit, since a hook protects that file.
+- **Open, Joey's:** ask the MySys admin for reusable test Notes on the test site, so seam 2 stops consuming the 3 trial POs and needs fewer resets.
+- **Loosens?** Yes, three controls: the local re-run of the check before a merge (CI on the same commit still runs it), #8's approval step for intended behaviour changes, and Joey's merge of PRs outside the guard, hooks and CI. Joey told Claude to merge this PR after review (6 Nov 2026).
+- Carried in: `docs/workflow.md` (Production build loop steps 0, 7 and 10), `tasks/plan.md` (Cross-cutting rules), `.claude/skills/start-task/SKILL.md`. No `SPEC.md` change: nothing the agent does or prints changes.
 
 ## 6 Nov 2026 - Claude on `poagent`, test site only (Joey; loosens a safety control)
 

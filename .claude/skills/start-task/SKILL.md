@@ -24,6 +24,7 @@ git -C <repo> log --oneline -1 origin/main
 `$ARGUMENTS`, or the first unchecked task in `tasks/todo.md` in the order of `tasks/plan.md` -> Phase P.
 
 - **By-hand tasks** (M0b.x, 1.10, 3.4, 4.6, M6, anything marked "by hand"): don't start a session. Tell Joey what the task needs from him, in a few lines.
+- **Decision batch first** (decisions, 6 Nov 2026, faster shipping): if this task has an ask-first point or an open behaviour choice that Joey hasn't answered in `docs/decisions.md`, ask it now, together with the same kind of question for the next two or three tasks (one AskUserQuestion, up to four questions, each with a recommendation), and record the answers in `docs/decisions.md` (in the task's PR, or a docs PR if several tasks share them) before starting.
 - **Before 4.1:** M0b.2 merged and the doubt-driven review of the booker design done (fresh session). If not, start that first.
 - Read the task's section in `tasks/plan.md`: description, Needs, Acceptance, Files, ask-first points.
 
@@ -40,6 +41,8 @@ Task: <N> in tasks/plan.md (<title>), using /agent-skills:build for this one tas
 
 Key points: <3-6 lines from the task's acceptance and any carried-over notes from the previous PR's review>.
 
+Decided already (Joey, <date>; don't ask again): <each answer from the decision batch, one line each, or "none">. Ask Joey only about a choice not covered here.
+
 Tests: the fewest that pin the acceptance criteria and Must-never points; no mocking our own code; fakes only at MySys, the Anthropic API and the clock.
 Reports to Joey: in Traditional Chinese (code and repo text stay English), open with a one-line recap, use plain words, ask one question at a time, end with the next action. Ask him for a by-hand check only when no offline or seam-2 test covers the case.
 
@@ -54,9 +57,9 @@ Workflow (docs/workflow.md, Production build loop):
 ```
 
 No task has a review stop since 5 Nov 2026 (decisions, lighter process). Add when they apply:
-- **Ask-first points** from the task (address rules 2.4, prompt and model ID 2.5, prices 2.6, any new dependency): `Stop and ask Joey before <point>.`
+- **Ask-first points** from the task (address rules 2.4, prompt and model ID 2.5, prices 2.6, any new dependency): `Stop and ask Joey before <point>.` Skip any the decision batch already answered.
 - **Touches readers, prompt, model ID or address rules:** `Run the live-Claude seam (uv run pytest tests/seam1 -m live_claude) after Joey OKs it and show false PROCEED: 0.`
-- **Touches the test site** (`mysys/`, the booker, seam 2, decide-only): `No /goal for anything that touches the test site: run seam 2 once, watched, and report the result. Reset the test site first per docs/demo-runbook.md (Joey does the reset).`
+- **Touches the test site** (`mysys/`, the booker, seam 2, decide-only): `No /goal for anything that touches the test site: run seam 2 once, watched, and report the result. Reset the test site first per docs/demo-runbook.md (Joey does the reset). Don't ask Joey for the reset yourself: tell the advisor what you need to run (the -k selection); the advisor batches test-site runs behind one reset (test-site queue, decisions, 6 Nov 2026).`
 - **Real data** (`-m real_data`, `private/`): `Laptop only. Nothing from private/ goes into a committed file or the PR.`
 
 **`background`** (80+ characters): the project in one line, the production order, which tasks are merged, and "this session does <N> only; an advisor relays Joey's answers, verifies your PR and merges it once it passes."
