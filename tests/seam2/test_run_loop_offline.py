@@ -117,6 +117,12 @@ class FakeMySys:
             text = toml.read_text("utf-8")
             assert "enabled = true" in text
             toml.write_text(text.replace("enabled = true", "enabled = false"), "utf-8")
+        if self.break_log_at == name:
+            # The run log becomes a folder: the next write raises OSError.
+            self.break_log_at = None  # once
+            (log,) = self.logs_dir.glob("*.jsonl")
+            log.unlink()
+            log.mkdir()
         if note and note.fail_at == name:
             if note.fail_with is UnexpectedScreen:
                 raise UnexpectedScreen("fake failure", note_id=note_id)
@@ -243,6 +249,7 @@ class FakeMySys:
 
     def submit_task(self, guard, form):
         self._step("submit")
+        guard.history.append(("submit_task", "done"))
 
     def new_task_after_submit(self, form, project, before):
         self._step("new_task")
@@ -278,17 +285,20 @@ class FakeMySys:
 
     def confirm_hold(self, guard, page, dialog):
         self._step("confirm_hold")
+        guard.history.append(("confirm_hold", "done"))
 
     def check_on_hold(self, project, task_no):
         self._step("on_hold")
 
     def link_project(self, guard, page, window, pln, unticked=None):
-        # The real one reads Send Email back unticked right before its
-        # committing select (`unticked` is then told), as it records it.
+        # The real one reads Send Email back unticked right before Link to
+        # Project and again right before its committing select (`unticked`
+        # is told each time), as guard.act records them.
         self._step("link")
-        if unticked is not None:
-            unticked()
-        guard.history.append(("link_select_project", "done"))
+        for action in ("link_to_project", "link_select_project"):
+            if unticked is not None:
+                unticked()
+            guard.history.append((action, "done"))
 
     def log_line_count(self, window):
         self._step("log_count")
@@ -305,11 +315,6 @@ class FakeMySys:
 
     def gone_from_pending(self, guard, page, base_url, username, password, note_id):
         self._call("gone", note_id)
-        if self.break_log_at == "gone":
-            # The run log becomes a folder: the next write raises OSError.
-            (log,) = self.logs_dir.glob("*.jsonl")
-            log.unlink()
-            log.mkdir()
 
 
 DRIVER_NAMES = (
@@ -860,6 +865,31 @@ def test_run_books_a_proceed_w1_to_w5_and_returns_a_skip(mysys, capsys):
     assert summary["exit_code"] == 0
 
 
+BOOKER_WRITES = (
+    "submit_task",
+    "confirm_hold",
+    "link_to_project",
+    "link_select_project",
+    "mark_solved",
+)
+
+
+@pytest.mark.parametrize("at", ["check", "link", "solved"])
+def test_a_run_log_that_cant_be_written_mid_booking_doesnt_stop_it(mysys, capsys, at):
+    # 5.2 review: the booker's run-log writes (W1/W4 checks, W4/W5 read-back
+    # events, step flushes) never turn a booking into a partial write.
+    fake = mysys({"300001": FakeNote("2600001B")}, break_log_at=at)
+
+    code = book_run("--detailed-log")
+
+    lines = output(capsys)
+    assert "gone 300001" in fake.calls
+    (booked,) = notes_of(lines)
+    assert (booked["outcome"], booked["task_id"]) == ("booked", "tsk_200002")
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"], code) == (1, 0, 0)
+
+
 def test_the_detailed_log_has_send_email_unticked_after_w4s_check_before_w4_and_w5(
     mysys, capsys, tmp_path
 ):
@@ -878,15 +908,20 @@ def test_the_detailed_log_has_send_email_unticked_after_w4s_check_before_w4_and_
         if e["note_id"] == "300001"
         and (
             e["event"] in ("assignee_check", "email_notification_unticked")
-            or e.get("action") in ("link_select_project", "mark_solved")
+            or e.get("action") in BOOKER_WRITES
         )
     ]
+    # Each guard action carries its own W step (the safe trace, SPEC.md).
     assert named == [
         ("assignee_check", "2", None),
         ("assignee_check", "W1", None),
+        ("guard_action", "W2", "submit_task"),
+        ("guard_action", "W3", "confirm_hold"),
         ("assignee_check", "W4", None),
         ("email_notification_unticked", "W4", None),
-        ("guard_action", "W5", "link_select_project"),
+        ("guard_action", "W4", "link_to_project"),
+        ("email_notification_unticked", "W4", None),
+        ("guard_action", "W4", "link_select_project"),
         ("email_notification_unticked", "W5", None),
         ("guard_action", "W5", "mark_solved"),
     ]

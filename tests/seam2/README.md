@@ -29,7 +29,7 @@ runs leave the reset state as they found it, so they run back to back.
 | 9 | `uv run pytest tests/seam2 -m testsite -k test_booker_w4_w5` | reset |
 | 10 | `uv run pytest tests/seam2 -m testsite -k test_run_book` | reset |
 | 11 | `uv run pytest tests/seam2 -m testsite -k "test_run_book and fresh_copy"` | Joey places a fresh copy of the 2609034B Note and a non-`/048` Note in the Agent Pool |
-| 12 | `uv run pytest tests/seam2 -m testsite -k test_safety` | reset |
+| 12 | `uv run pytest tests/seam2 -m testsite -k test_safety` | reset, leaving run 11's non-`/048` Note in the Agent Pool |
 
 Reset again after run 12.
 
@@ -43,8 +43,10 @@ Notes:
   that a non-`/048` Note is untouched (S5).
 - Run 12 (`test_safety.py`): `guard.vet()` refuses Discard in an open trial
   Note window (D3), then one booking run with `--detailed-log` must read Send
-  Email back unticked after the latest assignee check before every Note-window
-  write (W4's check for W4 and W5, D7), and touch no Note but the trial ones.
+  Email back unticked after the latest assignee check and the previous write,
+  before every Note-window write (W4's check for W4 and W5, D7), and touch no
+  Note but the trial ones. It fails without a non-`/048` Note in the Agent
+  Pool, so that case is never passed untested.
   Its detailed log goes to pytest's temporary folder, not `logs/`.
 - To check what a run selects without logging in, add `--collect-only`.
   Running a seam-2 file by path without `-m "not testsite"` logs in to MySys.

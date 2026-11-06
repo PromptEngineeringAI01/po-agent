@@ -7,12 +7,13 @@ From the reset state (docs/workflow.md 6.1), in this order:
    DENYLISTED (D3). Found again afterwards, the Note has no new log line and
    its assignee and status are unchanged.
 2. One `po-agent run --site test --detailed-log` books the 3 trial POs. In
-   its detailed log, before every Note-window write (Assign, the Choose
-   Project select, Solved) there is an `email_notification_unticked` event
-   after the most recent `assignee_check` of that Note; for W4's select and
-   W5's Solved that check is W4's (D7). Every Note in the log is a trial
-   Note: a non-`/048` Note in the Agent Pool is never assigned or opened,
-   and is still in the pool as it was.
+   its detailed log, before every Note-window write (Assign, Link to
+   Project, the Choose Project select, Solved) there is an
+   `email_notification_unticked` event after both the most recent
+   `assignee_check` of that Note and its previous Note-window write; for W4
+   and W5 that check is W4's (D7). Every Note in the log is a trial Note:
+   the non-`/048` Note left in the Agent Pool after run 11 (README) is never
+   assigned or opened, and is still in the pool as it was.
 
 Joey resets the test site afterwards (the 3 bookings). The detailed log is
 written under pytest's tmp_path, never logs/ or the repo. Assertions use
@@ -35,12 +36,16 @@ TRIAL_INTERNAL_NOS = ("2609017B", "2609034B", "2610002B")
 DISCARD_NOTE = "2609034B"  # the Note row 15b was mapped on
 # The guard actions that write in a Note window (SPEC.md -> MySys screen
 # rules); each needs Send Email read back unticked first (Must never #4).
-NOTE_WINDOW_WRITES = ("assign_note", "link_select_project", "mark_solved")
+NOTE_WINDOW_WRITES = (
+    "assign_note",
+    "link_to_project",
+    "link_select_project",
+    "mark_solved",
+)
 CHANGES = (
     "select_note_user",
     "select_note_pool",
     "untick_send_email_notification",
-    "link_to_project",
     *NOTE_WINDOW_WRITES,
 )
 
@@ -70,8 +75,9 @@ def read_pool(config, login) -> driver.NotePoolList:
 
 def unticked_before_each_write(events: list[dict]) -> list[tuple[str, str, str]]:
     """(note_id, action, step of the latest assignee_check) for each
-    Note-window write; step is "none" when no unticked event follows that
-    check before the write, or there is no check."""
+    Note-window write; step is "none" when no unticked event follows both
+    that check and the Note's previous Note-window write, or there is no
+    check."""
     found = []
     for i, event in enumerate(events):
         if event["event"] != "guard_action":
@@ -81,9 +87,14 @@ def unticked_before_each_write(events: list[dict]) -> list[tuple[str, str, str]]
         note_id = event["note_id"]
         mine = [(j, e) for j, e in enumerate(events[:i]) if e["note_id"] == note_id]
         checks = [(j, e) for j, e in mine if e["event"] == "assignee_check"]
+        writes = [
+            j
+            for j, e in mine
+            if e["event"] == "guard_action" and e.get("action") in NOTE_WINDOW_WRITES
+        ]
         step = "none"
         if checks and checks[-1][1]["ok"]:
-            last = checks[-1][0]
+            last = max([checks[-1][0], *writes])
             if any(
                 e["event"] == "email_notification_unticked" and e["ok"] and j > last
                 for j, e in mine
@@ -143,6 +154,8 @@ def test_full_run_unticks_send_email_after_the_latest_check_before_note_window_w
         for r in before.rows
         if r.note_id not in trial
     }
+    if not others:  # the non-/048 Note from run 11 (README)
+        pytest.fail("needs a non-/048 Note in the Agent Pool: others=0")
     monkeypatch.setattr(cli, "LOGS_DIR", tmp_path / "logs")
 
     code = cli.main(["run", "--site", "test", "--detailed-log"])
@@ -164,6 +177,7 @@ def test_full_run_unticks_send_email_after_the_latest_check_before_note_window_w
     steps = {(action, step) for _, action, step in writes}
     assert steps == {
         ("assign_note", "2"),
+        ("link_to_project", "W4"),
         ("link_select_project", "W4"),
         ("mark_solved", "W4"),
     }
