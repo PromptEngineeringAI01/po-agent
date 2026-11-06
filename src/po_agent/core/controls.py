@@ -30,6 +30,7 @@ from po_agent.core.errors import (
     PartialWrite,
     UnexpectedScreen,
 )
+from po_agent.core.runlog import RunLog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -109,7 +110,11 @@ class NoteTaken(Exception):
 
 
 def assignee_check(
-    guard: ActionGuard, page: Page, login: tuple[str, str, str], agent: str
+    guard: ActionGuard,
+    page: Page,
+    login: tuple[str, str, str],
+    agent: str,
+    log: RunLog | None = None,
 ) -> AssigneeCheck:
     """The check `Controls` runs before W1 and W4: reload, search the Note
     ID under All Pools, and the one row whose ID cell equals it must have
@@ -117,11 +122,15 @@ def assignee_check(
     task exists and is on hold, so any failure is PartialWrite: the Note
     stays with the agent and is never returned to the pool, where it would
     look unbooked (3.6 review). `page` is the booker's browser context:
-    build one check per context."""
+    build one check per context. With `log`, each check is an
+    `assignee_check` event (5.2 checks the order)."""
 
     def check(note_id: str, step: str) -> None:
         _, listing = driver.search_note(guard, page, *login, note_id)
         row = driver.exact_row(listing, note_id)
+        if log is not None:
+            ok = row is not None and row.assignee == agent
+            log.event("assignee_check", note_id=note_id, step=step, ok=ok)
         if row is None:
             raise UnexpectedScreen("Note not found once", note_id=note_id, step=step)
         if row.assignee != agent:

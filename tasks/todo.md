@@ -88,7 +88,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 ## M5 — MVP safety
 
 - [x] **5.1** ALERT lines and exit codes for every typed error, end to end; RUN_SUMMARY always last; nothing on stderr · step
-- [ ] **5.2** Seam-2 safety cases (`guard.vet()` refuses Discard, non-`/048` untouched, Send Email untick after the latest assignee check, from the log); full seam 2 green as the fixed sequence of runs with resets in `tests/seam2/README.md` · step
+- [x] **5.2** Seam-2 safety cases (`guard.vet()` refuses Discard, non-`/048` untouched, Send Email untick after the latest assignee check, from the log); full seam 2 green as the fixed sequence of runs with resets in `tests/seam2/README.md` · step
 
 **Checkpoint M5:** check green; full seam 2 green; manual mid-run takeover (4.5) done; review + security review; docs drift checked.
 
