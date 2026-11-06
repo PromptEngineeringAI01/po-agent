@@ -11,6 +11,7 @@ copied into a temp folder first, so even if a stub were missed, the real
 import itertools
 import os
 import plistlib
+import re
 import shutil
 import subprocess
 import time
@@ -54,11 +55,22 @@ STUB_PKILL = """#!/bin/bash
 echo "pkill $*" >> "$STUB_DIR/pkill.calls"
 exit 1
 """
+# Each `gh <a> <b> ...` call's arguments go to gh.<a>-<b>.args. The heartbeat
+# ping (`issue list`, then `issue edit`) fails with STUB_PING_EXIT; `issue
+# list` prints STUB_HEARTBEAT_ISSUE (default 7), the open heartbeat issue.
+# STUB_GH_HANG makes every call hang (exec, so the kill reaches the sleep).
 STUB_GH = """#!/bin/bash
-echo "gh" >> "$STUB_DIR/calls"
-printf '%s\\0' "$@" > "$STUB_DIR/gh.args"
+echo "gh $1 $2" >> "$STUB_DIR/calls"
+printf '%s\\0' "$@" > "$STUB_DIR/gh.$1-$2.args"
+if [ -n "${STUB_GH_HANG:-}" ]; then exec sleep 300; fi
+if [ "$2" = list ] || [ "$2" = edit ]; then
+  [ "${STUB_PING_EXIT:-0}" = 0 ] || exit "$STUB_PING_EXIT"
+fi
+if [ "$2" = list ]; then printf '%s\\n' "${STUB_HEARTBEAT_ISSUE-7}"; fi
 exit 0
 """
+PING_CALLS = ["gh issue list", "gh issue edit"]
+TIMESTAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 
 
 def posix(path: Path) -> str:
@@ -127,8 +139,8 @@ class Box:
         path = self.stubs / "calls"
         return path.read_text().splitlines() if path.exists() else []
 
-    def gh_args(self) -> list[str] | None:
-        path = self.stubs / "gh.args"
+    def gh_args(self, call: str = "issue-create") -> list[str] | None:
+        path = self.stubs / f"gh.{call}.args"
         if not path.exists():
             return None
         return path.read_bytes().decode().split("\0")[:-1]
@@ -165,6 +177,7 @@ def test_clean_run_logs_stdout_and_opens_no_issue(box):
         "uv sync --locked",
         "uv run playwright install chromium",
         "uv run po-agent run --site test",
+        *PING_CALLS,
     ]
     log = box.runs_log()
     assert all(line in log for line in (INFO, NOTE, summary(0)))
@@ -185,7 +198,7 @@ def test_modes_map_to_the_cli(box, mode, agent_call):
     result = box.run(mode)
 
     assert result.returncode == 0
-    assert box.calls()[-1] == agent_call
+    assert box.calls()[-3:] == [agent_call, *PING_CALLS]
 
 
 @pytest.mark.parametrize("args", (("demo",), ("",), (), ("run", "--detailed-log")))
@@ -272,6 +285,83 @@ def test_hung_agent_also_kills_detached_playwright_browsers(box):
     assert args[:2] == ["pkill", "-KILL"]
     assert args[args.index("-f") + 1] == "ms-playwright/"
     assert "-u" in args
+
+
+# 7.1 heartbeat: one ping at the end of every run.
+
+
+def ping_body(box: Box) -> list[str]:
+    """The heartbeat issue's new body, after checking the ping's two calls."""
+    gh_issue_calls = [call for call in box.calls() if call.startswith("gh issue")]
+    assert gh_issue_calls[-2:] == PING_CALLS
+    assert box.calls().count("gh issue edit") == 1
+    listed = box.gh_args("issue-list")
+    assert listed[listed.index("--label") + 1] == "po-agent-heartbeat"
+    assert listed[listed.index("--state") + 1] == "open"
+    edit = box.gh_args("issue-edit")
+    assert edit[:4] == ["issue", "edit", "7", "--body"]
+    assert len(edit) == 5
+    return edit[4].splitlines()
+
+
+@pytest.mark.parametrize("exit_code", (0, 1, 2, 3))
+def test_every_exit_code_pings_once(box, exit_code):
+    box.agent([INFO, NOTE, summary(exit_code)], exit_code)
+
+    result = box.run("run")
+
+    assert result.returncode == exit_code
+    time_line, code_line, run_line = ping_body(box)
+    assert TIMESTAMP.fullmatch(time_line.removeprefix("last run: "))
+    assert code_line == f"exit code: {exit_code}"
+    assert run_line == f"run_id: {RUN_ID}"
+
+
+def test_failed_git_pull_still_pings(box):
+    box.agent([summary(0)], 0)
+
+    result = box.run("run", STUB_GIT_EXIT="1")
+
+    assert result.returncode == 2
+    assert ping_body(box)[1:] == ["exit code: 2", "run_id: none"]
+
+
+def test_hung_agent_still_pings(box):
+    box.agent_script(f"echo '{INFO}'\nsleep 300\n")
+
+    result = box.run("run", timeout=60, MACMINI_RUN_LIMIT_S="2")
+
+    assert ping_body(box)[1:] == [f"exit code: {result.returncode}", "run_id: none"]
+
+
+@pytest.mark.parametrize("exit_code", (0, 3))
+@pytest.mark.parametrize(
+    "failing", ({"STUB_PING_EXIT": "1"}, {"STUB_HEARTBEAT_ISSUE": ""})
+)
+def test_failed_ping_keeps_the_exit_code(box, exit_code, failing):
+    box.agent([summary(exit_code)], exit_code)
+
+    result = box.run("run", **failing)
+
+    assert result.returncode == exit_code
+    assert box.gh_args("issue-edit") is None
+    assert "wrapper: heartbeat not sent" in box.runs_log().splitlines()
+
+
+def test_hung_gh_is_killed_and_keeps_the_exit_code(box):
+    # A hung gh must not hold the wrapper: launchd skips every later run
+    # while it is still running.
+    box.agent([INFO], 1)
+
+    start = time.monotonic()
+    result = box.run("run", timeout=60, STUB_GH_HANG="1", MACMINI_RUN_GH_LIMIT_S="2")
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 30
+    assert result.returncode == 1
+    log = box.runs_log().splitlines()
+    assert "wrapper: alert issue not opened" in log
+    assert "wrapper: heartbeat not sent" in log
 
 
 def test_plist_schedules_55_weekday_runs():

@@ -1,0 +1,39 @@
+# Alert email (plan task 7.1; docs/macmini-setup.md section 8). The Mac Mini
+# opens po-agent-alert issues with Joey's own token, and GitHub doesn't email
+# you about your own actions. So github-actions[bot] posts one fixed comment
+# on each such issue, which emails Joey as its author. Issues the bot opens
+# itself (the missed-heartbeat alert) already email him and are skipped.
+# No checkout, no issue text in any shell: only the issue number, via env.
+name: alert-email
+on:
+  issues:
+    types: [opened, labeled]
+permissions:
+  issues: write # read the issue's comments, post the comment
+concurrency:
+  # One run at a time per issue: `opened` and `labeled` can fire together,
+  # and the second run then sees the first's comment.
+  group: alert-email-${{ github.event.issue.number }}
+jobs:
+  comment:
+    if: >-
+      contains(github.event.issue.labels.*.name, 'po-agent-alert')
+      && github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          case "$ISSUE" in "" | *[!0-9]*) exit 1 ;; esac
+          marker='<!-- po-agent-alert-email -->'
+          done="$(gh api --paginate "repos/$GH_REPO/issues/$ISSUE/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\"))) | .id")"
+          if [ -n "$done" ]; then
+            echo "alert-email: already commented"
+            exit 0
+          fi
+          gh issue comment "$ISSUE" --body "po-agent alert: see the issue body. $marker"
+          echo "alert-email: commented"
