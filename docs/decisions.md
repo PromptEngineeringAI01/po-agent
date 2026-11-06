@@ -32,6 +32,20 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **5 Nov 2026: M4 security pass, three Nits fixed** (entry below).
 - **5 Nov 2026: heartbeat built** (task 7.1; entry below): a scheduled GitHub Action, not healthchecks.io.
 - **5 Nov 2026: silent-skip alert and more pages** (task 7.2, M4 Nit #3; entry below).
+- **6 Nov 2026: Claude on the Mac Mini's `poagent` account, test site only** (ADR-002 gate H2 waived for the test site; entry below).
+
+## 6 Nov 2026 - Claude on `poagent`, test site only (Joey; loosens a safety control)
+
+- **Found in 1.10:** the S1 spike passed, and Claude Desktop (with computer use and Claude Code) was running inside `poagent`'s own session. Joey uses it there for another project, with his own GitHub account.
+- **Joey's choice:** keep it. ADR-002 gate H2 ("no AI session can read the agent's secrets") is **waived for the test site only**. On `poagent`, an AI session can now reach the test-site MySys login and the Mac Mini's `po-agent` GitHub token in the Keychain. The advisor recommended moving Claude to another macOS account instead (Keychains are per account); Joey declined.
+- **Why it's acceptable for now:** the test-site account books only test data; the token is fine-grained (this repo only: contents read, issues read and write); no live credential or real PO beyond the 3 trial POs is on the Mac Mini.
+- **Conditions while it lasts:**
+  - Never open a Claude session (Desktop, Code or computer use) in `~/po-agent` or on the test site, and never let one run `po-agent`, `keyring`, `security` or `macmini-run.sh`, or read `~/Library/Logs/po-agent`.
+  - Keep `~/po-agent` unchanged by hand: any local change makes the wrapper's `git pull --ff-only` fail and the agent stop.
+  - Don't `gh auth login` another GitHub account in `poagent`: the wrapper uses `gh`'s active account for alerts and the heartbeat. Use a separate credential for the other project (an SSH key, or `GH_CONFIG_DIR` pointing elsewhere).
+- **Before go-live (P6), H2 must pass again:** Claude and any other AI tool are removed from `poagent` (or moved to another account) before any live credential reaches the Mac Mini. This is a go-live gate; the CEO's decision 3 assumed H2 passes.
+- **Loosens?** Yes: a safety control (ADR-002 H2) is waived on the test site. Joey merges this PR.
+- Carried in: `SPEC.md` (v1.30, Trial conditions), `docs/macmini-setup.md` section 3.
 
 ## 5 Nov 2026 - Heartbeat: a scheduled GitHub Action (Joey, task 7.1)
 

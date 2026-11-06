@@ -56,7 +56,7 @@ System Settings → **Users & Groups**:
 
 - **FileVault: on** (System Settings → Privacy & Security → FileVault). Allow all three accounts to unlock the disk. Put the recovery key in the company password manager, not on the Mac.
 - **Automatic login: off.** macOS greys it out while FileVault is on. This is deliberate (`docs/decisions.md`, 15 Oct 2026): an encrypted disk protects the agent's credentials if the Mac is stolen; the cost is that after an unplanned restart someone must log in (section 10).
-- Never install Claude Code or any AI tool for `poagent`. No AI session may read its Keychain (ADR-002 gate H2).
+- Never install Claude Code or any AI tool for `poagent`. No AI session may read its Keychain (ADR-002 gate H2). **Test site only, from 6 Nov 2026:** Joey runs Claude in `poagent` for another project (`docs/decisions.md`, 6 Nov 2026). Never in `~/po-agent`, never near the agent's Keychain items or logs, no second `gh` login; remove it from `poagent` before any live credential goes on this Mac.
 - Optional: **Remote Login** (System Settings → General → Sharing) for the two admin accounts only, key-based, so Joey can read the log and stop the job without being in the office.
 
 ## 4. Power and clock
