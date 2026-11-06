@@ -14,7 +14,7 @@ fake.
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Locator, Page, sync_playwright
 
 from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys import booking, driver
@@ -93,6 +93,37 @@ def test_a_project_with_no_tasks_reads_as_none(page):
     window = booking.project_window(page, "pln_10001")
 
     assert driver.settled_tasks(window) == {}
+
+
+def test_the_table_is_read_in_one_call_with_the_same_cells(page, monkeypatch):
+    # Seam 2, 6 Nov 2026: with 25 tasks (74 rows) a read of one call per row
+    # took 8-11 s, so the settled read never got two equal reads in its 15 s
+    # and W2 stopped with NO_NEW_TASK. One call reads every row's cells
+    # (innerText, cells split on tabs); a row of one empty cell stays [""].
+    spacer = "<tr><td></td></tr>"
+    page.set_content(project_page(options=BOTH, rows=ROWS + spacer, late_ms=0))
+    window = booking.project_window(page, "pln_10001")
+    page.wait_for_timeout(100)
+    calls = []
+    real = Locator.all_inner_texts
+
+    def counted(self):
+        calls.append(self)
+        return real(self)
+
+    monkeypatch.setattr(Locator, "all_inner_texts", counted)
+
+    rows = driver.task_rows(window)
+
+    assert len(calls) == 1
+    assert rows[1] == [AGENT, "Perth Scheduling", "Cancelled"]
+    assert rows[3] == [AGENT, "Perth Scheduling", "New Project"]
+    assert rows[4] == [""]
+    assert rows[0][0].startswith("(tsk_200001) | Compaction Test")
+    assert driver.rules.compaction_tasks(rows) == {
+        "tsk_200001": "Cancelled",
+        "tsk_200002": "New Project",
+    }
 
 
 def test_an_empty_table_counts_as_no_tasks_only_after_the_full_wait(page, monkeypatch):
