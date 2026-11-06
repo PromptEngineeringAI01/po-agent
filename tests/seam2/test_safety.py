@@ -110,8 +110,10 @@ def test_vet_refuses_discard_in_an_open_trial_note_window_and_nothing_changes(
     ]
     window = driver.open_note(guard, page, panel, note.note_id)
     lines_before = driver.log_line_count(window)
+    status_before = driver.read_status(window)
     assert driver.read_assignee(window) == pool
-    assert driver.read_status(window) == "Pending"
+    # A reopened Note reads "Pending by <user>" (Joey, 6 Nov 2026).
+    assert status_before.startswith("Pending")
 
     # D3: vet() only, never act(); a status-button click is what Discard is.
     discard = window.get_by_role("button", name="Discard", exact=True)
@@ -121,7 +123,7 @@ def test_vet_refuses_discard_in_an_open_trial_note_window_and_nothing_changes(
     window = driver.find_note_again(guard, page, *login, note.note_id)
     assert driver.log_line_count(window) == lines_before
     assert driver.read_assignee(window) == pool
-    assert driver.read_status(window) == "Pending"
+    assert driver.read_status(window) == status_before
     done = {action for action, _ in guard.history}
     assert not done & set(CHANGES)
 

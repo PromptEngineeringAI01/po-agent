@@ -95,7 +95,8 @@ def test_note_window_takes_a_note_and_hands_it_back(
     taken.remove(note.note_id)
 
     assert driver.read_assignee(window) == pool
-    assert driver.read_status(window) == "Pending"
+    # A reopened Note reads "Pending by <user>" (Joey, 6 Nov 2026).
+    assert driver.read_status(window).startswith("Pending")
     assert driver.log_line_count(window) - lines_before == 2
 
     # Every action done; a covered-page click may fail first and be retried
