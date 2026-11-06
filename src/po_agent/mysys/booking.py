@@ -18,6 +18,7 @@ Reads that fail become a fixed `UnexpectedScreen` (or `WriteNotStarted` /
 
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from playwright.sync_api import Error as PlaywrightError
@@ -249,10 +250,19 @@ def download_pdf(guard: ActionGuard, page: Page, window: Locator) -> tuple[str, 
         raise UnexpectedScreen("PDF did not download") from None
 
 
-def mark_solved(guard: ActionGuard, window: Locator, agent: str) -> None:
-    """Step 9: Solved; read back "Solved by <agent>" and Solved disabled."""
+def mark_solved(
+    guard: ActionGuard,
+    window: Locator,
+    agent: str,
+    unticked: Callable[[], None] | None = None,
+) -> None:
+    """Step 9: Solved; read back "Solved by <agent>" and Solved disabled.
+    `unticked` is called once Send Email reads back unticked, right before
+    the click (the booker's run-log event)."""
     untick_send_email(guard, window)
     _email_unticked(window)
+    if unticked is not None:
+        unticked()
     solved = window.get_by_role("button", name="Solved", exact=True)
     guard.act("mark_solved", window, solved)
     if not _reads(window, "Status:", f"Solved by {agent}"):
@@ -341,12 +351,20 @@ def _pln_cell(picker: Locator, pln: str) -> Locator:
 
 
 def _search_choose_project(
-    guard: ActionGuard, page: Page, window: Locator, pln: str, snapshots: bool
+    guard: ActionGuard,
+    page: Page,
+    window: Locator,
+    pln: str,
+    snapshots: bool,
+    unticked: Callable[[], None] | None = None,
 ) -> Locator:
-    """Send Email unticked, Link to Project, then in Choose Project (up to
-    60 s to load): fill its own Search/filter with the pln and run the search.
-    Only reads and opens: nothing is linked until a result is selected."""
+    """Send Email unticked (`unticked` is then called), Link to Project, then
+    in Choose Project (up to 60 s to load): fill its own Search/filter with
+    the pln and run the search. Only reads and opens: nothing is linked until
+    a result is selected."""
     untick_send_email(guard, window)
+    if unticked is not None:
+        unticked()
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
@@ -375,16 +393,28 @@ def probe_link(guard: ActionGuard, page: Page, window: Locator, pln: str) -> Non
         raise UnexpectedScreen("project not listed in Choose Project")
 
 
-def link_project(guard: ActionGuard, page: Page, window: Locator, pln: str) -> None:
+def link_project(
+    guard: ActionGuard,
+    page: Page,
+    window: Locator,
+    pln: str,
+    unticked: Callable[[], None] | None = None,
+) -> None:
     """Step 8 / W4: Send Email unticked and read back, Link to Project ->
     Choose Project: search the pln (Enter), Send Email read back again (it
     ticks itself whenever a Note window opens, row 02), then the pln cell,
     once; read back the Note's project button and a Status that still starts
     "Pending" (live it reads "Pending by <user>"). Another pln on the button
-    is a wrong project: AccuracyBreach (docs/specs/spec.md §6)."""
-    picker = _search_choose_project(guard, page, window, pln, snapshots=False)
+    is a wrong project: AccuracyBreach (docs/specs/spec.md §6). `unticked`
+    is called each time Send Email reads back unticked, right before Link to
+    Project and right before the select (the booker's run-log events)."""
+    picker = _search_choose_project(
+        guard, page, window, pln, snapshots=False, unticked=unticked
+    )
     cell = _pln_cell(picker, pln)
     _email_unticked(window)  # right before the committing select
+    if unticked is not None:
+        unticked()
     guard.act("link_select_project", picker, cell)
     project = window.get_by_role("button", name=driver.PROJECT_BUTTON)
     if not _shows(project.first, LOAD_TIMEOUT_MS):

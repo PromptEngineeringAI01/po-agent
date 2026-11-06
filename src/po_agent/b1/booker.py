@@ -52,6 +52,7 @@ PartialWrite, except AccuracyBreach and GuardRefusal, which keep their type.
 Pending, Discard, Change Project and Unlink are never targeted.
 """
 
+from collections.abc import Callable
 from typing import NoReturn
 
 from playwright.sync_api import Locator, Page
@@ -65,6 +66,7 @@ from po_agent.core.errors import (
     PoAgentError,
     WriteNotStarted,
 )
+from po_agent.core.runlog import RunLog
 from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -82,10 +84,12 @@ def book(
     controls: Controls,
     agent: str,
     stop_after: str,
+    log: RunLog | None = None,
 ) -> str | None:
     """Books the Note `note_id` (the one the run loop holds) as `proceed`
     decided, up to and including `stop_after`. Returns the new task number
-    once W2 has run."""
+    once W2 has run. With `log`, W4's and W5's Send Email read-backs are
+    `email_notification_unticked` events (5.2)."""
     if not isinstance(proceed, Proceed):
         raise TypeError("book() takes only a Proceed from decide()")
     if stop_after not in BUILT:
@@ -93,18 +97,22 @@ def book(
     if proceed.note_id != note_id:
         raise WriteNotStarted("decision is for another Note", step="W1")
     project, form = _w1(proceed, guard, page, login, controls)
+    _flush(log, note_id, "W1")
     if stop_after == "W1":
         return None
     task_no = _w2(proceed, guard, page, controls, agent, project, form)
+    _flush(log, note_id, "W2")
     if stop_after == "W2":
         return task_no
     _w3(proceed, guard, page, controls, task_no)
+    _flush(log, note_id, "W3")
     if stop_after == "W3":
         return task_no
-    window = _w4(proceed, guard, page, login, controls)
+    window = _w4(proceed, guard, page, login, controls, log)
+    _flush(log, note_id, "W4")
     if stop_after == "W4":
         return task_no
-    _w5(proceed, guard, page, login, controls, agent, window)
+    _w5(proceed, guard, page, login, controls, agent, window, log)
     return task_no
 
 
@@ -283,18 +291,50 @@ def _stop_after_submit(
     ) from error
 
 
+def _unticked(log: RunLog | None, note_id: str, step: str) -> Callable[[], None]:
+    """The run-log event for Send Email read back unticked before `step`'s
+    Note-window write. The run log is evidence, not a control: a write that
+    fails never stops the booking."""
+
+    def logged() -> None:
+        if log is None:
+            return
+        try:
+            log.event(
+                "email_notification_unticked", note_id=note_id, step=step, ok=True
+            )
+        except OSError:
+            pass
+
+    return logged
+
+
+def _flush(log: RunLog | None, note_id: str, step: str) -> None:
+    """Writes a finished step's guard actions with its own step name (the
+    safe trace); a write that fails never stops the booking."""
+    if log is None:
+        return
+    try:
+        log.flush(note_id=note_id, step=step)
+    except OSError:
+        pass
+
+
 def _w4(
     proceed: Proceed,
     guard: ActionGuard,
     page: Page,
     login: tuple[str, str, str],
     controls: Controls,
+    log: RunLog | None,
 ) -> Locator:
     note_id = proceed.note_id
     try:
         controls.before_write(note_id, "W4")  # the assignee check (D7)
         window = driver.find_note_again(guard, page, *login, note_id)  # row 25
-        booking.link_project(guard, page, window, proceed.pln)
+        booking.link_project(
+            guard, page, window, proceed.pln, unticked=_unticked(log, note_id, "W4")
+        )
         return window
     except BaseException as error:  # Ctrl+C too
         _stop_after_submit(page, error, note_id, "W4")
@@ -308,12 +348,15 @@ def _w5(
     controls: Controls,
     agent: str,
     window: Locator,
+    log: RunLog | None,
 ) -> None:
     note_id = proceed.note_id
     try:
         controls.before_write(note_id, "W5")  # no assignee check (D7)
         before = driver.log_line_count(window)
-        booking.mark_solved(guard, window, agent)
+        booking.mark_solved(
+            guard, window, agent, unticked=_unticked(log, note_id, "W5")
+        )
         booking.check_solved_log(window, before)
         driver.gone_from_pending(guard, page, *login, note_id)
     except BaseException as error:  # Ctrl+C too

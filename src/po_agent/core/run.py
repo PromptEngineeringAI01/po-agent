@@ -407,7 +407,14 @@ def _one_note(
     if config_dir is not None and isinstance(decision, Proceed):
         try:
             task_no = _book(
-                guard, page, config, login, decision, config_dir, note_id=note_id
+                guard,
+                page,
+                config,
+                login,
+                decision,
+                config_dir,
+                note_id=note_id,
+                log=log,
             )
         except BaseException as error:
             if _submitted(error):
@@ -458,11 +465,12 @@ def _book(
     config_dir: Path,
     *,
     note_id: str,
+    log: RunLog | None = None,
 ) -> str:
     """W1-W5 for this browser context: the assignee check holds its page.
     `note_id` is the Note the run holds: a decision for another Note is
     WriteNotStarted before W1."""
-    check = controls.assignee_check(guard, page, login, config.agent_user_name)
+    check = controls.assignee_check(guard, page, login, config.agent_user_name, log)
     gate = controls.Controls("test", config_dir, check)  # test site only
     task_no = booker.book(
         proceed,
@@ -473,6 +481,7 @@ def _book(
         controls=gate,
         agent=config.agent_user_name,
         stop_after="W5",
+        log=log,
     )
     if task_no is None:  # stop_after W5 always returns it
         raise PartialWrite("no task number after W5", note_id=note_id, step="W5")
