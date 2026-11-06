@@ -84,7 +84,7 @@ Merge only if all of these hold; otherwise report and ask Joey:
 
 - Steps 2-6 found nothing Important, and CI passed on `headRefOid` (plus the local check when step 5 required it).
 - Every CI check passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
-- The PR doesn't touch `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, and doesn't loosen a safety control. Those PRs stay Joey's to merge.
+- The PR doesn't touch the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`), the hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`). Those PRs stay Joey's to merge; every other PR passing the steps above is merged here, including docs that loosen a rule with their decisions entry (decisions, 6 Nov 2026).
 
 ```bash
 gh pr merge $ARGUMENTS --merge --match-head-commit <headRefOid>
