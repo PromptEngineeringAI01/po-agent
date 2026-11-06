@@ -97,15 +97,19 @@ def book(
     if proceed.note_id != note_id:
         raise WriteNotStarted("decision is for another Note", step="W1")
     project, form = _w1(proceed, guard, page, login, controls)
+    _flush(log, note_id, "W1")
     if stop_after == "W1":
         return None
     task_no = _w2(proceed, guard, page, controls, agent, project, form)
+    _flush(log, note_id, "W2")
     if stop_after == "W2":
         return task_no
     _w3(proceed, guard, page, controls, task_no)
+    _flush(log, note_id, "W3")
     if stop_after == "W3":
         return task_no
     window = _w4(proceed, guard, page, login, controls, log)
+    _flush(log, note_id, "W4")
     if stop_after == "W4":
         return task_no
     _w5(proceed, guard, page, login, controls, agent, window, log)
@@ -289,15 +293,31 @@ def _stop_after_submit(
 
 def _unticked(log: RunLog | None, note_id: str, step: str) -> Callable[[], None]:
     """The run-log event for Send Email read back unticked before `step`'s
-    Note-window write."""
+    Note-window write. The run log is evidence, not a control: a write that
+    fails never stops the booking."""
 
     def logged() -> None:
-        if log is not None:
+        if log is None:
+            return
+        try:
             log.event(
                 "email_notification_unticked", note_id=note_id, step=step, ok=True
             )
+        except OSError:
+            pass
 
     return logged
+
+
+def _flush(log: RunLog | None, note_id: str, step: str) -> None:
+    """Writes a finished step's guard actions with its own step name (the
+    safe trace); a write that fails never stops the booking."""
+    if log is None:
+        return
+    try:
+        log.flush(note_id=note_id, step=step)
+    except OSError:
+        pass
 
 
 def _w4(

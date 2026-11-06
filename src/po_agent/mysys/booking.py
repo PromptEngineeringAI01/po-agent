@@ -351,12 +351,20 @@ def _pln_cell(picker: Locator, pln: str) -> Locator:
 
 
 def _search_choose_project(
-    guard: ActionGuard, page: Page, window: Locator, pln: str, snapshots: bool
+    guard: ActionGuard,
+    page: Page,
+    window: Locator,
+    pln: str,
+    snapshots: bool,
+    unticked: Callable[[], None] | None = None,
 ) -> Locator:
-    """Send Email unticked, Link to Project, then in Choose Project (up to
-    60 s to load): fill its own Search/filter with the pln and run the search.
-    Only reads and opens: nothing is linked until a result is selected."""
+    """Send Email unticked (`unticked` is then called), Link to Project, then
+    in Choose Project (up to 60 s to load): fill its own Search/filter with
+    the pln and run the search. Only reads and opens: nothing is linked until
+    a result is selected."""
     untick_send_email(guard, window)
+    if unticked is not None:
+        unticked()
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
@@ -398,9 +406,11 @@ def link_project(
     once; read back the Note's project button and a Status that still starts
     "Pending" (live it reads "Pending by <user>"). Another pln on the button
     is a wrong project: AccuracyBreach (docs/specs/spec.md §6). `unticked`
-    is called once Send Email reads back unticked, right before the select
-    (the booker's run-log event)."""
-    picker = _search_choose_project(guard, page, window, pln, snapshots=False)
+    is called each time Send Email reads back unticked, right before Link to
+    Project and right before the select (the booker's run-log events)."""
+    picker = _search_choose_project(
+        guard, page, window, pln, snapshots=False, unticked=unticked
+    )
     cell = _pln_cell(picker, pln)
     _email_unticked(window)  # right before the committing select
     if unticked is not None:

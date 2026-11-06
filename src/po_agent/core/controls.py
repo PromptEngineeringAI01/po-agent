@@ -130,7 +130,10 @@ def assignee_check(
         row = driver.exact_row(listing, note_id)
         if log is not None:
             ok = row is not None and row.assignee == agent
-            log.event("assignee_check", note_id=note_id, step=step, ok=ok)
+            try:
+                log.event("assignee_check", note_id=note_id, step=step, ok=ok)
+            except OSError:
+                pass  # the run log is evidence, not a control: go on
         if row is None:
             raise UnexpectedScreen("Note not found once", note_id=note_id, step=step)
         if row.assignee != agent:
