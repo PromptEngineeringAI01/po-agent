@@ -2,11 +2,10 @@
 
 A read-only audit of `main` at `82ec374` for correctness, safety and security defects. Architecture and refactoring ideas are out of scope: they are in `docs/architecture-review.md` (PR 79). Nothing in `src/` or `tests/` was changed; seam 2 and real-data tests were not run; `private/`, `logs/` and `state/` were not read.
 
-**Result:** 3 Important findings (1 code defect, 2 test gaps on Must-never controls) and 5 Nits. No path was found that clicks outside the guard, returns a booked or partly booked Note to the pool, skips a read-back, or puts a secret or page text in run output or the trace.
+**Result:** 2 Important findings (test gaps on Must-never controls) and 6 Nits, one of them accepted by Joey (N6, first found as Important I1). No path was found that clicks outside the guard, returns a booked or partly booked Note to the pool, skips a read-back, or puts a secret or page text in run output or the trace.
 
 | # | Severity | Where | One line |
 |---|---|---|---|
-| I1 | Important | `b1/reader_rules.py:30` | PDF PO `X/0481` is read as `X/048` and can be booked |
 | I2 | Important (test gap) | `tests/test_guard.py:654` | The guard's Hold-label clause can be deleted and every test passes |
 | I3 | Important (test gap) | `tests/test_booker_offline.py:582` | The pre-Submit read-back of PO number, Note and PO file can be disabled and every test passes |
 | N1 | Nit | `b1/address.py:73-76` | Project state and postcode are dropped, not compared |
@@ -14,6 +13,7 @@ A read-only audit of `main` at `82ec374` for correctness, safety and security de
 | N3 | Nit | `core/run.py:286-365` | A Note that fails the same way blocks every later run |
 | N4 | Nit | `scripts/macmini-run.sh:88` | Alert issues in a public repo will carry live Note IDs |
 | N5 | Nit | `tests/test_guard_check.py:49` | 22 of the 44 banned page calls are never tested |
+| N6 | Nit, accepted (was I1) | `b1/reader_rules.py:30` | PDF PO `X/0481` would be read as `X/048`; B1 POs never carry more after `/048` (Joey, 9 Nov 2026) |
 
 ## Method
 
@@ -24,14 +24,6 @@ A read-only audit of `main` at `82ec374` for correctness, safety and security de
 - **Sources for the method:** the Stanford "Agentic Code Review" lecture; Cloudflare, "Orchestrating AI Code Review at scale" (specialists by domain, a judge that drops speculative and convention-contradicting findings); Greptile, "How to build a code review agent" (context beyond the diff, a different reviewer model, verify by running code); Anthropic, "Solving code review at Anthropic" (parallel finders, a vote per finding, Important / Nit labels, style dropped). The Addy Osmani post on X could not be read (HTTP 402); cognition.com had no code-review material.
 
 ## Important
-
-### I1. A PDF whose PO number only starts with `/048` passes the PO check
-
-- **Where:** `src/po_agent/b1/reader_rules.py:30` (`_PDF_PO`), used by `read_pdf` (`:117`), so by `check_pdf` and `src/po_agent/b1/decision.py:102-106`.
-- **Defect:** `([0-9A-Z]+/[0-9]{3})` has no right anchor, so `2609017B/0481`, `2609017B/048X` and `2609017B/048999` are all read as `2609017B/048`. The file-name rule (`fullmatch`) and the title rule (`(?=\s|$)`) are anchored, and seam 1 already checks that `_0480` and `/0480` are rejected there; this rule has no such check.
-- **Failure scenario:** a Note's attachment is named `2609017B_048.pdf` but the PDF itself says `Purchase Order No 2609017B/0481` (a mis-named file, or another trade's PO). Both readers run the same rule, so they agree on `2609017B/048`. The PO check passes, and if the address and project checks pass, the agent books a Compaction Test task with PO Number `2609017B/048` and attaches a PDF for another PO. `docs/decisions.md` (PO number rule) says the PDF must agree with the file name; here it does not, and the Note still proceeds.
-- **Verified:** ran. `read_pdf("B1 Homes Pty Ltd\nPurchase Order No 2609017B/0481", "", "").po_number` returns `'2609017B/048'`; the same for `/048X` and `/048999`.
-- **Fix:** add `(?![0-9])` after `[0-9]{3}` (digits only, so a text layer that runs the next word on without a space still reads), with a `test:` commit for `/0481` -> `PO_MISMATCH`. Add the same case for the title rule: deleting its `(?=\s|$)` passes every test today.
 
 ### I2. The guard's "label of a Hold checkbox" refusal is untested
 
@@ -85,6 +77,15 @@ A read-only audit of `main` at `82ec374` for correctness, safety and security de
 - **Gap:** 22 of the 44 names never appear in the test file, among them `set_checked`, `dblclick`, `clear`, `drag_to`, `evaluate_handle`, `expose_function`, `storage_state` and `record_video_dir`. Dropping them from `BANNED` keeps CI green; `test_repo_passes` only shows nothing uses them today.
 - **Verified:** ran (the judge counted the names; the reviewer narrowed `BANNED` to the tested names and all 94 tests passed).
 - **Fix (Joey's to merge):** parametrize the banned-call test over `sorted(BANNED)`.
+
+### N6. A PDF whose PO number only starts with `/048` passes the PO check (accepted; was I1)
+
+- **Where:** `src/po_agent/b1/reader_rules.py:30` (`_PDF_PO`), used by `read_pdf` (`:117`), so by `check_pdf` and `src/po_agent/b1/decision.py:102-106`.
+- **Defect:** `([0-9A-Z]+/[0-9]{3})` has no right anchor, so `2609017B/0481`, `2609017B/048X` and `2609017B/048999` are all read as `2609017B/048`. The file-name rule (`fullmatch`) and the title rule (`(?=\s|$)`) are anchored, and seam 1 already checks that `_0480` and `/0480` are rejected there; this rule has no such check.
+- **Failure scenario:** a Note's attachment is named `2609017B_048.pdf` but the PDF itself says `Purchase Order No 2609017B/0481` (a mis-named file, or another trade's PO). Both readers run the same rule, so they agree on `2609017B/048`. The PO check passes, and if the address and project checks pass, the agent books a Compaction Test task with PO Number `2609017B/048` and attaches a PDF for another PO. `docs/decisions.md` (PO number rule) says the PDF must agree with the file name; here it does not, and the Note still proceeds.
+- **Verified:** ran. `read_pdf("B1 Homes Pty Ltd\nPurchase Order No 2609017B/0481", "", "").po_number` returns `'2609017B/048'`; the same for `/048X` and `/048999`.
+- **Accepted (Joey, 9 Nov 2026):** a B1 PO suffix is always exactly `/048` with nothing after it, so the unanchored `_PDF_PO` can't misread a real PO; no regex change. Revisit if a second client or another suffix appears (`docs/decisions.md`, 9 Nov 2026).
+- **Fix, if revisited:** add `(?![0-9])` after `[0-9]{3}` (digits only, so a text layer that runs the next word on without a space still reads), with a `test:` commit for `/0481` -> `PO_MISMATCH`. Add the same case for the title rule: deleting its `(?=\s|$)` passes every test today.
 
 ## Checked and found fine
 
