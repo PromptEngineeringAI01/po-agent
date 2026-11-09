@@ -29,7 +29,7 @@ For each commit, list its files (`git show --name-only --format= <sha>`).
 - **Fail** if a commit whose subject doesn't start with `test:` touches `tests/` (CLAUDE.md, TDD: test changes go in their own commit).
 - **Fail** if a `test:` commit touches `src/`.
 - Every subject is a Conventional Commit (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
-- Flag a `test:` commit that changes an existing expected result. Say whether the PR explains it as an intended behaviour change, and quote that line; otherwise it's Important (CLAUDE.md Must never #8).
+- Flag a `test:` commit that changes an existing expected result. It passes without asking Joey only if the PR explains it as an intended behaviour change **and** the PR carries the `docs/decisions.md` entry that made that change: quote both. Otherwise it's Important (CLAUDE.md Must never #8; decisions, 6 Nov 2026).
 
 ## 3. Safety-sensitive files
 
@@ -57,9 +57,11 @@ Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_fi
 - A PR that builds a task in `tasks/todo.md` ticks that task (`- [x] **<N>**`; the PR number is welcome but not required, since the tick is made before the PR exists); a missing tick is Important, so the list can't fall behind `main`.
 - The PR has Intent, What changed, Risk and Testing. The risk level is at least what docs/workflow.md step 5 gives for the files changed (Important if it's understated). High: the second-model findings and the must-fix triage are in the PR (decisions, 5 Nov 2026, lighter process).
 
-## 5. Local check
+## 5. Local check (only when CI can't vouch for it)
 
-On the PR branch (only if step 1 allowed switching):
+CI runs `scripts/check.py` on the PR's head commit, so a green CI in step 6 is the check (decisions, 6 Nov 2026, faster shipping). Run it locally only if the PR touches `scripts/check.py`, `.github/workflows/`, `pyproject.toml` or `uv.lock`, or step 1 found the CI runs aren't for `headRefOid`; otherwise skip this step and say "local check skipped: CI on <sha>" in the report.
+
+When it runs, on the PR branch (only if step 1 allowed switching):
 
 ```bash
 uv run scripts/check.py 2>&1 | tail -3
@@ -80,7 +82,7 @@ Every check passes, the runs are for `headRefOid` (not an older push), and `merg
 
 Merge only if all of these hold; otherwise report and ask Joey:
 
-- Steps 2-6 found nothing Important, and the local check (or, if skipped, CI) passed.
+- Steps 2-6 found nothing Important, and CI passed on `headRefOid` (plus the local check when step 5 required it).
 - Every CI check passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
 - The PR doesn't touch `.claude/hooks/`, `.claude/settings*.json`, `.claude/skills/verify-pr/`, `.github/workflows/`, the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`) or `scripts/check.py`, and doesn't loosen a safety control. Those PRs stay Joey's to merge.
 

@@ -25,7 +25,13 @@ target-version = "py312"
 extend-exclude = ["*.md"]  # docs hold illustrative snippets, not code
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B"]
+select = ["E", "F", "W", "I", "UP", "B", "T10", "T20"]
+
+[tool.ruff.lint.per-file-ignores]
+# CLAUDE.md: only core/output.py prints (the run-output contract); scripts and
+# tests may print too. No file may keep a debugger call (T10).
+"!src/**" = ["T20"]
+"src/po_agent/core/output.py" = ["T20"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

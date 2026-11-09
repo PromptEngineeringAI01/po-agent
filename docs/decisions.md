@@ -33,6 +33,51 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **5 Nov 2026: heartbeat built** (task 7.1; entry below): a scheduled GitHub Action, not healthchecks.io.
 - **5 Nov 2026: silent-skip alert and more pages** (task 7.2, M4 Nit #3; entry below).
 - **6 Nov 2026: Claude on the Mac Mini's `poagent` account, test site only** (ADR-002 gate H2 waived for the test site; entry below).
+- **6 Nov 2026: faster shipping** (decision batch, verify by CI, test-site queue, Must never #8 pre-authorised; entry below).
+- **9 Nov 2026: CMU 06-643 practices** (GitHub protections on, print and debugger calls banned by ruff, CI timeout; entry below).
+
+## 9 Nov 2026 - CMU 06-643 practices: GitHub protections, print ban, CI timeout (Joey)
+
+- **Why:** Joey compared the project with CMU 06-643 (s26) lectures 06-09 (code quality, debugging, GitHub collaboration, GitHub Actions). The repo is public and `main` was not protected, although `docs/workflow.md` (Straight after M1 merges) asked for it.
+- **Adopted** (Joey picked all five):
+  1. **Branch protection on `main`:** a pull request and the `check` status are required before a merge; no force push, no deletion. No approving review is required (one account can't approve its own PRs). Enforced on admins too (Joey, 9 Nov 2026): Claude works through Joey's admin account, and the Mac Mini pulls `main` until the `production` tag (7.4), so nothing unchecked may reach `main`. If CI itself is broken and a merge can't wait, Joey turns the protection off in Settings, merges, and turns it back on.
+  2. **ruff T20 and T10:** `print` is an error under `src/` except `core/output.py`, so CLAUDE.md's "only output.py prints" rule is now checked, not just written; a debugger call (`breakpoint()`, `pdb`) is an error everywhere, since a left-over one would stop an unattended run and print source lines into the run log.
+  3. **Secret scanning and push protection** on GitHub: a known secret is refused at push time, before it is public. gitleaks in pre-commit and CI stays.
+  4. **Dependabot alerts** (security alerts only, no update PRs): pypdf and pdfplumber read untrusted PDFs, and pinned versions only stay safe if someone hears about their CVEs.
+  5. **`timeout-minutes: 30`** on the CI check job (runs take 10-20 minutes; GitHub's default is 6 hours).
+- **Not adopted:** mypy (a trial run found 15 errors; the ones checked were false positives from pydantic defaults and narrowing, and fixing them means casts in `guard.py`), coverage gates, OS or Python matrix, caching, badges, `act`, PR and issue templates, ruff docstring rules, CODEOWNERS reviews (one account can't approve its own PRs).
+- **Loosens?** No: all five tighten. Items 1, 3 and 4 are GitHub settings, not repo files. No `SPEC.md` change: nothing the agent does or prints changes.
+
+## 9 Nov 2026 - PO number suffix is always exactly /048 (Joey)
+
+- **Why:** the code review audit (`docs/code-review-audit.md`, PR 81) found that `_PDF_PO` in `src/po_agent/b1/reader_rules.py` has no right anchor, so a PDF reading `2609017B/0481` or `2609017B/048X` is read as `2609017B/048` (audit I1, reproduced with fake values).
+- **Joey's answer:** a B1 Homes PDF never shows anything after `/048` ("Never", 9 Nov 2026; earlier "/048X will never happen"). So the rule can't misread a real B1 PO.
+- **Decision:** audit I1 is accepted and moved to the Nits (N6); no regex change.
+- **Revisit:** if a second client or another PO suffix appears.
+
+## 6 Nov 2026 - Faster shipping: fewer waits on Joey (Joey)
+
+- **Why:** Joey asked whether cmux, Claude Code agent teams, git worktrees, QA automation or gstack would ship faster (the Claude Code power-user tips article). The slowest part is waiting for Joey: a task stopping to ask him, a seam-2 run waiting for his reset, his reserved merges. More parallel agents don't shorten that.
+- **Not adopted:**
+  - cmux: macOS only. Joey builds on Windows, where the Claude Desktop Code tab already runs parallel worktree sessions.
+  - Agent teams: experimental, and in-process teammates can't be resumed. The advisor plus linked worktree sessions already covers the work.
+  - gstack, for this repo:
+    - `/ship` and `/land-and-deploy` merge and deploy (Must never #9; a merge deploys to the Mac Mini).
+    - `/qa` and `/browse` click pages (Must never #1).
+    - It sends code to another provider for review by default.
+    - It installs hooks and needs `.claude/` changes (Joey's).
+    - Joey may use it in other projects.
+  - Git worktrees are already the build loop.
+- **Adopted:**
+  1. **Decision batch:** at the start of each phase or week, the advisor asks Joey every foreseeable choice for the next few tasks at once, records them here, and task briefs carry them under "Decided already" (`docs/workflow.md`, Production build loop step 0; `.claude/skills/start-task/SKILL.md`).
+  2. **Verify by CI:** CI runs `scripts/check.py` on the PR's head commit. `/verify-pr` takes that instead of re-running the check locally (12-55 minutes), unless the PR touches `scripts/check.py`, `.github/workflows/`, `pyproject.toml` or `uv.lock`. The skill is Joey's file: the advisor hands him the patch.
+  3. **Test-site queue:** seam-2 and decide-only runs from several tasks share one reset where their order allows. The advisor keeps the queue and asks Joey for one reset per batch (Production build loop step 10; plan Cross-cutting rules).
+  4. **Must never #8, pre-authorised case:** a `test:` commit may change an existing expected result without asking Joey when the PR says it is an intended behaviour change and carries the decisions entry that made it. `/verify-pr` checks both and quotes them. Everything else under #8 stays: never edit a test to make it pass. Joey changes the CLAUDE.md line by hand.
+  5. **Answer from the phone:** Remote Control for all sessions, so Joey can answer a waiting session from the Claude mobile app. It is disabled by the organisation's admin today (6 Nov 2026); until it is allowed, desktop banners (the default) are the signal. A desktop setting, no repo change.
+- **Who merges (Joey, 6 Nov 2026, later the same day):** Joey stops approving PRs one by one. Only PRs that touch the guard (`guard.py`, `guard_check.py`), the hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`) stay his to merge. Claude merges every other PR once `/verify-pr` passes, with the same pinned command. That includes PRs touching `scripts/check.py` or the verify-pr skill, and docs that loosen a rule, which still need their decisions entry. Must never #9 and the `/verify-pr` merge condition say so; the skill line is Joey's hand edit, since a hook protects that file.
+- **Open, Joey's:** ask the MySys admin for reusable test Notes on the test site, so seam 2 stops consuming the 3 trial POs and needs fewer resets.
+- **Loosens?** Yes, three controls: the local re-run of the check before a merge (CI on the same commit still runs it), #8's approval step for intended behaviour changes, and Joey's merge of PRs outside the guard, hooks and CI. Joey told Claude to merge this PR after review (6 Nov 2026).
+- Carried in: `docs/workflow.md` (Production build loop steps 0, 7 and 10), `tasks/plan.md` (Cross-cutting rules), `.claude/skills/start-task/SKILL.md`. No `SPEC.md` change: nothing the agent does or prints changes.
 
 ## 6 Nov 2026 - Claude on `poagent`, test site only (Joey; loosens a safety control)
 
