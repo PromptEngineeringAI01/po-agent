@@ -40,3 +40,6 @@ Thumbs.db
 # Claude Code local-only files
 .claude/settings.local.json
 CLAUDE.local.md
+
+# /teach workspace (Matt Pocock's teach skill): lessons stay on the laptop
+learning/
