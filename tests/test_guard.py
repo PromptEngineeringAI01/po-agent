@@ -669,6 +669,22 @@ def test_click_on_a_label_or_row_holding_a_hold_checkbox_is_refused(
     assert not scope.get_by_role("checkbox", name="Job 1", exact=True).is_checked()
 
 
+def test_click_on_a_label_for_a_hold_checkbox_outside_it_is_refused(page, guard):
+    # The label holds no checkbox, but a click on it still toggles one.
+    page.set_content(
+        window(
+            "Hold Task: tsk_200001",
+            '<label for="c">Job 1</label><input type="checkbox" id="c">'
+            + button("Hold"),
+        )
+    )
+    scope = win(page, "Hold Task: tsk_200001")
+    label = scope.locator("label", has_text="Job 1")
+
+    assert refusal(guard, "confirm_hold", scope, label) == Refusal.HOLD_CHECKBOX
+    assert not scope.locator("#c").is_checked()
+
+
 def test_failed_action_is_a_fixed_error_without_the_typed_value(page, guard):
     # Playwright's own message quotes the call: fill("<the password>").
     page.set_content(

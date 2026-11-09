@@ -184,6 +184,7 @@ def fake_mysys(
     search_pln: str = PLN,
     internal_no: str = INTERNAL_NO,
     multiple: str = "",
+    mangle: str | None = None,
     new_tasks: tuple[str, ...] = (NEW_TASK,),
     row_creator: str = "Perth Scheduling",
     form_closes: bool = True,
@@ -206,6 +207,10 @@ def fake_mysys(
     on the Tasks tab only). Every task's detail screen shows the same values,
     so only the task number tells them apart.
 
+    `mangle`: the form changes that one field after the agent sets it
+    (creator, po_number, note), adds a second PO file (po_documents) or
+    opens with another Sale Office (sale_office).
+
     W3: a new task's Hold opens the Hold Task dialog as mapped (row 11),
     changed by `hold` (HOLD_DIALOG's keys); its Hold closes it and puts the
     task on hold with the typed note (row 12)."""
@@ -223,6 +228,7 @@ def fake_mysys(
             "olderFile": FILE,
             "agent": AGENT,
             "hold": {**HOLD_DIALOG, **(hold or {})},
+            "mangle": mangle,
         }
     )
     documents_button = "<button onclick=\"show('documents')\">Documents</button>"
@@ -258,20 +264,20 @@ def fake_mysys(
 <div id="form" hidden><div>
   <h3>Create New Task</h3>
   <div><div>Multiple Units</div><input type="checkbox" aria-label="multiple" {multiple}></div>
-  <div><div>Creator</div><select><option>Choose...</option><option selected>&lt;project creator&gt;</option><option>Perth Scheduling</option></select></div>
+  <div><div>Creator</div><select id="creator"><option>Choose...</option><option selected>&lt;project creator&gt;</option><option>Perth Scheduling</option></select></div>
   <div><input type="checkbox" aria-label="- 1.Single Storey Engineering Bundle"> - 1.Single Storey Engineering Bundle</div>
   <div><input type="checkbox" aria-label="- Compaction Test"
     onchange="document.getElementById('sub_form').hidden = !this.checked"> - Compaction Test</div>
   <div id="sub_form" hidden>
     <div><div>Task Client</div><div>Same as Project <button>Select Client</button> <span>close</span></div></div>
     <div><div>Task Name</div><input aria-label="Task Name"></div>
-    <div><div>PO Number</div><input></div>
+    <div><div>PO Number</div><input id="po_number"></div>
     <div><div>PO Contact</div><select><option selected>Choose...</option><option>&lt;user&gt;</option></select></div>
     <div><div>PO Documents</div><div id="po_docs"><span>Upload <input type="file" onchange="addDoc(this, 'po_docs')"></span></div></div>
     <div><div>Documents</div><div id="docs"><span>Upload <input type="file" onchange="addDoc(this, 'docs')"></span></div></div>
-    <div><div>Sale Office</div><select><option>... Use Default Office ...</option><option selected>Prompt Engineering Pty Ltd</option></select></div>
+    <div><div>Sale Office</div><select id="sale_office"><option>... Use Default Office ...</option><option selected>Prompt Engineering Pty Ltd</option></select></div>
     <div><div>Delivery Office</div><select><option selected>Choose...</option><option>Prompt Engineering Pty Ltd</option></select></div>
-    <div><div>Note</div><textarea></textarea></div>
+    <div><div>Note</div><textarea id="note"></textarea></div>
   </div>
   <button onclick="submitTask()">Submit</button>
 </div>{CLOSE}</div>
@@ -294,9 +300,16 @@ function search(text) {{
   }}, 200);
 }}
 function addDoc(input, area) {{
-  document.getElementById(area).insertAdjacentHTML('beforeend',
-    '<table><tbody><tr><td>' + input.files[0].name + '</td><td>close</td></tr></tbody></table>');
+  const names = [input.files[0].name];
+  if (area === 'po_docs' && FAKE.mangle === 'po_documents') names.push('2600009B_048_1.pdf');
+  for (const name of names) document.getElementById(area).insertAdjacentHTML('beforeend',
+    '<table><tbody><tr><td>' + name + '</td><td>close</td></tr></tbody></table>');
 }}
+const byId = (id) => document.getElementById(id);
+if (FAKE.mangle === 'creator') byId('creator').addEventListener('change', (e) => {{ e.target.selectedIndex = 1; }});
+if (FAKE.mangle === 'po_number') byId('po_number').addEventListener('input', (e) => {{ e.target.value += '9'; }});
+if (FAKE.mangle === 'note') byId('note').addEventListener('input', (e) => {{ e.target.value += ' X'; }});
+if (FAKE.mangle === 'sale_office') byId('sale_office').selectedIndex = 0;
 function submitTask() {{
   document.body.dataset.submitted = 'yes';
   if (FAKE.formCloses) document.getElementById('form').hidden = true;
@@ -591,6 +604,23 @@ def test_a_read_back_mismatch_closes_the_browser_context_and_does_not_submit(
     assert "set_task_note" in actions(guard)
     assert "submit_task" not in actions(guard)
     assert page.is_closed()
+
+
+@pytest.mark.parametrize(
+    "field", ["po_number", "note", "po_documents", "creator", "sale_office"]
+)
+def test_each_read_back_mismatch_is_write_not_started_and_never_submits(
+    serve, guard, search, field
+):
+    served = serve(tasks=[CANCELLED], mangle=field)
+
+    # Up to W2, so a read-back that missed the mismatch would press Submit.
+    with pytest.raises(WriteNotStarted) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W2")
+
+    assert caught.value.field == field
+    assert "set_task_note" in actions(guard)
+    assert "submit_task" not in actions(guard)
 
 
 def test_a_task_cancelled_at_step_10_and_live_again_is_write_not_started(
