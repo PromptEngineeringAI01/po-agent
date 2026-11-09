@@ -238,3 +238,31 @@ What the build task (`tasks/todo.md` 8.1) implements. Its own `docs/decisions.md
 - **Not in scope:** making the guard refuse a Note-window committing click without a prior check (a guard change, high risk; revisit only if a missed check ever happens).
 - **When:** after the P5 week, before P6 go-live. It changes `mysys/` and the booker, so seam 2 (take, return, W4, W5) runs on the test site with the Mac Mini job unloaded.
 - **Done:** `check.py`; seam 2 as above; review at Medium depth.
+
+## B, A and C: the settled designs (Joey, 9 Nov 2026)
+
+**Order.** The Mac Mini runs the `production` tag (7.4), so a merge to `main` doesn't change the P5 week's runs; what waits is any seam-2 run, which needs the Mac Mini job unloaded. So B (no test-site run) is built now, during P5; after the P5 week and before P6 go-live: D (8.1), then A with round 1's proposal 6 (8.3), then C (8.4).
+
+**B (task 8.2): smaller than the report said.** `cli._report` is already the one report point. The task does two things:
+
+- **The ALERT kind lives on the error class,** next to `exit_code` (for example `alert_kind: ClassVar[AlertKind]`; `WriteNotStarted` keeps `UNEXPECTED_SCREEN`). `ALERT_KINDS` and the MRO walk in `cli.py` go. `AlertKind` stays the stdout contract's `Literal` in `output.py`; a test checks every error class's kind is in it.
+- **One traceback writer.** A module-level function in `core/runlog.py` appends the traceback event to `logs/<run_id>.jsonl` in the run log's format; `cli` calls it (it must also work before a `RunLog` exists, for a config error). `cli._log_traceback` and the dead `RunLog.error` go.
+- **Unchanged:** every ALERT, NOTE and RUN_SUMMARY line and every exit code; `test_output_cli.py` and `test_exit_codes.py` pass unchanged. No `docs/decisions.md` entry needed (nothing printed or written to MySys changes).
+- **Left out on purpose:** making `KillSwitch` and `NoteTaken` `PoAgentError`s (the run loop's `isinstance(error, PoAgentError)` checks would then take other paths: a change to the stop path); removing `SkipReason.PARTIAL_WRITE` and turning `Skip(UNEXPECTED_SCREEN)` into a raised error (both reach the decision engine and seam 1). Known, not planned.
+- **Done:** `check.py`; review at Low depth.
+
+**A with round 1's proposal 6 (task 8.3): one task, because both change the interface of `decide()`.**
+
+- **A readers module in `b1/`** turns the PDF bytes into one value holding pdfplumber's and pypdf's texts (each "" when unreadable) and the bytes. It owns the two-readers rule (decisions, 2 Nov 2026): the per-field agreement (issuer, COMPACTION, PO number, Job Address label line) and the address check on both texts (exact under the label on pypdf's). Seam 1 can still build the value from fake texts.
+- **`decide()` takes that value and a lookup callable,** and calls the lookup only once the Note and PDF checks pass (step 8). `run._decide` shrinks to building the `NoteSnapshot` and calling `decide()`; it no longer runs `check_note_and_pdf` and `check_second_reader` itself.
+- **`tests/seam1/real_pos.py` uses the module's per-field agreement;** its `_agreement` copy goes.
+- **Tests:** seam 1 gains "the lookup is not called on an early skip". Seam-1 tests that call `decide()` with the old arguments change in their own `test:` commit with a `docs/decisions.md` line (Must never #8).
+- **Done:** `check.py`; `uv run pytest tests/seam1 -s` shows `false PROCEED: 0`; the real-PO seam on the laptop; seam 2 decide-only (it changes the run loop); review at Medium depth.
+
+**C (task 8.4): one wait module in `mysys/`.**
+
+- **Three waits on one injectable clock:** until a read is true; settled (N equal reads, with a predicate); retry an opening click. Every loop listed under C calls it; the timeout constants live once, with today's values (15 s, 60 s for Choose Project and the Projects search, the W2 new-task wait).
+- **The retry refuses a committing click.** It takes a fixed set of opening action names (today's retried actions are `open_note`, `refresh_note_pool` and `open_project`, plus the two menu loops) and raises on any other name, so the 3 Nov 2026 M4-gate rule (committing clicks are never retried) is enforced in code, not only by naming. The set lives in `mysys/`, not in the guard.
+- **Tests:** new pure tests on a list of reads and a fake clock, no browser. The existing `setTimeout`-based tests stay; dropping any of them later is its own decision.
+- **Must keep:** the one-call `task_rows` read (PR 75); `driver._polls` semantics (a label gone for a moment is read again).
+- **Done:** `check.py`; seam 2 on the test site, all modes; review at Medium depth.
