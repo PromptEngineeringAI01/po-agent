@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 5 Nov 2026, production)
+# PO Agent - decision log (updated 9 Nov 2026, go-live)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -37,6 +37,25 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **9 Nov 2026: release pinning built** (task 7.4; entry below): the Mac Mini runs the `production` tag; `enabled` is read from `origin/main`.
 - **9 Nov 2026: CMU 06-643 practices** (GitHub protections on, print and debugger calls banned by ruff, CI timeout; entry below).
 - **9 Nov 2026: 5.2 closed without the last seam-2 booking runs;** they are checked in the first P5 booking run instead (entry below).
+- **9 Nov 2026: go-live plan.** The CEO gave Joey full authority for every go-live decision. P5's week is skipped, gates 2-5 are met or reshaped, code is frozen until live runs hourly (entry below).
+
+## 9 Nov 2026 - Go-live plan: Joey decides, P5 skipped, code freeze (Joey)
+
+- **Authority:** the CEO gave Joey full authority for every go-live decision (9 Nov 2026). Wherever `SPEC.md`, `tasks/plan.md` or this log asks for the CEO's go-live sign-off, Joey's decision, recorded here, is that sign-off. Must never #3 is still changed only by Joey, by hand, with the live-profile task.
+- **Target:** live as fast as is safe, within 3 days (by 12 Nov 2026). Safety comes from the deterministic controls (guard, hooks, assignee check, read-backs before and after every write, kill switch, `production` tag) and from the watched live order, not from more test ceremony. None of those controls changes here.
+- **Decisions**, each marked whether it loosens a gate or control:
+  1. **P5 is skipped** (the week of hourly test-site runs, gate 5's first half). The 5.2 trace check (entry below) moves from P5's first booking run to the **first live booking, which is watched**: in that run's safe trace, every `assign_note`, `link_to_project`, `link_select_project` and `mark_solved` has an ok `email_notification_unticked` after both the Note's latest ok `assignee_check` and its previous Note-window write (D7), and only that Note's `note_id` appears. Joey pastes the `grep <run_id>` trace lines; Claude checks them (Claude doesn't read the Mac Mini's logs). A miss, or no booking in that run, stops the live order: `enabled = false` on `main` before any second booking, and a fix. **Loosens?** Yes, gate 5: no unattended week on the test site. Instead the first live bookings are watched one PO per run, and the guard, assignee check and Send Email read-back are unchanged in code.
+  2. **Real POs:** only 3-5 real B1 `/048` POs exist, not 10-20. The real-PO seam (`uv run pytest tests/seam1 -m real_data`, laptop, `private/`) runs on those, with `false PROCEED: 0`; coverage is reported, not judged against 80%. Live `run --decide-only` is the wider real-PO check: it reads and decides on every eligible live Note and writes nothing; Joey reads its NOTE lines (PO number, pln, skip reason) against the Notes in MySys before the first booking run. **Loosens?** Yes, gate 5's second half and S3's 80% line.
+  3. **Audit N4** (alert issues in a public repo would carry live Note IDs): **the repo stays public**, and the alert issue body drops `note_id`; the Note stays named in `runs.log` on the Mac Mini, which is where `docs/ops-runbook.md` sends the reader. Built in the live-profile task, before any live run. Joey chose this over a private repo: on a free personal account a private repo loses branch protection on `main` and GitHub's push protection, and gets 2,000 Actions minutes a month, while CI used about 1,680 in the 16 days to 9 Nov and the heartbeat needs about 480 a month; past the cap CI and the heartbeat stop without a word. GitHub Pro (about US$4 a month) was the alternative. **Loosens?** No: it removes live identifiers from a public place.
+  4. **Gate 2 by Joey's own look at live:** Joey logs in to live MySys with the agent's account by hand, opens one `/048` Note and the Create New Task form, saves nothing, and reports: PO Documents or Documents; Resolve or Solved; live's Client Ref No. column holds `<internal no>/048`; whether the agent's password expires. The same look also reports (added by the advisor, 9 Nov 2026): the live pool's name and the agent's user name as the Assign list shows them; the `/048` Note title format (`[B1 Homes] Order <internal no>/048`); and **how many Pending Notes the Note Pool lists with Assigned Pool = All Pools, Locked/Unlocked = All and Assigned User = All Users** (the stale-Note read, D6): more than one page (50) stops every run with `MORE_PAGES` (entry 5 Nov 2026, 7.2), which would be a code change. Any difference from the test site is a code change and moves the date. **Loosens?** No: the PO admin's written answers become Joey's direct look.
+  5. **Gate 3:** Joey signs off (Authority above). **No backlog cut-off:** every `/048` Note in the agent's pool is processed like a new one; one already booked by a person skips `DUPLICATE_TASK` and goes back to the pool. No code change. **Loosens?** No: it is the behaviour the code already has.
+  6. **Code freeze** until live runs hourly: only fixes for what go-live finds, and the live-profile task. Tasks 8.1-8.4 wait until after, and so does task 8.2's PR. **Loosens?** 8.4 (its retry refuses committing clicks) was a tightening planned before go-live; live starts without it. Today's retry is the proven demo one, and the booker's read-backs stay.
+  7. **Dropped:** 6.1-6.4 (the M6 demos, superseded by the 28 Oct demo and P4) and 7.6's formal triage loop. Alerts are handled with `docs/ops-runbook.md`. **Loosens?** Yes, 7.6 (part of gate 6): an alert is no longer closed with one of four recorded outcomes.
+  8. **Gate 4 and the heartbeat** are needed before **unattended hourly live runs**, not before the watched ones (live spike, decide-only and one-PO runs, all with Joey there): a named backup admin for the Mac Mini, and `gh workflow enable heartbeat`. The Mac Mini's GitHub token and the `po-agent-alert` label are already in place. **Loosens?** Yes, gate 4 and 7.1 move later, while Joey is watching each run.
+- **Unchanged before any live contact** (read-only spike included): gate 1 (met 29 Oct); ADR-002 H2 passes again (Claude and every other AI tool removed from `poagent` before any live credential reaches the Mac Mini; entry 6 Nov 2026); live secrets only in `poagent`'s Keychain under their own names; the Mac Mini runs the `production` tag, moved by Joey to the go-live commit; Claude never runs anything against the live host.
+- **Live order**, each step with its own dated entry here: read-only `spike` on live → `run --decide-only` on live → `run` booking one PO per run, watched (the trace check in item 1 on the first) → full hourly runs.
+- **Next:** the live-profile task (live config only on the Mac Mini, `config/live*.toml` stays out of the repo; its own keyring names; the wrapper and kill switch for live; item 3's `note_id` drop) is designed with Joey, gets its own entry, and is built with a second-model review.
+- Carried in: `SPEC.md` v1.32 (Production; S3), `tasks/plan.md` (Phase P), `tasks/todo.md`.
 
 ## 9 Nov 2026 - 5.2 closed; its last booking runs are checked in P5 (Joey)
 
@@ -701,11 +720,11 @@ The MVP's goal is to show the agent runs by itself on the office Mac Mini agains
 
 ## Still open
 
-Updated 4 Nov 2026; the go-live gates in `SPEC.md` -> Production are the full list.
+Updated 9 Nov 2026 (go-live plan, entry above); the go-live gates in `SPEC.md` -> Production are the full list.
 
-- **PO admin's live answers** (gate 2): PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column ends `/048` (open question 10); whether the agent account's password expires (open question 3; MFA not seen).
-- **CEO go-live sign-off and the backlog cut-off date** (gate 3): which older Notes the agent may touch.
-- **Accounts** (gate 4): a named backup admin for the Mac Mini; the Mac Mini's GitHub token and the `po-agent-alert` label.
+- **Live answers** (gate 2; from 9 Nov 2026 Joey's own look at live, go-live plan entry, which adds the pool and agent names, the title format and the Pending Note count): PO Documents or Documents (open question 11); Resolve or Solved on live; whether live's Client Ref No. column ends `/048` (open question 10); whether the agent account's password expires (open question 3; MFA not seen).
+- ~~CEO go-live sign-off and the backlog cut-off date~~ **Answered 9 Nov 2026:** Joey signs off under the CEO's delegated authority; no backlog cut-off (go-live plan entry).
+- **Accounts** (gate 4): a named backup admin for the Mac Mini, before unattended hourly live runs (go-live plan entry). The Mac Mini's GitHub token and the `po-agent-alert` label are in place.
 - ~~Heartbeat service~~ **Answered 5 Nov 2026:** a scheduled GitHub Action (entry above).
 - ~~CEO decision 2~~ **Answered 25 Oct 2026:** delegated to Joey, who said yes (entry above). Since 2 Nov 2026 no model reads the PDFs.
 - ~~CEO/IT OK on the private GitHub repo~~ **Answered 25 Oct 2026:** the repo is public so the CEO can read it; no real client data in it.

@@ -16,8 +16,21 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **P2** (done: PRs #33-#45) Decide: 2.1-2.6
 - [x] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
 - [x] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
-- [ ] **P5** Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2, then the hourly job; a week of hourly runs with zero wrong bookings, every alert triaged (7.6)
-- [ ] **P6** Go live, after the go-live gates (MySys permission; PO admin's live answers; CEO sign-off and backlog cut-off date; accounts; P5's week; production operations 7.1-7.6): live spike, then decide-only, then one booking per run, watched · tasks written then
+- [x] **P5** (tasks built; the hourly week skipped, decisions 9 Nov 2026, go-live plan) Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2
+- [ ] **P6** Go live (decisions, 9 Nov 2026, go-live plan): the G tasks below, in order. Code frozen until G.8: only fixes for what go-live finds
+
+## Go live (added 9 Nov 2026; `SPEC.md` -> Production)
+
+Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Claude never runs anything against the live host.
+
+- [ ] **G.1** Joey's look at live with the agent's account, nothing saved (gate 2): PO Documents or Documents; Resolve or Solved; Client Ref No. `<internal no>/048`; password expiry; pool and agent names; `/048` title format; Pending Note count for the stale-Note read (more than 50 is a code change) · by hand
+- [ ] **G.2** Real-PO seam on the 3-5 real POs (`uv run pytest tests/seam1 -m real_data`, laptop): `false PROCEED: 0` · Joey puts the POs in `private/`, Claude runs it
+- [ ] **G.3** Live profile: live config and its own keyring names on the Mac Mini only, the wrapper and kill switch for live, alert issues without `note_id` (audit N4) · step · high risk, second-model review · designed with Joey first
+- [ ] **G.4** Joey's by-hand steps: Must never #3, the `guard_bash.py` live-host deny and `.claude/` changes for live; Claude and every AI tool removed from `poagent` (H2); live secrets into `poagent`'s Keychain; live config on the Mac Mini; the `production` tag moved to the go-live commit · by hand
+- [ ] **G.5** Live read-only `spike` from the Mac Mini · by hand (Joey runs, pastes `runs.log` lines)
+- [ ] **G.6** Live `run --decide-only`; Joey reads its NOTE lines against the Notes · by hand
+- [ ] **G.7** Live `run`, one PO per run, watched; the 5.2 trace check on the first (Joey pastes the `grep <run_id>` trace lines, Claude checks) · by hand
+- [ ] **G.8** Backup admin named (gate 4), `gh workflow enable heartbeat`, then the hourly job loaded on live · by hand
 
 ## Freeze — before any build
 
@@ -99,15 +112,17 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **7.3** Safe trace on the Mac Mini: allowlisted fields only, 90 days · step · before go-live
 - [x] **7.4** Release pinning: the Mac Mini runs the `production` tag; `enabled` still read from `main` · step · before go-live
 - [x] **7.5** `docs/ops-runbook.md`: what to do for each alert · docs · before go-live
-- [ ] **7.6** Alert triage loop: every alert issue closed as expected skip, new case, fix or decision · from the P5 week
+- [ ] ~~**7.6** Alert triage loop~~ (dropped, decisions 9 Nov 2026, go-live plan: alerts are handled with `docs/ops-runbook.md`)
 - [x] **7.7** (done: PR #59) Dev workflow: `.claude/agents/pr-reviewer.md`; `/verify-pr` requires the todo tick · by hand (Joey)
 
 ## Architecture (added 9 Nov 2026; `docs/architecture-review.md` -> Round 2)
 
-- [ ] **8.1** One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after the P5 week, before P6 go-live
-- [ ] **8.2** One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step · now: no test-site run, and the Mac Mini runs the `production` tag
+**Code freeze (decisions, 9 Nov 2026, go-live plan):** 8.1-8.4 wait until live runs hourly (G.8), 8.2's PR too.
+
+- [ ] **8.1** One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after G.8
+- [ ] **8.2** One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step · after G.8
 - [ ] **8.3** The two readers as one module, and `decide()` calls the project lookup itself (Round 2, candidate A, with round 1's proposal 6) · step · after 8.1
-- [ ] **8.4** One MySys wait module; its retry refuses committing clicks (Round 2, candidate C) · step · after 8.3, before P6 go-live
+- [ ] **8.4** One MySys wait module; its retry refuses committing clicks (Round 2, candidate C) · step · after 8.3 (after G.8)
 
 ## Demo - shown 28 Oct 2026 (decisions, 27-28 Oct 2026)
 
@@ -118,7 +133,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 
 ## M6 — MVP demo
 
-**Superseded by the Demo above:** 6.1-6.4 were written for the unattended run and weren't done as written. Their checks (S1-S8 on the scheduled job) move to P5.
+**Superseded by the Demo above:** 6.1-6.4 were written for the unattended run and weren't done as written. **Dropped (decisions, 9 Nov 2026, go-live plan).**
 
 - [ ] **6.1** `/agent-skills:ship` go/no-go; load the job again, then rehearse `enabled = false` and `launchctl bootout` (S6) · by hand
 - [ ] **6.2** Demo 1: scheduled run (S4), fresh 2609034B copy (S5), controls (S6), evidence (S7) · by hand
