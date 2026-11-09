@@ -886,11 +886,14 @@ TASK_OPTION = re.compile(r"^\((tsk_\d+)\) \[Compaction Test\]$")
 
 
 def task_rows(window: Locator) -> list[list[str]]:
-    """The Tasks table's rows as cell texts (header and details rows)."""
+    """The Tasks table's rows as cell texts (header and details rows), in one
+    call: a row's innerText holds its cells separated by tabs. Seam 2 (6 Nov
+    2026): one call per row took 8-11 s for 74 rows, too slow for the
+    settled read's 15 s, and W2 stopped with NO_NEW_TASK."""
     try:
         return [
-            [c.strip() for c in row.locator("td").all_inner_texts()]
-            for row in window.locator("tbody tr").all()
+            [c.strip() for c in text.split("\t")]
+            for text in window.locator("tbody tr").all_inner_texts()
         ]
     except PlaywrightError:
         raise UnexpectedScreen("task table not readable") from None
