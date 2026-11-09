@@ -35,6 +35,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **6 Nov 2026: Claude on the Mac Mini's `poagent` account, test site only** (ADR-002 gate H2 waived for the test site; entry below).
 - **6 Nov 2026: faster shipping** (decision batch, verify by CI, test-site queue, Must never #8 pre-authorised; entry below).
 
+## 9 Nov 2026 - PO number suffix is always exactly /048 (Joey)
+
+- **Why:** the code review audit (`docs/code-review-audit.md`, PR 81) found that `_PDF_PO` in `src/po_agent/b1/reader_rules.py` has no right anchor, so a PDF reading `2609017B/0481` or `2609017B/048X` is read as `2609017B/048` (audit I1, reproduced with fake values).
+- **Joey's answer:** a B1 Homes PDF never shows anything after `/048` ("Never", 9 Nov 2026; earlier "/048X will never happen"). So the rule can't misread a real B1 PO.
+- **Decision:** audit I1 is accepted and moved to the Nits (N6); no regex change.
+- **Revisit:** if a second client or another PO suffix appears.
+
 ## 6 Nov 2026 - Faster shipping: fewer waits on Joey (Joey)
 
 - **Why:** Joey asked whether cmux, Claude Code agent teams, git worktrees, QA automation or gstack would ship faster (the Claude Code power-user tips article). The slowest part is waiting for Joey: a task stopping to ask him, a seam-2 run waiting for his reset, his reserved merges. More parallel agents don't shorten that.
