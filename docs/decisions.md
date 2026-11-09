@@ -34,6 +34,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **5 Nov 2026: silent-skip alert and more pages** (task 7.2, M4 Nit #3; entry below).
 - **6 Nov 2026: Claude on the Mac Mini's `poagent` account, test site only** (ADR-002 gate H2 waived for the test site; entry below).
 - **6 Nov 2026: faster shipping** (decision batch, verify by CI, test-site queue, Must never #8 pre-authorised; entry below).
+- **9 Nov 2026: release pinning built** (task 7.4; entry below): the Mac Mini runs the `production` tag; `enabled` is read from `origin/main`.
 - **9 Nov 2026: CMU 06-643 practices** (GitHub protections on, print and debugger calls banned by ruff, CI timeout; entry below).
 - **9 Nov 2026: 5.2 closed without the last seam-2 booking runs;** they are checked in the first P5 booking run instead (entry below).
 
@@ -43,6 +44,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Decision:** 5.2 is closed without runs 10, 11 and 12b. Run 11's skip was already proven on the site in 4.5 (S5).
 - **Instead, in P5:** the first scheduled booking run of the P5 week is the first full booking after the W2 fix. Before the week counts, Claude checks that run's safe trace (`SPEC.md` -> Safe trace; allowlisted fields only): every trial Note's `assign_note`, `link_to_project`, `link_select_project` and `mark_solved` has an ok `email_notification_unticked` after both the Note's latest ok `assignee_check` and its previous Note-window write (D7), and every `note_id` in the trace is a trial Note. Any miss, or no booking in that run, stops the P5 week until it is fixed (and the job is unloaded).
 - **Loosens?** Yes, a test gate before P5 (not a runtime control): the same checks move from a watched seam-2 run to the first unattended run on the test site. The guard, the assignee check and the Send Email read-back are unchanged and still enforced in code. No `SPEC.md` change: nothing the agent does or prints changes.
+
+## 9 Nov 2026 - Release pinning: the Mac Mini runs the `production` tag (Joey, task 7.4)
+
+- **Why:** the wrapper pulled `main` before every run, so every merge reached the Mac Mini within the hour. On live, a commit should reach it only after it has run on the test site and Joey has chosen it.
+- **Decision:** each run, `scripts/macmini-run.sh` runs `git fetch --force --prune --prune-tags origin` (so a moved tag updates and a deleted one disappears), reads `enabled` from `config/test.toml` on `origin/main`, then checks out the `production` tag's commit (detached HEAD), runs `uv sync --locked` and the Playwright install, and runs the agent. `runs.log` gets `wrapper: running production <first 12 characters of the commit>`. No `git pull` any more.
+- **Kill switch path (Joey, 9 Nov 2026):** `enabled` is read from `origin/main`, not from the tag, so `enabled = false` merged to `main` still stops the next run without a tag move. Then the wrapper logs `wrapper: enabled = false on main, agent not run`, checks out nothing, opens no alert issue and exits 0 (as the agent's own kill switch does). The agent's own reads of `enabled` (run start and `before_write`) read the checked-out tag's file, so a run goes ahead only when both say `true`; mid-run they never saw a change to `main` anyway, since a run fetched only at its start.
+- **Fails closed:** a failed fetch, a missing `production` tag, a failed checkout, or `config/test.toml` on `origin/main` without exactly one `enabled = true` or `enabled = false` line (a trailing comment allowed) runs nothing: `wrapper: setup failed (<step>), agent not run`, the alert issue, exit 2, as a failed pull did. It never falls back to the code already on disk.
+- **Who moves the tag:** Joey only, by hand on his laptop (`docs/macmini-setup.md` section 8, "Moving the production tag"). Claude never creates, moves or pushes it, in code, docs or commands; the wrapper calls no `git` tag, push or pull command (a test checks the script).
+- **Rollback:** move the tag back to an earlier commit; never to one from before this change, whose wrapper runs `git pull`, which fails on a detached HEAD.
+- **Loosens?** No: it tightens what reaches the Mac Mini. `SPEC.md` v1.31: Tech Stack 8, Commands, Project Structure, S6. `docs/workflow.md` Ground rules: merging no longer deploys, except `enabled`.
 
 ## 9 Nov 2026 - CMU 06-643 practices: GitHub protections, print ban, CI timeout (Joey)
 

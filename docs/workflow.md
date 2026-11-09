@@ -71,7 +71,7 @@ Not used: `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`
 
 | Thing | Rule |
 |---|---|
-| Code | GitHub repo `PromptEngineeringAI01/po-agent`, **public** so the CEO can read it: never put anything in it you wouldn't publish. The Mac Mini pulls `main` before every run, so **merging is deploying**. |
+| Code | GitHub repo `PromptEngineeringAI01/po-agent`, **public** so the CEO can read it: never put anything in it you wouldn't publish. The Mac Mini runs the `production` tag, which only Joey moves by hand after the commit has run on the test site, so **merging no longer deploys** (task 7.4; decisions, 9 Nov 2026, release pinning). The one exception: each run reads `enabled` from `config/test.toml` on `main`, so a merged `enabled = false` stops the next run. |
 | Plan and tasks | `tasks/plan.md`, `tasks/todo.md`. Tasks run in order, one per branch and session. |
 | Changes after the freeze | A change to what the agent does in MySys or prints in its run output, or one that loosens a safety control, needs a dated `docs/decisions.md` entry plus the `SPEC.md` lines it changes, in the same commit; `tasks/plan.md` gets no "Built" paragraph per task, only the tick in `tasks/todo.md` (5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message. |
 | Hooks | Created in M1 (task 1.2), then changed only by Joey, by hand. |

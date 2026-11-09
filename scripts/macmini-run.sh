@@ -3,9 +3,14 @@
 #
 #   scripts/macmini-run.sh <run|spike|decide-only>
 #
-# 1. git pull --ff-only, uv sync --locked, uv run playwright install chromium.
-#    If any fails, the agent doesn't run (stale code would ignore
-#    enabled = false on main): a fixed line to runs.log, an alert issue, exit 2.
+# 1. Release pinning (plan task 7.4): fetches origin (moved and deleted tags
+#    too), reads enabled from config/test.toml on origin/main (false: a fixed
+#    line to runs.log, exit 0, nothing else run), then checks out the
+#    production tag's commit, detached. Only Joey moves that tag, by hand;
+#    this script never creates, moves or pushes it. Then uv sync --locked and
+#    uv run playwright install chromium. If any step fails, or enabled on main
+#    isn't exactly one "enabled = true|false" line, the agent doesn't run:
+#    a fixed line to runs.log, an alert issue, exit 2.
 # 2. Runs the agent on the test site (never --detailed-log) with a hard time
 #    limit, in its own process group, and kills the whole group plus this
 #    user's Playwright browsers when it ends or hits the limit, so nothing
@@ -163,8 +168,33 @@ setup_failed() { # $1 = the step that failed
   open_issue "no run_id" 2 "$line"
   exit 2
 }
+# enabled from config/test.toml on origin/main: prints true or false, or
+# fails unless there is exactly one "enabled = true|false" line (a trailing
+# comment allowed). Read from main, not the tag, so enabled = false stops the
+# next run without a tag move (decisions, 9 Nov 2026, release pinning).
+main_enabled() {
+  local config value
+  config="$(git show origin/main:config/test.toml)" || return 1
+  [ "$(printf '%s\n' "$config" | grep -cE '^[[:space:]]*enabled[[:space:]]*=')" = 1 ] || return 1
+  value="$(printf '%s\n' "$config" | sed -n -E \
+    's/^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*(#.*)?$/\1/p')"
+  case "$value" in
+    true | false) echo "$value" ;;
+    *) return 1 ;;
+  esac
+}
+
 # Their own output goes to launchd.log (the plist's StandardOutPath).
-git pull --ff-only || setup_failed "git pull"
+git fetch --force --prune --prune-tags origin || setup_failed "git fetch"
+enabled="$(main_enabled)" || setup_failed "enabled on main"
+if [ "$enabled" = false ]; then
+  log "wrapper: enabled = false on main, agent not run"
+  exit 0
+fi
+tag_sha="$(git rev-parse --verify --quiet 'refs/tags/production^{commit}')" ||
+  setup_failed "production tag missing"
+git checkout --quiet --detach "$tag_sha" || setup_failed "git checkout"
+log "wrapper: running production $(printf '%.12s' "$tag_sha")"
 uv sync --locked || setup_failed "uv sync"
 uv run playwright install chromium || setup_failed "playwright install"
 

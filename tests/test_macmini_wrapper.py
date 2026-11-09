@@ -1,5 +1,7 @@
 """Tests for the Mac Mini wrapper `scripts/macmini-run.sh` and its launchd
-plist (plan task 1.9; `docs/macmini-setup.md` section 8).
+plist (plan task 1.9; `docs/macmini-setup.md` section 8), and its release
+pinning (plan task 7.4): it runs the `production` tag, with `enabled` read
+from `origin/main`.
 
 The wrapper runs under bash (CI on Linux, Git Bash on Windows) with stub
 `git`, `uv` and `gh` first on its PATH via MACMINI_RUN_PATH_PREFIX. The stub
@@ -25,6 +27,8 @@ PLIST = ROOT / "scripts" / "au.com.prompteng.po-agent.plist"
 BASH = shutil.which("bash")
 
 RUN_ID = "20261105T000700Z-3fa2"
+TAG_SHA = "0123456789abcdef0123456789abcdef01234567"
+REAL_CONFIG = (ROOT / "config" / "test.toml").read_text()
 INFO = "INFO  config loaded"
 NOTE = 'NOTE  {"note_id": "1001", "outcome": "skipped", "reason": "NOT_B1"}'
 ALERT_1 = 'ALERT UNEXPECTED_SCREEN {"note_id": "1002", "step": null, "detail": "fixed"}'
@@ -36,9 +40,26 @@ def summary(exit_code: int) -> str:
     return f'RUN_SUMMARY {{"run_id": "{RUN_ID}", "exit_code": {exit_code}}}'
 
 
+# `git show` prints STUB_MAIN_CONFIG if set, else main.toml (the real
+# config/test.toml): config on origin/main. `git rev-parse` prints TAG_SHA,
+# the production tag's commit, unless STUB_TAG_MISSING is set.
 STUB_GIT = """#!/bin/bash
 echo "git $*" >> "$STUB_DIR/calls"
-exit "${STUB_GIT_EXIT:-0}"
+case "$1" in
+  fetch) exit "${STUB_FETCH_EXIT:-0}" ;;
+  rev-parse)
+    [ -z "${STUB_TAG_MISSING:-}" ] || exit 1
+    echo "$STUB_TAG_SHA" ;;
+  show)
+    [ "${STUB_SHOW_EXIT:-0}" = 0 ] || exit "$STUB_SHOW_EXIT"
+    if [ -n "${STUB_MAIN_CONFIG+set}" ]; then
+      printf '%s\\n' "$STUB_MAIN_CONFIG"
+    else
+      cat "$STUB_DIR/main.toml"
+    fi ;;
+  checkout) exit "${STUB_CHECKOUT_EXIT:-0}" ;;
+esac
+exit 0
 """
 STUB_UV = """#!/bin/bash
 echo "uv $*" >> "$STUB_DIR/calls"
@@ -70,6 +91,17 @@ if [ "$2" = list ]; then printf '%s\\n' "${STUB_HEARTBEAT_ISSUE-7}"; fi
 exit 0
 """
 PING_CALLS = ["gh issue list", "gh issue edit"]
+FETCH_CALLS = [
+    "git fetch --force --prune --prune-tags origin",
+    "git show origin/main:config/test.toml",
+    "git rev-parse --verify --quiet refs/tags/production^{commit}",
+]
+SETUP_CALLS = [
+    *FETCH_CALLS,
+    f"git checkout --quiet --detach {TAG_SHA}",
+    "uv sync --locked",
+    "uv run playwright install chromium",
+]
 TIMESTAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 
 
@@ -109,12 +141,17 @@ class Box:
             stub = self.stubs / name
             stub.write_text(body, newline="\n")
             stub.chmod(0o755)
+        (self.stubs / "main.toml").write_text(REAL_CONFIG, newline="\n")
+        # The checkout's own config (an old tag's) still says enabled = true.
+        (self.repo / "config").mkdir()
+        (self.repo / "config" / "test.toml").write_text(REAL_CONFIG, newline="\n")
         self.home = tmp / "home"
         self.home.mkdir()
         self.env = {
             **os.environ,
             "MACMINI_RUN_PATH_PREFIX": posix(self.stubs),
             "STUB_DIR": posix(self.stubs),
+            "STUB_TAG_SHA": TAG_SHA,
             "HOME": posix(self.home),
         }
 
@@ -173,14 +210,13 @@ def test_clean_run_logs_stdout_and_opens_no_issue(box):
     assert result.returncode == 0
     assert box.gh_args() is None
     assert box.calls() == [
-        "git pull --ff-only",
-        "uv sync --locked",
-        "uv run playwright install chromium",
+        *SETUP_CALLS,
         "uv run po-agent run --site test",
         *PING_CALLS,
     ]
     log = box.runs_log()
     assert all(line in log for line in (INFO, NOTE, summary(0)))
+    assert f"wrapper: running production {TAG_SHA[:12]}" in log.splitlines()
     assert STDERR_TEXT not in log
     assert log.splitlines()[0] not in (INFO, NOTE, summary(0))  # timestamp line
 
@@ -234,14 +270,19 @@ def test_nonzero_exit_without_alert_opens_an_issue(box):
 
 
 @pytest.mark.parametrize(
-    "failing",
+    ("failing", "step"),
     (
-        {"STUB_GIT_EXIT": "1"},
-        {"STUB_SYNC_EXIT": "1"},
-        {"STUB_PLAYWRIGHT_EXIT": "1"},
+        ({"STUB_FETCH_EXIT": "1"}, "git fetch"),
+        ({"STUB_TAG_MISSING": "1"}, "production tag missing"),
+        ({"STUB_SHOW_EXIT": "128"}, "enabled on main"),
+        ({"STUB_MAIN_CONFIG": 'site = "test"'}, "enabled on main"),
+        ({"STUB_MAIN_CONFIG": "enabled = False"}, "enabled on main"),
+        ({"STUB_CHECKOUT_EXIT": "1"}, "git checkout"),
+        ({"STUB_SYNC_EXIT": "1"}, "uv sync"),
+        ({"STUB_PLAYWRIGHT_EXIT": "1"}, "playwright install"),
     ),
 )
-def test_failed_setup_runs_no_agent_and_opens_an_issue(box, failing):
+def test_failed_setup_runs_no_agent_and_opens_an_issue(box, failing, step):
     box.agent([summary(0)], 0)
 
     result = box.run("run", **failing)
@@ -250,8 +291,45 @@ def test_failed_setup_runs_no_agent_and_opens_an_issue(box, failing):
     assert not any("po-agent" in call for call in box.calls())
     title, body = issue(box.gh_args())
     assert title == "po-agent alert no run_id"
-    assert "exit code: 2" in body.splitlines()
-    assert "agent not run" in box.runs_log()
+    line = f"wrapper: setup failed ({step}), agent not run"
+    assert body.splitlines() == [line, "exit code: 2"]
+    assert line in box.runs_log().splitlines()
+
+
+def test_failed_fetch_or_missing_tag_checks_out_nothing(box):
+    # A failed fetch or a missing tag must not fall back to whatever code
+    # the checkout already has.
+    box.agent([summary(0)], 0)
+
+    for failing in ({"STUB_FETCH_EXIT": "1"}, {"STUB_TAG_MISSING": "1"}):
+        (box.stubs / "calls").unlink(missing_ok=True)
+        box.run("run", **failing)
+        assert not any(
+            call.startswith(("git checkout", "git pull", "uv ")) for call in box.calls()
+        )
+
+
+def test_enabled_false_on_main_stops_an_old_tag(box):
+    # The production tag's own config says enabled = true; main says false.
+    box.agent([summary(0)], 0)
+    main_config = REAL_CONFIG.replace("enabled = true", "enabled = false", 1)
+    assert main_config != REAL_CONFIG
+
+    result = box.run("run", STUB_MAIN_CONFIG=main_config)
+
+    assert result.returncode == 0
+    assert box.calls() == [*FETCH_CALLS[:2], *PING_CALLS]
+    assert box.gh_args() is None
+    assert (
+        "wrapper: enabled = false on main, agent not run" in box.runs_log().splitlines()
+    )
+    assert ping_body(box)[1:] == ["exit code: 0", "run_id: none"]
+
+
+def test_wrapper_never_moves_or_pushes_the_tag():
+    # Only Joey moves the production tag (plan task 7.4).
+    script = WRAPPER.read_text()
+    assert not re.search(r"\bgit\s+(tag|push|pull)\b", script)
 
 
 def test_hung_agent_is_killed_with_its_children(box, tmp_path):
@@ -317,10 +395,10 @@ def test_every_exit_code_pings_once(box, exit_code):
     assert run_line == f"run_id: {RUN_ID}"
 
 
-def test_failed_git_pull_still_pings(box):
+def test_failed_git_fetch_still_pings(box):
     box.agent([summary(0)], 0)
 
-    result = box.run("run", STUB_GIT_EXIT="1")
+    result = box.run("run", STUB_FETCH_EXIT="1")
 
     assert result.returncode == 2
     assert ping_body(box)[1:] == ["exit code: 2", "run_id: none"]
