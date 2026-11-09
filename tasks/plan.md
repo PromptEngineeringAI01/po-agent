@@ -600,6 +600,7 @@ The run controls and the assignee check moved to M3 (3.5, 3.6) under D1. M5 now 
 - From the detailed log (`--detailed-log`, 3.1's format): before every Note-window write in a full run, an `email_notification_unticked` event that comes **after** the most recent `assignee_check` event (W4's, for both W4 and W5; D7). A non-`/048` Note in the pool is never assigned or opened.
 - "Full seam 2 green" means one fixed sequence of `uv run pytest tests/seam2 -m testsite -k <name>` runs, each started from the reset state it needs, with a reset (workflow 6.1) after every W-step or booking run (Cross-cutting rules): spike, note_window, reads, decide_only, assignee, booker_w1, booker_w2, booker_w3 (includes the Hold-checkbox refusal), booker_w4_w5, run_book (booking, rerun, skip), safety. `tests/seam2/README.md` lists the sequence and which runs need a reset first; the output of every run is shown.
 
+**Closed (decisions, 9 Nov 2026):** runs 1-6, 9 and 12a passed; runs 10, 11 and 12b are not run. Their checks move to the safe trace of the first P5 booking run.
 **Verify:** `uv run pytest tests/seam2 -m testsite` with the output shown; reset afterwards.
 **Files:** `tests/seam2/test_safety.py`, `tests/seam2/README.md`. **Scope:** S.
 
