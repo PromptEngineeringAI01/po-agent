@@ -73,6 +73,6 @@ Read the docs that match your task before changing anything:
 - Architecture and why: `docs/specs/spec.md` (v1 design), `docs/intent.md`; ADR-001 still describes the Claude reader dropped on 2 Nov
 - MySys screens, locators, guard targets: `docs/screen-map.md`; `SPEC.md` → MySys screen rules
 - Safety and real data: `SPEC.md` → Boundaries, Trial conditions, Real client data
-- Production and go-live: `SPEC.md` → Production; `docs/demo-runbook.md`
+- Production and go-live: `SPEC.md` → Production; `docs/demo-runbook.md`; alerts on the Mac Mini: `docs/ops-runbook.md`
 - What's decided: `docs/decisions.md` (newest first); current task: `tasks/plan.md`, `tasks/todo.md`
 - Skills: `/start-task`, `/verify-pr`, and the agent-skills plugin (always the full name, e.g. `/agent-skills:build`; bare `/plan` and `/review` are built-ins).
