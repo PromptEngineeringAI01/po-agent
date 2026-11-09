@@ -1,11 +1,13 @@
 """Tests for the commit-time and CI checks.
 
 `.pre-commit-config.yaml` (gitleaks + the repo-data rule), `.gitleaks.toml`
-(an `sk-ant-` rule; only the hook test's fake key allowed) and
-`.github/workflows/check.yml`.
+(an `sk-ant-` rule; only the hook test's fake key allowed),
+`.github/workflows/check.yml` and the ruff rules in `pyproject.toml`.
 """
 
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -172,6 +174,12 @@ def test_ci_checkout_has_full_history_for_gitleaks(ci_steps):
     assert checkout["persist-credentials"] is False
 
 
+def test_ci_job_has_a_timeout():
+    # A hung browser test must not hold the runner for GitHub's 6-hour default.
+    job = load_yaml(".github/workflows/check.yml")["jobs"]["check"]
+    assert 0 < job["timeout-minutes"] <= 60
+
+
 def test_ci_uses_no_secret_but_the_github_token():
     workflow = (ROOT / ".github/workflows/check.yml").read_text(encoding="utf-8")
     assert set(re.findall(r"secrets\.(\w+)", workflow)) == {"GITHUB_TOKEN"}
@@ -190,3 +198,39 @@ def test_ci_gitleaks_matches_precommit(ci_steps, precommit_hooks):
     # Don't publish findings: no SARIF artifact, no PR comment.
     assert env["GITLEAKS_ENABLE_UPLOAD_ARTIFACT"] is False
     assert env["GITLEAKS_ENABLE_COMMENTS"] is False
+
+
+# --- ruff ---
+
+
+def ruff_codes(rel: str, source: str) -> set[str]:
+    """The T-rule codes ruff reports for `source` as if it were the file `rel`."""
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--no-cache"]
+        + ["--output-format", "concise", "--stdin-filename", rel, "-"],
+        input=source,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return set(re.findall(r"\b(T\d{3})\b", result.stdout))
+
+
+STRAY = "print('x')\nbreakpoint()\n"
+
+
+@pytest.mark.parametrize(
+    ("rel", "expected"),
+    [
+        # CLAUDE.md: only core/output.py prints (the run-output contract).
+        ("src/po_agent/b1/decision.py", {"T201", "T100"}),
+        ("src/po_agent/mysys/guard.py", {"T201", "T100"}),
+        ("src/po_agent/core/output.py", {"T100"}),
+        # Scripts and tests may print; nothing may leave a debugger call.
+        ("scripts/check.py", {"T100"}),
+        ("tests/test_x.py", {"T100"}),
+    ],
+)
+def test_ruff_bans_print_outside_output_and_any_debugger_call(rel, expected):
+    assert ruff_codes(rel, STRAY) == expected
