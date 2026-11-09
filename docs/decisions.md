@@ -36,6 +36,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **6 Nov 2026: faster shipping** (decision batch, verify by CI, test-site queue, Must never #8 pre-authorised; entry below).
 - **9 Nov 2026: release pinning built** (task 7.4; entry below): the Mac Mini runs the `production` tag; `enabled` is read from `origin/main`.
 - **9 Nov 2026: CMU 06-643 practices** (GitHub protections on, print and debugger calls banned by ruff, CI timeout; entry below).
+- **9 Nov 2026: 5.2 closed without the last seam-2 booking runs;** they are checked in the first P5 booking run instead (entry below).
+
+## 9 Nov 2026 - 5.2 closed; its last booking runs are checked in P5 (Joey)
+
+- **Why:** of 5.2's fixed seam-2 sequence (`tests/seam2/README.md`), runs 1-6 and 12a (`guard.vet()` refuses Discard on a real Note window, D3) passed on 6 Nov (PR 74), and run 9 (W4/W5) passed after the W2 fix (PR 75). Only the full booking runs were left: 10 (`test_run_book`), 11 (fresh copy skips `DUPLICATE_TASK`, non-`/048` untouched) and 12b (Send Email read back unticked after the latest assignee check before every Note-window write). They need about three more resets. Joey has tested a lot already and chose not to run them now.
+- **Decision:** 5.2 is closed without runs 10, 11 and 12b. Run 11's skip was already proven on the site in 4.5 (S5).
+- **Instead, in P5:** the first scheduled booking run of the P5 week is the first full booking after the W2 fix. Before the week counts, Claude checks that run's safe trace (`SPEC.md` -> Safe trace; allowlisted fields only): every trial Note's `assign_note`, `link_to_project`, `link_select_project` and `mark_solved` has an ok `email_notification_unticked` after both the Note's latest ok `assignee_check` and its previous Note-window write (D7), and every `note_id` in the trace is a trial Note. Any miss, or no booking in that run, stops the P5 week until it is fixed (and the job is unloaded).
+- **Loosens?** Yes, a test gate before P5 (not a runtime control): the same checks move from a watched seam-2 run to the first unattended run on the test site. The guard, the assignee check and the Send Email read-back are unchanged and still enforced in code. No `SPEC.md` change: nothing the agent does or prints changes.
 
 ## 9 Nov 2026 - Release pinning: the Mac Mini runs the `production` tag (Joey, task 7.4)
 
