@@ -12,6 +12,7 @@ import json
 import pytest
 
 from po_agent.core import runlog
+from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys.guard import ActionGuard
 
 RUN_ID = "20261102T010203Z-abcd"
@@ -81,7 +82,10 @@ def test_an_error_is_its_type_name_then_a_separate_traceback(tmp_path):
     try:
         raise RuntimeError(PAGE_TEXT)
     except RuntimeError as error:
-        log.error(error, note_id=NOTE_ID, step="2")
+        log.event(
+            "error", note_id=NOTE_ID, step="2", ok=False, type=type(error).__name__
+        )
+        runlog.write_traceback(tmp_path, RUN_ID, error)
 
     error_event, traceback_event = events_in(tmp_path)
     assert set(error_event) == BASE_KEYS | {"type"}
@@ -115,3 +119,56 @@ def test_a_name_that_is_not_an_identifier_is_redacted(tmp_path):
     log.event("read_back", note_id=NOTE_ID, step="2", ok=False, field=PAGE_TEXT)
     (event,) = events_in(tmp_path)
     assert event["field"] == "<redacted>"
+
+
+# --- the one traceback writer (task 8.2) ------------------------------------
+
+
+class _PageTextIds(Exception):
+    """Duck-typed note_id and step, as KillSwitch and NoteTaken carry."""
+
+    note_id = PAGE_TEXT
+    step = "W 2"
+
+
+def test_write_traceback_appends_one_line_in_the_run_log_format(tmp_path):
+    log = runlog.RunLog(RUN_ID, ActionGuard(), directory=tmp_path)
+    log.event("error", note_id=NOTE_ID, step="W2", ok=False, type="UnexpectedScreen")
+    try:
+        raise UnexpectedScreen("task not found", note_id=NOTE_ID, step="W2")
+    except UnexpectedScreen as error:
+        runlog.write_traceback(tmp_path, RUN_ID, error)
+
+    error_event, traceback_event = events_in(tmp_path)
+    assert error_event["event"] == "error"
+    assert set(traceback_event) == BASE_KEYS | {"traceback"}
+    assert {k: traceback_event[k] for k in ("run_id", "note_id", "step")} == {
+        "run_id": RUN_ID,
+        "note_id": NOTE_ID,
+        "step": "W2",
+    }
+    assert (traceback_event["event"], traceback_event["ok"]) == ("traceback", False)
+    assert "UnexpectedScreen" in traceback_event["traceback"]
+
+
+def test_write_traceback_needs_no_run_log_and_hides_what_it_must(tmp_path):
+    # A config error is reported before any RunLog exists.
+    try:
+        try:
+            raise RuntimeError(f"locator resolved to {PAGE_TEXT}")
+        except RuntimeError:
+            raise _PageTextIds() from None
+    except _PageTextIds as error:
+        runlog.write_traceback(tmp_path / "logs", RUN_ID, error)
+
+    (event,) = events_in(tmp_path / "logs")
+    assert (event["note_id"], event["step"]) == ("<redacted>", "<redacted>")
+    assert "_PageTextIds" in event["traceback"]
+    assert PAGE_TEXT not in json.dumps(event)
+
+
+def test_write_traceback_swallows_a_file_error(tmp_path):
+    blocked = tmp_path / "logs"
+    blocked.write_text("a file where the folder should be", "utf-8")
+    runlog.write_traceback(blocked, RUN_ID, RuntimeError("fixed"))
+    assert blocked.read_text("utf-8") == "a file where the folder should be"

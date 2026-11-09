@@ -37,6 +37,12 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **9 Nov 2026: release pinning built** (task 7.4; entry below): the Mac Mini runs the `production` tag; `enabled` is read from `origin/main`.
 - **9 Nov 2026: CMU 06-643 practices** (GitHub protections on, print and debugger calls banned by ruff, CI timeout; entry below).
 - **9 Nov 2026: 5.2 closed without the last seam-2 booking runs;** they are checked in the first P5 booking run instead (entry below).
+- **9 Nov 2026: one error-report path** (task 8.2; entry below): `RunLog.error` goes, so its test changes.
+
+## 9 Nov 2026 - One error-report path: `RunLog.error`'s test changes (Joey, task 8.2)
+
+- **Why:** task 8.2 (`docs/architecture-review.md` -> Round 2 -> B, settled by Joey 9 Nov 2026) replaces `cli._log_traceback` and the dead `RunLog.error` (no caller in `src/`) with one module-level traceback writer, `runlog.write_traceback`. `tests/test_runlog.py` called `RunLog.error`, so that test now writes the `error` event with `RunLog.event` (as `core/run.py` does) and the traceback is covered by the writer's own tests (Must never #8; 6 Nov 2026).
+- **Unchanged:** every ALERT, NOTE and RUN_SUMMARY line, every exit code and the run log's line format. No `SPEC.md` change: nothing the agent does or prints changes.
 
 ## 9 Nov 2026 - 5.2 closed; its last booking runs are checked in P5 (Joey)
 

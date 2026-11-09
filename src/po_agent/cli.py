@@ -13,10 +13,11 @@ opens Choose Project on the untaken Note, searches the pln, snapshots
 and stops without selecting (28 Oct 2026).
 
 Every run ends with RUN_SUMMARY as its last stdout line, whatever happened.
-A typed error becomes its ALERT and exit code; anything else is caught here
-and becomes ALERT UNEXPECTED_SCREEN with a fixed detail, exit 1. Nothing goes
-to stderr, because an exception's text can quote page content: the traceback
-goes to logs/ only with --detailed-log, else nowhere.
+A typed error becomes its ALERT and exit code (both declared on its class,
+core/errors.py); anything else is caught here and becomes ALERT
+UNEXPECTED_SCREEN with a fixed detail, exit 1. Nothing goes to stderr,
+because an exception's text can quote page content: the traceback goes to
+logs/ only with --detailed-log (core/runlog.write_traceback), else nowhere.
 
 The safe trace (7.3) starts right after config is loaded, when config sets
 `trace_dir` (core/trace.py): the run log's events, then one run_end event
@@ -30,31 +31,18 @@ refusal until then, D1, is gone); `run --decide-only` books nothing.
 """
 
 import argparse
-import json
 import os
 import shutil
 import sys
 import tempfile
 import time
-import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from po_agent.core import controls, demo, output, run, secrets
+from po_agent.core import controls, demo, output, run, runlog, secrets
 from po_agent.core.config import CONFIG_DIR, Config, load_config
-from po_agent.core.errors import (
-    AccuracyBreach,
-    ConfigError,
-    GuardRefusal,
-    LoginFailed,
-    MorePages,
-    PartialWrite,
-    PoAgentError,
-    UnexpectedScreen,
-    WriteNotStarted,
-    identifier,
-)
+from po_agent.core.errors import ConfigError, PoAgentError, identifier
 from po_agent.core.secrets import SecretName
 from po_agent.core.trace import Trace
 
@@ -65,18 +53,6 @@ DOWNLOAD_PREFIX = "po-agent-dl-"
 _TRACES: dict[str, Trace] = {}
 UNEXPECTED_DETAIL = "unexpected error"
 
-# A subclass maps like its nearest listed base. WriteNotStarted has no ALERT
-# kind of its own: the run stops (exit 1), as for an unexpected screen.
-ALERT_KINDS: dict[type[PoAgentError], output.AlertKind] = {
-    PartialWrite: "PARTIAL_WRITE",
-    AccuracyBreach: "ACCURACY_BREACH",
-    GuardRefusal: "GUARD_REFUSAL",
-    MorePages: "MORE_PAGES",
-    UnexpectedScreen: "UNEXPECTED_SCREEN",
-    WriteNotStarted: "UNEXPECTED_SCREEN",
-    LoginFailed: "LOGIN_FAILED",
-    ConfigError: "CONFIG",
-}
 _MYSYS: tuple[SecretName, ...] = ("mysys_test_username", "mysys_test_password")
 SECRETS_FOR: dict[output.Mode, tuple[SecretName, ...]] = {
     "spike": _MYSYS,
@@ -214,42 +190,13 @@ def _run(
     return start(mode, config, credentials, options, summary)
 
 
-def _alert_kind(error: PoAgentError) -> output.AlertKind:
-    for cls in type(error).__mro__:
-        if cls in ALERT_KINDS:
-            return ALERT_KINDS[cls]
-    return "UNEXPECTED_SCREEN"
-
-
-def _log_traceback(run_id: str, error: BaseException) -> None:
-    # format_exception follows __cause__ and __context__ itself and honours
-    # `raise ... from None`, so a Playwright message the guard hid stays
-    # hidden; never walk the chain by hand
-    # (https://docs.python.org/3.12/library/traceback.html#traceback.format_exception).
-    event = {
-        "ts": datetime.now(UTC).isoformat(),
-        "run_id": run_id,
-        "note_id": getattr(error, "note_id", None),
-        "step": getattr(error, "step", None),
-        "event": "traceback",
-        "ok": False,
-        "traceback": "".join(traceback.format_exception(error)),
-    }
-    try:
-        LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        with open(LOGS_DIR / f"{run_id}.jsonl", "a", encoding="utf-8") as file:
-            file.write(json.dumps(event) + "\n")
-    except OSError:
-        pass  # the ALERT and RUN_SUMMARY still go out
-
-
 def _report(error: BaseException, run_id: str, detailed_log: bool) -> int:
     if detailed_log:
-        _log_traceback(run_id, error)
+        runlog.write_traceback(LOGS_DIR, run_id, error)
     if isinstance(error, PoAgentError):
         # str(error): the fixed detail plus identifiers (core/errors.py).
         line = output.Alert(note_id=error.note_id, step=error.step, detail=str(error))
-        output.alert(_alert_kind(error), line)
+        output.alert(error.alert_kind, line)
         return error.exit_code
     detail = f"{UNEXPECTED_DETAIL} (type={identifier(type(error).__name__)})"
     output.alert("UNEXPECTED_SCREEN", output.Alert(detail=detail))
