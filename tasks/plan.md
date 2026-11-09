@@ -639,6 +639,8 @@ The run controls and the assignee check moved to M3 (3.5, 3.6) under D1. M5 now 
 
 ## Phase P: Production
 
+**Go-live plan (decisions, 9 Nov 2026):** the CEO gave Joey every go-live decision. P5's hourly week, 6.1-6.4 and 7.6 are dropped; gates 2-5 are reshaped (`SPEC.md` -> Production); code is frozen until live runs hourly, so 8.1-8.4 come after; the go-live steps are G.1-G.8 in `tasks/todo.md`. The rows below keep their history.
+
 From 29 Oct 2026 (decisions, 29 Oct 2026; `SPEC.md` -> Production). The goal is the agent running by itself, hourly, on the office Mac Mini: unattended on the test site first, then on live MySys once every go-live gate has passed. The tasks keep their numbers and acceptance criteria from the phases above; this is the order they're built in. Must never #3 (test site only) holds until Joey changes it as the first go-live task.
 
 | Step | Tasks | Notes | Done when |
