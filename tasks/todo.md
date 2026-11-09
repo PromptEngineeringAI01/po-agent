@@ -102,6 +102,10 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [ ] **7.6** Alert triage loop: every alert issue closed as expected skip, new case, fix or decision · from the P5 week
 - [x] **7.7** (done: PR #59) Dev workflow: `.claude/agents/pr-reviewer.md`; `/verify-pr` requires the todo tick · by hand (Joey)
 
+## Architecture (added 9 Nov 2026; `docs/architecture-review.md` -> Round 2)
+
+- [ ] **8.1** One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after the P5 week, before P6 go-live
+
 ## Demo - shown 28 Oct 2026 (decisions, 27-28 Oct 2026)
 
 - [x] **D.1** (done: PR #21, 28 Oct 2026) `po-agent demo --site test --headed`: one trial PO, 2609017B -> pln_66935, Enter before every write; `--until-check` read-only · step

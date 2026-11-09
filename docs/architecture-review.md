@@ -178,3 +178,63 @@ This is split ownership of one rule: "from the Submit click on, the task may exi
 ## Doc impact
 
 Each proposal that lands changes SPEC.md -> Project Structure. Proposal 1 also changes SPEC.md -> Commands (`po-agent demo`) and `docs/demo-runbook.md`. Already stale today: the "Demo only" label on three guard actions in SPEC.md -> MySys screen rules (see proposal 1). Proposal 4 removes the `login` tuple wording from the booker and run docstrings.
+
+---
+
+# Round 2 - 9 Nov 2026
+
+A second pass with `/improve-codebase-architecture` (`.claude/skills/`, PR 80), at `main` 38dfdf5. Same vocabulary and risk levels as round 1; it looks for new candidates and checks round 1 against current code. The visual report stayed outside the repo. Joey picked candidate D and settled its design (below).
+
+## New candidates
+
+| # | Candidate | Strength | Risk | Main files |
+|---|---|---|---|---|
+| D | One Send Email Notification control for every Note-window write | Strong | Medium | `mysys/driver.py`, `mysys/booking.py`, `b1/booker.py` |
+| B | One error-report path: exit code, ALERT kind, traceback, trace end | Strong | Low-Medium | `core/errors.py`, `cli.py`, `core/output.py`, `core/runlog.py`, `core/trace.py` |
+| A | The two readers as one module; `decide()` gets the PDF once | Strong | Medium (seam 1) | `b1/decision.py`, `b1/reader_rules.py`, `core/run.py`, `tests/seam1/real_pos.py` |
+| C | One module owns MySys waiting (poll, settle, retry an opening click) | Strong | Medium | `mysys/driver.py`, `mysys/booking.py` |
+| E | A run plan: the run's inputs and mode policy as one value | Worth exploring | Low-Medium | `cli.py`, `core/run.py`, `core/controls.py` |
+| F | Note Pool views as one call (menu exit and filter preset inside) | Worth exploring | Medium | `mysys/driver.py`, `core/run.py` |
+| G | MySys modules by screen, without the driver-booking import cycle | Worth exploring | Medium | `mysys/driver.py`, `mysys/booking.py`, `b1/reader_rules.py` |
+
+None touches `guard.py`, hooks or CI.
+
+**D.** Send Email is unticked and read back in two implementations: `driver.py:668-676, :708-745` (take and return) and `booking.py:143-165` (W4 twice, W5), plus the demo's copies (`booking.py:189-216`, `demo.py:249`). The driver logs `email_notification_unticked` with `ok=false` before it stops; booking logs through a callback from `booker._unticked` (`booker.py:294-309`) that only ever logs `ok=true`, so a box still ticked at W4 or W5 stops the run with no `ok=false` event. W5 reads the box back twice (`booking.py:262-263`). Must never #4 has two homes with different evidence.
+
+**B.** One error's reporting is known in `errors.py` (`exit_code`), `cli.py:70-79` (`ALERT_KINDS`) and its MRO walk (`:217-221`), `output.py:61` (`AlertKind`, synced by hand), `cli._log_traceback` (`:224-243`, its own format for the file `RunLog` writes; `RunLog.error`, `runlog.py:83-92`, has no caller in `src/`), `run.py:328-337` and `trace.py:187-194`. `KillSwitch` and `NoteTaken` (`controls.py:69-82, :101-109`) are plain `Exception`s with duck-typed `note_id` and `step`. Dead vocabulary: `SkipReason.PARTIAL_WRITE`; `Skip(UNEXPECTED_SCREEN)` (`decision.py:162`) is an error that `run.py:405` re-raises. Change: each error class declares its exit code and ALERT kind; one `report(error)` prints the ALERT, writes the traceback through `RunLog` and ends the trace. Stdout unchanged; `test_output_cli` and `test_exit_codes` must pass unchanged.
+
+**A.** `decide()` (`decision.py:204`) takes `pdf_text`, `pypdf_text` and `pdf_bytes`: three forms of one PDF, two of them positional strings that can be swapped with no type error (the `exact_line_under=True` rule would then apply to the wrong text). Three callers repeat `text_layer` plus `pypdf_text_layer` (`run.py:518-519`, `test_seam1_decide.py:29`, `real_pos.py:237`), and the agreement rule lives in `check_second_reader` (`:183`), the second address pass in `decide()` (`:233-236`) and a test copy (`real_pos._agreement`, `:157-170`). Change: one readers module turns the bytes into both readings and owns the agreement rule; `decide()` takes that value. Do it with round 1's proposal 6 (both change the interface of `decide()`); seam 1 and the real-PO seam are part of done.
+
+**C.** Six hand-written deadline loops (`driver._polls`, `settled_tasks`; `booking._reads`, `search_project_rows`, `new_task_after_submit`, demo-only `wait_new_task`), two identical opening-retry helpers (`driver._open_retried`, `:488`; `booking._open`, `:107`), two menu-retry loops and timeout constants copied at import (`booking.py:37-44`; tests patch both). The settle rules are pure logic but can only be tested through Chromium, `setTimeout` fakes and timeout patches. Change: one wait module on one clock. Must keep: committing clicks are never retried (3 Nov 2026, M4 gate) and the one-call `task_rows` read (PR 75).
+
+**E.** `book_run` and `decide_only` (`run.py:211-243`) are pass-throughs to `_note_loop`; decide-only is encoded as `config_dir=None`; an `argparse.Namespace` reaches four places in `run.py` and the demo; mode policy is spread over `SECRETS_FOR`, `WINDOW_MODES`, `cli.py:199`, `:268-270` and a docstring; `_TRACES` is a module global "so start() keeps its signature". Change: `cli` builds one frozen run plan (mode policy, config, browser options, trace, and a kill-switch reader that re-reads `enabled` before each W step). Pairs with round 1's proposal 4.
+
+**F.** Four of five `open_note_pool` callers must follow it with `leave_menu` (`run.py:274`, `driver.py:518`, `booking.py:285`, `demo.py:161`; `spike` does not), and the three filter presets are checked to three different levels (`search_note`, `:504-530`, checks none). W5's `gone_from_pending` relies on filters that are not checked there; not a defect today (the stale read checks them at run start), but implicit. Change: one Note Pool module with `open(view)` for the eligible, stale and search views.
+
+**G.** `driver.py:1021` imports `booking` lazily to get round a cycle; `booking` uses about ten `driver` privates; the Projects screen is spread over `driver`, `booking`, `reader_rules` and `decision`. Change: one module per screen plus a public locate-helpers module; B1 rules stay in `b1/`. Not a split by size: the reasons are the cycle and locality. After round 1's proposals 1 and 7; D and F can be its first slices.
+
+## Round 1, checked against current code
+
+- **1 is partly wrong.** `booking.untick_send_email` and `_reads` are on the run path (W4, W5), and `reader_rules.pdf_text` is on it through `text_layer`: merge them (D), don't delete them. `po_from_file_name` is used by `tests/seam1/real_pos.py`. Demo-only and missing from the list: `wait_new_task`, `search_projects`, `probe_link`, `download_hrefs`, `has_link_to_project`, `save_snapshot`, `reader_rules.new_task`.
+- **2 is larger.** `trace.STEPS` also holds the non-W steps ("0"-"11", "2a", "return", "decide"); the table must cover them, or the trace keeps its own list.
+- **4 is larger.** It should also take the `credentials` dict and `cli.SECRETS_FOR`, and `Controls("test", ...)` (`run.py:474`, 8 copies in tests); "find again, still ours?, return" is duplicated at `run.py:437-446` and `:557-566`.
+- **5 is larger.** See B for `RunLog.error` and `_log_traceback`. The `read_back.*` names in `trace.CHECKS` are synced by hand with the field strings in `driver.py`; W2 and W3 read-backs emit no `read_back` events.
+- **9 is partly stale.** `new_task` is demo-only (delete it with proposal 1); `live_tasks` is used by `driver.reopen_project`.
+- 3, 6, 7 and 8 stand as written.
+
+## Deep enough, not proposed
+
+`guard.py` (`vet`/`act`), `config.py`, `secrets.py`, `trace._kept`, `errors.identifier`, `models.Proceed`, `address.verify_address` and the contract models in `output.py`; tests `test_hooks.py`, `test_guard.py`, `test_output_cli.py` and the seam-1 layout. Two items are Joey's call if ever wanted: three allowlist names with no caller in `src/` (`open_pool`, `search_task`, `open_task_detail`; a guard change, high risk), and the dead NOTE fields `outcome "partial"`, `tokens_in`, `tokens_out` and `cost_aud` (a stdout-contract change).
+
+## D: the settled design (Joey, 9 Nov 2026)
+
+What the build task (`tasks/todo.md` 8.1) implements. Its own `docs/decisions.md` entry and SPEC lines come with it.
+
+- **One module, two operations,** in the Note-window part of `driver.py` (moved to its own module later if G is done): *untick* (untick if ticked; no event) and *check before a committing click* (read back unticked, record `email_notification_unticked` with `ok` true or false, raise `UnexpectedScreen` with `note_id` and `step` if still ticked). Both are called at exactly today's points, so the guarded click sequence is unchanged: take and return (untick first, check right before Assign), W4 (untick and check before Link to Project, check again before the select), W5 (untick and check before Solved; the duplicate read goes).
+- **The demo uses it too** (its own take, return and Assign copies in `booking.py`, and `demo.py:249`), so the box has one locator and one read-back. The demo has no run log, so it records no event. The demo copies themselves still go with round 1's proposal 1.
+- **The callback goes.** `link_project`, `mark_solved` and `_search_choose_project` take the run log and Note ID instead of `unticked`; `booker._unticked` is deleted.
+- **Evidence change:** a box still ticked at W4 or W5 now records `ok=false` before the stop, as take and return already do. The success-path events and their order are unchanged, so the P5 trace check (decisions, 9 Nov 2026, 5.2) still holds. The ALERT and its detail are unchanged (the booker retypes the error as today). Needs a `docs/decisions.md` entry and the `SPEC.md` -> Safe trace line.
+- **Tests:** a failing test first for the W4/W5 `ok=false` event; the offline MySys fake's `link_project` and `mark_solved` signatures change in their own `test:` commit with a `docs/decisions.md` line (Must never #8). Guard-history assertions don't change.
+- **Not in scope:** making the guard refuse a Note-window committing click without a prior check (a guard change, high risk; revisit only if a missed check ever happens).
+- **When:** after the P5 week, before P6 go-live. It changes `mysys/` and the booker, so seam 2 (take, return, W4, W5) runs on the test site with the Mac Mini job unloaded.
+- **Done:** `check.py`; seam 2 as above; review at Medium depth.
