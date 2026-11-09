@@ -82,7 +82,10 @@ def test_an_error_is_its_type_name_then_a_separate_traceback(tmp_path):
     try:
         raise RuntimeError(PAGE_TEXT)
     except RuntimeError as error:
-        log.error(error, note_id=NOTE_ID, step="2")
+        log.event(
+            "error", note_id=NOTE_ID, step="2", ok=False, type=type(error).__name__
+        )
+        runlog.write_traceback(tmp_path, RUN_ID, error)
 
     error_event, traceback_event = events_in(tmp_path)
     assert set(error_event) == BASE_KEYS | {"type"}
