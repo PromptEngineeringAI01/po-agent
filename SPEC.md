@@ -128,12 +128,12 @@ src/po_agent/
     config.py                   load + validate config/<site>.toml; refuse non-test URLs
     secrets.py                  PO_AGENT_* env var, else keyring
     output.py                   the ONLY module that prints (stdout contract below)
-    runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log); feeds the trace
+    runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log), its one traceback writer; feeds the trace
     trace.py                    the safe trace (7.3): allowlisted fields only, one file per day, 90 days
     run.py                      Note loop, RUN_SUMMARY
     demo.py                     supervised demo: one trial PO, Enter before every write (decisions, 27 Oct 2026)
     controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
-    errors.py                   typed errors and their exit codes
+    errors.py                   typed errors, their exit codes and ALERT kinds
   mysys/                        reusable
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
@@ -191,7 +191,7 @@ def set_po_number(guard: ActionGuard, task_form: Locator, po_number: str) -> Non
 ```
 
 - Names: `snake_case` functions, `PascalCase` models and errors, skip reasons exactly as in `docs/specs/spec.md` §3.
-- Typed errors (`UnexpectedScreen` and its `MorePages`, `WriteNotStarted`, `PartialWrite`, `AccuracyBreach`, `GuardRefusal`, `LoginFailed`, `ConfigError`) in `core/errors.py`, mapped to exit codes in `cli.py`. Their messages come from fixed templates plus identifiers only, never page text or a Playwright message (which can quote an address).
+- Typed errors (`UnexpectedScreen` and its `MorePages`, `WriteNotStarted`, `PartialWrite`, `AccuracyBreach`, `GuardRefusal`, `LoginFailed`, `ConfigError`) in `core/errors.py`; each class declares its exit code and its ALERT kind, and `cli.py` reports them. Their messages come from fixed templates plus identifiers only, never page text or a Playwright message (which can quote an address).
 
 **Run output (stdout) contract.** The Mac Mini's run log and alert issues are built from this, so it is short and holds no PDF text, addresses, Note bodies or Claude readings:
 
@@ -211,7 +211,7 @@ RUN_SUMMARY {"run_id": "...", "site": "test", "mode": "run|decide-only|spike", "
 - Run-control `INFO` lines (3.5), each ending the run with exit 0 unless noted: `kill switch on: run not started` (any mode, before secrets or a browser), `outside the run window: run not started` (`run` and `run --decide-only` only), `kill switch on: run stopped` (switched off before W1 or W2: the Note is returned first), and `run cap reached: <n> notes left for the next run` (the run goes on to its summary).
 - **Silent skips and more pages (7.2; decisions, 5 Nov 2026):** the run stops on its first `UNEXPECTED_SCREEN` (exit 1), so a MySys screen change can't skip every Note quietly; there is no separate all-skipped alert, and business skips (`NOT_B1`, `DUPLICATE_TASK`, ...) never alert. A Note Pool with a second page, which is never read, prints `ALERT MORE_PAGES` (fixed detail, no `note_id`) and exits 1 before any Note is taken: in `run` and `run --decide-only` from the stale-Note read (D6), which lists every Pending Note and so has a second page whenever the eligible read does; in `spike` from the eligible read, after its counts line. A typed error raised later has its own exit code (none can follow, since the run stops).
 - `run_id` = UTC start time plus 4 random hex characters (e.g. `20261016T013507Z-3fa2`), made before the config is loaded, so even an exit-2 `RUN_SUMMARY` has one. `RUN_SUMMARY` is always the last line, even after a crash.
-- **Nothing goes to stderr.** An unexpected exception becomes `ALERT UNEXPECTED_SCREEN` with a fixed detail; its traceback goes to `logs/` only with `--detailed-log`, else nowhere, because Playwright's error text can quote page content.
+- **Nothing goes to stderr.** An unexpected exception becomes `ALERT UNEXPECTED_SCREEN` with a fixed detail; its traceback goes to `logs/` only with `--detailed-log` (`core/runlog.write_traceback`, for any error that ends the run), else nowhere, because Playwright's error text can quote page content.
 
 Never print or log a secret, the environment, cookies or browser storage state. PDF and Note text are untrusted data.
 

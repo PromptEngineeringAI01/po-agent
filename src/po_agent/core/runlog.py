@@ -11,6 +11,9 @@ Guard actions come from `guard.history` and are written, in order, before
 the next event, so the log keeps the order 5.2 checks (Send Email read back
 unticked after the last change and before each Assign).
 
+The traceback event is written by `write_traceback` alone (cli.py calls it
+for the error that ends the run), so it also works before a RunLog exists.
+
 Every event but the traceback also goes to the safe trace (core/trace.py,
 task 7.3), with or without --detailed-log: its name and pass/fail, the skip
 reason or the error type, never more.
@@ -80,17 +83,6 @@ class RunLog:
             )
         self._written = len(self.guard.history)
 
-    def error(
-        self, error: BaseException, *, note_id: str | None, step: str | None
-    ) -> None:
-        """The error's type name, then its traceback as a separate event."""
-        self.event(
-            "error", note_id=note_id, step=step, ok=False, type=type(error).__name__
-        )
-        # format_exception honours `raise ... from None`.
-        text = "".join(traceback.format_exception(error))
-        self._write("traceback", note_id, step, False, {"traceback": text})
-
     def _write(
         self,
         event: str,
@@ -99,22 +91,11 @@ class RunLog:
         ok: bool,
         extra: dict[str, str | None],
     ) -> None:
-        if self.trace is not None and event != "traceback":
+        if self.trace is not None:
             self._trace(event, note_id, step, ok, extra)
         if self.path is None:
             return
-        line = {
-            "ts": datetime.now(UTC).isoformat(),
-            "run_id": self.run_id,
-            "note_id": identifier(note_id),
-            "step": identifier(step),
-            "event": event,
-            "ok": ok,
-            **extra,
-        }
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, "a", encoding="utf-8") as file:
-            file.write(json.dumps(line) + "\n")
+        _append(self.path, _line(self.run_id, event, note_id, step, ok, extra))
 
     def _trace(
         self,
@@ -140,3 +121,54 @@ class RunLog:
         else:
             name = event
         self.trace.event(note_id=note_id, step=step, name=name, outcome=outcome)
+
+
+def write_traceback(directory: Path, run_id: str, error: BaseException) -> None:
+    """Appends the error's traceback to <directory>/<run_id>.jsonl as one
+    "traceback" event in the run log's line format (cli._report, with
+    --detailed-log). Needs no RunLog: a config error is reported before one
+    exists. Never goes to the safe trace. A file error is swallowed, so the
+    ALERT and RUN_SUMMARY still go out."""
+    # format_exception follows __cause__ and __context__ itself and honours
+    # `raise ... from None`, so a Playwright message the guard hid stays
+    # hidden; never walk the chain by hand
+    # (https://docs.python.org/3.12/library/traceback.html#traceback.format_exception).
+    text = "".join(traceback.format_exception(error))
+    # A PoAgentError's note_id and step, or KillSwitch's and NoteTaken's.
+    note_id = _str_or_none(getattr(error, "note_id", None))
+    step = _str_or_none(getattr(error, "step", None))
+    line = _line(run_id, "traceback", note_id, step, False, {"traceback": text})
+    try:
+        _append(directory / f"{run_id}.jsonl", line)
+    except OSError:
+        pass
+
+
+def _str_or_none(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _line(
+    run_id: str,
+    event: str,
+    note_id: str | None,
+    step: str | None,
+    ok: bool,
+    extra: dict[str, str | None],
+) -> str:
+    line = {
+        "ts": datetime.now(UTC).isoformat(),
+        "run_id": run_id,
+        "note_id": identifier(note_id),
+        "step": identifier(step),
+        "event": event,
+        "ok": ok,
+        **extra,
+    }
+    return json.dumps(line) + "\n"
+
+
+def _append(path: Path, line: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as file:
+        file.write(line)

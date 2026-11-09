@@ -117,10 +117,10 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 
 ## Architecture (added 9 Nov 2026; `docs/architecture-review.md` -> Round 2)
 
-**Code freeze (decisions, 9 Nov 2026, go-live plan):** 8.1-8.4 wait until live runs hourly (G.8), 8.2's PR too.
+**Code freeze (decisions, 9 Nov 2026, go-live plan):** 8.1, 8.3 and 8.4 wait until live runs hourly (G.8). 8.2 was merged before the freeze (PR 88).
 
 - [ ] **8.1** One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after G.8
-- [ ] **8.2** One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step · after G.8
+- [x] **8.2** (done: PR 88, before the freeze) One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step
 - [ ] **8.3** The two readers as one module, and `decide()` calls the project lookup itself (Round 2, candidate A, with round 1's proposal 6) · step · after 8.1
 - [ ] **8.4** One MySys wait module; its retry refuses committing clicks (Round 2, candidate C) · step · after 8.3 (after G.8)
 
