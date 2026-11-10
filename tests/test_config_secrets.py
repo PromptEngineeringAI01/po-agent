@@ -1,9 +1,10 @@
 """Tests for core/config.py, core/secrets.py and core/errors.py (task 1.5).
 
-Only the test host and made-up hosts appear here; the live host never does
-(CLAUDE.md Must never #3; decisions, 16 Oct 2026, D4). This file is the one
-place the name ANTHROPIC_API_KEY may appear: it sets it to prove it's ignored
-(D4).
+The test host and made-up hosts appear here; the live host only as the
+`LIVE_HOST` constant, never as text (CLAUDE.md Must never #3; decisions,
+10 Nov 2026, hooks for the live profile). Nothing here logs in anywhere.
+This file is the one place the name ANTHROPIC_API_KEY may appear: it sets it
+to prove it's ignored (D4).
 """
 
 import tomllib
@@ -15,6 +16,7 @@ from keyring.backend import KeyringBackend
 from keyring.errors import KeyringError, NoKeyringError
 from pydantic import ValidationError
 
+from po_agent.core import config as config_module
 from po_agent.core import secrets
 from po_agent.core.config import Config, load_config, parse_config
 from po_agent.core.errors import (
@@ -31,9 +33,15 @@ from po_agent.core.errors import (
 
 ROOT = Path(__file__).resolve().parent.parent
 TEST_TOML = ROOT / "config" / "test.toml"
+LIVE_TOML = ROOT / "config" / "live.toml"
 TEST_HOST = "test-prompt.mysys.com.au"
 MADE_UP_HOST = "mysys.example.invalid"
-SECRET_NAMES = ("mysys_test_username", "mysys_test_password")
+SECRET_NAMES = (
+    "mysys_test_username",
+    "mysys_test_password",
+    "mysys_live_username",
+    "mysys_live_password",
+)
 
 
 def repo_config() -> dict:
@@ -42,6 +50,12 @@ def repo_config() -> dict:
 
 def with_changes(**changes) -> dict:
     data = repo_config()
+    data.update(changes)
+    return data
+
+
+def live_config(**changes) -> dict:
+    data = tomllib.loads(LIVE_TOML.read_text(encoding="utf-8"))
     data.update(changes)
     return data
 
@@ -112,14 +126,16 @@ def test_test_host_in_any_case_is_accepted():
     assert config.base_url.host == TEST_HOST
 
 
-@pytest.mark.parametrize("site", ["live", "staging", ""])
-def test_site_other_than_test_is_a_config_error(site):
+@pytest.mark.parametrize("site", ["staging", "", "prod"])
+def test_an_unknown_site_is_a_config_error(site):
     with pytest.raises(ConfigError):
         parse_config(with_changes(site=site))
 
 
-@pytest.mark.parametrize("site", ["live", "../test", "TEST"])
-def test_load_config_refuses_a_site_other_than_test_before_reading(site, tmp_path):
+@pytest.mark.parametrize("site", ["staging", "../test", "TEST", "LIVE", "live/../test"])
+def test_load_config_refuses_an_unknown_site_before_reading(site, tmp_path):
+    # tmp_path holds a valid test.toml: a refused site never reaches it.
+    (tmp_path / "test.toml").write_text(TEST_TOML.read_text("utf-8"), "utf-8")
     with pytest.raises(ConfigError):
         load_config(site, config_dir=tmp_path)
 
@@ -180,6 +196,79 @@ def test_a_claude_setting_is_an_unknown_key(key):
         parse_config(data)
 
     assert key in str(caught.value)
+
+
+# --- the live profile (decisions, 10 Nov 2026, live profile) ------------------
+
+
+def test_repo_live_config_loads_as_the_live_profile():
+    config = load_config("live")
+
+    assert config.site == "live"
+    assert config.base_url.host == config_module.LIVE_HOST
+    assert config.title_rule == "live-b1-title"
+    assert config.duplicate_ignores_cancelled is False
+    # Committed disabled; one PR flips it just before the live spike (Joey).
+    assert config.enabled is False
+    assert config.max_notes_per_run == 1  # the watched runs (G.7)
+    assert config.stale_read_by_agent is True
+    assert config.project_document_type == "Client Documents"
+
+
+def test_the_test_profile_keeps_its_own_values():
+    config = load_config("test")
+
+    assert config.stale_read_by_agent is False
+    assert config.project_document_type == "Purchase Order"
+
+
+def test_load_config_reads_the_sites_own_file(tmp_path):
+    (tmp_path / "live.toml").write_text(LIVE_TOML.read_text("utf-8"), "utf-8")
+
+    assert load_config("live", config_dir=tmp_path).site == "live"
+    with pytest.raises(ConfigError):
+        load_config("test", config_dir=tmp_path)  # no test.toml there
+
+
+def test_each_site_needs_its_own_host():
+    live_url = f"https://{config_module.LIVE_HOST}/index.php"
+    with pytest.raises(ConfigError) as caught:
+        parse_config(with_changes(base_url=live_url))
+    assert "base_url" in str(caught.value)
+
+    with pytest.raises(ConfigError) as caught:
+        parse_config(live_config(base_url=f"https://{TEST_HOST}/index.php"))
+    assert "base_url" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://{host}/index.php",
+        "https://{host}:8443/index.php",
+        "https://someone:pw@{host}/index.php",
+        "https://{host}.example.invalid/index.php",
+        "https://evil-{host}/index.php",
+    ],
+)
+def test_live_base_url_must_be_https_on_exactly_the_live_host(url):
+    with pytest.raises(ConfigError) as caught:
+        parse_config(live_config(base_url=url.format(host=config_module.LIVE_HOST)))
+
+    assert "base_url" in str(caught.value)
+    assert "pw" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"title_rule": "test-body-filename"},
+        {"duplicate_ignores_cancelled": True},
+    ],
+)
+def test_live_needs_the_live_title_rule_and_counts_cancelled_tasks(changes):
+    with pytest.raises(ConfigError):
+        parse_config(live_config(**changes))
 
 
 def test_missing_key_is_a_config_error():
@@ -315,7 +404,7 @@ def test_anthropic_api_key_env_var_does_not_override_keyring(
 @pytest.mark.parametrize(
     # anthropic_api_key: no Claude key since 2 Nov 2026 (decisions)
     "name",
-    ["mysys_live_password", "ANTHROPIC_API_KEY", "anthropic_api_key", ""],
+    ["mysys_prod_password", "ANTHROPIC_API_KEY", "anthropic_api_key", ""],
 )
 def test_unknown_secret_name_is_refused(name, clean_env, use_keyring):
     backend = use_keyring(MemoryKeyring())
@@ -323,6 +412,20 @@ def test_unknown_secret_name_is_refused(name, clean_env, use_keyring):
     with pytest.raises(ValueError):
         secrets.get(name)
     assert backend.asked == []
+
+
+@pytest.mark.parametrize("site", ["test", "live"])
+def test_the_site_picks_its_own_mysys_secret_pair(site):
+    assert secrets.mysys_names(site) == (
+        f"mysys_{site}_username",
+        f"mysys_{site}_password",
+    )
+
+
+@pytest.mark.parametrize("site", ["staging", "", "LIVE"])
+def test_an_unknown_site_has_no_secrets(site):
+    with pytest.raises(ValueError):
+        secrets.mysys_names(site)
 
 
 # --- errors -----------------------------------------------------------------

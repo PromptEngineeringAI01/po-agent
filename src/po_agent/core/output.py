@@ -103,7 +103,7 @@ class Alert(_Line):
 
 class RunSummary(_Line):
     run_id: str = Field(pattern=r"^\d{8}T\d{6}Z-[0-9a-f]{4}$")
-    site: Literal["test"] | None = None
+    site: Literal["test", "live"] | None = None
     mode: Mode | None = None
     seen: Count = 0
     eligible: Count = 0

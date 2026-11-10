@@ -269,7 +269,7 @@ base = "p1"
 covers = ["live-title-config"]
 config = { site = "live", title_rule = "live-b1-title", duplicate_ignores_cancelled = false }
 note = { title = "[B1 Homes] Order 2600001B/048" }
-lookup = { search_rows = [{ pln = "pln_10001", client_ref_no = "2600001B/048", company = "B1 Homes" }], project_internal_no = "2600001B/048" }
+lookup = { search_rows = [{ pln = "pln_10001", client_ref_no = "2600001B", company = "B1 Homes" }], project_internal_no = "2600001B" }
 expect = { result = "proceed", pln = "pln_10001", po_number = "2600001B/048" }
 
 [[case]]
@@ -278,7 +278,7 @@ base = "p2"
 covers = ["live-title-config"]
 config = { site = "live", title_rule = "live-b1-title", duplicate_ignores_cancelled = false }
 note = { title = "[B1 Homes] Order 2600002B/048" }
-lookup = { search_rows = [{ pln = "pln_10002", client_ref_no = "2600002B/048", company = "B1 Homes" }], project_internal_no = "2600002B/048" }
+lookup = { search_rows = [{ pln = "pln_10002", client_ref_no = "2600002B", company = "B1 Homes" }], project_internal_no = "2600002B" }
 expect = { result = "proceed", pln = "pln_10002", po_number = "2600002B/048" }
 
 [[case]]
@@ -287,7 +287,7 @@ base = "p3"
 covers = ["live-title-config"]
 config = { site = "live", title_rule = "live-b1-title", duplicate_ignores_cancelled = false }
 note = { title = "[B1 Homes] Order 2600003B/048" }
-lookup = { search_rows = [{ pln = "pln_10003", client_ref_no = "2600003B/048", company = "B1 Homes" }], project_internal_no = "2600003B/048" }
+lookup = { search_rows = [{ pln = "pln_10003", client_ref_no = "2600003B", company = "B1 Homes" }], project_internal_no = "2600003B" }
 expect = { result = "proceed", pln = "pln_10003", po_number = "2600003B/048" }
 
 [[case]]
@@ -512,9 +512,9 @@ note = { title = "[B1 Homes] Order 2600001B/048" }
 lookup = { search_rows = [
   { pln = "pln_10011", client_ref_no = "2600001B/023", company = "B1 Homes" },
   { pln = "pln_10013", client_ref_no = "2600001B/030", company = "B1 Homes" },
-  { pln = "pln_10001", client_ref_no = "2600001B/048", company = "B1 Homes" },
-  { pln = "pln_10012", client_ref_no = "2600001B", company = "B1 Homes" },
-], project_internal_no = "2600001B/048" }
+  { pln = "pln_10001", client_ref_no = "2600001B", company = "B1 Homes" },
+  { pln = "pln_10012", client_ref_no = "2600001B/048", company = "B1 Homes" },
+], project_internal_no = "2600001B" }
 expect = { result = "proceed", pln = "pln_10001", po_number = "2600001B/048" }
 
 [[case]]

@@ -12,11 +12,13 @@ private/
 # Playwright CLI snapshot files (may hold page content)
 .playwright-cli/
 
-# Secrets and live config: never in the repo
+# Secrets: never in the repo. config/live.toml is the one live config and
+# holds no secrets (decisions, 10 Nov 2026, live profile); any other is local.
 .env
 .env.*
 secrets/
 config/live*.toml
+!config/live.toml
 
 # Python / uv
 __pycache__/

@@ -23,11 +23,11 @@ from po_agent.b1.models import (
     SkipReason,
 )
 
-# test-body-filename is the only rule a config can select in the MVP;
-# live-b1-title exists for offline tests of real live Notes (SPEC.md, section 2 row).
+# Each profile's Note Pool title rule: test-body-filename on test,
+# live-b1-title on live (core/config.py).
 TitleRule = Literal["test-body-filename", "live-b1-title"]
-# The code is test site only (Must never #3); "live" is the live match rule as
-# pure logic, for offline tests, with no host or config behind it.
+# The profile's site; the project match rule is the same on both (Joey's
+# look at live, 10 Nov 2026).
 Site = Literal["test", "live"]
 
 UNLINKED_PROJECT = "---"
@@ -116,15 +116,13 @@ def check_note_and_pdf(
 
 def _client_ref(internal_no: str, site: Site) -> str | None:
     """The Client Ref No. a matching project holds, lower case; None when
-    there is no internal number to match."""
-    wanted = internal_no.strip().lower()
-    if site == "test":
-        ref = wanted
-    elif site == "live":
-        ref = f"{wanted}/{rules.PO_SUFFIX}"
-    else:
+    there is no internal number to match. The bare internal number on both
+    sites: live's Projects search shows it so too, and `/048` belongs to the
+    Note's title (Joey's look at live, 10 Nov 2026)."""
+    if site not in ("test", "live"):
         raise ValueError("unknown site")
-    return ref if wanted else None
+    wanted = internal_no.strip().lower()
+    return wanted or None
 
 
 def _is_ref(value: str, ref: str | None) -> bool:
@@ -136,8 +134,8 @@ def match_project(
 ) -> Skip | str:
     """Step 8's match rule (SPEC.md -> MySys screen rules -> Project search):
     the pln of the one B1 Homes row whose Client Ref No. (trimmed, any case)
-    is <internal no> on test or <internal no>/048 on live. Other rows are
-    ignored. The driver (3.2) calls this to choose the pln link it opens."""
+    is <internal no>, on both sites. Other rows are ignored. The driver
+    (3.2) calls this to choose the pln link it opens."""
     ref = _client_ref(internal_no, site)
     # A set: a list can show the same row twice (screen map row 27).
     plns = {

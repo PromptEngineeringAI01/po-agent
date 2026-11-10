@@ -92,6 +92,8 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "open_pool": "click",
         "set_pool_filter": "select",
         "set_locked_filter": "select",
+        # live's stale-Note read: Assigned User = the agent (10 Nov 2026)
+        "set_user_filter": "select",
         "search_note_pool": "fill",
         "refresh_note_pool": "click",
         "open_note": "click",

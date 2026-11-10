@@ -504,6 +504,7 @@ def run_book(
     note_id: str = NOTE_ID,
     stop_after: str = "W1",
     config_dir: Path = CONFIG_DIR,
+    document_type: str = "Purchase Order",
 ) -> str | None:
     page, login = served
     gate = controls.Controls(
@@ -519,6 +520,8 @@ def run_book(
         login=login,
         controls=gate,
         agent=AGENT,
+        site="test",
+        document_type=document_type,
         stop_after=stop_after,
     )
 
@@ -731,6 +734,41 @@ def test_after_submit_a_wrong_value_is_an_accuracy_breach(
 
     assert caught.value.step == "W2"
     assert actions(guard).count("submit_task") == 1
+
+
+@pytest.mark.parametrize(
+    ("document_type", "documents", "passes"),
+    [
+        # Live files a PO Documents upload as Client Documents (Joey's
+        # screenshot, 10 Nov 2026; decisions, 10 Nov 2026, live profile).
+        ("Client Documents", (("Client Documents", FILE),), True),
+        ("Client Documents", (PO_ROW,), False),
+        ("Purchase Order", (("Client Documents", FILE),), False),
+    ],
+    ids=["live-type", "test-type-on-live", "live-type-on-test"],
+)
+def test_w2_reads_back_the_profiles_document_type(
+    serve, guard, search, monkeypatch, document_type, documents, passes
+):
+    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    served = serve(tasks=[CANCELLED], documents=documents)
+
+    def book() -> str | None:
+        return run_book(
+            served,
+            guard,
+            proceed_for_p1(),
+            stop_after="W2",
+            document_type=document_type,
+        )
+
+    if passes:
+        assert book() == NEW_TASK
+    else:
+        with pytest.raises(AccuracyBreach) as caught:
+            book()
+        assert caught.value.field == "document_type"
 
 
 def test_a_guard_refusal_after_submit_keeps_its_type(serve, guard, search):

@@ -107,8 +107,9 @@ def test_the_one_b1_row_with_the_bare_internal_no_matches_on_test() -> None:
     assert match_project(rows, False, INTERNAL_NO, "test") == "pln_10001"
 
 
-def test_the_one_b1_row_ending_048_matches_on_live() -> None:
-    rows = (row("pln_10001", f"{INTERNAL_NO}/048"),)
+def test_the_one_b1_row_with_the_bare_internal_no_matches_on_live() -> None:
+    # Live's Client Ref No. is the bare number too (Joey's look, 10 Nov 2026).
+    rows = (row("pln_10001", INTERNAL_NO),)
     assert match_project(rows, False, INTERNAL_NO, "live") == "pln_10001"
 
 
@@ -118,8 +119,8 @@ def test_client_ref_is_trimmed_and_any_case(ref: str) -> None:
     assert match_project(rows, False, INTERNAL_NO, "test") == "pln_10001"
 
 
-def test_client_ref_048_any_case_on_live() -> None:
-    rows = (row("pln_10001", " 2600001b/048 "),)
+def test_client_ref_any_case_on_live() -> None:
+    rows = (row("pln_10001", " 2600001b "),)
     assert match_project(rows, False, INTERNAL_NO, "live") == "pln_10001"
 
 
@@ -127,7 +128,7 @@ def test_client_ref_048_any_case_on_live() -> None:
     ("ref", "site"),
     [
         ("2600001B/048", "test"),  # the live form is another suffix on test
-        ("2600001B", "live"),  # the bare number is another suffix on live
+        ("2600001B/048", "live"),  # the /048 form is another value on live too
         ("2600001B/023", "test"),
         ("2600001B/023", "live"),
         ("2600001B/0480", "live"),
@@ -150,7 +151,7 @@ def test_other_suffix_rows_are_ignored_beside_the_one_match() -> None:
         row("pln_10001", "2600001B/048"),
         row("pln_10012", "2600001B"),
     )
-    assert match_project(rows, False, INTERNAL_NO, "live") == "pln_10001"
+    assert match_project(rows, False, INTERNAL_NO, "live") == "pln_10012"
     assert match_project(rows, False, INTERNAL_NO, "test") == "pln_10012"
 
 
@@ -218,7 +219,7 @@ def test_check_project_gives_the_matched_pln() -> None:
 
 @pytest.mark.parametrize(
     ("value", "site"),
-    [(" 2600001b ", "test"), ("2600001B/048", "live"), (" 2600001b/048", "live")],
+    [(" 2600001b ", "test"), ("2600001B", "live"), (" 2600001b ", "live")],
 )
 def test_the_window_internal_no_follows_the_match_rule(value: str, site: str) -> None:
     project = lookup(search_rows=(row("pln_10001", value),), project_internal_no=value)
@@ -231,15 +232,16 @@ def test_the_window_internal_no_follows_the_match_rule(value: str, site: str) ->
         ("2600004B", "test"),
         ("", "test"),
         ("2600001B/048", "test"),
-        ("2600001B", "live"),
+        ("2600001B/048", "live"),
         ("2600001B/023", "live"),
     ],
 )
 def test_a_window_internal_no_that_does_not_match_is_unexpected_screen(
     value: str, site: str
 ) -> None:
-    ref = INTERNAL_NO if site == "test" else f"{INTERNAL_NO}/048"
-    project = lookup(search_rows=(row("pln_10001", ref),), project_internal_no=value)
+    project = lookup(
+        search_rows=(row("pln_10001", INTERNAL_NO),), project_internal_no=value
+    )
     result = check_project(project, INTERNAL_NO, site)
     assert result == skip(SkipReason.UNEXPECTED_SCREEN)
 

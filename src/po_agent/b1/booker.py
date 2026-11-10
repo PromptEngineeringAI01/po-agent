@@ -57,6 +57,7 @@ from typing import NoReturn
 
 from playwright.sync_api import Locator, Page
 
+from po_agent.b1.decision import Site
 from po_agent.b1.models import Proceed
 from po_agent.core.controls import Controls
 from po_agent.core.errors import (
@@ -83,24 +84,28 @@ def book(
     login: tuple[str, str, str],
     controls: Controls,
     agent: str,
+    site: Site,
+    document_type: str,
     stop_after: str,
     log: RunLog | None = None,
 ) -> str | None:
     """Books the Note `note_id` (the one the run loop holds) as `proceed`
     decided, up to and including `stop_after`. Returns the new task number
     once W2 has run. With `log`, W4's and W5's Send Email read-backs are
-    `email_notification_unticked` events (5.2)."""
+    `email_notification_unticked` events (5.2). `site` picks the project
+    match rule for W1's reopen; `document_type` is W2's expected Type in
+    the project's Documents tab (both from the profile)."""
     if not isinstance(proceed, Proceed):
         raise TypeError("book() takes only a Proceed from decide()")
     if stop_after not in BUILT:
         raise ValueError("stop_after must be W1-W5")
     if proceed.note_id != note_id:
         raise WriteNotStarted("decision is for another Note", step="W1")
-    project, form = _w1(proceed, guard, page, login, controls)
+    project, form = _w1(proceed, guard, page, login, controls, site)
     _flush(log, note_id, "W1")
     if stop_after == "W1":
         return None
-    task_no = _w2(proceed, guard, page, controls, agent, project, form)
+    task_no = _w2(proceed, guard, page, controls, agent, project, form, document_type)
     _flush(log, note_id, "W2")
     if stop_after == "W2":
         return task_no
@@ -131,11 +136,11 @@ def _w1(
     page: Page,
     login: tuple[str, str, str],
     controls: Controls,
+    site: Site,
 ) -> tuple[Locator, Locator]:
     note_id = proceed.note_id
     controls.before_write(note_id, "W1")
-    # The MVP is test site only (Must never #3).
-    project = driver.reopen_project(guard, page, *login, proceed, "test")
+    project = driver.reopen_project(guard, page, *login, proceed, site)
     try:
         form = booking.open_task_form(guard, page, project)
         booking.fill_task_form(
@@ -164,6 +169,7 @@ def _w2(
     agent: str,
     project: Locator,
     form: Locator,
+    document_type: str,
 ) -> str:
     note_id = proceed.note_id
     try:
@@ -184,7 +190,7 @@ def _w2(
         )
         booking.back_to_project(guard, page, window, proceed.pln)
         booking.check_project_document(
-            guard, page, proceed.pln, task_no, proceed.pdf_file_name
+            guard, page, proceed.pln, task_no, proceed.pdf_file_name, document_type
         )
         return task_no
     except GuardRefusal as error:

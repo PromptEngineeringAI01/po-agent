@@ -41,6 +41,9 @@ BANNED_NAMES = {
     ),
 }
 LIVE_CONFIG = "config/live*.toml"
+# The one committed live config, at the repo root; it holds no secrets
+# (decisions, 10 Nov 2026, live profile).
+COMMITTED_LIVE_CONFIG = "config/live.toml"
 
 Step = tuple[str, Callable[[], bool]]
 
@@ -59,7 +62,9 @@ def classify(path: str) -> str | None:
         for pattern in patterns:
             if fnmatch.fnmatchcase(name, pattern):
                 return f"{reason} ({pattern})"
-    if fnmatch.fnmatchcase("/".join(parts[-2:]), LIVE_CONFIG):
+    if path != COMMITTED_LIVE_CONFIG and fnmatch.fnmatchcase(
+        "/".join(parts[-2:]), LIVE_CONFIG
+    ):
         return f"live config ({LIVE_CONFIG})"
     return None
 

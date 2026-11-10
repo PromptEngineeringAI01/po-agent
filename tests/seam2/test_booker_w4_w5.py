@@ -116,6 +116,8 @@ def test_booker_w4_w5_links_the_pln_marks_solved_and_reads_back(
             login=login,
             controls=gate,
             agent=agent,
+            site=config.site,
+            document_type=config.project_document_type,
             stop_after="W5",
         )
         done = [action for action, _ in guard.history]

@@ -62,7 +62,7 @@ from po_agent.core.errors import (
     identifier,
 )
 from po_agent.core.runlog import RunLog
-from po_agent.core.secrets import SecretName
+from po_agent.core.secrets import SecretName, mysys_names
 from po_agent.core.trace import Trace
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
@@ -136,12 +136,8 @@ def spike(
     guard = ActionGuard()
     with driver.open_browser(headed=options.headed, slow_mo=options.slow_mo) as page:
         driver.go_home(page, str(config.base_url))
-        driver.login(
-            guard,
-            page,
-            credentials["mysys_test_username"],
-            credentials["mysys_test_password"],
-        )
+        username, password = mysys_names(config.site)
+        driver.login(guard, page, credentials[username], credentials[password])
         output.info("logged in")
         panel = driver.open_note_pool(guard, page)
         driver.set_note_pool_filters(guard, panel, config.pool_name)
@@ -256,11 +252,8 @@ def _note_loop(
     """`config_dir` None: decide-only, nothing booked."""
     guard = ActionGuard()
     log = RunLog(summary.run_id, guard, logs, trace)
-    login = (
-        str(config.base_url),
-        credentials["mysys_test_username"],
-        credentials["mysys_test_password"],
-    )
+    username, password = mysys_names(config.site)
+    login = (str(config.base_url), credentials[username], credentials[password])
     progress = _Progress()
     started = controls.now()
     browser = _Browser(options, downloads)
@@ -272,7 +265,12 @@ def _note_loop(
             output.info("logged in")
             panel = driver.open_note_pool(guard, page)
             driver.leave_menu(guard, page)
-            controls.stale_note_stop(guard, panel, config.agent_user_name)
+            controls.stale_note_stop(
+                guard,
+                panel,
+                config.agent_user_name,
+                by_agent=config.stale_read_by_agent,
+            )
             driver.set_note_pool_filters(guard, panel, config.pool_name)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, config, summary)
@@ -471,7 +469,7 @@ def _book(
     `note_id` is the Note the run holds: a decision for another Note is
     WriteNotStarted before W1."""
     check = controls.assignee_check(guard, page, login, config.agent_user_name, log)
-    gate = controls.Controls("test", config_dir, check)  # test site only
+    gate = controls.Controls(config.site, config_dir, check)
     task_no = booker.book(
         proceed,
         note_id=note_id,
@@ -480,6 +478,8 @@ def _book(
         login=login,
         controls=gate,
         agent=config.agent_user_name,
+        site=config.site,
+        document_type=config.project_document_type,
         stop_after="W5",
         log=log,
     )
@@ -510,7 +510,7 @@ def _decide(
     data = pdf.data if pdf else b""
     snapshot = NoteSnapshot(
         note_id=note_id,
-        title="",  # the test title rule reads the body only
+        title="",  # step 0 read the title rule on the Note Pool cell
         body=driver.note_body(window, pdf.file_name) if pdf else "",
         attachment_names=names,
         project_linked=linked,
@@ -523,7 +523,7 @@ def _decide(
     second = check_second_reader(plumber, pypdf)
     if second is not None:
         return second
-    lookup = driver.project_lookup(guard, page, *login, note.internal_no, "test")
+    lookup = driver.project_lookup(guard, page, *login, note.internal_no, config.site)
     decision = decide(
         snapshot,
         note.internal_no,
@@ -531,7 +531,7 @@ def _decide(
         pypdf,
         data,
         lookup,
-        site="test",
+        site=config.site,
         duplicate_ignores_cancelled=config.duplicate_ignores_cancelled,
     )
     return decision

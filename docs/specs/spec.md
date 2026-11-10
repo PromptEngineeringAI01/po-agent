@@ -182,7 +182,7 @@ Where `SPEC.md` and this file differ, `SPEC.md` governs the MVP and this file go
 | 5 | (Live, if enabled) sender domain check. See concern C6. | `NOT_B1` |
 | 6 | Second code reader (§7): pypdf reads the PDF's text again (decisions, 2 Nov 2026). | `PDF_UNREADABLE` |
 | 7 | Agreement: issuer, COMPACTION, PO number and the Job Address label line (normalised) must be identical in both readers' text. | `READERS_DISAGREE` |
-| 8 | Project lookup by internal no (read-only): exactly one matching row, i.e. Company B1 Homes and Client Ref No. `<internal no>/048` (live; on test the bare internal no). Rows with other suffixes are ignored: on live the search returns 3–4 projects per internal number (Joey, 16 Oct 2026). | `PROJECT_NOT_FOUND` (retryable), `PROJECT_AMBIGUOUS` |
+| 8 | Project lookup by internal no (read-only): exactly one matching row, i.e. Company B1 Homes and Client Ref No. `<internal no>/048` (live; on test the bare internal no). **Superseded 10 Nov 2026:** live's Client Ref No. is the bare internal no too (decisions, live profile). Rows with other suffixes are ignored: on live the search returns 3–4 projects per internal number (Joey, 16 Oct 2026). | `PROJECT_NOT_FOUND` (retryable), `PROJECT_AMBIGUOUS` |
 | 9 | Address check (§4): the PDF's Job Address block against the project's address, on both readers' text. | `ADDRESS_MISMATCH`, `ADDRESS_UNVERIFIABLE`, `READERS_DISAGREE` |
 | 10 | Duplicate check: project has no Compaction Test with this PO number, unless it's the agent's own partial booking recorded in the skip list (then resume it, §6). | `DUPLICATE_TASK` |
 | 11 | **PROCEED** with values: pln, PO number, email body, PDF. | — |

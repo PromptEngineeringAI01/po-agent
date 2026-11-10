@@ -116,6 +116,8 @@ def test_booker_w3_holds_the_new_task_once_and_reads_it_back(
             login=login,
             controls=gate,
             agent=agent,
+            site=config.site,
+            document_type=config.project_document_type,
             stop_after="W3",
         )
         done = [action for action, _ in guard.history]

@@ -103,6 +103,8 @@ def test_booker_w1_fills_create_new_task_reads_it_back_and_leaves_nothing(
             login=login,
             controls=gate,
             agent=agent,
+            site=config.site,
+            document_type=config.project_document_type,
             stop_after="W1",
         )
         done = [action for action, _ in guard.history]

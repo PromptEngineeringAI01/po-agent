@@ -258,7 +258,8 @@ def test_a_clean_po_proceeds() -> None:
     assert result.existing_task_nos == ()
 
 
-def test_the_site_picks_the_match_rule_in_decide() -> None:
+def test_both_sites_match_the_bare_internal_no_in_decide() -> None:
+    # Live's Client Ref No. is the bare number too (Joey's look, 10 Nov 2026).
     lookup = CLEAN.lookup.model_copy(
         update={
             "search_rows": (
@@ -273,7 +274,8 @@ def test_the_site_picks_the_match_rule_in_decide() -> None:
     live = CLEAN.model_copy(
         update={"config": CLEAN.config.model_copy(update={"site": "live"})}
     )
-    assert isinstance(run(live, lookup=lookup), Proceed)
+    assert run(live, lookup=lookup) == skip(SkipReason.PROJECT_NOT_FOUND)
+    assert isinstance(run(live), Proceed)
 
 
 @pytest.mark.parametrize(
