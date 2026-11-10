@@ -399,11 +399,13 @@ def test_live_reads_enabled_from_its_own_config_on_main(box, mode, agent_call):
     assert f"macmini-run.sh {mode} live ===" in box.runs_log().splitlines()[0]
 
 
-def test_live_as_committed_is_stopped_by_its_kill_switch(box):
-    # config/live.toml is committed with enabled = false (Joey, 10 Nov 2026).
+def test_live_switched_off_on_main_is_stopped_by_its_kill_switch(box):
+    # enabled = false on main stops the next live run (decisions, 10 Nov 2026,
+    # G.5: committed on since then, so the test sets it off itself).
     box.agent([summary(0)], 0)
+    live_off = re.sub(r"(?m)^enabled = \w+", "enabled = false", live_config())
 
-    result = box.run("run", "live", STUB_MAIN_CONFIG=live_config())
+    result = box.run("run", "live", STUB_MAIN_CONFIG=live_off)
 
     assert result.returncode == 0
     assert box.calls() == [

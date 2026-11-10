@@ -208,8 +208,9 @@ def test_repo_live_config_loads_as_the_live_profile():
     assert config.base_url.host == config_module.LIVE_HOST
     assert config.title_rule == "live-b1-title"
     assert config.duplicate_ignores_cancelled is False
-    # Committed disabled; one PR flips it just before the live spike (Joey).
-    assert config.enabled is False
+    # Committed disabled, then switched on for the G.5 spike (decisions,
+    # 10 Nov 2026, G.5).
+    assert config.enabled is True
     assert config.max_notes_per_run == 1  # the watched runs (G.7)
     assert config.stale_read_by_agent is True
     assert config.project_document_type == "Client Documents"
