@@ -6,9 +6,10 @@ block = exit 2 with the hook's own message on stderr; ask = exit 0 with the
 `permissionDecision: "ask"` JSON on stdout; allow = exit 0, nothing on stdout.
 Commands are only ever sent as text to the hook, never run.
 
-This file and guard_bash.py are the only places the live host may appear
-(CLAUDE.md Must never #3; decisions, 16 Oct 2026, D4), and the only place the
-fake Anthropic key may appear (D4).
+Besides `LIVE_HOST` in core/config.py and config/live.toml, this file and
+guard_bash.py are the only places the live host may appear (CLAUDE.md Must
+never #3; decisions, 10 Nov 2026, live profile), and this file is the only
+place the fake Anthropic key may appear (decisions, 16 Oct 2026, D4).
 """
 
 import json
@@ -106,6 +107,25 @@ BASH_BLOCKED = {
     "live host, upper case": f"curl https://{LIVE_HOST.upper()}/",
     "live host, bare": f"ping {LIVE_HOST}",
     "live host after a test-site URL": f"curl {TEST_URL} https://{LIVE_HOST}/",
+    # the agent on live, and the live secrets: Joey's alone (decisions,
+    # 10 Nov 2026, live profile)
+    "po-agent --site live": "uv run po-agent run --site live",
+    "po-agent --site=live": "uv run po-agent run --site=live --decide-only",
+    "po-agent --site quoted live": 'uv run po-agent spike --site "live"',
+    "po-agent --site LIVE": "uv run po-agent run --site LIVE",
+    "po-agent --site live inside bash -c": "bash -c 'uv run po-agent run --site live'",
+    "po-agent --site live from python": (
+        "python -c \"import subprocess; subprocess.run(['po-agent', 'run', "
+        "'--site', 'live'])\""
+    ),
+    "wrapper on live": "scripts/macmini-run.sh run live",
+    "wrapper on live through bash": "bash scripts/macmini-run.sh decide-only live",
+    "wrapper on quoted live": "./scripts/macmini-run.sh spike 'live'",
+    "live username from keyring": "keyring get po-agent mysys_live_username",
+    "live password set in keyring": "keyring set po-agent mysys_live_password",
+    "live password from the macOS Keychain": (
+        "security find-generic-password -s po-agent -a MYSYS_LIVE_PASSWORD -w"
+    ),
     # playwright-cli: observe only
     "playwright-cli click": "playwright-cli click e3",
     "playwright-cli eval": "playwright-cli eval 'document.title'",
@@ -249,6 +269,12 @@ BASH_ALLOWED = {
     "set -euo pipefail": "set -euo pipefail; uv run ruff check .",
     "env with an assignment": "env RUFF_CACHE_DIR=x uv run ruff check .",
     "test site": f"curl {TEST_URL}",
+    # the test site's agent and wrapper, and "live" as an ordinary word
+    "po-agent on the test site": "uv run po-agent run --site test --decide-only",
+    "wrapper on the test site": "scripts/macmini-run.sh run test",
+    "pytest selecting live tests": "uv run pytest tests/test_config_secrets.py -k live",
+    "grep for LIVE_HOST": "grep -rn LIVE_HOST src tests",
+    "commit message naming the live config": 'git commit -m "feat: live profile"',
     "playwright-cli open the test site": f'playwright-cli open --headed "{TEST_URL}"',
     "playwright-cli open the test site, unquoted": f"playwright-cli open {TEST_URL}",
     "playwright-cli snapshot": "playwright-cli snapshot",
@@ -406,8 +432,9 @@ REPO_BLOCKED = [
     ".claude/settings.json",
     ".claude/hooks/guard_bash.py",
     ".CLAUDE\\hooks\\x.py",
-    "config/live.toml",
+    # config/live.toml is the one live config (decisions, 10 Nov 2026)
     "config/live-prod.toml",
+    "config/live.local.toml",
     ".env",
     "src/.env.local",
     "secrets/a.txt",
@@ -418,6 +445,9 @@ REPO_ASKS = [
     ".github/workflows/check.yml",
     "docs/macmini-setup.md",
     "scripts/macmini-run.sh",
+    # the live kill switch, caps and host: Joey sees every edit
+    "config/live.toml",
+    "CONFIG/Live.toml",
 ]
 
 REPO_ALLOWED = [
@@ -459,7 +489,7 @@ WORKTREE_BLOCKED = [
     f"{WORKTREE}/.claude/settings.json",
     f"{WORKTREE}/.claude/hooks/protect_paths.py",
     f"{WORKTREE}/.env",
-    f"{WORKTREE}/config/live.toml",
+    f"{WORKTREE}/config/live-prod.toml",
     f"{WORKTREE}/state/s.json",
     f"{WORKTREE}/.claude/worktrees/nested/src/x.py",
     ".claude/worktrees/loose.txt",
@@ -494,10 +524,9 @@ def test_protect_paths_blocks_an_escape_from_skills_into_settings(places):
     assert_blocked(protect(path, places), "protect_paths")
 
 
-def test_protect_paths_asks_for_ask_first_files_in_a_worktree(places):
-    assert_asks(
-        protect(places["project"] / WORKTREE / ".github/workflows/check.yml", places)
-    )
+@pytest.mark.parametrize("rel", [".github/workflows/check.yml", "config/live.toml"])
+def test_protect_paths_asks_for_ask_first_files_in_a_worktree(rel, places):
+    assert_asks(protect(places["project"] / WORKTREE / rel, places))
 
 
 def test_protect_paths_blocks_an_escape_from_a_worktree_into_claude(places):
