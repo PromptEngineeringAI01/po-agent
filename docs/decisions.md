@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, live lookups)
+# PO Agent - decision log (updated 10 Nov 2026, G.5 live spike)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -41,6 +41,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **9 Nov 2026: go-live plan.** The CEO gave Joey full authority for every go-live decision. P5's week is skipped, gates 2-5 are met or reshaped, code is frozen until live runs hourly (entry below).
 - **10 Nov 2026: live profile built** (G.3; entries below): hooks changed by Joey (PR 90), committed `config/live.toml` starting disabled, live answers from Joey's look in code, alert issues without Note IDs, no seam 2 for this PR.
 - **10 Nov 2026: Claude reads live project lookups for the real-PO seam** in the browser pane, after Joey logs in (G.2; entry below).
+- **10 Nov 2026: live switched on for the G.5 spike** (entry below): G.1, G.2 and G.4 done; `enabled = true` in `config/live.toml`.
+
+## 10 Nov 2026 - G.5: live switched on for the read-only spike (Joey)
+
+- **Done before it:** G.1 (Joey's look at live, answers built in by G.3); G.2 (real-PO seam on the laptop: 5 of 5 cases decided, `false PROCEED: 0`); G.3 (PR 91, second-model review after the merge: no Important findings); G.4 (PR 90 hooks and CLAUDE.md; Claude and every AI tool removed from `poagent`, H2, checked empty by Joey; the old launchd job unloaded; `~/po-agent` clean; the `production` tag on 8044ee6 with a read-only test `spike` from the Mac Mini, exit 0; live secrets in `poagent`'s Keychain, set by Joey).
+- **Decision:** `config/live.toml` gets `enabled = true`. After this PR merges, Joey moves the `production` tag to its merge commit (the agent reads `enabled` from the tagged commit), then runs the wrapper's `spike` on live from the Mac Mini and pastes the `runs.log` lines.
+- **What it allows:** only Joey's own runs on the Mac Mini; the launchd job stays unloaded until G.8. The live order stands: G.6 (decide-only) and G.7 (one-PO `run`, watched) each need their own dated entry first. `enabled = false` on main stops the next run.
+- **Loosens?** Yes: the live kill switch goes from off to on. Nothing else changes; no code change.
 
 ## 10 Nov 2026 - Live lookups for the real-PO seam (Joey, task G.2; loosens a safety control)
 
