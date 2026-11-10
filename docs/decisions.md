@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, G.5 live spike)
+# PO Agent - decision log (updated 10 Nov 2026, G.6 live decide-only)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -42,6 +42,26 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: live profile built** (G.3; entries below): hooks changed by Joey (PR 90), committed `config/live.toml` starting disabled, live answers from Joey's look in code, alert issues without Note IDs, no seam 2 for this PR.
 - **10 Nov 2026: Claude reads live project lookups for the real-PO seam** in the browser pane, after Joey logs in (G.2; entry below).
 - **10 Nov 2026: live switched on for the G.5 spike** (entry below): G.1, G.2 and G.4 done; `enabled = true` in `config/live.toml`.
+- **10 Nov 2026: G.5 spike passed; G.6 live decide-only on one Note** (entry below).
+
+## 10 Nov 2026 - G.6: live decide-only, one Note (Joey)
+
+- **G.5 done:** the read-only live `spike` from the Mac Mini on tag 7f7fe66
+  ran with exit 0: logged in, filters set, 35 rows in the PO Allocation Pool
+  under Locked, 10 eligible `/048` Notes, nothing taken.
+- **Decision:** Joey runs the wrapper's `decide-only` on live from the Mac
+  Mini, once, by hand, and reads its NOTE line against the Note. With
+  `max_notes_per_run = 1` it takes only the oldest eligible Note: assign to
+  the agent, download, decide, assign back to the PO Allocation Pool. A rerun
+  would take the same Note again, so one run is the step.
+- **What it proves on live for the first time:** the stale-Note read with
+  Assigned User = the agent, the two Assigns with Send Email Notification
+  read back unticked, the attachment count and the download.
+- **What it writes:** the two Assigns only (two "User Assigned" log lines on
+  that Note); no task, no link, no Solved. A person working that Note at the
+  same moment gets NOTE_TAKEN and is left alone.
+- **Loosens?** No new control is loosened: the kill switch is already on
+  (G.5). G.7 (`run`, one PO, watched) needs its own entry.
 
 ## 10 Nov 2026 - G.5: live switched on for the read-only spike (Joey)
 
