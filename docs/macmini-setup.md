@@ -26,7 +26,7 @@ The office Mac Mini is model **A3238**: the 2024 Mac mini with the **M4** chip, 
 
 ## 1. Before you start
 
-- [ ] The repo is on GitHub (private) and `main` has M1's code.
+- [ ] The repo is on GitHub (public since 25 Oct 2026, so nothing real goes in it; decisions, 9 Nov 2026, go-live plan item 3) and `main` has M1's code.
 - [ ] The test-site agent account username and password, and confirmation that it has no MFA (SPEC open question 3).
 - [ ] A GitHub label for alerts. On your laptop: `gh label create po-agent-alert --color B60205`
 - [ ] The heartbeat issue (task 7.1, section 8), once. On your laptop: `gh label create po-agent-heartbeat --color 0E8A16`, then `gh issue create --label po-agent-heartbeat --title "po-agent heartbeat" --body "no run yet"`. Lock it (`gh issue lock <number>`), so nobody can comment on it. Keep it open, and keep it the only open issue with that label.
@@ -167,7 +167,7 @@ It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`, then the system fol
 
 **The job** is a LaunchAgent in `poagent`'s own session (not a LaunchDaemon: keyring needs the login Keychain, which is only unlocked while `poagent` is logged in). Label `au.com.prompteng.po-agent`; the plist is in the repo as `scripts/au.com.prompteng.po-agent.plist`:
 
-- `ProgramArguments`: `/Users/poagent/po-agent/scripts/macmini-run.sh`, `run`, `live` (after go-live the Mac Mini runs only live; decisions, 10 Nov 2026). Load it only at G.8 (hourly live runs); the watched live runs before that are started by hand (below).
+- `ProgramArguments`: `/Users/poagent/po-agent/scripts/macmini-run.sh`, `run`, `live` (after go-live the Mac Mini runs only live; decisions, 10 Nov 2026). Load it only at G.8 (hourly live runs); the watched live runs before that are started by hand (below). **At G.8, copy the plist again** with the `cp` line below before `launchctl bootstrap`: the copy in `~/Library/LaunchAgents/` from the test-site trial still runs `run` with no site, which the wrapper now refuses (usage message, exit 2), so every scheduled run would do nothing.
 - `StartCalendarInterval`: one entry per weekday and hour, **Weekday 1–5 × Hour 7–17, Minute 7** (55 entries) → 07:07, 08:07 … 17:07 Monday–Friday, Perth time (the Mac's clock, section 4). Seven minutes past, as before, so a slow start never lands on the hour.
 - `StandardOutPath` / `StandardErrorPath`: `/Users/poagent/Library/Logs/po-agent/launchd.log` (the wrapper's own errors; launchd doesn't expand `~`).
 - No `RunAtLoad`, no `KeepAlive`.
@@ -187,7 +187,7 @@ launchctl print gui/$(id -u)/au.com.prompteng.po-agent | head -30    # state, la
 
 **Spike and decide-only by hand:** as `poagent` in Terminal, `~/po-agent/scripts/macmini-run.sh spike test` (or `decide-only test`). Don't start a manual run within a few minutes of :07.
 
-**The live order by hand (G.5-G.7; Joey only, at the Mac, never Claude):** `config/live.toml` is committed with `enabled = false`, so every live run does nothing until one PR flips it to `true` on `main`, just before G.5. Then, as `poagent`: `~/po-agent/scripts/macmini-run.sh spike live` (G.5, read only), `~/po-agent/scripts/macmini-run.sh decide-only live` (G.6, books nothing), `~/po-agent/scripts/macmini-run.sh run live` (G.7, `max_notes_per_run = 1`: one watched PO per run). Paste the `runs.log` lines (and for G.7 the `grep <run_id>` trace lines) to the advisor. Each step has its own dated `docs/decisions.md` entry first.
+**The live order by hand (G.5-G.7; Joey only, at the Mac, never Claude):** `config/live.toml` is committed with `enabled = false`, so every live run does nothing until one PR flips it to `true` on `main`, just before G.5. **Then move the `production` tag to that PR's merge commit** (the commands under "Moving the production tag" above): the wrapper reads `enabled` from `main`, but the agent itself reads it from the tagged commit's `config/live.toml`, at the run start and before every write, so a tag left on a commit with `enabled = false` still stops every live run (`INFO  kill switch on: run not started`). Check the next `runs.log` shows `wrapper: running production <that commit>`. Then, as `poagent`: `~/po-agent/scripts/macmini-run.sh spike live` (G.5, read only), `~/po-agent/scripts/macmini-run.sh decide-only live` (G.6, books nothing), `~/po-agent/scripts/macmini-run.sh run live` (G.7, `max_notes_per_run = 1`: one watched PO per run). Paste the `runs.log` lines (and for G.7 the `grep <run_id>` trace lines) to the advisor. Each step has its own dated `docs/decisions.md` entry first.
 
 **When the job is loaded (decision D1, 16 Oct 2026):** after the S1 spike (M1), unload it (`launchctl bootout gui/$(id -u)/au.com.prompteng.po-agent`) and check `launchctl print` no longer finds it. Load it again only for the first bookings (plan task 4.6, unloaded again afterwards) and from M6 on. Until then a merge to `main` can't start a booking run, because nothing is scheduled; and since task 7.4 a merge doesn't change the code the job runs until the `production` tag moves.
 

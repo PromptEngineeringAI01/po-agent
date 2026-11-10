@@ -72,7 +72,7 @@ While the job is unloaded, the heartbeat check will open `po-agent heartbeat mis
 ### 3.2 Restart the agent
 
 1. Fix the cause first (the alert's entry in section 4), and make sure no Pending Note is still assigned to the agent (3.3), or the next run stops at the start.
-2. If code or the site's config had to change: Joey merges the fix to `main`, tries it on the test site from the laptop (job unloaded) and moves the `production` tag to it (`docs/macmini-setup.md` section 8). Nobody else moves the tag. If Joey set `enabled = false`, he sets it back to `true` on `main`.
+2. If code or the site's config had to change: Joey merges the fix to `main`, tries it on the test site from the laptop (job unloaded) and moves the `production` tag to it (`docs/macmini-setup.md` section 8). Nobody else moves the tag. If Joey set `enabled = false`, he sets it back to `true` on `main`. The agent also reads `enabled` from the tagged commit's config, so the tag must be on a commit whose config says `true`: if the tag was moved while `main` said `false`, Joey moves it again after setting `true`.
 3. As `poagent` on the Mac, try a read-only run first. It logs in and lists the Notes, and takes none. Don't start it within a few minutes of :07.
    ```bash
    ~/po-agent/scripts/macmini-run.sh spike live
