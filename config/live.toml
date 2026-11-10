@@ -7,7 +7,7 @@ base_url = "https://prompt.mysys.com.au/index.php?option=com_cweb&view=managemen
 pool_name = "PO Allocation Pool"
 agent_user_name = "Agent 1 (MySys Only)"
 title_rule = "live-b1-title"
-enabled = false                   # kill switch, read from main: committed off; one PR flips it just before the live spike (G.5)
+enabled = false                   # kill switch, read from main: committed off; one PR flips it just before the live spike (G.5), then the production tag moves to that merge commit (the agent reads the tag's copy)
 duplicate_ignores_cancelled = false   # every task status counts on live
 max_notes_per_run = 1             # one watched PO per run (G.7); 10 for hourly runs (G.8), its own PR
 max_run_minutes = 12

@@ -181,7 +181,7 @@ project_document_type = "Purchase Order"   # W2: the Type of the new task's row 
 trace_dir = "~/Library/Logs/po-agent/trace"   # the safe trace (7.3): written only where ~/Library/Logs/po-agent exists (the Mac Mini)
 ```
 
-`config/live.toml` differs in (decisions, 10 Nov 2026, live profile): `site = "live"`, `base_url` on `LIVE_HOST`, `pool_name = "PO Allocation Pool"`, `title_rule = "live-b1-title"`, `enabled = false` (flipped by its own PR just before the live spike), `duplicate_ignores_cancelled = false` (required on live), `max_notes_per_run = 1` (watched runs; 10 for hourly, its own PR), `stale_read_by_agent = true`, `project_document_type = "Client Documents"`. The agent user name is the same as on test.
+`config/live.toml` differs in (decisions, 10 Nov 2026, live profile): `site = "live"`, `base_url` on `LIVE_HOST`, `pool_name = "PO Allocation Pool"`, `title_rule = "live-b1-title"`, `enabled = false` (flipped by its own PR just before the live spike, then the `production` tag moved to that merge commit, since the agent reads `enabled` from the tagged commit too), `duplicate_ignores_cancelled = false` (required on live), `max_notes_per_run = 1` (watched runs; 10 for hourly, its own PR), `stale_read_by_agent = true`, `project_document_type = "Client Documents"`. The agent user name is the same as on test.
 
 ## Code Style
 
