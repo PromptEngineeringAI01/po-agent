@@ -45,7 +45,7 @@ Show the full diff, and say plainly whether it **loosens or tightens** a control
 - `config/test.toml`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, the launchd plist
 - the model ID, the Claude prompt, or the address rules (then the live-Claude seam must have been run and shown `false PROCEED: 0`)
 
-Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_files(`, `evaluate(`, `dispatch_event(` outside `guard.py`; the live host name; `ANTHROPIC_API_KEY` outside `tests/test_config_secrets.py`. Any hit is Important.
+Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_files(`, `evaluate(`, `dispatch_event(` outside `guard.py`; the live host name outside `LIVE_HOST` in `src/po_agent/core/config.py`, `config/live.toml`, `.claude/hooks/guard_bash.py` and `tests/test_hooks.py`; `ANTHROPIC_API_KEY` outside `tests/test_config_secrets.py`. Any hit is Important.
 
 ## 4. Repo hygiene
 

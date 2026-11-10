@@ -30,7 +30,9 @@ from pathlib import Path, PurePath
 
 HOOK = "protect_paths"
 BLOCKED_DIRS = {"secrets", "state", ".state"}  # at any depth
-ASK_FILES = {"docs/macmini-setup.md", "scripts/macmini-run.sh"}
+# config/live.toml holds live's host, kill switch and caps (decisions,
+# 10 Nov 2026, live profile): Joey sees every edit.
+ASK_FILES = {"docs/macmini-setup.md", "scripts/macmini-run.sh", "config/live.toml"}
 
 
 class Blocked(Exception):
@@ -87,8 +89,10 @@ def decide_in_repo(path: Path, project: Path, in_worktree: bool = False) -> str 
         raise Blocked(".env files hold secrets (Must never #5)")
     if BLOCKED_DIRS.intersection(parts[:-1]):
         raise Blocked("secrets/ and state/ never go in the repo (Must never #5, #6)")
-    if fnmatch.fnmatchcase("/".join(parts[-2:]), "config/live*.toml"):
-        raise Blocked("live config: the MVP is test site only (Must never #3)")
+    if rel != "config/live.toml" and fnmatch.fnmatchcase(
+        "/".join(parts[-2:]), "config/live*.toml"
+    ):
+        raise Blocked("config/live.toml is the only live config (Must never #3)")
     if parts[:2] == [".github", "workflows"] or rel in ASK_FILES:
         return "ask-first file (tasks/plan.md, Cross-cutting rules)"
     if parts[:3] == ["tests", "seam1", "fixtures"] and path.exists():
