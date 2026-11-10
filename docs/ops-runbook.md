@@ -190,7 +190,7 @@ The username works the same way with `mysys_live_username`. For the test site, u
 
 ### MORE_PAGES (exit 1)
 
-- **Means:** the Note Pool's list has a second page, which the agent never reads, so it stopped before taking any Note. The detail is "Note Pool has more pages: stale-Note read incomplete" (the check of all Pending Notes, any pool or user) or "Note Pool has more pages: page 2 not read". In practice: more Pending Notes than fit on one page (50). On live the stale-Note check lists only the agent's Pending Notes (live has about 150 at All Users), so there this means the agent holds more than 50, or the PO Allocation Pool + Locked list is over 50.
+- **Means:** the Note Pool's list has a second page, which the agent never reads, so it stopped before taking any Note. The detail is "Note Pool has more pages: stale-Note read incomplete" (test: the check of all Pending Notes, any pool or user), "My Notes has more pages: stale-Note read incomplete" (live: the agent's own My Notes tab, so the agent holds more Pending Notes than fit on one page) or "Note Pool has more pages: page 2 not read" (the PO Allocation Pool + Locked list is over one page, 50). On live a My Notes row already stops the run as `UNEXPECTED_SCREEN`, so the My Notes detail is rare.
 - **In MySys:** nothing to undo. The count of Pending Notes has to come down below one page. Which Notes to deal with first is Joey's call.
 - **Restart:** every run stops with this alert until the count is down; then the next run goes on by itself. If it will take more than a day, stop the agent (3.1) to save the hourly alerts.
 - **Told:** Joey (automatic).

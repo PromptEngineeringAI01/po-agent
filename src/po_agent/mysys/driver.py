@@ -60,6 +60,7 @@ FOOTER = re.compile(r"^Page (\d+) of (\d+)\s*\((\d+) Items?\)$")
 NO_RECORD = "No record could be found."
 PROJECTS_NO_RECORD = "No record found."
 POLL_MS = 500
+EMPTY_SETTLE_MS = 3000  # My Notes: how long an empty list must stay empty
 OPEN_TRIES = 4  # x 15 s
 SELECT_USER = "--Select User--"
 SELECT_POOL = "--Select Pool--"
@@ -249,9 +250,6 @@ def open_my_notes(guard: ActionGuard, page: Page) -> Locator:
     leave_menu(guard, page)
     panel = my_notes_panel(page)
     wait_for_list(panel)
-    # The list's first load: wait for MySys to finish before it is read, so
-    # an empty list is never read before its rows arrive.
-    _network_idle(page)
     return panel
 
 
@@ -284,13 +282,21 @@ def read_my_notes(panel: Locator) -> NotePoolList:
     where shown. My Notes lists the Notes assigned to the logged-in agent
     (Joey, live, 10 Nov 2026), so every row is listed, whatever its
     Assignee cell. The one empty list is "No record could be found." with
-    no rows; rows that don't match the footer are an UnexpectedScreen (no
-    Refresh: nothing on My Notes is clicked). Reads only."""
+    no rows, read twice EMPTY_SETTLE_MS apart; rows that don't match the
+    footer are an UnexpectedScreen (no Refresh: nothing on My Notes is
+    clicked). Reads only."""
     try:
         if panel.count() != 1:
             raise UnexpectedScreen("My Notes panel not found once")
         _check_my_notes_filters(panel)
-        return _read_my_notes_list(panel)
+        listing = _read_my_notes_list(panel)
+        if not listing.rows:
+            # An empty list counts only if it is still empty a moment later:
+            # "No record could be found." can show while the rows load, and
+            # networkidle doesn't wait for a list loaded after the page.
+            panel.page.wait_for_timeout(EMPTY_SETTLE_MS)
+            listing = _read_my_notes_list(panel)
+        return listing
     except PlaywrightError:
         raise UnexpectedScreen("My Notes list not readable") from None
 
