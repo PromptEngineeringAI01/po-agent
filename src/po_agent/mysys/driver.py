@@ -925,17 +925,44 @@ def return_note(
 
 
 def note_body(window: Locator, file_name: str) -> str:
-    """The Note's body (row 02): the <pre> in the window whose text ends with
-    the file name (27 Oct 2026; the title heading and the file-name <span>
-    end with it too). Untrusted data: never printed."""
+    """The Note's body (row 02): the one source in the window whose text ends
+    with the file name, either a <pre> (test site, 27 Oct 2026; the title
+    heading and the file-name <span> end with it too) or the document body
+    of an iframe (live email Notes: MySys's get_email_body; decisions, 10
+    Nov 2026, Note body iframe). None or more than one -> UnexpectedScreen.
+
+    An iframe's document loads after the window shows, so while any iframe
+    in the window is still empty the read waits, up to 15 s. Read only:
+    nothing in a frame is clicked. Untrusted data: never printed."""
     ends = re.compile(rf"{re.escape(file_name)}\s*$")
-    body = window.locator("pre").filter(has_text=ends)
+    pres = window.locator("pre").filter(has_text=ends)
+    frames = window.locator("iframe")
+
+    def read() -> tuple[list[str], bool]:
+        """Every matching body, and whether every iframe has loaded."""
+        found = [pre.inner_text().strip() for pre in pres.all()]
+        loaded = True
+        for frame in frames.all():
+            text = frame.content_frame.locator("body").inner_text().strip()
+            if not text:
+                loaded = False
+            elif ends.search(text):
+                found.append(text)
+        return found, loaded
+
+    def settled() -> bool:
+        found, loaded = read()
+        return bool(found) and loaded
+
     try:
-        if body.count() != 1:
-            raise UnexpectedScreen("Note body not found once")
-        return body.inner_text().strip()
+        if frames.count():
+            _polls(window, settled)
+        found, _ = read()
     except PlaywrightError:
         raise UnexpectedScreen("Note body not readable") from None
+    if len(found) != 1:
+        raise UnexpectedScreen("Note body not found once")
+    return found[0]
 
 
 @dataclass(frozen=True)

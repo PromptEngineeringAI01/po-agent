@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, live stale-Note read from My Notes)
+# PO Agent - decision log (updated 10 Nov 2026, Note body from live's email iframe)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -44,6 +44,17 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: live switched on for the G.5 spike** (entry below): G.1, G.2 and G.4 done; `enabled = true` in `config/live.toml`.
 - **10 Nov 2026: G.5 spike passed; G.6 live decide-only on one Note** (entry below).
 - **10 Nov 2026: live stale-Note read from My Notes** (entry below): live's Assigned User filter has no agent; `set_user_filter` removed.
+- **10 Nov 2026: Note body from live's email iframe** (entry below): live email Notes show the body in an iframe, not a `<pre>`.
+
+## 10 Nov 2026 - Note body from live's email iframe (Joey, G.6 fix; changes what the agent reads in MySys)
+
+- **What happened:** the second live `decide-only` (run 20261110T083443Z-ad28) passed the My Notes read, read 35 rows and 10 eligible, took the oldest `/048` Note, passed step 2a and downloaded the PDF, then stopped at the Note body: `UNEXPECTED_SCREEN "Note body not found once"`. The Note went back to the pool. Both Assigns had Send Email Notification read back unticked first. Nothing else was written.
+- **Cause (Joey's DevTools look at the live Note window):** for an email Note the window shows the body in an `iframe` (MySys's `get_email_body` for that Note, inside a bordered `div` under a knockout `user_note.type === 'email'` block). Its document's body is the two lines, e.g. `<p><font face="Calibri">Please find attached Purchase Order / Quotation file</font><br><font face="Calibri">2600001B_048_1.pdf</font></p>`. There is no `<pre>`; the test site's Notes show the body as a `<pre>` (row 02). Assumed: every live email Note uses the iframe, with or without `<font>`.
+- **Decision:** `note_body` reads the body from exactly one source whose text ends with the file name: the window's `<pre>` (as before) or the document body of an `iframe` in the window (its inner text, stripped). None, or more than one across both, is `UNEXPECTED_SCREEN` as before. While any iframe in the window is still empty (its document loads after the window), the read waits up to 15 s. Read only: nothing in the frame is clicked; the text is untrusted and never printed.
+- **W2 unchanged:** the iframe text has a newline between its two lines, as a two-line `<pre>` would; the Note field is filled with it and read back as the same text, and the task detail check compares it with whitespace collapsed.
+- **No guard change.** The test site's `<pre>` path is unchanged.
+- **Loosens?** No.
+- Carried in: `SPEC.md` v1.36 (Email body), `docs/screen-map.md` row 02.
 
 ## 10 Nov 2026 - Live stale-Note read from My Notes (Joey, G.6 fix; changes what the agent does in MySys)
 
