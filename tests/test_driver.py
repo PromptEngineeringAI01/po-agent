@@ -506,6 +506,24 @@ def test_an_empty_my_notes_lists_no_stale_note(page):
     assert listing.pages == 1
 
 
+def test_rows_that_arrive_after_an_empty_my_notes_are_still_read(page):
+    # Review of this fix: a first "No record could be found." can show while
+    # the rows are still loading; the empty list must hold before it counts.
+    full = my_notes_panel_html(rows=[("300099", AGENT, "fake")])
+    empty = my_notes_panel_html()
+    page.set_content(
+        f'<div id="slot">{empty}</div><template id="later">{full}</template>'
+        "<script>setTimeout(() => {"
+        "document.getElementById('slot').innerHTML ="
+        " document.getElementById('later').innerHTML; }, 500);</script>"
+    )
+    panel = driver.my_notes_panel(page)
+
+    listing = driver.read_my_notes(panel)
+
+    assert [row.note_id for row in listing.rows] == ["300099"]
+
+
 def test_a_note_in_my_notes_is_listed_whatever_its_assignee_cell(page):
     rows = [
         ("300099", AGENT, "Please find attached file x.pdf"),
