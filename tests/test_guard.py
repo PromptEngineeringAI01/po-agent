@@ -88,12 +88,11 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "open_project_tab": "click",
         "open_note_pool": "click",
         "open_projects_subtab": "click",
+        "open_my_notes": "click",  # live's stale-Note read (10 Nov 2026)
         "move_pointer_off_menu": "move",  # Joey, 28 Oct 2026
         "open_pool": "click",
         "set_pool_filter": "select",
         "set_locked_filter": "select",
-        # live's stale-Note read: Assigned User = the agent (10 Nov 2026)
-        "set_user_filter": "select",
         "search_note_pool": "fill",
         "refresh_note_pool": "click",
         "open_note": "click",
@@ -1020,3 +1019,47 @@ def test_link_select_on_anything_but_a_cell_is_refused_without_acting(
         Refusal.WRONG_ELEMENT
     )
     assert page.locator("[data-clicked]").count() == 0
+
+
+# Live's stale-Note read (decisions, 10 Nov 2026, My Notes): the Project
+# menu's "My Notes" item, by its exact text only, never another menu item.
+
+MENU_PAGE = """
+<ul><li><span>Project</span><div>
+  <div onclick="this.dataset.clicked='yes'">Projects</div>
+  <div onclick="this.dataset.clicked='yes'">My Notes</div>
+  <div onclick="this.dataset.clicked='yes'">My Notes (old)</div>
+  <div onclick="this.dataset.clicked='yes'">Note Pool</div>
+</div></li></ul>
+"""
+
+
+def test_open_my_notes_is_allowed_on_the_my_notes_item(page, guard):
+    page.set_content(MENU_PAGE)
+    item = page.get_by_text("My Notes", exact=True)
+
+    guard.act("open_my_notes", page.locator("li"), item)
+
+    assert clicked(item)
+
+
+@pytest.mark.parametrize("text", ["Note Pool", "Projects", "My Notes (old)"])
+def test_open_my_notes_on_any_other_item_is_refused_without_acting(page, guard, text):
+    page.set_content(MENU_PAGE)
+    item = page.get_by_text(text, exact=True)
+
+    assert refusal(guard, "open_my_notes", page.locator("li"), item) == (
+        Refusal.WRONG_ELEMENT
+    )
+    assert page.locator("[data-clicked]").count() == 0
+
+
+def test_set_user_filter_is_no_longer_allowed(page, guard):
+    page.set_content(
+        '<section><h2>Pool</h2><select name="filter_user_id">'
+        "<option>All Users</option><option>Unassigned</option></select></section>"
+    )
+    scope = win(page, "Pool")
+    assert refusal(
+        guard, "set_user_filter", scope, scope.locator("select"), "Unassigned"
+    ) == (Refusal.UNKNOWN_ACTION)

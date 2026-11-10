@@ -304,7 +304,7 @@ def test_the_stale_note_read_lists_only_the_agents_rows_at_the_defaults(page, gu
     rows = [*ROWS, ("300004", agent, "---", "Please find attached file x.pdf", 0)]
     panel = panel_of(page, note_pool_page(rows=rows))
 
-    listing = driver.read_agent_notes(guard, panel, agent, by_agent=False)
+    listing = driver.read_agent_notes(guard, panel, agent)
 
     assert actions(guard) == []  # All Pools and All are the defaults
     assert [row.note_id for row in listing.rows] == ["300004"]
@@ -321,35 +321,7 @@ def test_the_stale_note_read_off_its_defaults_is_an_unexpected_screen(
     panel = panel_of(page, note_pool_page(filters={name: value}))
 
     with pytest.raises(UnexpectedScreen):
-        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)", by_agent=False)
-
-
-def test_on_live_the_stale_note_read_filters_by_the_agent_then_resets(page, guard):
-    # Live lists 153 Pending Notes over 4 pages at All Users (Joey's look,
-    # 10 Nov 2026), so the live profile reads only the agent's (decisions,
-    # 10 Nov 2026, live profile).
-    agent = "Agent 1 (MySys Only)"
-    rows = [*ROWS, ("300004", agent, "---", "Please find attached file x.pdf", 0)]
-    panel = panel_of(page, note_pool_page(rows=rows, total=None))
-
-    listing = driver.read_agent_notes(guard, panel, agent, by_agent=True)
-
-    assert actions(guard) == ["set_user_filter", "set_user_filter"]
-    assert [row.note_id for row in listing.rows] == ["300004"]
-    assert (listing.total, listing.pages) == (1, 1)
-    # Back at All Users: the eligible read's filters read back as expected.
-    driver.set_note_pool_filters(guard, panel, POOL)
-    assert [row.note_id for row in driver.read_note_pool(guard, panel).rows] == [
-        "300003",
-        "300002",
-    ]
-
-
-def test_on_live_another_filter_off_its_default_is_an_unexpected_screen(page, guard):
-    panel = panel_of(page, note_pool_page(filters={"filter_status": "All Status"}))
-
-    with pytest.raises(UnexpectedScreen):
-        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)", by_agent=True)
+        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)")
 
 
 # --- reading the list ------------------------------------------------------------
@@ -414,3 +386,236 @@ def test_a_list_that_never_loads_is_an_unexpected_screen(page, guard):
 
     with pytest.raises(UnexpectedScreen):
         driver.wait_for_list(driver.note_pool_panel(page))
+
+
+# --- My Notes: live's stale-Note read (decisions, 10 Nov 2026, My Notes) ---------
+# Live's Assigned User filter has no agent option either, and live lists 28
+# pages at All Users, so the live profile reads the agent's own My Notes tab
+# (Joey's look, 10 Nov 2026): no Assigned User or Assigned Pool filter,
+# Status (default Pending), the same New Note, Search/filter, Refresh and
+# list as the Note Pool. A Note assigned to the agent by hand shows there.
+
+AGENT = "Agent 1 (MySys Only)"
+MY_NOTES_HEADERS = [
+    "",
+    "ID",
+    "Assignee",
+    "Project",
+    "Task",
+    "Company",
+    "Date",
+    "Source",
+    "Subject/Note",
+    "Status",
+    "Note Type",
+]
+
+
+def my_notes_panel_html(
+    *,
+    rows=(),
+    status: str = "Pending",
+    search: str = "",
+    pages: int = 1,
+    total: int | None = None,
+) -> str:
+    """A static My Notes panel after a fresh load (rows rendered here)."""
+    statuses = "".join(
+        f"<option{' selected' if s == status else ''}>{s}</option>"
+        for s in ["All Status", "Pending", "Solved", "Discard"]
+    )
+    headers = "".join(f"<th>{h}</th>" for h in MY_NOTES_HEADERS)
+    body = "".join(
+        "<tr>"
+        + "".join(
+            f"<td>{text}</td>"
+            for text in [
+                "",
+                r[0],
+                r[1],
+                "---",
+                "---",
+                "---",
+                "01 Jan 2026 00:00",
+                "<user>",
+                r[2],
+                "Pending",
+                "",
+            ]
+        )
+        + "</tr>"
+        for r in rows
+    )
+    count = len(rows) if total is None else total
+    listed = (
+        f'<footer><span class="limit"><select><option selected>50</option></select></span>'
+        f"<span>Page 1 of {pages}<br>({count} Items)</span></footer>"
+        if count
+        else "<div>No record could be found.</div>"
+    )
+    return f"""
+<div id="my_notes__456">
+  <div>
+    <div><div><button>Refresh</button><button>Reset Filter</button></div>
+      <button>New Note</button><button disabled>Batch Edit (0)</button></div>
+    <div>
+      <input aria-label="Search/filter" value="{search}">
+      <div><span>Company</span><input aria-label="Select..."></div>
+      <div><span>Date From</span><input><span>To</span><input></div>
+      <div><span>Status</span><select>{statuses}</select></div>
+      <div><span>Note Type</span><select><option>All Note Types</option><option>internal</option></select></div>
+      <label><input type="checkbox" aria-label="Filter No Company Note">Filter No Company Note</label>
+    </div>
+  </div>
+  <div>
+    <table><thead><tr>{headers}</tr></thead><tbody>{body}</tbody></table>
+    {listed}
+  </div>
+</div>
+"""
+
+
+# The Note Pool's panel: the same New Note, Search/filter and list, plus its
+# Assigned User and Assigned Pool filters.
+POOL_PANEL_HTML = """
+<div id="user_note__123">
+  <div><button>Refresh</button><button>New Note</button>
+    <input aria-label="Search/filter">
+    <div><span>Assigned User</span><select name="filter_user_id"><option>All Users</option></select></div>
+    <div><span>Assigned Pool</span><select name="filter_allocation_pool_id"><option>All Pools</option></select></div>
+    <div><span>Status</span><select name="filter_status"><option selected>Pending</option></select></div>
+  </div>
+  <div><table><thead><tr><th>ID</th><th>Assignee</th><th>Project</th><th>Subject/Note</th></tr></thead>
+    <tbody><tr><td>300001</td><td>Agent Pool</td><td>---</td><td>fake</td></tr></tbody></table>
+    <footer><span>Page 1 of 1<br>(1 Items)</span></footer></div>
+</div>
+"""
+
+
+def my_notes_of(page: Page, html: str):
+    page.set_content(html)
+    return driver.my_notes_panel(page)
+
+
+def test_an_empty_my_notes_lists_no_stale_note(page):
+    panel = my_notes_of(page, my_notes_panel_html())
+
+    listing = driver.read_my_notes(panel)
+
+    assert listing.rows == ()
+    assert listing.pages == 1
+
+
+def test_rows_that_arrive_after_an_empty_my_notes_are_still_read(page):
+    # Review of this fix: a first "No record could be found." can show while
+    # the rows are still loading; the empty list must hold before it counts.
+    full = my_notes_panel_html(rows=[("300099", AGENT, "fake")])
+    empty = my_notes_panel_html()
+    page.set_content(
+        f'<div id="slot">{empty}</div><template id="later">{full}</template>'
+        "<script>setTimeout(() => {"
+        "document.getElementById('slot').innerHTML ="
+        " document.getElementById('later').innerHTML; }, 500);</script>"
+    )
+    panel = driver.my_notes_panel(page)
+
+    listing = driver.read_my_notes(panel)
+
+    assert [row.note_id for row in listing.rows] == ["300099"]
+
+
+def test_a_note_in_my_notes_is_listed_whatever_its_assignee_cell(page):
+    rows = [
+        ("300099", AGENT, "Please find attached file x.pdf"),
+        ("300098", "<user>", "fake"),
+    ]
+    panel = my_notes_of(page, my_notes_panel_html(rows=rows))
+
+    listing = driver.read_my_notes(panel)
+
+    assert [row.note_id for row in listing.rows] == ["300099", "300098"]
+    assert (listing.total, listing.pages) == (2, 1)
+
+
+def test_a_second_page_of_my_notes_is_read_as_more_pages(page):
+    rows = [("300099", AGENT, "fake"), ("300098", AGENT, "fake")]
+    panel = my_notes_of(page, my_notes_panel_html(rows=rows, pages=2, total=60))
+
+    listing = driver.read_my_notes(panel)
+
+    assert listing.pages == 2
+    assert [row.note_id for row in listing.rows] == ["300099", "300098"]
+
+
+def test_my_notes_rows_not_matching_its_footer_is_an_unexpected_screen(page):
+    rows = [("300099", AGENT, "fake")]
+    panel = my_notes_of(page, my_notes_panel_html(rows=rows, total=2))
+
+    with pytest.raises(UnexpectedScreen):
+        driver.read_my_notes(panel)
+
+
+@pytest.mark.parametrize("status", ["All Status", "Solved"])
+def test_my_notes_status_not_pending_is_an_unexpected_screen(page, status):
+    panel = my_notes_of(page, my_notes_panel_html(status=status))
+
+    with pytest.raises(UnexpectedScreen):
+        driver.read_my_notes(panel)
+
+
+def test_text_left_in_my_notes_search_is_an_unexpected_screen(page):
+    panel = my_notes_of(page, my_notes_panel_html(search="300099"))
+
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.read_my_notes(panel)
+
+    assert "300099" not in str(caught.value)
+
+
+def test_the_my_notes_panel_is_never_the_note_pool_panel(page):
+    panel = my_notes_of(page, f"<div>{POOL_PANEL_HTML}</div>")
+
+    assert panel.count() == 0
+    with pytest.raises(UnexpectedScreen):
+        driver.read_my_notes(panel)
+
+
+def test_with_both_panels_in_the_page_my_notes_is_its_own_panel(page):
+    html = f"<div>{POOL_PANEL_HTML}{my_notes_panel_html()}</div>"
+    panel = my_notes_of(page, html)
+
+    assert panel.count() == 1
+    assert panel.get_attribute("id") == "my_notes__456"
+    assert driver.read_my_notes(panel).rows == ()
+
+
+MY_NOTES_MENU_PAGE = """
+<style>
+  .drop { display: none; }
+  li:hover .drop { display: block; }
+</style>
+<header style="height: 40px">
+  <ul><li><span>Project</span><div class="drop">
+    <div onclick="document.getElementById('pool').hidden = false">Note Pool</div>
+    <div onclick="document.getElementById('mine').hidden = false">My Notes</div>
+  </div></li></ul>
+</header>
+<main style="margin-top: 80px">
+  <div id="pool" hidden>%(pool)s</div>
+  <div id="mine" hidden>%(mine)s</div>
+</main>
+"""
+
+
+def test_open_my_notes_goes_project_then_my_notes_through_the_guard(page, guard):
+    page.set_content(
+        MY_NOTES_MENU_PAGE % {"pool": POOL_PANEL_HTML, "mine": my_notes_panel_html()}
+    )
+
+    panel = driver.open_my_notes(guard, page)
+
+    assert actions(guard)[-2:] == ["open_my_notes", "move_pointer_off_menu"]
+    assert set(actions(guard)[:-2]) == {"open_project_tab"}
+    assert panel.get_attribute("id") == "my_notes__456"
+    assert page.locator("#pool").is_hidden()
+    assert driver.read_my_notes(panel).rows == ()

@@ -267,6 +267,78 @@ def test_with_no_note_left_with_the_agent_decide_only_goes_on(mysys, capsys):
     assert fake.notes["300002"].assignee == POOL
 
 
+# Live (decisions, 10 Nov 2026, My Notes): the read is the agent's own My
+# Notes tab, between two reloads, before the Note Pool is opened. The test
+# profile is switched to it here; nothing runs on live.
+
+
+def my_notes_profile(tmp_path) -> None:
+    toml = tmp_path / "config" / "test.toml"
+    text = toml.read_text("utf-8")
+    assert 'stale_read = "note_pool"' in text
+    toml.write_text(
+        text.replace('stale_read = "note_pool"', 'stale_read = "my_notes"'), "utf-8"
+    )
+
+
+def test_my_notes_profile_reads_my_notes_between_reloads_then_goes_on(
+    mysys, capsys, tmp_path
+):
+    my_notes_profile(tmp_path)
+    fake = mysys({"300002": FakeNote("2600002B", names=())})
+
+    code = cli.main(["run", "--site", "test", "--decide-only"])
+
+    assert code == 0
+    calls = fake.calls
+    start = calls.index("login")
+    assert calls[start : start + 5] == [
+        "login",
+        "reload_home",
+        "open_my_notes",
+        "my_notes",
+        "reload_home",
+    ]
+    assert calls[start + 5] == "open_note_pool"
+    assert "agent_notes" not in calls
+    assert calls.index("my_notes") < calls.index("filters") < calls.index("read")
+
+
+def test_any_note_in_my_notes_stops_the_run_before_the_note_pool(
+    mysys, capsys, tmp_path
+):
+    my_notes_profile(tmp_path)
+    # Any row stops it, whatever its Assignee cell says.
+    fake = mysys(
+        {"300002": FakeNote("2600002B")},
+        my_notes_rows=(pool_row("300099", PERSON),),
+    )
+
+    code = cli.main(["run", "--site", "test", "--decide-only"])
+
+    lines = lines_of(capsys)
+    assert code == 1
+    assert "open_note_pool" not in fake.calls
+    assert not [c for c in fake.calls if c.startswith(("find_again", "take"))]
+    (alert,) = [x for x in lines if x.startswith("ALERT ")]
+    kind, _, body = alert.removeprefix("ALERT ").partition(" ")
+    assert kind == "UNEXPECTED_SCREEN"
+    assert json.loads(body)["note_id"] == "300099"
+    assert json.loads(body)["detail"].startswith(STALE_DETAIL)
+
+
+def test_a_second_page_of_my_notes_stops_the_run_as_more_pages(mysys, capsys, tmp_path):
+    my_notes_profile(tmp_path)
+    fake = mysys({"300002": FakeNote("2600002B")}, my_notes_pages=2)
+
+    code = cli.main(["run", "--site", "test", "--decide-only"])
+
+    lines = lines_of(capsys)
+    assert code == 1
+    assert "open_note_pool" not in fake.calls
+    assert [x.split()[1] for x in lines if x.startswith("ALERT ")] == ["MORE_PAGES"]
+
+
 def test_spike_skips_the_stale_note_read(mysys, capsys):
     fake = mysys(
         {"300002": FakeNote("2600002B")},

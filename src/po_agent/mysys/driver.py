@@ -60,6 +60,7 @@ FOOTER = re.compile(r"^Page (\d+) of (\d+)\s*\((\d+) Items?\)$")
 NO_RECORD = "No record could be found."
 PROJECTS_NO_RECORD = "No record found."
 POLL_MS = 500
+EMPTY_SETTLE_MS = 3000  # My Notes: how long an empty list must stay empty
 OPEN_TRIES = 4  # x 15 s
 SELECT_USER = "--Select User--"
 SELECT_POOL = "--Select Pool--"
@@ -72,13 +73,15 @@ POOL_FILTER = "filter_allocation_pool_id"
 LOCK_FILTER = "filter_lock_status"
 USER_FILTER = "filter_user_id"
 ALL_USERS = "All Users"
+PENDING = "Pending"
+MY_NOTES = "My Notes"  # the Project menu item (decisions, 10 Nov 2026, My Notes)
 # Every Note Pool filter and its default after a fresh login (rows 01, 27).
 FILTER_DEFAULTS = {
     USER_FILTER: ALL_USERS,
     POOL_FILTER: "All Pools",
     "filter_creator_id": "All Creators",
     "filter_source": "All Sources",
-    "filter_status": "Pending",
+    "filter_status": PENDING,
     LOCK_FILTER: "All",
     "filter_note_type": "All Note Types",
 }
@@ -211,31 +214,148 @@ def set_note_pool_filters(guard: ActionGuard, panel: Locator, pool_name: str) ->
     )
 
 
-def read_agent_notes(
-    guard: ActionGuard, panel: Locator, agent: str, *, by_agent: bool
-) -> NotePoolList:
-    """The stale-Note read (D6): Assigned Pool = All Pools and Locked/
-    Unlocked = All, each read back; Status left at Pending, every other
-    filter at its default and Search/filter empty. Page 1's rows with
-    `agent` as Assignee; `total` and `pages` as the footer says.
-
-    Assigned User stays at All Users unless `by_agent` (the live profile):
-    live lists more than one page of Pending Notes at All Users, so there it
-    is set to `agent`, read back, and set back to All Users after the read,
-    for the eligible read's filters (decisions, 10 Nov 2026, live profile).
-    The test site's Assigned User list has no agent (decisions, 3 Nov 2026)."""
+def read_agent_notes(guard: ActionGuard, panel: Locator, agent: str) -> NotePoolList:
+    """The test profile's stale-Note read (D6): Assigned Pool = All Pools and
+    Locked/Unlocked = All, each read back; Assigned User at All Users (the
+    test site's Assigned User list has no agent; decisions, 3 Nov 2026),
+    Status left at Pending, every other filter at its default and
+    Search/filter empty. Page 1's rows with `agent` as Assignee; `total` and
+    `pages` as the footer says. Live reads My Notes instead (read_my_notes)."""
     _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, ALL_POOLS)
     _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, ALL_LOCKED)
-    if by_agent:
-        _set_filter(guard, panel, "set_user_filter", USER_FILTER, agent)
-        _check_filters(panel, {**FILTER_DEFAULTS, USER_FILTER: agent})
-    else:
-        _check_filters(panel, FILTER_DEFAULTS)
+    _check_filters(panel, FILTER_DEFAULTS)
     listing = read_note_pool(guard, panel)
-    if by_agent:
-        _set_filter(guard, panel, "set_user_filter", USER_FILTER, ALL_USERS)
     rows = tuple(row for row in listing.rows if row.assignee == agent)
     return NotePoolList(rows=rows, total=listing.total, pages=listing.pages)
+
+
+# Live's stale-Note read: My Notes (decisions, 10 Nov 2026, My Notes)
+
+
+def open_my_notes(guard: ActionGuard, page: Page) -> Locator:
+    """Project menu -> My Notes, as open_note_pool does Note Pool; then the
+    pointer off the menu and the list loaded. Read only: nothing in MySys
+    changes. Returns the My Notes panel."""
+    menu = _project_menu(page)
+    title = _project_title(page)
+    item = menu.get_by_text(MY_NOTES, exact=True)
+    for _ in range(MENU_TRIES):
+        guard.act("open_project_tab", menu, title)
+        _network_idle(page)
+        if _shows(item, 2000):
+            break
+    else:
+        raise UnexpectedScreen("My Notes menu item did not show")
+    guard.act("open_my_notes", menu, item)
+    leave_menu(guard, page)
+    panel = my_notes_panel(page)
+    wait_for_list(panel)
+    return panel
+
+
+def my_notes_panel(page: Page) -> Locator:
+    """The My Notes panel: the innermost visible element holding New Note,
+    Search/filter and the list, and no Assigned User or Assigned Pool
+    filter. The Note Pool panel holds the same New Note, Search/filter and
+    list plus those two filters, so neither it nor any element holding both
+    panels matches. Never a generated id or nth (row 26)."""
+    listed = page.locator("table").or_(page.get_by_text(NO_RECORD, exact=True))
+    pool_filters = (
+        page.locator(f'select[name="{POOL_FILTER}"]')
+        .or_(page.locator(f'select[name="{USER_FILTER}"]'))
+        .or_(page.get_by_text("Assigned Pool", exact=True))
+        .or_(page.get_by_text("Assigned User", exact=True))
+    )
+    candidates = (
+        page.locator("*")
+        .filter(has=page.get_by_role("button", name="New Note", exact=True))
+        .filter(has=page.get_by_role("textbox", name="Search/filter", exact=True))
+        .filter(has=listed)
+        .filter(has_not=pool_filters)
+    )
+    return candidates.filter(has_not=candidates).visible
+
+
+def read_my_notes(panel: Locator) -> NotePoolList:
+    """Page 1 of My Notes, once its filters read back: Status = Pending,
+    every textbox (Search/filter too) empty, Filter No Company Note unticked
+    where shown. My Notes lists the Notes assigned to the logged-in agent
+    (Joey, live, 10 Nov 2026), so every row is listed, whatever its
+    Assignee cell. The one empty list is "No record could be found." with
+    no rows, read twice EMPTY_SETTLE_MS apart; rows that don't match the
+    footer are an UnexpectedScreen (no Refresh: nothing on My Notes is
+    clicked). Reads only."""
+    try:
+        if panel.count() != 1:
+            raise UnexpectedScreen("My Notes panel not found once")
+        _check_my_notes_filters(panel)
+        listing = _read_my_notes_list(panel)
+        if not listing.rows:
+            # An empty list counts only if it is still empty a moment later:
+            # "No record could be found." can show while the rows load, and
+            # networkidle doesn't wait for a list loaded after the page.
+            panel.page.wait_for_timeout(EMPTY_SETTLE_MS)
+            listing = _read_my_notes_list(panel)
+        return listing
+    except PlaywrightError:
+        raise UnexpectedScreen("My Notes list not readable") from None
+
+
+def _check_my_notes_filters(panel: Locator) -> None:
+    page = panel.page
+    # The Status filter's block: the innermost element holding the exact
+    # text "Status" and a select, outside the list (whose header also reads
+    # "Status").
+    blocks = (
+        page.locator("*")
+        .filter(has=page.get_by_text("Status", exact=True))
+        .filter(has=page.locator("select"))
+        .filter(has_not=page.locator("table"))
+    )
+    status = panel.locator("*").and_(blocks.filter(has_not=blocks)).locator("select")
+    if status.count() != 1:
+        raise UnexpectedScreen("My Notes Status filter not found once")
+    chosen = (status.locator("option:checked").text_content() or "").strip()
+    if chosen != PENDING:
+        raise UnexpectedScreen("My Notes filter not as expected", field="Status")
+    if any(box.input_value() for box in panel.get_by_role("textbox").all()):
+        raise UnexpectedScreen("My Notes text filter not empty")
+    no_company = panel.get_by_role(
+        "checkbox", name="Filter No Company Note", exact=True
+    )
+    if no_company.count() and no_company.is_checked():
+        raise UnexpectedScreen("My Notes filter not as expected")
+
+
+def _read_my_notes_list(panel: Locator) -> NotePoolList:
+    rows = panel.locator("tbody tr")
+    if _no_record(panel).count():
+        if rows.count():
+            raise UnexpectedScreen("My Notes rows do not match the footer")
+        return NotePoolList(rows=(), total=0, pages=1)
+    match = FOOTER.match((_footer(panel).text_content() or "").strip())
+    if match is None:
+        raise UnexpectedScreen("My Notes footer not recognised")
+    pages, total = int(match.group(2)), int(match.group(3))
+    count = rows.count()
+    if count == 0 or (pages == 1 and count != total):
+        raise UnexpectedScreen("My Notes rows do not match the footer")
+    headers = [h.strip() for h in panel.locator("thead th").all_text_contents()]
+    try:
+        index = {field: headers.index(name) for field, name in COLUMNS.items()}
+    except ValueError:
+        raise UnexpectedScreen("My Notes columns not recognised") from None
+    read = []
+    for row in rows.all():
+        cells = [c.strip() for c in row.locator("td").all_inner_texts()]
+        if len(cells) != len(headers):
+            raise UnexpectedScreen("My Notes row not recognised")
+        try:
+            read.append(NotePoolRow(**{f: cells[i] for f, i in index.items()}))
+        except ValidationError:
+            # from None: pydantic's message quotes the cell.
+            raise UnexpectedScreen("My Notes row not recognised") from None
+    return NotePoolList(rows=tuple(read), total=total, pages=pages)
 
 
 def _check_filters(panel: Locator, wanted: dict[str, str]) -> None:

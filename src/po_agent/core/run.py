@@ -263,14 +263,17 @@ def _note_loop(
             driver.go_home(page, login[0])
             driver.login(guard, page, login[1], login[2])
             output.info("logged in")
+            if config.stale_read == "my_notes":
+                # Live: the agent's My Notes, between two reloads, so the
+                # Note Pool opens from a fresh page (decisions, 10 Nov 2026,
+                # My Notes).
+                driver.reload_home(guard, page, *login)
+                controls.my_notes_stop(guard, page)
+                driver.reload_home(guard, page, *login)
             panel = driver.open_note_pool(guard, page)
             driver.leave_menu(guard, page)
-            controls.stale_note_stop(
-                guard,
-                panel,
-                config.agent_user_name,
-                by_agent=config.stale_read_by_agent,
-            )
+            if config.stale_read == "note_pool":
+                controls.stale_note_stop(guard, panel, config.agent_user_name)
             driver.set_note_pool_filters(guard, panel, config.pool_name)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, config, summary)

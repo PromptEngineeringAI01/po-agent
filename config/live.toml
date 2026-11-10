@@ -12,6 +12,6 @@ duplicate_ignores_cancelled = false   # every task status counts on live
 max_notes_per_run = 1             # one watched PO per run (G.7); 10 for hourly runs (G.8), its own PR
 max_run_minutes = 12
 run_window = { days = "Mon-Fri", start = "07:00", end = "18:00", tz = "Australia/Perth" }
-stale_read_by_agent = true        # live lists 4 pages of Pending Notes at All Users: read only the agent's
+stale_read = "my_notes"           # live lists 28 pages at All Users and its Assigned User list has no agent: read the agent's own My Notes
 project_document_type = "Client Documents"   # W2: live files a PO Documents upload as Type Client Documents
 trace_dir = "~/Library/Logs/po-agent/trace"   # the safe trace (7.3), as on test

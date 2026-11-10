@@ -52,6 +52,9 @@ ALLOWLIST: dict[str, Kind] = {
     "open_project_tab": Kind.CLICK,
     "open_note_pool": Kind.CLICK,
     "open_projects_subtab": Kind.CLICK,
+    # Live's stale-Note read: the agent's own My Notes tab, read only
+    # (decisions, 10 Nov 2026, My Notes). Pinned to its text (TEXT_TARGETS).
+    "open_my_notes": Kind.CLICK,
     # The pointer off the header after a Project menu choice: while it stays
     # there, the page takes no click below the header (decisions, 28 Oct).
     "move_pointer_off_menu": Kind.MOVE,
@@ -59,9 +62,6 @@ ALLOWLIST: dict[str, Kind] = {
     "open_pool": Kind.CLICK,
     "set_pool_filter": Kind.SELECT,
     "set_locked_filter": Kind.SELECT,
-    # Live's stale-Note read: Assigned User = the agent, then back to All
-    # Users (decisions, 10 Nov 2026, live profile).
-    "set_user_filter": Kind.SELECT,
     "search_note_pool": Kind.FILL,
     "refresh_note_pool": Kind.CLICK,  # row 27 (decisions, 25 Oct 2026)
     "open_note": Kind.CLICK,
@@ -169,6 +169,9 @@ CLICK_TARGETS: dict[str, tuple[str, str | None]] = {
     # holds the Site Address), a link or a button (Joey, 4 Nov 2026).
     "link_select_project": ("cell", None),
 }
+# A CLICK action whose one target's whole text (whitespace collapsed) is
+# exactly this: a Project menu item has no role or name of its own.
+TEXT_TARGETS = {"open_my_notes": "My Notes"}
 # A SELECT action that may choose only this one option.
 SELECT_VALUES = {"back_to_project": "-- Select Task --"}
 # A MOVE's only target: a list's status line, its footer or its empty text.
@@ -215,8 +218,8 @@ class ActionGuard:
         Reads the page only. Checks, in order: the action is allowlisted and
         the value fits it; the scope is exactly one visible window; the target
         is exactly one visible element, inside that window; a pinned action's
-        element has its one role and name (PRESS_TARGETS, CLICK_TARGETS); the
-        element's own
+        element has its one role and name (PRESS_TARGETS, CLICK_TARGETS) or
+        text (TEXT_TARGETS); the element's own
         name and text (for a select: its name plus the chosen option) miss the
         denylist; it isn't the Pending button; it isn't a checkbox while a
         Hold Task window is open.
@@ -276,6 +279,10 @@ class ActionGuard:
             want_role, want_name = CLICK_TARGETS[action]
             if role != want_role or want_name not in (None, name):
                 return Refused(Refusal.WRONG_ELEMENT)
+        if action in TEXT_TARGETS and (
+            " ".join((element.text_content() or "").split()) != TEXT_TARGETS[action]
+        ):
+            return Refused(Refusal.WRONG_ELEMENT)
         if kind == Kind.MOVE and (
             role not in MOVE_ROLES
             or not MOVE_TARGET.fullmatch(

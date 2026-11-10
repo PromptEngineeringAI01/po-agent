@@ -93,6 +93,9 @@ class FakeMySys:
     # What the stale-Note read (3.6) lists on page 1 of `agent_pages`.
     agent_rows: tuple[NotePoolRow, ...] = ()
     agent_pages: int = 1
+    # What live's stale-Note read, My Notes, lists on page 1 of `my_notes_pages`.
+    my_notes_rows: tuple[NotePoolRow, ...] = ()
+    my_notes_pages: int = 1
     pool_pages: int = 1  # pages of the run's filtered Note Pool read
     config_dir: Path | None = None  # the run's config, for `kill_at`
     task_no: str = "tsk_200002"  # the task the fake Submit creates
@@ -162,10 +165,25 @@ class FakeMySys:
             rows=self.rows, total=len(self.rows), pages=self.pool_pages
         )
 
-    def read_agent_notes(self, guard, panel, agent, *, by_agent):
+    def read_agent_notes(self, guard, panel, agent):
         self.calls.append("agent_notes")
         rows = self.agent_rows
         return driver.NotePoolList(rows=rows, total=len(rows), pages=self.agent_pages)
+
+    def reload_home(self, guard, page, base_url, username, password):
+        self.calls.append("reload_home")
+
+    def open_my_notes(self, guard, page):
+        self.calls.append("open_my_notes")
+        return "my-notes"
+
+    def read_my_notes(self, panel):
+        assert panel == "my-notes"
+        self.calls.append("my_notes")
+        rows = self.my_notes_rows
+        return driver.NotePoolList(
+            rows=rows, total=len(rows), pages=self.my_notes_pages
+        )
 
     def find_note_again(self, guard, page, base_url, username, password, note_id):
         # The real one reloads base_url first: a reload before every Note.
@@ -328,6 +346,9 @@ DRIVER_NAMES = (
     "set_note_pool_filters",
     "read_note_pool",
     "read_agent_notes",
+    "reload_home",
+    "open_my_notes",
+    "read_my_notes",
     "find_note_again",
     "read_assignee",
     "take_note",

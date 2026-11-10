@@ -212,14 +212,14 @@ def test_repo_live_config_loads_as_the_live_profile():
     # 10 Nov 2026, G.5).
     assert config.enabled is True
     assert config.max_notes_per_run == 1  # the watched runs (G.7)
-    assert config.stale_read_by_agent is True
+    assert config.stale_read == "my_notes"  # decisions, 10 Nov 2026, My Notes
     assert config.project_document_type == "Client Documents"
 
 
 def test_the_test_profile_keeps_its_own_values():
     config = load_config("test")
 
-    assert config.stale_read_by_agent is False
+    assert config.stale_read == "note_pool"
     assert config.project_document_type == "Purchase Order"
 
 

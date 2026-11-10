@@ -386,6 +386,21 @@ Every earlier booking's task has its own section with its own copy, so the read-
 
 **The agent's target:** `getByRole('cell', { name: 'pln_10001', exact: true })` inside the Choose Project window. **Never the row:** the row's accessible name is the whole row text, **Site Address included** (Playwright offered `getByRole('row', { name: 'pln_10001 2600001B …' })`), so a project on a "… Close" street would trip the denylist's `close` and refuse every run. The cell's name is only the pln.
 
+## Live: My Notes (Joey's look, 10 Nov 2026)
+
+Joey looked at live with the agent account and sent screenshots; Claude saw no live page. Fake values (`300099` is a Note ID).
+
+### Row 29 · My Notes (live's stale-Note read)
+
+| | What Joey saw | How the agent uses it |
+|---|---|---|
+| Where | Project -> sub-tabs Projects, Tasks, My Tasks, Stages, Timesheets, Library Document, **My Notes**, Note Pool (the test site's Project menu has the same `generic` item "My Notes") | `open_my_notes`: the Project menu's list item whose text is exactly "My Notes", as Note Pool is opened (row 26), then the pointer off the menu |
+| Panel | Buttons Refresh, Reset Filter, New Note, Batch Edit; filters Search/filter, Company, Date From/To, **Status (default Pending)**, Note Type, Filter No Company Note. **No Assigned User or Assigned Pool filter** | Anchor: the innermost visible element holding New Note, Search/filter and the list, and no Assigned User or Assigned Pool filter (never the Note Pool panel). Status found by its label block, outside the list |
+| List | Columns ID, Assignee, Project, Task, Company, Date, Source, Subject/Note, Status, Note Type; footer "Page 1 of 1 (N Items)"; empty: "No record could be found." | Read by column header, page 1 only. Any row stops the run (`UNEXPECTED_SCREEN` with its ID); a second page is `MORE_PAGES` |
+| What it lists | A `/048` Note Joey assigned to Agent 1 by hand showed there with Assignee "Agent 1 (MySys Only)", Status Pending | The Notes assigned to the logged-in user |
+
+**Danger:** Company's "close" (clears the filter) and Reset Filter are never targeted; nothing on My Notes is clicked.
+
 ---
 
 ## Live vs test
