@@ -6,7 +6,7 @@ of Note IDs, so a Note skipped and returned to the pool isn't taken again in
 the same run. Output is counts, skip reasons and identifiers only
 (core/output.py).
 
-Decide-only, for each eligible Note, oldest first by Note ID, up to
+Decide-only, for each eligible Note, newest first by Note ID, up to
 max_notes_per_run: find it ("Finding a Note again": reload, All Pools, the
 exact ID) -> its Assignee is the pool, else NOTE_TAKEN and it is left alone
 -> take it -> step 2a -> attachments -> download -> decide -> back to the
@@ -99,9 +99,15 @@ def eligible_notes(
     return tuple(found)
 
 
-def oldest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote, ...]:
-    """By Note ID as a number (a longer ID is newer), at most `cap`."""
-    ordered = sorted(found, key=lambda note: (len(note.note_id), note.note_id))
+def newest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote, ...]:
+    """By Note ID as a number (a longer ID is newer), newest first, at most
+    `cap`. With no state between runs, an old Note that always skips (e.g.
+    PROJECT_NOT_FOUND) would otherwise take every run's cap; newest first,
+    it is retried each run after the newer ones (decisions, 10 Nov 2026,
+    newest first)."""
+    ordered = sorted(
+        found, key=lambda note: (len(note.note_id), note.note_id), reverse=True
+    )
     return tuple(ordered[:cap])
 
 
@@ -283,7 +289,7 @@ def _note_loop(
                 log.flush(note_id=None, step="0")
             except OSError:
                 pass  # the run goes on
-            ordered = oldest_first(found, len(found))
+            ordered = newest_first(found, len(found))
             for done, note in enumerate(ordered):
                 if controls.cap_reached(config, started, done):
                     output.info(

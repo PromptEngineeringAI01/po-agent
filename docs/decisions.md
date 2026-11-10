@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, Note body from live's email iframe)
+# PO Agent - decision log (updated 10 Nov 2026, eligible Notes newest first)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -45,6 +45,17 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: G.5 spike passed; G.6 live decide-only on one Note** (entry below).
 - **10 Nov 2026: live stale-Note read from My Notes** (entry below): live's Assigned User filter has no agent; `set_user_filter` removed.
 - **10 Nov 2026: Note body from live's email iframe** (entry below): live email Notes show the body in an iframe, not a `<pre>`.
+- **10 Nov 2026: eligible Notes newest first** (Joey: "A"; entry below): an old Note that always skips no longer takes every run's cap.
+
+## 10 Nov 2026 - Eligible Notes newest first (Joey: "A"; changes what the agent does in MySys)
+
+- **What happened:** live run 20261110T092542Z-fc5b: the oldest eligible `/048` Note (in the pool since September) skipped `PROJECT_NOT_FOUND`, a correct skip (Joey confirmed), then "run cap reached: 9 notes left". Eligible Notes went oldest first by Note ID and runs keep no state, so a Note that always skips takes the run cap every time: at cap 1 (G.7) every run would take that same Note, and at cap 10 ten unbookable old Notes would block the hourly runs for good.
+- **Decision (Joey, 10 Nov 2026: "A"):** eligible Notes are processed **newest first** (descending Note ID, as a number), on both sites, one rule with no profile option. So stuck old Notes don't block new POs: they are retried each run after the newer ones, while the cap allows.
+- **Unchanged:** the run cap is checked before each Note; the time cap; the Note Pool list is read once per run, page 1 only.
+- **Two Notes for one PO:** still "the first one processed is booked; any other copy skips `DUPLICATE_TASK`". The first processed is now the newest copy; an older copy, processed after it in the same run or in a later run, finds the task and skips. The rule doesn't depend on the order.
+- **Tests (Must never #8):** the order test now expects newest first; every other offline test that relied on oldest first has its Note IDs reversed, so each Note keeps its place in the order and the test its meaning (`test:` commit). The seam-2 tests don't depend on the order.
+- **Loosens?** No.
+- Carried in: `SPEC.md` v1.37 (Opening each Note order, Two Notes for one PO), `tasks/plan.md` (4.5's order line).
 
 ## 10 Nov 2026 - Note body from live's email iframe (Joey, G.6 fix; changes what the agent reads in MySys)
 
