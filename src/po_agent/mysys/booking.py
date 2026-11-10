@@ -884,11 +884,18 @@ def project_tabs_window(page: Page, pln: str) -> Locator:
 
 
 def check_project_document(
-    guard: ActionGuard, page: Page, pln: str, task_no: str, file_name: str
+    guard: ActionGuard,
+    page: Page,
+    pln: str,
+    task_no: str,
+    file_name: str,
+    document_type: str,
 ) -> Locator:
     """Row 19: the project's Documents tab, the section headed by the new
     task number (older tasks have their own copies): exactly one row, Type
-    Purchase Order, File starting with the PDF's file name. No section ->
+    `document_type` (the profile's: Purchase Order on test, Client Documents
+    on live; decisions, 10 Nov 2026, live profile), File starting with the
+    PDF's file name. No section ->
     PartialWrite; "No Document Found" or any other row -> AccuracyBreach.
     Then the Tasks button, back to the task table for W3; returns the
     project window."""
@@ -913,7 +920,7 @@ def check_project_document(
     if len(rows) != 1:
         raise AccuracyBreach("document not as booked", field="documents")
     (cells,) = rows
-    if len(cells) < 3 or cells[1] != "Purchase Order":
+    if len(cells) < 3 or cells[1] != document_type:
         raise AccuracyBreach("document not as booked", field="document_type")
     if not cells[2].startswith(file_name):
         raise AccuracyBreach("document not as booked", field="document_file")

@@ -1,10 +1,14 @@
 """The po-agent command (SPEC.md -> Commands, Code style, Exit codes).
 
-    po-agent spike|run --site test [--decide-only] [--headed] [--slow-mo N]
-             [--detailed-log]
+    po-agent spike|run --site test|live [--decide-only] [--headed]
+             [--slow-mo N] [--detailed-log]
     po-agent demo --site test [--headed] [--slow-mo N] [--until-check]
              [--probe-link]
              [--detailed-log]
+
+`--site` picks config/<site>.toml and that site's MySys secrets (decisions,
+10 Nov 2026, live profile); only Joey runs a live site, on the Mac Mini.
+The demo is test site only.
 
 `demo` books the one trial PO 2609017B, supervised: it waits for Joey's
 Enter before every write; --until-check stops after the read-only checks
@@ -53,13 +57,6 @@ DOWNLOAD_PREFIX = "po-agent-dl-"
 _TRACES: dict[str, Trace] = {}
 UNEXPECTED_DETAIL = "unexpected error"
 
-_MYSYS: tuple[SecretName, ...] = ("mysys_test_username", "mysys_test_password")
-SECRETS_FOR: dict[output.Mode, tuple[SecretName, ...]] = {
-    "spike": _MYSYS,
-    "run": _MYSYS,
-    "decide-only": _MYSYS,
-    "demo": _MYSYS,
-}
 # The Perth window (3.5): spike and demo are laptop work and ignore it.
 WINDOW_MODES: tuple[output.Mode, ...] = ("run", "decide-only")
 
@@ -101,6 +98,17 @@ def _parser() -> _Parser:
             command.add_argument("--until-check", action="store_true")
             command.add_argument("--probe-link", action="store_true")
     return parser
+
+
+def secret_names(mode: output.Mode, site: str) -> tuple[SecretName, ...]:
+    """The MySys secrets the mode needs on that site: its own pair. The demo
+    (Joey's Enter before each write, from the laptop) is test site only."""
+    if mode == "demo" and site != "test":
+        raise ConfigError("the demo is test site only")
+    try:
+        return secrets.mysys_names(site)
+    except ValueError:
+        raise ConfigError("unknown site") from None
 
 
 def new_run_id() -> str:
@@ -175,6 +183,7 @@ def _run(
     if mode == "demo" and not _demo_read_only(options) and not options.headed:
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")
+    names = secret_names(mode, options.site)  # before any file is read
     config = load_config(options.site, CONFIG_DIR)
     _start_trace(trace, config)
     if not config.enabled:
@@ -185,7 +194,7 @@ def _run(
     ):
         output.info("outside the run window: run not started")
         return 0
-    credentials = {name: secrets.get(name) for name in SECRETS_FOR[mode]}
+    credentials = {name: secrets.get(name) for name in names}
     output.info("config loaded")
     return start(mode, config, credentials, options, summary)
 
@@ -216,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
             "decide-only" if getattr(options, "decide_only", False) else options.command
         )
         summary.mode = mode
-        summary.site = "test" if options.site == "test" else None
+        summary.site = options.site if options.site in ("test", "live") else None
         exit_code = _run(mode, options, summary, trace)
     except BaseException as error:  # the catch-all: nothing reaches stderr
         failure = error

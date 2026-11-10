@@ -59,6 +59,9 @@ ALLOWLIST: dict[str, Kind] = {
     "open_pool": Kind.CLICK,
     "set_pool_filter": Kind.SELECT,
     "set_locked_filter": Kind.SELECT,
+    # Live's stale-Note read: Assigned User = the agent, then back to All
+    # Users (decisions, 10 Nov 2026, live profile).
+    "set_user_filter": Kind.SELECT,
     "search_note_pool": Kind.FILL,
     "refresh_note_pool": Kind.CLICK,  # row 27 (decisions, 25 Oct 2026)
     "open_note": Kind.CLICK,

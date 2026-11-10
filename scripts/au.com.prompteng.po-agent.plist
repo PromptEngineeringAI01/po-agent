@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- launchd LaunchAgent for the PO Agent (docs/macmini-setup.md section 8).
      Weekday 1-5 x Hour 7-17 at minute 7: 55 runs a week, Perth time.
-     No RunAtLoad, no KeepAlive: it runs only on this schedule. -->
+     No RunAtLoad, no KeepAlive: it runs only on this schedule.
+     After go-live the Mac Mini runs only live (decisions, 10 Nov 2026). -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
@@ -11,6 +12,7 @@
   <array>
     <string>/Users/poagent/po-agent/scripts/macmini-run.sh</string>
     <string>run</string>
+    <string>live</string>
   </array>
   <key>StandardOutPath</key>
   <string>/Users/poagent/Library/Logs/po-agent/launchd.log</string>

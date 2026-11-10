@@ -82,12 +82,15 @@ class KillSwitch(Exception):
         super().__init__(detail)
 
 
-def stale_note_stop(guard: ActionGuard, panel: Locator, agent: str) -> None:
+def stale_note_stop(
+    guard: ActionGuard, panel: Locator, agent: str, *, by_agent: bool
+) -> None:
     """A Pending Note still with the agent was left by an earlier run's
     partial write or failed return: the run takes no Note (D6). Only page 1
     can be read, so a second page stops the run too, as MorePages (after
-    page 1's rows, so a stale Note there is named; 7.2)."""
-    listing = driver.read_agent_notes(guard, panel, agent)
+    page 1's rows, so a stale Note there is named; 7.2). `by_agent`: the
+    profile's stale_read_by_agent (live lists only the agent's Notes)."""
+    listing = driver.read_agent_notes(guard, panel, agent, by_agent=by_agent)
     for row in listing.rows:
         if row.assignee == agent:
             raise UnexpectedScreen(

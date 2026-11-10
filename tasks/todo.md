@@ -25,7 +25,7 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 
 - [ ] **G.1** Joey's look at live with the agent's account, nothing saved (gate 2): PO Documents or Documents; Resolve or Solved; Client Ref No. `<internal no>/048`; password expiry; pool and agent names; `/048` title format; Pending Note count for the stale-Note read (more than 50 is a code change) · by hand
 - [ ] **G.2** Real-PO seam on the 3-5 real POs (`uv run pytest tests/seam1 -m real_data`, laptop): `false PROCEED: 0` · Joey puts the POs in `private/`, Claude runs it
-- [ ] **G.3** Live profile: live config and its own keyring names on the Mac Mini only, the wrapper and kill switch for live, alert issues without `note_id` (audit N4) · step · high risk, second-model review · designed with Joey first
+- [x] **G.3** Live profile: committed `config/live.toml` (starts disabled, one PO per run), its own keyring names, the wrapper and kill switch for live, the live answers from G.1 (bare-number match, stale read by the agent, Client Documents), alert issues without `note_id` (audit N4) · step · high risk, second-model review · decisions, 10 Nov 2026, live profile
 - [ ] **G.4** Joey's by-hand steps: Must never #3, the `guard_bash.py` live-host deny and `.claude/` changes for live; Claude and every AI tool removed from `poagent` (H2); live secrets into `poagent`'s Keychain; live config on the Mac Mini; the `production` tag moved to the go-live commit · by hand
 - [ ] **G.5** Live read-only `spike` from the Mac Mini · by hand (Joey runs, pastes `runs.log` lines)
 - [ ] **G.6** Live `run --decide-only`; Joey reads its NOTE lines against the Notes · by hand

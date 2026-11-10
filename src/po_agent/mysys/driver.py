@@ -70,9 +70,11 @@ PROJECT_BUTTON = re.compile(r"^pln_\d+$")
 LOCKED = "Locked"
 POOL_FILTER = "filter_allocation_pool_id"
 LOCK_FILTER = "filter_lock_status"
+USER_FILTER = "filter_user_id"
+ALL_USERS = "All Users"
 # Every Note Pool filter and its default after a fresh login (rows 01, 27).
 FILTER_DEFAULTS = {
-    "filter_user_id": "All Users",
+    USER_FILTER: ALL_USERS,
     POOL_FILTER: "All Pools",
     "filter_creator_id": "All Creators",
     "filter_source": "All Sources",
@@ -209,17 +211,29 @@ def set_note_pool_filters(guard: ActionGuard, panel: Locator, pool_name: str) ->
     )
 
 
-def read_agent_notes(guard: ActionGuard, panel: Locator, agent: str) -> NotePoolList:
+def read_agent_notes(
+    guard: ActionGuard, panel: Locator, agent: str, *, by_agent: bool
+) -> NotePoolList:
     """The stale-Note read (D6): Assigned Pool = All Pools and Locked/
-    Unlocked = All, each read back; Assigned User at All Users (the test
-    site's Assigned User list has no agent; decisions, 3 Nov 2026), Status
-    left at Pending, every other filter at its default and Search/filter
-    empty. Page 1's rows with `agent` as Assignee; `total` and `pages` as
-    the footer says."""
+    Unlocked = All, each read back; Status left at Pending, every other
+    filter at its default and Search/filter empty. Page 1's rows with
+    `agent` as Assignee; `total` and `pages` as the footer says.
+
+    Assigned User stays at All Users unless `by_agent` (the live profile):
+    live lists more than one page of Pending Notes at All Users, so there it
+    is set to `agent`, read back, and set back to All Users after the read,
+    for the eligible read's filters (decisions, 10 Nov 2026, live profile).
+    The test site's Assigned User list has no agent (decisions, 3 Nov 2026)."""
     _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, ALL_POOLS)
     _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, ALL_LOCKED)
-    _check_filters(panel, FILTER_DEFAULTS)
+    if by_agent:
+        _set_filter(guard, panel, "set_user_filter", USER_FILTER, agent)
+        _check_filters(panel, {**FILTER_DEFAULTS, USER_FILTER: agent})
+    else:
+        _check_filters(panel, FILTER_DEFAULTS)
     listing = read_note_pool(guard, panel)
+    if by_agent:
+        _set_filter(guard, panel, "set_user_filter", USER_FILTER, ALL_USERS)
     rows = tuple(row for row in listing.rows if row.assignee == agent)
     return NotePoolList(rows=rows, total=listing.total, pages=listing.pages)
 

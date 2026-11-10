@@ -10,4 +10,6 @@ duplicate_ignores_cancelled = true   # test only: Joey resets the test site by c
 max_notes_per_run = 10            # MVP values; v1 defaults are 25 Notes / 12 minutes
 max_run_minutes = 12
 run_window = { days = "Mon-Fri", start = "07:00", end = "18:00", tz = "Australia/Perth" }
+stale_read_by_agent = false       # the test site's Assigned User list has no agent: the stale read stays at All Users
+project_document_type = "Purchase Order"   # W2: the test site files a PO Documents upload as Type Purchase Order
 trace_dir = "~/Library/Logs/po-agent/trace"   # the safe trace (7.3): written only where ~/Library/Logs/po-agent exists (the Mac Mini)

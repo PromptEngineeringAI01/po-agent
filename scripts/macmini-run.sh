@@ -1,24 +1,30 @@
 #!/bin/bash
 # Mac Mini wrapper for the PO Agent (docs/macmini-setup.md section 8).
 #
-#   scripts/macmini-run.sh <run|spike|decide-only>
+#   scripts/macmini-run.sh <run|spike|decide-only> <test|live>
+#
+# The site is required, with no default (decisions, 10 Nov 2026, live
+# profile): after go-live launchd runs `run live`. Only launchd or Joey runs
+# it on live; Claude never does (CLAUDE.md Must never #3).
 #
 # 1. Release pinning (plan task 7.4): fetches origin (moved and deleted tags
-#    too), reads enabled from config/test.toml on origin/main (false: a fixed
-#    line to runs.log, exit 0, nothing else run), then checks out the
+#    too), reads enabled from config/<site>.toml on origin/main (false: a
+#    fixed line to runs.log, exit 0, nothing else run), then checks out the
 #    production tag's commit, detached. Only Joey moves that tag, by hand;
 #    this script never creates, moves or pushes it. Then uv sync --locked and
 #    uv run playwright install chromium. If any step fails, or enabled on main
 #    isn't exactly one "enabled = true|false" line, the agent doesn't run:
 #    a fixed line to runs.log, an alert issue, exit 2.
-# 2. Runs the agent on the test site (never --detailed-log) with a hard time
+# 2. Runs the agent on that site (never --detailed-log) with a hard time
 #    limit, in its own process group, and kills the whole group plus this
 #    user's Playwright browsers when it ends or hits the limit, so nothing
 #    overlaps the next run.
 # 3. Appends a timestamp line and the agent's stdout to runs.log; its stderr
 #    goes to /dev/null (a crash's text could quote page content).
 # 4. On any ALERT line or a non-zero exit, opens a GitHub issue labelled
-#    po-agent-alert whose body is only the ALERT lines and the exit code.
+#    po-agent-alert whose body is only the ALERT lines, without any Note ID
+#    (the repo is public; audit N4), and the exit code. runs.log keeps the
+#    ALERT lines whole.
 # 5. At the end of every run, whatever the exit code (a failed setup and a
 #    killed agent too), pings: the body of the one open issue labelled
 #    po-agent-heartbeat becomes the time, the exit code and the run_id. The
@@ -45,15 +51,19 @@ LOG_DIR="$HOME/Library/Logs/po-agent"
 RUNS_LOG="$LOG_DIR/runs.log"
 
 usage() {
-  echo "usage: macmini-run.sh <run|spike|decide-only>" >&2
+  echo "usage: macmini-run.sh <run|spike|decide-only> <test|live>" >&2
   exit 2
 }
 
-[ "$#" -eq 1 ] || usage
+[ "$#" -eq 2 ] || usage
+case "$2" in
+  test | live) SITE="$2" ;;
+  *) usage ;;
+esac
 case "$1" in
-  run) AGENT_ARGS="run --site test" ;;
-  spike) AGENT_ARGS="spike --site test" ;;
-  decide-only) AGENT_ARGS="run --decide-only --site test" ;;
+  run) AGENT_ARGS="run --site $SITE" ;;
+  spike) AGENT_ARGS="spike --site $SITE" ;;
+  decide-only) AGENT_ARGS="run --decide-only --site $SITE" ;;
   *) usage ;;
 esac
 MODE="$1"
@@ -86,11 +96,30 @@ gh_limited() {
   wait "$pid"
 }
 
+# The ALERT lines from $OUT without any Note ID (audit N4): the JSON key and
+# the detail's "note_id=<id>" (core/errors.py) are cut; a line that still
+# names one, in any case, keeps only "ALERT <KIND>".
+public_alerts() {
+  grep '^ALERT ' "$OUT" | sed -E \
+    -e 's/"note_id": *("[^"]*"|null), *//g' \
+    -e 's/, *"note_id": *("[^"]*"|null)//g' \
+    -e 's/ \(note_id=[^,)]*\)//g' \
+    -e 's/\(note_id=[^,)]*, */(/g' \
+    -e 's/, *note_id=[^,)]*//g' |
+    while IFS= read -r line; do
+      if printf '%s\n' "$line" | grep -qi 'note_id'; then
+        printf '%s\n' "$line" | cut -d ' ' -f 1-2
+      else
+        printf '%s\n' "$line"
+      fi
+    done
+}
+
 # $1 = run_id or "no run_id", $2 = exit code, $3 = an optional fixed wrapper
-# line. The body is the ALERT lines from $OUT, that line and the exit code.
+# line. The body is the public ALERT lines, that line and the exit code.
 open_issue() {
   local body
-  body="$(grep '^ALERT ' "$OUT")"
+  body="$(public_alerts)"
   if [ -n "${3:-}" ]; then
     body="${body:+$body
 }$3"
@@ -160,7 +189,7 @@ trap 'exit 1' INT TERM HUP
 mkdir -p "$LOG_DIR" || exit 2
 OUT="$(mktemp "${TMPDIR:-/tmp}/po-agent-run.XXXXXX")" || exit 2
 
-log "=== $(date '+%Y-%m-%dT%H:%M:%S%z') macmini-run.sh $MODE ==="
+log "=== $(date '+%Y-%m-%dT%H:%M:%S%z') macmini-run.sh $MODE $SITE ==="
 
 setup_failed() { # $1 = the step that failed
   local line="wrapper: setup failed ($1), agent not run"
@@ -168,13 +197,13 @@ setup_failed() { # $1 = the step that failed
   open_issue "no run_id" 2 "$line"
   exit 2
 }
-# enabled from config/test.toml on origin/main: prints true or false, or
+# enabled from config/<site>.toml on origin/main: prints true or false, or
 # fails unless there is exactly one "enabled = true|false" line (a trailing
 # comment allowed). Read from main, not the tag, so enabled = false stops the
 # next run without a tag move (decisions, 9 Nov 2026, release pinning).
 main_enabled() {
   local config value
-  config="$(git show origin/main:config/test.toml)" || return 1
+  config="$(git show "origin/main:config/$SITE.toml")" || return 1
   [ "$(printf '%s\n' "$config" | grep -cE '^[[:space:]]*enabled[[:space:]]*=')" = 1 ] || return 1
   value="$(printf '%s\n' "$config" | sed -n -E \
     's/^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*(#.*)?$/\1/p')"
