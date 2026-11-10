@@ -40,6 +40,17 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **9 Nov 2026: one error-report path** (task 8.2; entry below): `RunLog.error` goes, so its test changes.
 - **9 Nov 2026: go-live plan.** The CEO gave Joey full authority for every go-live decision. P5's week is skipped, gates 2-5 are met or reshaped, code is frozen until live runs hourly (entry below).
 
+## 10 Nov 2026 - Hooks for the live profile (Joey, task G.3; loosens a safety control)
+
+- **Why:** G.3 commits the live profile: `config/live.toml` and a `LIVE_HOST` constant in `src/po_agent/core/config.py` (Joey, 9 Nov 2026, live-profile decisions 1 and 4; the profile itself gets its own entry with G.3). The hooks banned every `config/live*.toml` and allowed the live host only in `guard_bash.py` and its test.
+- **Changes** (Joey's hand edit; `tests/test_hooks.py` pins each):
+  - `protect_paths.py`: `config/live.toml` becomes an ask-first file, like `scripts/macmini-run.sh`: Joey approves every edit Claude makes to live's host, kill switch and caps. Any other `config/live*.toml` stays blocked.
+  - `guard_bash.py`: besides the live host, blocks `--site live` (with only non-word characters between, so `--site=live`, `--site "live"` and `['--site', 'live']` too), `macmini-run.sh <mode> live`, and any `mysys_live_` name, anywhere in a command.
+  - `.claude/settings.json`: the `Read(./config/live*.toml)` deny goes; the file holds no secrets.
+  - CLAUDE.md Must never #3 and the verify-pr skill's diff grep allow the live host only in `LIVE_HOST`, `config/live.toml`, the hook and Playwright CLI deny rules, and their tests.
+- **Unchanged:** Claude never runs anything against the live host, never runs the agent or the wrapper on live, never logs in to live from a test, command or seam (seam 2 stays test only), and never reads or sets a live secret.
+- **Loosens?** Yes: the live config ban (now ask-first) and where the live host may appear. The Bash backstop tightens. Joey merges this PR.
+
 ## 9 Nov 2026 - Go-live plan: Joey decides, P5 skipped, code freeze (Joey)
 
 - **Authority:** the CEO gave Joey full authority for every go-live decision (9 Nov 2026). Wherever `SPEC.md`, `tasks/plan.md` or this log asks for the CEO's go-live sign-off, Joey's decision, recorded here, is that sign-off. Must never #3 is still changed only by Joey, by hand, with the live-profile task.
