@@ -96,10 +96,11 @@ def mysys(env, tmp_path):
 
 
 def two_notes(**changes) -> dict[str, "FakeNote"]:
-    """300001 (a PROCEED unless `changes` break it), then 300002."""
+    """300002 (a PROCEED unless `changes` break it), then 300001: newest first
+    (decisions, 10 Nov 2026, newest first)."""
     return {
-        "300001": FakeNote("2600001B", **changes),
-        "300002": FakeNote("2600002B", names=()),
+        "300002": FakeNote("2600001B", **changes),
+        "300001": FakeNote("2600002B", names=()),
     }
 
 
@@ -190,7 +191,7 @@ def test_each_typed_error_ends_the_run_with_its_alert_and_exit_code(
     summary = summary_of(lines)
     assert summary["exit_code"] == exit_code
     assert raised(tmp_path, summary["run_id"]) == error
-    assert not any(c.endswith(" 300002") for c in fake.calls)  # the run stopped
+    assert not any(c.endswith(" 300001") for c in fake.calls)  # the run stopped
 
 
 # --- a guard refusal from the real act() aborts the run -----------------------------
@@ -212,12 +213,12 @@ def test_a_guard_refusal_from_act_aborts_the_whole_run(env, mysys, capsys):
     lines = lines_of(capsys)
     assert code == 1
     ((kind, alert),) = alerts_of(lines)
-    assert (kind, alert["note_id"]) == ("GUARD_REFUSAL", "300001")
+    assert (kind, alert["note_id"]) == ("GUARD_REFUSAL", "300002")
     assert "reason=UNKNOWN_ACTION" in alert["detail"]
-    assert "submit 300001" not in fake.calls
-    assert not any(c.endswith(" 300002") for c in fake.calls)
+    assert "submit 300002" not in fake.calls
+    assert not any(c.endswith(" 300001") for c in fake.calls)
     # Before Submit: back to the pool in a fresh browser context.
-    assert fake.notes["300001"].assignee == POOL
+    assert fake.notes["300002"].assignee == POOL
     assert summary_of(lines)["exit_code"] == 1
 
 
@@ -276,7 +277,7 @@ def test_an_address_passed_as_an_identifier_is_redacted(env, mysys, capsys):
     ((kind, alert),) = alerts_of(captured.out.splitlines())
     assert kind == "UNEXPECTED_SCREEN"
     assert "pln=<redacted>" in alert["detail"]
-    assert fake.notes["300001"].assignee == POOL
+    assert fake.notes["300002"].assignee == POOL
     assert summary_of(captured.out.splitlines())["exit_code"] == 1
 
 
@@ -292,7 +293,7 @@ def test_run_summary_is_last_even_when_the_crash_hits_the_cleanup(env, mysys, ca
     lines = lines_of(capsys)
     assert code == 1
     ((kind, alert),) = alerts_of(lines)
-    assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300001")
+    assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300002")
     assert "not returned to the pool" in alert["detail"]
     assert summary_of(lines)["exit_code"] == 1
 
@@ -324,11 +325,11 @@ def test_ctrl_c_from_the_submit_click_on_is_a_partial_write(
     lines = lines_of(capsys)
     assert code == 1
     ((alert_kind, alert),) = alerts_of(lines)
-    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300001", step)
+    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300002", step)
     summary = summary_of(lines)
     assert (summary["partial"], summary["exit_code"]) == (partial, 1)
-    assert fake.notes["300001"].assignee == AGENT  # never returned
-    assert not any(c.endswith(" 300002") for c in fake.calls)
+    assert fake.notes["300002"].assignee == AGENT  # never returned
+    assert not any(c.endswith(" 300001") for c in fake.calls)
 
 
 def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path):
@@ -337,7 +338,7 @@ def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path
     fake = mysys(two_notes())
     config_dir = tmp_path / "config"
     other = Proceed(
-        note_id="300002",
+        note_id="300001",
         internal_no="2600002B",
         pln="pln_10002",
         po_number="2600002B/048",
@@ -355,7 +356,7 @@ def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path
             ("https://fake.test", "fake-user", "fake-password"),
             other,
             config_dir,
-            note_id="300001",
+            note_id="300002",
         )
 
     assert error.value.step == "W1"
