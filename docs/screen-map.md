@@ -92,7 +92,7 @@ Opens from a Note Pool row. Heading **"Note 300001 - created on 12 Oct 2026"**; 
 | button | "Link to Project" | `getByRole('button', { name: 'Link to Project' })` | Replaced after linking (row 13) |
 | text | Source, Created, Type, Status | | Status e.g. **Pending**, **Solved by Agent 1 (MySys Only)** |
 | link | "Download document" | `getByRole('link', { name: 'Download document' })` | Next to the file name. The link's name is only "Download document": the **file name is in its URL** (`file_name=2600001B_048_1.pdf`). The file-name cell beside it shows the name on screen but has no accessible text |
-| text | the Note body | | One line, below the attachment: `Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf`. This is the "email body" for the task Note |
+| text | the Note body | | Below the attachment; on the test site one line: `Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf`. This is the "email body" for the task Note. Test site: a `<pre>`. **Live email Notes (Joey's DevTools look, 10 Nov 2026): an `iframe`** in a bordered `div` (MySys's `get_email_body` for the Note), whose document body is two lines, e.g. `<p><font face="Calibri">Please find attached Purchase Order / Quotation file</font><br><font face="Calibri">2600001B_048_1.pdf</font></p>`; no `<pre>`. The agent reads the one source ending with the file name |
 
 **Read:** title, body, file name, assignee, status.
 **Opening a Note changes nothing visible:** no log line, no status change (check 3.5).
