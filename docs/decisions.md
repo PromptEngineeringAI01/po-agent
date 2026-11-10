@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, G.6 live decide-only)
+# PO Agent - decision log (updated 10 Nov 2026, live stale-Note read from My Notes)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -43,6 +43,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: Claude reads live project lookups for the real-PO seam** in the browser pane, after Joey logs in (G.2; entry below).
 - **10 Nov 2026: live switched on for the G.5 spike** (entry below): G.1, G.2 and G.4 done; `enabled = true` in `config/live.toml`.
 - **10 Nov 2026: G.5 spike passed; G.6 live decide-only on one Note** (entry below).
+- **10 Nov 2026: live stale-Note read from My Notes** (entry below): live's Assigned User filter has no agent; `set_user_filter` removed.
+
+## 10 Nov 2026 - Live stale-Note read from My Notes (Joey, G.6 fix; changes what the agent does in MySys)
+
+- **What happened:** the first live `decide-only` (run 20261110T071111Z-d3b6) stopped before taking any Note with `ALERT GUARD_REFUSAL ... action=set_user_filter, reason=OPTION_NOT_FOUND`. Nothing was written. Live's Note Pool **Assigned User** filter has no agent option, the same as the test site (entry 3 Nov 2026): it lists All Users, Unassigned, then people. The agent Joey saw in "the dropdown" (G.3) was the Note window's Assign list. At All Users / All Pools / Locked All / Pending live has 28 pages (about 1,400 items), so the test profile's read can't work there either.
+- **Joey's look at live (10 Nov 2026):** the agent account has a **My Notes** tab (Project -> Projects, Tasks, My Tasks, Stages, Timesheets, Library Document, My Notes, Note Pool). Its filters: Search/filter, Company, Date From/To, Status (default Pending), Note Type, Filter No Company Note; buttons Refresh, Reset Filter, New Note, Batch Edit; no Assigned User or Assigned Pool filter. Columns ID, Assignee, Project, Task, Company, Date, Source, Subject/Note, Status, Note Type; footer "Page 1 of 1 (N Items)"; empty: "No record could be found." Joey assigned one `/048` Note to Agent 1 by hand: it showed in the agent's My Notes with Assignee "Agent 1 (MySys Only)", Status Pending. So My Notes lists the Notes assigned to the logged-in user.
+- **Decision:** the profile value `stale_read` picks the stale-Note read's source and replaces `stale_read_by_agent`. Test: `"note_pool"`, the Note Pool at All Users as before (unchanged). Live: `"my_notes"`: reload `base_url`; Project -> **My Notes** (new read-only guard action `open_my_notes`, a click pinned to the element whose text is exactly "My Notes"); Status read back Pending, every textbox (Search/filter too) empty, Filter No Company Note unticked where shown; page 1 read. Any row -> `ALERT UNEXPECTED_SCREEN` with its `note_id`, exit 1, whatever its Assignee cell; "No record could be found." with no rows -> no stale Note; a second page -> `ALERT MORE_PAGES`, exit 1; rows not matching the footer -> `UNEXPECTED_SCREEN` (no Refresh on My Notes). Then a reload before the Note Pool steps, which are unchanged.
+- **Anchor:** the My Notes panel is the innermost visible element holding New Note, Search/filter and the list, with no Assigned User or Assigned Pool filter, so the Note Pool panel (or anything holding both) never matches. No generated id or nth.
+- **Guard:** `set_user_filter` leaves the allowlist and the driver; nothing uses it. This also drops the reset-race Nit from the PR 91 review. The PR touches `guard.py`, so it is Joey's to merge.
+- **No seam 2 (Joey to confirm, as for G.3):** the test profile's read is unchanged; the proof is offline tests on a fake My Notes page, then the live decide-only (G.6). Joey's test Note is still assigned to the agent, so the first decide-only after the fix should stop with `UNEXPECTED_SCREEN` naming it; Joey then returns it to the PO Allocation Pool and reruns.
+- **Loosens?** No: one more read-only click (a menu item by exact text) and one select action removed. Replaces the stale-Note bullet of the live profile entry below and the G.6 entry's "stale-Note read with Assigned User = the agent".
+- Carried in: `SPEC.md` v1.35 (Project Structure config, Guard allowlist, stale-Note stop), `docs/screen-map.md` row 29, `tasks/todo.md` (G.6).
 
 ## 10 Nov 2026 - G.6: live decide-only, one Note (Joey)
 

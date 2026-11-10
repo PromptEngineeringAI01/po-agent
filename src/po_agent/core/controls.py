@@ -16,13 +16,14 @@ built before any booking code (D1).
 `now` is the one clock; tests replace it.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from playwright.sync_api import Locator, Page
 
+from po_agent.b1.models import NotePoolRow
 from po_agent.core.config import Config, RunWindow, load_config
 from po_agent.core.errors import (
     ConfigError,
@@ -82,23 +83,35 @@ class KillSwitch(Exception):
         super().__init__(detail)
 
 
-def stale_note_stop(
-    guard: ActionGuard, panel: Locator, agent: str, *, by_agent: bool
-) -> None:
+def stale_note_stop(guard: ActionGuard, panel: Locator, agent: str) -> None:
     """A Pending Note still with the agent was left by an earlier run's
-    partial write or failed return: the run takes no Note (D6). Only page 1
-    can be read, so a second page stops the run too, as MorePages (after
-    page 1's rows, so a stale Note there is named; 7.2). `by_agent`: the
-    profile's stale_read_by_agent (live lists only the agent's Notes)."""
-    listing = driver.read_agent_notes(guard, panel, agent, by_agent=by_agent)
-    for row in listing.rows:
-        if row.assignee == agent:
-            raise UnexpectedScreen(
-                "a Note is still assigned to the agent from an earlier run",
-                note_id=row.note_id,
-            )
+    partial write or failed return: the run takes no Note (D6). The test
+    profile's read: the Note Pool at All Users, its rows with `agent` as
+    Assignee. Only page 1 can be read, so a second page stops the run too,
+    as MorePages (after page 1's rows, so a stale Note there is named; 7.2)."""
+    listing = driver.read_agent_notes(guard, panel, agent)
+    _stop_on_stale([row for row in listing.rows if row.assignee == agent])
     if listing.pages > 1:
         raise MorePages("Note Pool has more pages: stale-Note read incomplete")
+
+
+def my_notes_stop(guard: ActionGuard, page: Page) -> None:
+    """The live profile's stale-Note stop (D6; decisions, 10 Nov 2026, My
+    Notes): Project -> My Notes, which lists the Notes assigned to the
+    logged-in agent. Any row stops the run, whatever its Assignee cell;
+    a second page stops it too, as MorePages (after page 1's rows)."""
+    listing = driver.read_my_notes(driver.open_my_notes(guard, page))
+    _stop_on_stale(listing.rows)
+    if listing.pages > 1:
+        raise MorePages("My Notes has more pages: stale-Note read incomplete")
+
+
+def _stop_on_stale(rows: Sequence[NotePoolRow]) -> None:
+    if rows:
+        raise UnexpectedScreen(
+            "a Note is still assigned to the agent from an earlier run",
+            note_id=rows[0].note_id,
+        )
 
 
 class NoteTaken(Exception):

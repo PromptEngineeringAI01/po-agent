@@ -85,10 +85,11 @@ class Config(_Section):
     max_notes_per_run: int = Field(gt=0)
     max_run_minutes: int = Field(gt=0)
     run_window: RunWindow
-    # The stale-Note read (D6) filters Assigned User = the agent: live lists
-    # more than one page of Pending Notes at All Users; the test site's
-    # Assigned User list has no agent (decisions, 10 Nov 2026, live profile).
-    stale_read_by_agent: StrictBool
+    # Where the stale-Note read (D6) looks: "note_pool" = the Note Pool at
+    # All Users (test: one page); "my_notes" = the agent's own My Notes tab
+    # (live: 28 pages at All Users, and no agent in the Assigned User list;
+    # decisions, 10 Nov 2026, My Notes).
+    stale_read: Literal["note_pool", "my_notes"]
     # W2's read-back: the Type of the new task's one row in the project's
     # Documents tab ("Purchase Order" on test, "Client Documents" on live).
     project_document_type: str = Field(min_length=1)
