@@ -141,9 +141,11 @@ function value(name) {{
   return s.options[s.selectedIndex].text;
 }}
 function shown() {{
+  const user = value('filter_user_id');
   const pool = value('filter_allocation_pool_id');
   const lock = value('filter_lock_status');
   return CONFIG.rows.filter(r =>
+    (user === 'All Users' || r[1] === user) &&
     (pool === 'All Pools' || r[1] === pool) &&
     (lock === 'All' || (lock === 'Locked') === (r[4] === 1)));
 }}
@@ -302,7 +304,7 @@ def test_the_stale_note_read_lists_only_the_agents_rows_at_the_defaults(page, gu
     rows = [*ROWS, ("300004", agent, "---", "Please find attached file x.pdf", 0)]
     panel = panel_of(page, note_pool_page(rows=rows))
 
-    listing = driver.read_agent_notes(guard, panel, agent)
+    listing = driver.read_agent_notes(guard, panel, agent, by_agent=False)
 
     assert actions(guard) == []  # All Pools and All are the defaults
     assert [row.note_id for row in listing.rows] == ["300004"]
@@ -319,7 +321,35 @@ def test_the_stale_note_read_off_its_defaults_is_an_unexpected_screen(
     panel = panel_of(page, note_pool_page(filters={name: value}))
 
     with pytest.raises(UnexpectedScreen):
-        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)")
+        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)", by_agent=False)
+
+
+def test_on_live_the_stale_note_read_filters_by_the_agent_then_resets(page, guard):
+    # Live lists 153 Pending Notes over 4 pages at All Users (Joey's look,
+    # 10 Nov 2026), so the live profile reads only the agent's (decisions,
+    # 10 Nov 2026, live profile).
+    agent = "Agent 1 (MySys Only)"
+    rows = [*ROWS, ("300004", agent, "---", "Please find attached file x.pdf", 0)]
+    panel = panel_of(page, note_pool_page(rows=rows, total=None))
+
+    listing = driver.read_agent_notes(guard, panel, agent, by_agent=True)
+
+    assert actions(guard) == ["set_user_filter", "set_user_filter"]
+    assert [row.note_id for row in listing.rows] == ["300004"]
+    assert (listing.total, listing.pages) == (1, 1)
+    # Back at All Users: the eligible read's filters read back as expected.
+    driver.set_note_pool_filters(guard, panel, POOL)
+    assert [row.note_id for row in driver.read_note_pool(guard, panel).rows] == [
+        "300003",
+        "300002",
+    ]
+
+
+def test_on_live_another_filter_off_its_default_is_an_unexpected_screen(page, guard):
+    panel = panel_of(page, note_pool_page(filters={"filter_status": "All Status"}))
+
+    with pytest.raises(UnexpectedScreen):
+        driver.read_agent_notes(guard, panel, "Agent 1 (MySys Only)", by_agent=True)
 
 
 # --- reading the list ------------------------------------------------------------

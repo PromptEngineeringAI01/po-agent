@@ -1,7 +1,9 @@
 """Tests for the Mac Mini wrapper `scripts/macmini-run.sh` and its launchd
-plist (plan task 1.9; `docs/macmini-setup.md` section 8), and its release
+plist (plan task 1.9; `docs/macmini-setup.md` section 8), its release
 pinning (plan task 7.4): it runs the `production` tag, with `enabled` read
-from `origin/main`.
+from `origin/main`, and the live profile (G.3): the site is a required
+argument, `enabled` comes from that site's config, and alert issues carry
+no Note ID (audit N4). Nothing here runs the agent: `uv` is a stub.
 
 The wrapper runs under bash (CI on Linux, Git Bash on Windows) with stub
 `git`, `uv` and `gh` first on its PATH via MACMINI_RUN_PATH_PREFIX. The stub
@@ -29,10 +31,28 @@ BASH = shutil.which("bash")
 RUN_ID = "20261105T000700Z-3fa2"
 TAG_SHA = "0123456789abcdef0123456789abcdef01234567"
 REAL_CONFIG = (ROOT / "config" / "test.toml").read_text()
+
+
+def live_config() -> str:
+    return (ROOT / "config" / "live.toml").read_text()
+
+
 INFO = "INFO  config loaded"
 NOTE = 'NOTE  {"note_id": "1001", "outcome": "skipped", "reason": "NOT_B1"}'
-ALERT_1 = 'ALERT UNEXPECTED_SCREEN {"note_id": "1002", "step": null, "detail": "fixed"}'
-ALERT_2 = 'ALERT GUARD_REFUSAL {"note_id": "1003", "step": "W2", "detail": "fixed"}'
+# ALERT lines as the agent prints them: the Note ID is a JSON key and, from
+# str(error), part of the detail too (core/errors.py).
+ALERT_1 = (
+    'ALERT UNEXPECTED_SCREEN {"note_id": "1002", "step": null, '
+    '"detail": "Note window did not open (note_id=1002)"}'
+)
+ALERT_2 = (
+    'ALERT GUARD_REFUSAL {"note_id": "1003", "step": "W2", "detail": '
+    '"guard refused the action (action=submit_task, step=W2, note_id=1003, '
+    'reason=target_ambiguous)"}'
+)
+ALERT_3 = 'ALERT CONFIG {"note_id": null, "step": null, "detail": "secret not set"}'
+# Anything still naming a Note ID after the strip keeps only its kind.
+ALERT_ODD = 'ALERT PARTIAL_WRITE {"step": "W3", "detail": "NOTE_ID=1004"}'
 STDERR_TEXT = "stderr text that must not be kept"
 
 
@@ -205,7 +225,7 @@ def box(tmp_path) -> Box:
 def test_clean_run_logs_stdout_and_opens_no_issue(box):
     box.agent([INFO, NOTE, summary(0)], 0)
 
-    result = box.run("run")
+    result = box.run("run", "test")
 
     assert result.returncode == 0
     assert box.gh_args() is None
@@ -231,13 +251,28 @@ def test_clean_run_logs_stdout_and_opens_no_issue(box):
 def test_modes_map_to_the_cli(box, mode, agent_call):
     box.agent([summary(0)], 0)
 
-    result = box.run(mode)
+    result = box.run(mode, "test")
 
     assert result.returncode == 0
     assert box.calls()[-3:] == [agent_call, *PING_CALLS]
 
 
-@pytest.mark.parametrize("args", (("demo",), ("",), (), ("run", "--detailed-log")))
+@pytest.mark.parametrize(
+    "args",
+    (
+        ("run",),  # the site is required: no default (decisions, 10 Nov 2026)
+        ("run", "staging"),
+        ("run", "LIVE"),
+        ("run", ""),
+        ("run", "test", "extra"),
+        ("demo", "test"),
+        ("demo", "live"),
+        ("",),
+        (),
+        ("run", "--detailed-log"),
+        ("run", "test", "--detailed-log"),
+    ),
+)
 def test_other_arguments_run_nothing(box, args):
     box.agent([summary(0)], 0)
 
@@ -248,20 +283,33 @@ def test_other_arguments_run_nothing(box, args):
 
 
 def test_alert_run_opens_an_issue_with_only_the_alert_lines(box):
-    box.agent([INFO, ALERT_1, NOTE, ALERT_2, summary(1)], 1)
+    box.agent([INFO, ALERT_1, NOTE, ALERT_2, ALERT_3, ALERT_ODD, summary(1)], 1)
 
-    result = box.run("run")
+    result = box.run("run", "test")
 
     assert result.returncode == 1
     title, body = issue(box.gh_args())
     assert title == f"po-agent alert {RUN_ID}"
-    assert body.splitlines() == [ALERT_1, ALERT_2, "exit code: 1"]
+    # The repo is public: no Note ID in the issue (audit N4; decisions,
+    # 9 Nov 2026, go-live plan, item 3).
+    assert body.splitlines() == [
+        'ALERT UNEXPECTED_SCREEN {"step": null, "detail": "Note window did not open"}',
+        'ALERT GUARD_REFUSAL {"step": "W2", "detail": "guard refused the action '
+        '(action=submit_task, step=W2, reason=target_ambiguous)"}',
+        'ALERT CONFIG {"step": null, "detail": "secret not set"}',
+        "ALERT PARTIAL_WRITE",
+        "exit code: 1",
+    ]
+    assert not re.search(r"(?i)note_id|100[234]", body)
+    # runs.log on the Mac Mini keeps every ALERT line whole.
+    log = box.runs_log().splitlines()
+    assert all(line in log for line in (ALERT_1, ALERT_2, ALERT_3, ALERT_ODD))
 
 
 def test_nonzero_exit_without_alert_opens_an_issue(box):
     box.agent([INFO], 2)
 
-    result = box.run("run")
+    result = box.run("run", "test")
 
     assert result.returncode == 2
     title, body = issue(box.gh_args())
@@ -285,7 +333,7 @@ def test_nonzero_exit_without_alert_opens_an_issue(box):
 def test_failed_setup_runs_no_agent_and_opens_an_issue(box, failing, step):
     box.agent([summary(0)], 0)
 
-    result = box.run("run", **failing)
+    result = box.run("run", "test", **failing)
 
     assert result.returncode == 2
     assert not any("po-agent" in call for call in box.calls())
@@ -303,7 +351,7 @@ def test_failed_fetch_or_missing_tag_checks_out_nothing(box):
 
     for failing in ({"STUB_FETCH_EXIT": "1"}, {"STUB_TAG_MISSING": "1"}):
         (box.stubs / "calls").unlink(missing_ok=True)
-        box.run("run", **failing)
+        box.run("run", "test", **failing)
         assert not any(
             call.startswith(("git checkout", "git pull", "uv ")) for call in box.calls()
         )
@@ -315,7 +363,7 @@ def test_enabled_false_on_main_stops_an_old_tag(box):
     main_config = REAL_CONFIG.replace("enabled = true", "enabled = false", 1)
     assert main_config != REAL_CONFIG
 
-    result = box.run("run", STUB_MAIN_CONFIG=main_config)
+    result = box.run("run", "test", STUB_MAIN_CONFIG=main_config)
 
     assert result.returncode == 0
     assert box.calls() == [*FETCH_CALLS[:2], *PING_CALLS]
@@ -324,6 +372,61 @@ def test_enabled_false_on_main_stops_an_old_tag(box):
         "wrapper: enabled = false on main, agent not run" in box.runs_log().splitlines()
     )
     assert ping_body(box)[1:] == ["exit code: 0", "run_id: none"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "agent_call"),
+    (
+        ("run", "uv run po-agent run --site live"),
+        ("decide-only", "uv run po-agent run --decide-only --site live"),
+        ("spike", "uv run po-agent spike --site live"),
+    ),
+)
+def test_live_reads_enabled_from_its_own_config_on_main(box, mode, agent_call):
+    box.agent([summary(0)], 0)
+    live_on = re.sub(r"(?m)^enabled = \w+", "enabled = true", live_config())
+
+    result = box.run(mode, "live", STUB_MAIN_CONFIG=live_on)
+
+    assert result.returncode == 0
+    assert box.calls() == [
+        FETCH_CALLS[0],
+        "git show origin/main:config/live.toml",
+        *SETUP_CALLS[2:],
+        agent_call,
+        *PING_CALLS,
+    ]
+    assert f"macmini-run.sh {mode} live ===" in box.runs_log().splitlines()[0]
+
+
+def test_live_as_committed_is_stopped_by_its_kill_switch(box):
+    # config/live.toml is committed with enabled = false (Joey, 10 Nov 2026).
+    box.agent([summary(0)], 0)
+
+    result = box.run("run", "live", STUB_MAIN_CONFIG=live_config())
+
+    assert result.returncode == 0
+    assert box.calls() == [
+        FETCH_CALLS[0],
+        "git show origin/main:config/live.toml",
+        *PING_CALLS,
+    ]
+    assert box.gh_args() is None
+    assert (
+        "wrapper: enabled = false on main, agent not run" in box.runs_log().splitlines()
+    )
+
+
+def test_live_without_one_enabled_line_on_main_runs_nothing(box):
+    box.agent([summary(0)], 0)
+    two_lines = live_config() + "\nenabled = true\n"
+
+    result = box.run("run", "live", STUB_MAIN_CONFIG=two_lines)
+
+    assert result.returncode == 2
+    assert not any("po-agent" in call for call in box.calls())
+    line = "wrapper: setup failed (enabled on main), agent not run"
+    assert line in box.runs_log().splitlines()
 
 
 def test_wrapper_never_moves_or_pushes_the_tag():
@@ -339,7 +442,7 @@ def test_hung_agent_is_killed_with_its_children(box, tmp_path):
     )
 
     start = time.monotonic()
-    result = box.run("run", timeout=60, MACMINI_RUN_LIMIT_S="2")
+    result = box.run("run", "test", timeout=60, MACMINI_RUN_LIMIT_S="2")
     elapsed = time.monotonic() - start
 
     assert elapsed < 30
@@ -355,7 +458,7 @@ def test_hung_agent_is_killed_with_its_children(box, tmp_path):
 def test_hung_agent_also_kills_detached_playwright_browsers(box):
     box.agent_script(f"echo '{INFO}'\nsleep 300\n")
 
-    box.run("run", timeout=60, MACMINI_RUN_LIMIT_S="2")
+    box.run("run", "test", timeout=60, MACMINI_RUN_LIMIT_S="2")
 
     calls = (box.stubs / "pkill.calls").read_text().splitlines()
     assert len(calls) >= 1
@@ -386,7 +489,7 @@ def ping_body(box: Box) -> list[str]:
 def test_every_exit_code_pings_once(box, exit_code):
     box.agent([INFO, NOTE, summary(exit_code)], exit_code)
 
-    result = box.run("run")
+    result = box.run("run", "test")
 
     assert result.returncode == exit_code
     time_line, code_line, run_line = ping_body(box)
@@ -398,7 +501,7 @@ def test_every_exit_code_pings_once(box, exit_code):
 def test_failed_git_fetch_still_pings(box):
     box.agent([summary(0)], 0)
 
-    result = box.run("run", STUB_FETCH_EXIT="1")
+    result = box.run("run", "test", STUB_FETCH_EXIT="1")
 
     assert result.returncode == 2
     assert ping_body(box)[1:] == ["exit code: 2", "run_id: none"]
@@ -407,7 +510,7 @@ def test_failed_git_fetch_still_pings(box):
 def test_hung_agent_still_pings(box):
     box.agent_script(f"echo '{INFO}'\nsleep 300\n")
 
-    result = box.run("run", timeout=60, MACMINI_RUN_LIMIT_S="2")
+    result = box.run("run", "test", timeout=60, MACMINI_RUN_LIMIT_S="2")
 
     assert ping_body(box)[1:] == [f"exit code: {result.returncode}", "run_id: none"]
 
@@ -419,7 +522,7 @@ def test_hung_agent_still_pings(box):
 def test_failed_ping_keeps_the_exit_code(box, exit_code, failing):
     box.agent([summary(exit_code)], exit_code)
 
-    result = box.run("run", **failing)
+    result = box.run("run", "test", **failing)
 
     assert result.returncode == exit_code
     assert box.gh_args("issue-edit") is None
@@ -432,7 +535,9 @@ def test_hung_gh_is_killed_and_keeps_the_exit_code(box):
     box.agent([INFO], 1)
 
     start = time.monotonic()
-    result = box.run("run", timeout=60, STUB_GH_HANG="1", MACMINI_RUN_GH_LIMIT_S="2")
+    result = box.run(
+        "run", "test", timeout=60, STUB_GH_HANG="1", MACMINI_RUN_GH_LIMIT_S="2"
+    )
     elapsed = time.monotonic() - start
 
     assert elapsed < 30
@@ -447,9 +552,11 @@ def test_plist_schedules_55_weekday_runs():
         plist = plistlib.load(file)
 
     assert plist["Label"] == "au.com.prompteng.po-agent"
+    # After go-live the Mac Mini runs only live (decisions, 10 Nov 2026).
     assert plist["ProgramArguments"] == [
         "/Users/poagent/po-agent/scripts/macmini-run.sh",
         "run",
+        "live",
     ]
     entries = plist["StartCalendarInterval"]
     assert len(entries) == 55

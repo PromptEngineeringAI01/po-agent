@@ -114,6 +114,8 @@ def test_booker_w2_submits_reads_the_new_task_back_and_the_hold_checkbox_is_refu
             login=login,
             controls=gate,
             agent=agent,
+            site=config.site,
+            document_type=config.project_document_type,
             stop_after="W2",
         )
         done = [action for action, _ in guard.history]

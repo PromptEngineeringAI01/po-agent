@@ -162,7 +162,7 @@ class FakeMySys:
             rows=self.rows, total=len(self.rows), pages=self.pool_pages
         )
 
-    def read_agent_notes(self, guard, panel, agent):
+    def read_agent_notes(self, guard, panel, agent, *, by_agent):
         self.calls.append("agent_notes")
         rows = self.agent_rows
         return driver.NotePoolList(rows=rows, total=len(rows), pages=self.agent_pages)
@@ -269,7 +269,9 @@ class FakeMySys:
     def back_to_project(self, guard, page, window, pln):
         self._step("back")
 
-    def check_project_document(self, guard, page, pln, task_no, file_name):
+    def check_project_document(
+        self, guard, page, pln, task_no, file_name, document_type
+    ):
         self._step("document")
 
     def project_window(self, page, pln):

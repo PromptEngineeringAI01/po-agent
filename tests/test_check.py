@@ -103,8 +103,9 @@ def test_clean_repo_has_no_violations(tmp_path, check_script):
         "src/.ENV/key.txt",
         "secrets/key.txt",
         "src/Secrets/key.txt",
-        "config/live.toml",
+        # config/live.toml is the one live config (decisions, 10 Nov 2026)
         "config/Live-prod.TOML",
+        "config/live.local.toml",
         "deploy/config/live.toml",
         # images anywhere (screen captures are real data)
         "docs/screen-map/row02.png",
@@ -120,6 +121,12 @@ def test_each_bad_path_is_named(tmp_path, check_script, bad):
     violations = check_script.repo_data_violations(repo)
     assert len(violations) == 1
     assert violations[0].startswith(f"{bad}: ")
+
+
+def test_the_committed_live_config_is_allowed(tmp_path, check_script):
+    # It holds no secrets (decisions, 10 Nov 2026, live profile).
+    repo = make_repo(tmp_path, [*CLEAN, "config/live.toml"])
+    assert check_script.repo_data_violations(repo) == []
 
 
 def test_untracked_files_are_ignored(tmp_path, check_script):

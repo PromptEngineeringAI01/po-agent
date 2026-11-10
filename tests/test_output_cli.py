@@ -257,16 +257,59 @@ def test_modes_need_only_the_mysys_secrets(env, started, capsys, argv):
     assert set(credentials) == {"mysys_test_username", "mysys_test_password"}
 
 
-def test_a_site_other_than_test_exits_2(env, started, capsys):
+def test_an_unknown_site_exits_2(env, started, capsys):
     set_secrets(env)
 
-    code = cli.main(["spike", "--site", "live"])
+    code = cli.main(["spike", "--site", "staging"])
 
     captured = capsys.readouterr()
     assert code == 2
     assert alert_of(captured)[0] == "CONFIG"
     assert summary_of(captured)["site"] is None
     assert started == []
+
+
+# The live profile (decisions, 10 Nov 2026). No test here gets a live run
+# past its kill switch: the live secrets are checked as names only.
+
+
+def test_live_stops_at_its_kill_switch_before_secrets_or_a_mode(
+    env, started, capsys, tmp_path
+):
+    live = (ROOT / "config" / "live.toml").read_text("utf-8")
+    off = re.sub(r"(?m)^enabled = \w+", "enabled = false", live)
+    (tmp_path / "live.toml").write_text(off, "utf-8")
+    env.setattr(cli, "CONFIG_DIR", tmp_path)
+
+    code = cli.main(["run", "--site", "live", "--decide-only"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "INFO  kill switch on: run not started" in lines(captured)
+    assert summary_of(captured)["site"] == "live"
+    assert started == []
+
+
+@pytest.mark.parametrize("mode", ["run", "decide-only", "spike"])
+@pytest.mark.parametrize("site", ["test", "live"])
+def test_each_site_uses_its_own_mysys_secrets(mode, site):
+    assert cli.secret_names(mode, site) == (
+        f"mysys_{site}_username",
+        f"mysys_{site}_password",
+    )
+
+
+def test_the_demo_is_test_site_only(env, started, capsys, tmp_path):
+    env.setattr(cli, "CONFIG_DIR", tmp_path)  # empty: refused before reading
+
+    code = cli.main(["demo", "--site", "live", "--until-check"])
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert alert_of(captured)[0] == "CONFIG"
+    assert started == []
+    with pytest.raises(ConfigError):
+        cli.secret_names("demo", "live")
 
 
 @pytest.mark.parametrize(
