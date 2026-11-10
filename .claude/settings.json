@@ -70,7 +70,6 @@
       "Bash(npx @playwright/cli*)",
       "Read(./.env*)",
       "Read(./secrets/**)",
-      "Read(./config/live*.toml)",
       "Read(./state/**)"
     ]
   },

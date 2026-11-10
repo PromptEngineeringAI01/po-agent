@@ -7,8 +7,11 @@ wrong in here also exits 2, so the hook fails closed.
 It matches text, so it's a backstop: the action guard, the repo-data check and
 gitleaks are the main controls (docs/workflow.md, Appendix A).
 
-This file and tests/test_hooks.py are the only places the live host may appear
-(CLAUDE.md Must never #3; decisions, 16 Oct 2026, D4).
+Besides `LIVE_HOST` in src/po_agent/core/config.py and config/live.toml, this
+file and tests/test_hooks.py are the only places the live host may appear
+(CLAUDE.md Must never #3; decisions, 10 Nov 2026, live profile). Claude never
+runs the agent or the wrapper on live, and never reads or sets a live secret:
+only Joey does, on the Mac Mini.
 """
 
 import json
@@ -27,6 +30,24 @@ TEXT_RULES = [
         "the MVP is test site only (Must never #3)",
         # Appendix A's pattern; hostnames ignore case, so the match does too.
         re.compile(r"(?<!test-)prompt\.mysys\.com\.au", re.IGNORECASE),
+    ),
+    (
+        "agent on live",
+        "only Joey runs the agent on live, on the Mac Mini (Must never #3)",
+        # --site live, --site=live, --site "live", ['--site', 'live']: only
+        # non-word characters between, in any program or string.
+        re.compile(r"--site\W*live\b", re.IGNORECASE),
+    ),
+    (
+        "wrapper on live",
+        "only launchd runs macmini-run.sh on live (Must never #3)",
+        # macmini-run.sh <mode> live, quoted or as list items too
+        re.compile(r"macmini-run(\.sh)?\W+[\w-]+\W+live\b", re.IGNORECASE),
+    ),
+    (
+        "live secret",
+        "live secrets are only in poagent's Keychain, set by Joey (Must never #3, #5)",
+        re.compile(r"mysys_live_", re.IGNORECASE),
     ),
     (
         "Anthropic key",
