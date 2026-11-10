@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, live profile)
+# PO Agent - decision log (updated 10 Nov 2026, live lookups)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -40,6 +40,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **9 Nov 2026: one error-report path** (task 8.2; entry below): `RunLog.error` goes, so its test changes.
 - **9 Nov 2026: go-live plan.** The CEO gave Joey full authority for every go-live decision. P5's week is skipped, gates 2-5 are met or reshaped, code is frozen until live runs hourly (entry below).
 - **10 Nov 2026: live profile built** (G.3; entries below): hooks changed by Joey (PR 90), committed `config/live.toml` starting disabled, live answers from Joey's look in code, alert issues without Note IDs, no seam 2 for this PR.
+- **10 Nov 2026: Claude reads live project lookups for the real-PO seam** in the browser pane, after Joey logs in (G.2; entry below).
+
+## 10 Nov 2026 - Live lookups for the real-PO seam (Joey, task G.2; loosens a safety control)
+
+- **Why:** G.2's live cases (the real B1 `/048` POs in `private/`) need each project's lookup as live MySys shows it: the Projects search rows, the project's Client Internal No. and Address, and its Compaction Test tasks. Joey asked Claude to read them instead of him copying or screenshotting each one ("change the claude.md and also the hook"), since the agent account has limited permissions.
+- **Decision:** in the built-in browser pane of the Claude desktop app, after **Joey logs in to live himself** with the agent account, Claude may read the Projects search, a project's page and its Tasks list. It types only an internal number into the Projects search and clicks only the search, a result row and tabs. Nothing else on live: no Note Pool, no Note window, no button that saves or writes (Create New Task, Assign, Submit, Hold, Link, Solved, upload), nothing in Must never #2. Claude never types a live password. Every value read goes only into `private/fixtures/cases.toml`; chat, commits and PRs get counts and pass/fail only.
+- **Hooks unchanged:** the hooks see only Bash and file edits, not the browser pane, so nothing there needs loosening. `guard_bash.py` still blocks the live host, the agent's live site flag, the wrapper on live and any live secret name in a command; Playwright CLI still blocks the live origin; Claude never runs the agent on live.
+- **Risk accepted:** the agent account can do every booking write (create a task, upload, Hold, Link, Solved), so a wrong click could change a client's project. The hooks can't tell a search click from a write in the browser pane; the narrow list above and Joey watching the pane are the control. Joey logs out of live when the lookups are done.
+- **Loosens?** Yes: Must never #3 (Claude now reads live pages in a session Joey opened). Carried in: CLAUDE.md Must never #3, `SPEC.md` v1.34 (Real client data, Production).
 
 ## 10 Nov 2026 - Live profile (Joey, task G.3; loosens safety controls)
 
