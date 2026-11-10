@@ -210,8 +210,8 @@ def test_the_time_cap_stops_before_a_new_note_and_finishes_the_one_in_progress(
 
     lines = lines_of(capsys)
     assert code == 0
-    assert [n["note_id"] for n in notes_of(lines)] == ["300001", "300002", "300003"]
-    assert not [c for c in fake.calls if "300004" in c]
+    assert [n["note_id"] for n in notes_of(lines)] == ["300004", "300003", "300002"]
+    assert not [c for c in fake.calls if "300001" in c]
     assert all(v.assignee == POOL for v in fake.notes.values())
     assert "INFO  run cap reached: 1 notes left for the next run" in lines
     assert summary_of(lines)["exit_code"] == 0
@@ -226,8 +226,8 @@ def test_the_note_cap_leaves_the_rest_for_the_next_run(env, mysys, capsys):
 
     lines = lines_of(capsys)
     assert code == 0
-    assert [n["note_id"] for n in notes_of(lines)] == ["300001", "300002"]
-    assert not [c for c in fake.calls if "300003" in c or "300004" in c]
+    assert [n["note_id"] for n in notes_of(lines)] == ["300004", "300003"]
+    assert not [c for c in fake.calls if "300002" in c or "300001" in c]
     assert "INFO  run cap reached: 2 notes left for the next run" in lines
 
 
@@ -241,10 +241,10 @@ def test_a_kill_switch_mid_note_returns_it_in_a_fresh_context_and_exits_0(
     # fake MySys raises it mid-Note in its place.
     fake = mysys(
         {
-            "300001": FakeNote(
+            "300002": FakeNote(
                 "2600001B", fail_at="download", fail_with=controls.KillSwitch
             ),
-            "300002": FakeNote("2600002B"),
+            "300001": FakeNote("2600002B"),
         }
     )
 
@@ -256,13 +256,13 @@ def test_a_kill_switch_mid_note_returns_it_in_a_fresh_context_and_exits_0(
     assert after == [
         "closed",
         "open_browser",
-        "find_again 300001",
-        "assignee 300001",
-        "return 300001",
+        "find_again 300002",
+        "assignee 300002",
+        "return 300002",
         "closed",
     ]
-    assert fake.notes["300001"].assignee == POOL
-    assert not [c for c in fake.calls if "300002" in c]
+    assert fake.notes["300002"].assignee == POOL
+    assert not [c for c in fake.calls if "300001" in c]
     assert "INFO  kill switch on: run stopped" in lines
     assert not [x for x in lines if x.startswith("ALERT")]
     assert summary_of(lines)["exit_code"] == 0
