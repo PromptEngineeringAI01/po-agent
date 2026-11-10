@@ -64,6 +64,7 @@ def note_page(
     assignee: str = POOL,
     links: int = 1,
     assign_works: bool = True,
+    body: str = f"<pre>{BODY}</pre>",
 ) -> str:
     link = f'<a href="index.php?option=com_cweb&download=1&user_note_id=95&file_name={FILE}">Download document</a>'
     works = "true" if assign_works else "false"
@@ -83,7 +84,7 @@ def note_page(
     <button>Link to Project</button>
     <ul><li><strong>Status:</strong> <span id="status">Pending</span></li></ul>
     <table><tbody><tr><td><span>{FILE}</span></td><td>{link * links}</td></tr></tbody></table>
-    <pre>{BODY}</pre>
+    {body}
   </div>
 </div>{CLOSE}</div>
 <script>
@@ -156,6 +157,80 @@ def test_note_body_is_the_body_line_not_a_title_with_the_same_text(page):
     assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
 
 
+# Live G.6 (10 Nov 2026, Joey's DevTools look): an email Note's body is
+# no <pre> but an iframe (MySys's get_email_body) whose document body holds
+# the two lines, e.g. <p><font>...</font><br><font>file.pdf</font></p>.
+# Fake: srcdoc, fake values only.
+LIVE_LINE = "Please find attached Purchase Order / Quotation file"
+LIVE_BODY = (
+    f'<p><font face="Calibri">{LIVE_LINE}</font><br>'
+    f'<font face="Calibri">{FILE}</font></p>'
+)
+
+
+def email_iframe(html: str, *, srcdoc: str = "srcdoc") -> str:
+    escaped = html.replace("&", "&amp;").replace('"', "&quot;")
+    return (
+        f'<div style="border: 1px solid #ddd"><iframe {srcdoc}="{escaped}" '
+        'style="width:100%;height:600px;"></iframe></div>'
+    )
+
+
+@pytest.fixture
+def quick(monkeypatch):
+    # A body that never shows: wait 2 s, not 15 s.
+    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+
+
+def test_note_body_from_the_email_iframe(page):
+    page.set_content(note_page(body=email_iframe(LIVE_BODY)))
+    window = booking.note_window(page, NOTE_ID)
+    assert booking.note_body(window, FILE) == f"{LIVE_LINE}\n{FILE}"
+
+
+def test_note_body_from_an_email_iframe_without_font(page):
+    page.set_content(note_page(body=email_iframe(f"<p>{BODY}</p>")))
+    assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
+
+
+def test_note_body_waits_for_an_email_iframe_that_loads_late(page):
+    # The iframe's document loads after the window shows (live: its src).
+    page.set_content(
+        note_page(body=email_iframe("<p></p>"))
+        + "<script>setTimeout(() => { document.querySelector('iframe').srcdoc ="
+        + f" {LIVE_BODY!r}; }}, 500);</script>"
+    )
+    window = booking.note_window(page, NOTE_ID)
+    assert booking.note_body(window, FILE) == f"{LIVE_LINE}\n{FILE}"
+
+
+def test_no_pre_and_no_iframe_is_no_body(page, quick):
+    page.set_content(note_page(body="<p>nothing here</p>"))
+    with pytest.raises(UnexpectedScreen) as caught:
+        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+    assert FILE not in str(caught.value)
+
+
+def test_a_pre_and_an_iframe_both_matching_is_no_body(page, quick):
+    page.set_content(note_page(body=f"<pre>{BODY}</pre>" + email_iframe(LIVE_BODY)))
+    with pytest.raises(UnexpectedScreen):
+        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+
+
+def test_an_iframe_not_ending_with_the_file_name_is_no_body(page, quick):
+    html = f"<p>{LIVE_LINE}</p><p>{FILE}</p><p>Regards, fake sender</p>"
+    page.set_content(note_page(body=email_iframe(html)))
+    with pytest.raises(UnexpectedScreen) as caught:
+        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+    assert "fake sender" not in str(caught.value)
+
+
+def test_two_iframes_both_matching_is_no_body(page, quick):
+    page.set_content(note_page(body=email_iframe(LIVE_BODY) * 2))
+    with pytest.raises(UnexpectedScreen):
+        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+
+
 def test_mark_solved_unticks_email_and_reads_back(page, guard):
     page.set_content(note_page(assignee=AGENT))
     window = booking.note_window(page, NOTE_ID)
@@ -205,6 +280,17 @@ def test_task_form_is_filled_and_read_back(page, guard):
     assert "upload_document" in actions(guard)
     booking.submit_task(guard, form)
     assert page.locator("body").get_attribute("data-submitted") == "yes"
+
+
+def test_a_two_line_iframe_body_fills_and_reads_back_the_same(page, guard):
+    # Live's iframe body has a newline between its two lines (G.6): W2's
+    # Note fill and read-back must still compare the same text.
+    page.set_content(task_form_page())
+    form = booking.task_form(page)
+    booking.fill_task_form(
+        guard, form, "2600001B/048", f"{LIVE_LINE}\n{FILE}", FILE, PDF
+    )
+    assert "set_task_note" in actions(guard)
 
 
 def test_task_form_with_another_box_ticked_does_not_submit(page, guard):
