@@ -64,7 +64,7 @@ def stale_stop(guard, page, login, agent) -> str | None:
     panel = driver.open_note_pool(guard, page)
     driver.leave_menu(guard, page)
     try:
-        controls.stale_note_stop(guard, panel, agent, by_agent=False)
+        controls.stale_note_stop(guard, panel, agent)
     except UnexpectedScreen as stopped:
         return stopped.note_id or "<no note_id>"
     return None
