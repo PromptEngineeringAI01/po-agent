@@ -53,6 +53,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Decision:** `note_body` reads the body from exactly one source whose text ends with the file name: the window's `<pre>` (as before) or the document body of an `iframe` in the window (its inner text, stripped). None, or more than one across both, is `UNEXPECTED_SCREEN` as before. While any iframe in the window is still empty (its document loads after the window), the read waits up to 15 s. Read only: nothing in the frame is clicked; the text is untrusted and never printed.
 - **W2 unchanged:** the iframe text has a newline between its two lines, as a two-line `<pre>` would; the Note field is filled with it and read back as the same text, and the task detail check compares it with whitespace collapsed.
 - **No guard change.** The test site's `<pre>` path is unchanged.
+- **No seam 2 (Joey: "Skip seam 2", as for the My Notes fix):** CLAUDE.md "Done means" #3 is skipped for this PR. The test site's `<pre>` path is unchanged; the proof is the offline tests, then the live decide-only (G.6). The first live booking (G.7) is the first write of a two-line Note: watch W2's task detail read-back.
 - **Loosens?** No.
 - Carried in: `SPEC.md` v1.36 (Email body), `docs/screen-map.md` row 02.
 
