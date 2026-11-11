@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 11 Nov 2026, live document Type Purchase Order; live on again)
+# PO Agent - decision log (updated 11 Nov 2026, address house-number line)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -49,6 +49,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **11 Nov 2026: G.6 passed; G.7 live `run`, one PO, watched** (entry below).
 - **11 Nov 2026: G.7's first run stopped at W2's document Type; live switched off** (entry below).
 - **11 Nov 2026: live document Type is Purchase Order; live on again** (Joey; entry below).
+- **11 Nov 2026: address check takes a house-number line and a state inside the MySys address** (Joey: "fix it now"; entry below).
+
+## 11 Nov 2026 - Address check: a house-number line and a state inside the MySys address (Joey: "fix it now"; changes what the agent decides)
+
+- **What happened:** live run 20261111T041353Z-f50b (tag daef58e), watched: the newest eligible Note skipped `ADDRESS_MISMATCH` and went back to the pool (nothing else written; exit 0). Joey compared by hand: the address is the same. Two formats the rule didn't know (fake values here): the PDF's Job Address block puts the house number on its own line, `Lot 123` / `(45)` / `Sample Lane Sampleville WA`, so the line under the label was `(45)`, not the street; and the MySys address carries the state after the street too, `Lot 123 (#45 ) Sample Lane WA Sampleville 6000 WA`, so R kept a `wa` the PDF doesn't have. Joey: this kind of address is common, so fix it now.
+- **Decision:** the project address drops every state word, wherever it sits (before: only a trailing one), then a trailing postcode. A lone lot whose line under ends with a bracketed house number (`(45)`, optional `#`, digits and one optional letter; exactly that bracket on pypdf's text) takes the address from the next line by the same rule as before (ends with R plus a tail; exactly R plus a tail on pypdf's text), and the house number must equal the project's `(#45)`: a project without one, or with another, is `ADDRESS_MISMATCH`. Everything else is unchanged; a house number on the label line itself is still a skip.
+- **Accepted risk:** a street or suburb word that is exactly a state abbreviation (`Wa`, `Sa`, `Act`, ...) drops out of R; R of fewer than two words is still `ADDRESS_UNVERIFIABLE`.
+- **Tests:** a few fake cases in `tests/seam1/test_address_normaliser.py` (both reader layouts, another house number, a project without one, a state inside R), in their own `test:` commit. Seam 1 shows `false PROCEED: 0`, and the real-PO seam on the 5 POs already in `private/` still decides 5 of 5 with `false PROCEED: 0`. Joey: no real-PO seam work on his side and no new real case; the proof on this PO is the next watched live run.
+- **Loosens?** Yes: two more address layouts PROCEED. The lot, R and the readers' agreement are still required, and the house number is matched exactly.
+- Carried in: `SPEC.md` v1.39 (MySys screen rules -> Project address).
 
 ## 11 Nov 2026 - Live document Type is Purchase Order; live on again (Joey; changes what the agent checks in MySys)
 
