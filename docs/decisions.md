@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 11 Nov 2026, G.7 live run, one PO, watched)
+# PO Agent - decision log (updated 11 Nov 2026, G.7 first run stopped at W2; live switched off)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -47,6 +47,15 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: Note body from live's email iframe** (entry below): live email Notes show the body in an iframe, not a `<pre>`.
 - **10 Nov 2026: eligible Notes newest first** (Joey: "A"; entry below): an old Note that always skips no longer takes every run's cap.
 - **11 Nov 2026: G.6 passed; G.7 live `run`, one PO, watched** (entry below).
+- **11 Nov 2026: G.7's first run stopped at W2's document Type; live switched off** (entry below).
+
+## 11 Nov 2026 - G.7's first run stopped at W2's document Type; live switched off (G.7 entry's stop rule)
+
+- **What happened:** live run 20261111T024815Z-3f4d (tag 75605bc), watched by Joey: 35 rows, 10 eligible; the newest eligible Note passed every check, W1 filled the form and Submit created the task. W2's task detail read-back passed (PO number, Lodged By, Task Creator and the two-line Notes text), then the project Documents tab check stopped: `ALERT ACCURACY_BREACH`, step W2, `field=document_type`: the new task's section had exactly one row, but its Type cell was not `Client Documents`. Exit 3, `partial: 1`.
+- **In MySys now:** the task exists with the PDF; it is not On Hold, and the Note is still assigned to the agent, Pending, not linked, not Solved. The stale-Note stop makes every later live run stop at the start until the Note is finished or returned.
+- **Trace check (5.2):** passed for what ran. The one Note-window write, the step-2 `assign_note`, has an ok `email_notification_unticked` after that Note's ok `assignee_check`; only that Note's `note_id` appears. No `link_to_project`, `link_select_project` or `mark_solved` ran.
+- **Decision (the G.7 entry's stop rule: no booking):** `enabled = false` in `config/live.toml` on `main` before any second booking. The fix follows Joey's look at the new task's row in the project Documents tab; turning live on again is its own PR, with the `production` tag moved to it.
+- **Loosens?** No: it tightens (live off).
 
 ## 11 Nov 2026 - G.6 passed; G.7: live `run`, one PO, watched (Joey)
 
