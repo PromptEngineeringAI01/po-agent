@@ -124,6 +124,7 @@ def mysys(env, tmp_path):
 
 def seed(tmp_path: Path, day: date, *bookings: tuple[str, str, str, str]) -> None:
     """Writes `booked` events, as an earlier run would, to `day`'s file."""
+    trace_dir(tmp_path).parent.mkdir(exist_ok=True)  # as the Mac Mini has it
     log = trace.Trace(SEED_RUN)
     log.start(trace_dir(tmp_path), day)
     for note_id, pln, task_id, internal_no in bookings:
