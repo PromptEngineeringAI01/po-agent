@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 10 Nov 2026, eligible Notes newest first)
+# PO Agent - decision log (updated 11 Nov 2026, G.7 live run, one PO, watched)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -46,6 +46,44 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: live stale-Note read from My Notes** (entry below): live's Assigned User filter has no agent; `set_user_filter` removed.
 - **10 Nov 2026: Note body from live's email iframe** (entry below): live email Notes show the body in an iframe, not a `<pre>`.
 - **10 Nov 2026: eligible Notes newest first** (Joey: "A"; entry below): an old Note that always skips no longer takes every run's cap.
+- **11 Nov 2026: G.6 passed; G.7 live `run`, one PO, watched** (entry below).
+
+## 11 Nov 2026 - G.6 passed; G.7: live `run`, one PO, watched (Joey)
+
+- **G.6 done:** two live `decide-only` runs from the Mac Mini on tag 75605bc
+  (PRs 97, 99 and 100 merged), 20261111T014436Z-dd9a and
+  20261111T014801Z-e75a. Each passed the My Notes stale read, read 35 rows
+  and 10 eligible `/048` Notes, took the newest eligible Note, passed every
+  check and skipped it `DECIDE_ONLY` with a pln, returned it to the pool and
+  exited 0. The second run passing the My Notes stop shows the first run's
+  return worked.
+- **Decision:** Joey runs the wrapper's `run` mode on live from the Mac Mini,
+  once, by hand, watching it (`max_notes_per_run = 1`, the launchd job stays
+  unloaded). Newest first, it takes the same Note G.6 decided on, and books
+  it: W1 Create New Task with the PO PDF (Type Client Documents, in PO
+  Documents), W2 read-back, W3 On Hold, W4 link the Note to the project, W5
+  Solved.
+- **What it proves on live for the first time:** every write, and W2's task
+  detail read-back of a two-line Note body (the first anywhere). The read-back
+  compares the Notes text with whitespace collapsed; if live joins the two
+  lines with no space, W2 stops after Submit (`ACCURACY_BREACH` or
+  `PARTIAL_WRITE`) and the Note stays with the agent for Joey to finish by
+  hand.
+- **Trace check (go-live plan, item 1; the 5.2 check):** Joey pastes the run's
+  `runs.log` lines and the `grep <run_id>` safe-trace lines; Claude checks
+  that every `assign_note`, `link_to_project`, `link_select_project` and
+  `mark_solved` has an ok `email_notification_unticked` after both the Note's
+  latest ok `assignee_check` and its previous Note-window write (D7), and that
+  only that Note's `note_id` appears. Known gap, by design: a return to the
+  pool after a stop checks the Assignee but logs no `assignee_check`, so that
+  `assign_note` is judged by its `email_notification_unticked` only.
+- **A miss, or no booking:** `enabled = false` on `main` before any second
+  booking, then a fix. A pass: Joey checks the booking in MySys by hand, then
+  more watched one-PO runs until G.8.
+- **Loosens?** No new control: the kill switch is already on (G.5) and the
+  guard, assignee check and Send Email read-back are unchanged. This is the
+  first live write of a task, a link and Solved, with Joey watching. No
+  `SPEC.md` change: nothing the agent does or prints changes.
 
 ## 10 Nov 2026 - Eligible Notes newest first (Joey: "A"; changes what the agent does in MySys)
 
