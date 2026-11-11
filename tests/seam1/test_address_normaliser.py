@@ -630,3 +630,40 @@ def test_a_state_inside_the_project_address_is_dropped() -> None:
     assert parse_project_address(HOUSE_PROJECT) == ProjectAddress(
         lot="123", rest="sample lane sampleville"
     )
+
+
+@pytest.mark.parametrize(
+    ("pdf_text", "exact"),
+    [
+        # The street on the line after must still be R.
+        (
+            HOUSE_PDF_TEXT.replace(
+                "Sample Lane Sampleville WA", "Other Lane Sampleville WA"
+            ),
+            False,
+        ),
+        (
+            HOUSE_PYPDF_TEXT.replace(
+                "Sample Lane Sampleville  WA", "Other Lane Sampleville  WA"
+            ),
+            True,
+        ),
+        # On pypdf's text the line under is only the bracket.
+        (HOUSE_PYPDF_TEXT.replace("(45)", "Other Street (45)"), True),
+    ],
+    ids=["pdfplumber-other-street", "pypdf-other-street", "pypdf-text-before-house"],
+)
+def test_a_house_number_line_still_needs_the_address(
+    pdf_text: str, exact: bool
+) -> None:
+    assert (
+        verify_address(pdf_text, HOUSE_PROJECT, exact_line_under=exact)
+        is SkipReason.ADDRESS_MISMATCH
+    )
+
+
+def test_the_line_after_the_address_is_not_read_without_a_house_line() -> None:
+    # pypdf's line after the address is "Supervisor: <name>"; a non-ASCII name
+    # there must not change the normal layout's result (review, 11 Nov 2026).
+    text = PYPDF_TEXT.replace("Supervisor:", "Supervisor: Zoë Example")
+    assert verify_address(text, PROJECT, exact_line_under=True) is None
