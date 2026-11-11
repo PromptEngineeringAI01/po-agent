@@ -209,12 +209,14 @@ def test_repo_live_config_loads_as_the_live_profile():
     assert config.title_rule == "live-b1-title"
     assert config.duplicate_ignores_cancelled is False
     # Committed disabled, switched on for the G.5 spike (decisions, 10 Nov
-    # 2026, G.5), then off after G.7's first run stopped at W2 (decisions,
-    # 11 Nov 2026, G.7 first run).
-    assert config.enabled is False
+    # 2026, G.5), off after G.7's first run stopped at W2, on again with the
+    # document Type fix (decisions, 11 Nov 2026, live document Type).
+    assert config.enabled is True
     assert config.max_notes_per_run == 1  # the watched runs (G.7)
     assert config.stale_read == "my_notes"  # decisions, 10 Nov 2026, My Notes
-    assert config.project_document_type == "Client Documents"
+    # Live's project Documents tab shows Type Purchase Order, as on test
+    # (G.7's first run; decisions, 11 Nov 2026, live document Type).
+    assert config.project_document_type == "Purchase Order"
 
 
 def test_the_test_profile_keeps_its_own_values():

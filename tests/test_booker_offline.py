@@ -739,8 +739,9 @@ def test_after_submit_a_wrong_value_is_an_accuracy_breach(
 @pytest.mark.parametrize(
     ("document_type", "documents", "passes"),
     [
-        # Live files a PO Documents upload as Client Documents (Joey's
-        # screenshot, 10 Nov 2026; decisions, 10 Nov 2026, live profile).
+        # The Type is a profile value; any value other than the row's fails.
+        # Live turned out to show Purchase Order too (decisions, 11 Nov 2026,
+        # live document Type); these cases keep testing the profile value.
         ("Client Documents", (("Client Documents", FILE),), True),
         ("Client Documents", (PO_ROW,), False),
         ("Purchase Order", (("Client Documents", FILE),), False),
