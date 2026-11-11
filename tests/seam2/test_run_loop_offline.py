@@ -7,7 +7,7 @@ by seam 1's `text_pdf` (no committed PDF). The fake keeps each Note's
 assignee, so a test can check where every Note ends.
 
 `po-agent run --site test --decide-only` reads the Note Pool once, takes the
-eligible Notes oldest first by Note ID, up to `max_notes_per_run`, and for
+eligible Notes newest first by Note ID, up to `max_notes_per_run`, and for
 each: find it (reload, exact ID) -> its assignee is the pool -> take -> 2a ->
 attachments -> download -> decide -> back to the pool -> one NOTE line.
 Nothing is booked. An error while the agent holds a Note -> one return in a
@@ -479,8 +479,10 @@ def opened(fake: FakeMySys) -> list[str]:
 # --- the loop ----------------------------------------------------------------
 
 
-def test_eligible_notes_go_oldest_first_up_to_the_cap_from_one_list_read(mysys, capsys):
-    # List order is newest first; 99998 is the oldest (a number, not text).
+def test_eligible_notes_go_newest_first_up_to_the_cap_from_one_list_read(mysys, capsys):
+    # Newest first (decisions, 10 Nov 2026, newest first): an old Note that
+    # always skips can't take every run's cap. 99998 is the oldest (a
+    # number, not text), so it is past the cap of 3.
     fake = mysys(
         {
             "300010": FakeNote("2600010B", names=()),
@@ -489,11 +491,11 @@ def test_eligible_notes_go_oldest_first_up_to_the_cap_from_one_list_read(mysys, 
             "99998": FakeNote("2600998B", names=()),
         },
         rows=(
-            row("300010", "2600010B"),
+            row("99998", "2600998B"),
+            row("300001", "2600001B"),
             row("300007", "2600007B", assignee=PERSON),  # not eligible
             row("300002", "2600002B"),
-            row("300001", "2600001B"),
-            row("99998", "2600998B"),
+            row("300010", "2600010B"),
         ),
     )
 
@@ -502,17 +504,17 @@ def test_eligible_notes_go_oldest_first_up_to_the_cap_from_one_list_read(mysys, 
     lines = output(capsys)
     assert code == 0
     assert fake.reads == 1
-    assert opened(fake) == ["99998", "300001", "300002"]
+    assert opened(fake) == ["300010", "300002", "300001"]
     # Past the cap and not eligible: never opened, never taken.
-    assert not [c for c in fake.calls if "300010" in c or "300007" in c]
-    assert fake.notes["300010"].taken == 0
+    assert not [c for c in fake.calls if "99998" in c or "300007" in c]
+    assert fake.notes["99998"].taken == 0
     # Each processed Note taken once and back in the pool.
     assert Counter(n for n, v in fake.notes.items() if v.taken) == Counter(
-        ["99998", "300001", "300002"]
+        ["300010", "300002", "300001"]
     )
     assert all(v.taken <= 1 for v in fake.notes.values())
     assert all(v.assignee == POOL for v in fake.notes.values())
-    assert [n["note_id"] for n in notes_of(lines)] == ["99998", "300001", "300002"]
+    assert [n["note_id"] for n in notes_of(lines)] == ["300010", "300002", "300001"]
     summary = summary_of(lines)
     assert summary["mode"] == "decide-only"
     assert (summary["seen"], summary["eligible"]) == (5, 4)
@@ -522,9 +524,9 @@ def test_eligible_notes_go_oldest_first_up_to_the_cap_from_one_list_read(mysys, 
 def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
     fake = mysys(
         {
-            "300001": FakeNote("2600001B"),
+            "300003": FakeNote("2600001B"),
             "300002": FakeNote("2600002B", names=()),
-            "300003": FakeNote("2600003B", linked=True),
+            "300001": FakeNote("2600003B", linked=True),
         }
     )
 
@@ -535,7 +537,7 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
     zero = {"field": None, "task_id": None, "tokens_in": 0, "tokens_out": 0}
     assert notes_of(lines) == [
         {
-            "note_id": "300001",
+            "note_id": "300003",
             "outcome": "skipped",
             "reason": "DECIDE_ONLY",
             "po_number": "2600001B/048",
@@ -553,7 +555,7 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
             **zero,
         },
         {
-            "note_id": "300003",
+            "note_id": "300001",
             "outcome": "skipped",
             "reason": "NOTE_ALREADY_LINKED",
             "po_number": "2600003B/048",
@@ -569,7 +571,7 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
         n: [c.split()[0] for c in fake.calls if c.endswith(f" {n}")] for n in fake.notes
     }
     assert per_note == {
-        "300001": [
+        "300003": [
             "find_again",
             "assignee",
             "take",
@@ -593,7 +595,7 @@ def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):
             "assignee",
             "return",
         ],
-        "300003": [
+        "300001": [
             "find_again",
             "assignee",
             "take",
@@ -636,8 +638,8 @@ def test_a_note_a_person_holds_is_never_taken(mysys, capsys):
 def test_a_note_a_person_takes_mid_run_is_not_returned(mysys, capsys, during):
     fake = mysys(
         {
-            "300001": FakeNote("2600001B", person_takes_at=during),
-            "300002": FakeNote("2600002B", names=()),
+            "300002": FakeNote("2600001B", person_takes_at=during),
+            "300001": FakeNote("2600002B", names=()),
         }
     )
 
@@ -645,12 +647,12 @@ def test_a_note_a_person_takes_mid_run_is_not_returned(mysys, capsys, during):
 
     lines = output(capsys)
     assert code == 0
-    assert "return 300001" not in fake.calls
-    assert fake.notes["300001"].assignee == PERSON
-    assert fake.notes["300002"].assignee == POOL  # the run goes on
+    assert "return 300002" not in fake.calls
+    assert fake.notes["300002"].assignee == PERSON
+    assert fake.notes["300001"].assignee == POOL  # the run goes on
     first, _ = notes_of(lines)
     assert (first["note_id"], first["outcome"], first["reason"]) == (
-        "300001",
+        "300002",
         "untouched",
         "NOTE_TAKEN",
     )
@@ -672,27 +674,27 @@ WRONG_PROJECT = CLEAN.lookup.model_copy(update={"project_internal_no": "2600009B
 def test_an_unexpected_screen_returns_the_note_in_a_fresh_context_then_stops(
     mysys, capsys, failing
 ):
-    fake = mysys({"300001": failing, "300002": FakeNote("2600002B", names=())})
+    fake = mysys({"300002": failing, "300001": FakeNote("2600002B", names=())})
 
     code = decide_only()
 
     lines = output(capsys)
     assert code == 1
-    assert "300002" not in opened(fake)  # the run stopped
+    assert "300001" not in opened(fake)  # the run stopped
     # The old browser closed, then one return through the normal path.
     after = fake.calls[fake.calls.index("closed") :]
     assert after == [
         "closed",
         "open_browser",
-        "find_again 300001",
-        "assignee 300001",
-        "return 300001",
+        "find_again 300002",
+        "assignee 300002",
+        "return 300002",
         "closed",
     ]
-    assert fake.notes["300001"].assignee == POOL
+    assert fake.notes["300002"].assignee == POOL
     assert notes_of(lines) == []
     ((kind, alert),) = alerts_of(lines)
-    assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300001")
+    assert (kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300002")
     summary = summary_of(lines)
     assert (summary["exit_code"], summary["booked"]) == (1, 0)
 
@@ -771,10 +773,10 @@ def test_detailed_log_has_the_skips_and_one_traceback_per_error(
 ):
     mysys(
         {
-            "300001": FakeNote("2600001B", names=()),
+            "300002": FakeNote("2600001B", names=()),
             # Fails at the download: the fake PDF is 2600001B's, so this
             # Note would skip PO_MISMATCH before any project lookup.
-            "300002": FakeNote("2600002B", fail_at="download"),
+            "300001": FakeNote("2600002B", fail_at="download"),
         }
     )
 
@@ -787,8 +789,8 @@ def test_detailed_log_has_the_skips_and_one_traceback_per_error(
     named = [
         (e["event"], e["note_id"], e.get("reason") or e.get("type")) for e in events
     ]
-    assert ("skip", "300001", "NO_PDF") in named
-    assert ("error", "300002", "UnexpectedScreen") in named
+    assert ("skip", "300002", "NO_PDF") in named
+    assert ("error", "300001", "UnexpectedScreen") in named
     assert [e["event"] for e in events].count("traceback") == 1
 
 
@@ -840,8 +842,8 @@ def calls_for(fake: FakeMySys, note_id: str) -> list[str]:
 def test_run_books_a_proceed_w1_to_w5_and_returns_a_skip(mysys, capsys):
     fake = mysys(
         {
-            "300001": FakeNote("2600001B"),  # PROCEED
-            "300002": FakeNote("2600002B", names=()),  # NO_PDF
+            "300002": FakeNote("2600001B"),  # PROCEED
+            "300001": FakeNote("2600002B", names=()),  # NO_PDF
         }
     )
 
@@ -849,7 +851,7 @@ def test_run_books_a_proceed_w1_to_w5_and_returns_a_skip(mysys, capsys):
 
     lines = output(capsys)
     assert code == 0
-    assert calls_for(fake, "300001") == [
+    assert calls_for(fake, "300002") == [
         "find_again",
         "assignee",
         "take",
@@ -861,14 +863,14 @@ def test_run_books_a_proceed_w1_to_w5_and_returns_a_skip(mysys, capsys):
         *W1_TO_W5,
     ]
     # Booked: never returned (the Note is linked and Solved, with the agent).
-    assert "return 300001" not in fake.calls
-    assert fake.notes["300001"].assignee == AGENT
-    assert fake.notes["300002"].assignee == POOL
+    assert "return 300002" not in fake.calls
+    assert fake.notes["300002"].assignee == AGENT
+    assert fake.notes["300001"].assignee == POOL
     assert "context_closed" not in fake.calls
     zero = {"field": None, "tokens_in": 0, "tokens_out": 0, "cost_aud": 0.0}
     booked, skipped = notes_of(lines)
     assert booked == {
-        "note_id": "300001",
+        "note_id": "300002",
         "outcome": "booked",
         "reason": None,
         "po_number": "2600001B/048",
@@ -877,7 +879,7 @@ def test_run_books_a_proceed_w1_to_w5_and_returns_a_skip(mysys, capsys):
         **zero,
     }
     assert (skipped["note_id"], skipped["outcome"], skipped["reason"]) == (
-        "300002",
+        "300001",
         "skipped",
         "NO_PDF",
     )
@@ -961,8 +963,8 @@ def test_a_note_taken_at_the_w1_check_is_untouched_and_the_next_runs_in_a_new_co
     fake = mysys(
         {
             # A person takes it while the project is read (step 10).
-            "300001": FakeNote("2600001B", person_takes_at="lookup"),
-            "300002": FakeNote("2600002B", names=()),
+            "300002": FakeNote("2600001B", person_takes_at="lookup"),
+            "300001": FakeNote("2600002B", names=()),
         }
     )
 
@@ -970,27 +972,27 @@ def test_a_note_taken_at_the_w1_check_is_untouched_and_the_next_runs_in_a_new_co
 
     lines = output(capsys)
     assert code == 0
-    # Nothing written for 300001, and it stays with the person.
-    assert calls_for(fake, "300001")[-2:] == ["lookup", "check"]
-    assert "return 300001" not in fake.calls
-    assert fake.notes["300001"].assignee == PERSON
+    # Nothing written for 300002, and it stays with the person.
+    assert calls_for(fake, "300002")[-2:] == ["lookup", "check"]
+    assert "return 300002" not in fake.calls
+    assert fake.notes["300002"].assignee == PERSON
     # Its browser context closed, then a fresh one for the next Note. The
     # sync API holds one browser per thread, so the old one closes first.
-    checked = fake.calls.index("check 300001")
+    checked = fake.calls.index("check 300002")
     assert fake.calls[checked + 1 : checked + 4] == [
         "context_closed",
         "closed",
         "open_browser",
     ]
-    assert fake.calls.index("find_again 300002") > checked + 3
-    assert fake.notes["300002"].assignee == POOL
+    assert fake.calls.index("find_again 300001") > checked + 3
+    assert fake.notes["300001"].assignee == POOL
     first, second = notes_of(lines)
     assert (first["note_id"], first["outcome"], first["reason"]) == (
-        "300001",
+        "300002",
         "untouched",
         "NOTE_TAKEN",
     )
-    assert (second["note_id"], second["reason"]) == ("300002", "NO_PDF")
+    assert (second["note_id"], second["reason"]) == ("300001", "NO_PDF")
     assert alerts_of(lines) == []
     summary = summary_of(lines)
     assert (summary["booked"], summary["skipped"], summary["exit_code"]) == (0, 1, 0)
@@ -1006,8 +1008,8 @@ def test_a_kill_switch_at_w1_or_w2_returns_the_note_in_a_fresh_context_and_exits
 ):
     fake = mysys(
         {
-            "300001": FakeNote("2600001B", kill_at=kill_at),
-            "300002": FakeNote("2600002B", names=()),
+            "300002": FakeNote("2600001B", kill_at=kill_at),
+            "300001": FakeNote("2600002B", names=()),
         }
     )
 
@@ -1015,19 +1017,19 @@ def test_a_kill_switch_at_w1_or_w2_returns_the_note_in_a_fresh_context_and_exits
 
     lines = output(capsys)
     assert code == 0
-    assert "submit 300001" not in fake.calls
+    assert "submit 300002" not in fake.calls
     assert ("context_closed" in fake.calls) is closed_by_booker
     after = fake.calls[fake.calls.index("closed") :]
     assert after == [
         "closed",
         "open_browser",
-        "find_again 300001",
-        "assignee 300001",
-        "return 300001",
+        "find_again 300002",
+        "assignee 300002",
+        "return 300002",
         "closed",
     ]
-    assert fake.notes["300001"].assignee == POOL
-    assert "300002" not in opened(fake)
+    assert fake.notes["300002"].assignee == POOL
+    assert "300001" not in opened(fake)
     assert "INFO  kill switch on: run stopped" in lines
     assert alerts_of(lines) == []
     assert notes_of(lines) == []
@@ -1038,8 +1040,8 @@ def test_write_not_started_returns_the_note_in_a_fresh_context_and_stops(mysys, 
     # The Create New Task form not filled as read back (W1): nothing submitted.
     fake = mysys(
         {
-            "300001": FakeNote("2600001B", fail_at="fill"),
-            "300002": FakeNote("2600002B", names=()),
+            "300002": FakeNote("2600001B", fail_at="fill"),
+            "300001": FakeNote("2600002B", names=()),
         }
     )
 
@@ -1047,23 +1049,23 @@ def test_write_not_started_returns_the_note_in_a_fresh_context_and_stops(mysys, 
 
     lines = output(capsys)
     assert code == 1
-    assert "submit 300001" not in fake.calls
+    assert "submit 300002" not in fake.calls
     after = fake.calls[fake.calls.index("context_closed") :]
     assert after == [
         "context_closed",
         "closed",
         "open_browser",
-        "find_again 300001",
-        "assignee 300001",
-        "return 300001",
+        "find_again 300002",
+        "assignee 300002",
+        "return 300002",
         "closed",
     ]
-    assert fake.notes["300001"].assignee == POOL
-    assert "300002" not in opened(fake)
+    assert fake.notes["300002"].assignee == POOL
+    assert "300001" not in opened(fake)
     ((kind, alert),) = alerts_of(lines)
     assert (kind, alert["note_id"], alert["step"]) == (
         "UNEXPECTED_SCREEN",
-        "300001",
+        "300002",
         "W1",
     )
     summary = summary_of(lines)
@@ -1103,8 +1105,8 @@ def test_from_the_submit_click_on_the_note_is_never_returned_and_the_run_stops(
 ):
     fake = mysys(
         {
-            "300001": FakeNote("2600001B", **changes),
-            "300002": FakeNote("2600002B", names=()),
+            "300002": FakeNote("2600001B", **changes),
+            "300001": FakeNote("2600002B", names=()),
         }
     )
 
@@ -1112,14 +1114,14 @@ def test_from_the_submit_click_on_the_note_is_never_returned_and_the_run_stops(
 
     lines = output(capsys)
     assert code == exit_code
-    assert "submit 300001" in fake.calls
+    assert "submit 300002" in fake.calls
     # No return attempted: no fresh browser, no Assign back to the pool.
     assert fake.calls.count("open_browser") == 1
     assert not [c for c in fake.calls if c.startswith("return")]
-    assert fake.notes["300001"].assignee in (AGENT, PERSON)
-    assert "300002" not in opened(fake)  # the run stopped
+    assert fake.notes["300002"].assignee in (AGENT, PERSON)
+    assert "300001" not in opened(fake)  # the run stopped
     ((alert_kind, alert),) = alerts_of(lines)
-    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300001", step)
+    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300002", step)
     assert notes_of(lines) == []
     summary = summary_of(lines)
     assert (summary["booked"], summary["partial"]) == (0, 1)
@@ -1177,8 +1179,8 @@ def test_when_every_eligible_note_would_be_unexpected_screen_the_first_alerts(
     # can't skip every Note quietly: one ALERT, exit 1, the next Note untouched.
     fake = mysys(
         {
-            "300001": FakeNote("2600001B", fail_at="download"),
-            "300002": FakeNote("2600002B", fail_at="download"),
+            "300002": FakeNote("2600001B", fail_at="download"),
+            "300001": FakeNote("2600002B", fail_at="download"),
         }
     )
 
@@ -1186,9 +1188,9 @@ def test_when_every_eligible_note_would_be_unexpected_screen_the_first_alerts(
 
     lines = output(capsys)
     assert code == 1
-    assert opened(fake) == ["300001"]
+    assert opened(fake) == ["300002"]
     assert [(kind, alert["note_id"]) for kind, alert in alerts_of(lines)] == [
-        ("UNEXPECTED_SCREEN", "300001")
+        ("UNEXPECTED_SCREEN", "300002")
     ]
     assert summary_of(lines)["exit_code"] == 1
 
@@ -1196,8 +1198,8 @@ def test_when_every_eligible_note_would_be_unexpected_screen_the_first_alerts(
 def test_one_booked_then_one_unexpected_screen_still_alerts(mysys, capsys):
     fake = mysys(
         {
-            "300001": FakeNote("2600001B"),  # PROCEED: booked
-            "300002": FakeNote("2600002B", fail_at="download"),
+            "300002": FakeNote("2600001B"),  # PROCEED: booked
+            "300001": FakeNote("2600002B", fail_at="download"),
         }
     )
 
@@ -1207,9 +1209,9 @@ def test_one_booked_then_one_unexpected_screen_still_alerts(mysys, capsys):
     assert code == 1
     assert [n["outcome"] for n in notes_of(lines)] == ["booked"]
     assert [(kind, alert["note_id"]) for kind, alert in alerts_of(lines)] == [
-        ("UNEXPECTED_SCREEN", "300002")
+        ("UNEXPECTED_SCREEN", "300001")
     ]
-    assert fake.notes["300002"].assignee == POOL
+    assert fake.notes["300001"].assignee == POOL
     summary = summary_of(lines)
     assert (summary["booked"], summary["exit_code"]) == (1, 1)
 

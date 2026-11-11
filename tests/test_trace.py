@@ -134,10 +134,10 @@ def test_a_run_traces_only_allowlisted_fields_and_no_page_value(
 ):
     mysys(
         {
-            "300001": FakeNote("2600001B"),  # PROCEED -> DECIDE_ONLY
+            "300002": FakeNote("2600001B"),  # PROCEED -> DECIDE_ONLY
             # The error's message quotes the address, the Note body and PDF
             # text; the Note is taken, so it is returned, then the run stops.
-            "300002": FakeNote("2600002B", fail_at="names", fail_with=LeakyError),
+            "300001": FakeNote("2600002B", fail_at="names", fail_with=LeakyError),
         }
     )
 
@@ -157,11 +157,11 @@ def test_a_run_traces_only_allowlisted_fields_and_no_page_value(
     assert all(e["ts"].endswith("+00:00") for e in events)
     assert all(type(e["duration_ms"]) is int and e["duration_ms"] >= 0 for e in events)
     steps = named(events)
-    assert ("300001", "2", "assignee_check", "pass") in steps
-    assert ("300001", "decide", "decision", "DECIDE_ONLY") in steps
-    assert ("300002", None, "error", "LeakyError") in steps
+    assert ("300002", "2", "assignee_check", "pass") in steps
+    assert ("300002", "decide", "decision", "DECIDE_ONLY") in steps
+    assert ("300001", None, "error", "LeakyError") in steps
     # The run's last event: how it ended, as reported.
-    assert steps[-1] == ("300002", None, "run_end", "UnexpectedScreen")
+    assert steps[-1] == ("300001", None, "run_end", "UnexpectedScreen")
 
 
 def test_a_partial_write_is_traced_with_its_step(mysys, capsys, tmp_path):
