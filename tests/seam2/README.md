@@ -28,6 +28,7 @@ runs leave the reset state as they found it, so they run back to back.
 | 8 | `uv run pytest tests/seam2 -m testsite -k test_booker_w3` | reset |
 | 9 | `uv run pytest tests/seam2 -m testsite -k test_booker_w4_w5` | reset |
 | 10 | `uv run pytest tests/seam2 -m testsite -k test_run_book` | reset |
+| 10a | `uv run pytest tests/seam2 -m testsite -k test_hold_read` | - (read only, any state; after run 10 the 3 bookings read held) |
 | 11 | `uv run pytest tests/seam2 -m testsite -k "test_run_book and fresh_copy"` | Joey places a fresh copy of the 2609034B Note and a non-`/048` Note in the Agent Pool |
 | 12 | `uv run pytest tests/seam2 -m testsite -k test_safety` | reset, leaving run 11's non-`/048` Note in the Agent Pool |
 
@@ -38,6 +39,7 @@ Notes:
 - `-k` matches test and module names as substrings, so each name keeps its
   `test_` prefix: plain `-k reads` would also pick up tests whose names
   contain "reads" in other files.
+- Run 10a (`test_hold_read.py`, decisions 11 Nov 2026, hold re-check) re-reads every Compaction Test task on the 3 trial projects the way a run's hold re-check does: each reads held, Cancelled or not held as its Status says, and a task the project hasn't got reads not found. It only reads.
 - Run 10 books the 3 trial POs and reruns; its second test skips until the
   Notes for run 11 are in place. Run 11 checks the `DUPLICATE_TASK` skip and
   that a non-`/048` Note is untouched (S5).
