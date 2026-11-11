@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 11 Nov 2026, G.7 first run stopped at W2; live switched off)
+# PO Agent - decision log (updated 11 Nov 2026, live document Type Purchase Order; live on again)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -48,6 +48,17 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **10 Nov 2026: eligible Notes newest first** (Joey: "A"; entry below): an old Note that always skips no longer takes every run's cap.
 - **11 Nov 2026: G.6 passed; G.7 live `run`, one PO, watched** (entry below).
 - **11 Nov 2026: G.7's first run stopped at W2's document Type; live switched off** (entry below).
+- **11 Nov 2026: live document Type is Purchase Order; live on again** (Joey; entry below).
+
+## 11 Nov 2026 - Live document Type is Purchase Order; live on again (Joey; changes what the agent checks in MySys)
+
+- **What Joey saw (after G.7's first run, run 20261111T024815Z-3f4d):** the project's Documents tab on live has the same columns as on test (checkbox, Type, File, Document, Note, Creator, Create Date). The new task's section has exactly one row: Type **Purchase Order**, File the Note's PDF, Document Purchase Order, Creator the agent. So the booking was right and W2's expected value was wrong: the 10 Nov answer "Client Documents" (live profile entry, W2's document read-back) came from the task's own Documents tab, not the project's.
+- **Decision:** `project_document_type = "Purchase Order"` in `config/live.toml`, the same as test. The profile value and the rest of W2's check (exactly one row, File starting with the PDF's name) are unchanged; no code change (code freeze).
+- **Live on again (Joey: fix and switch on in one PR):** `enabled = true` in `config/live.toml`. Merged only after Joey has finished that run's Note by hand (W3 Hold, W4 link, W5 Solved), since the stale-Note stop would stop every live run until then. Then Joey moves the `production` tag to the merge commit and reruns G.7 (one PO, watched; same trace check).
+- **Tests (Must never #8):** the live profile test expects Purchase Order and `enabled = true`; the booker's offline Type cases keep testing the profile value, with a corrected comment (`test:` commit).
+- **No seam 2:** the test profile is unchanged; the proof is the next watched live run.
+- **Loosens?** Yes, the kill switch goes back on, after the cause is fixed, as the G.7 entry's stop rule says.
+- Carried in: `SPEC.md` v1.38 (live profile values, W2 document check, Production live answers), `docs/screen-map.md` (open question 9), `docs/ops-runbook.md` (checking a booked task).
 
 ## 11 Nov 2026 - G.7's first run stopped at W2's document Type; live switched off (G.7 entry's stop rule)
 
