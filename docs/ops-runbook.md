@@ -41,7 +41,7 @@ ALERT PARTIAL_WRITE {"note_id": "<note_id>", "step": "W3", "detail": "task not h
 - `step` says how far it got. `W1` fills the Create New Task form; `W2` is the **Submit** click and its checks; `W3` is Hold; `W4` is Link to Project; `W5` is Solved. **From W2 on, the task may exist in MySys.**
 - `detail` is a fixed sentence from the code, never page text.
 
-**Exit codes:** 0 run finished (bookings and skips are normal) · 1 run stopped (unexpected screen, Note Pool more pages, failed write, partial write, guard refusal, or killed at the time limit) · 2 config, secrets, login or wrapper setup problem · 3 accuracy breach.
+**Exit codes:** 0 run finished (bookings and skips are normal; a `HOLD_LOST` alert also exits 0) · 1 run stopped (unexpected screen, Note Pool more pages, failed write, partial write, guard refusal, or killed at the time limit) · 2 config, secrets, login or wrapper setup problem · 3 accuracy breach.
 
 **First steps for any alert:**
 
@@ -193,6 +193,14 @@ The username works the same way with `mysys_live_username`. For the test site, u
 - **Means:** the Note Pool's list has a second page, which the agent never reads, so it stopped before taking any Note. The detail is "Note Pool has more pages: stale-Note read incomplete" (test: the check of all Pending Notes, any pool or user), "My Notes has more pages: stale-Note read incomplete" (live: the agent's own My Notes tab, so the agent holds more Pending Notes than fit on one page) or "Note Pool has more pages: page 2 not read" (the PO Allocation Pool + Locked list is over one page, 50). On live a My Notes row already stops the run as `UNEXPECTED_SCREEN`, so the My Notes detail is rare.
 - **In MySys:** nothing to undo. The count of Pending Notes has to come down below one page. Which Notes to deal with first is Joey's call.
 - **Restart:** every run stops with this alert until the count is down; then the next run goes on by itself. If it will take more than a day, stop the agent (3.1) to save the hourly alerts.
+- **Told:** Joey (automatic).
+
+### HOLD_LOST (exit 0: the run goes on)
+
+- **Means:** at the start of a run, before taking any Note, the agent re-read a Compaction Test task it booked today or on the previous working day, and the task is no longer On Hold (decisions, 11 Nov 2026, hold re-check). The detail is "booked task not on hold" (the task's row has no **Un-Hold**, or its Status doesn't start "On-hold": on 11 Nov 2026 a live task was found back at "New Project" with the **Hold** button and no Un-Hold in any log) or "booked task not found" (the project no longer matches the internal number, or the task isn't on it). The agent only read: it changed nothing. A Cancelled task never alerts. The `note_id` is the booked Note's.
+- **Find the task:** on the Mac Mini as `poagent`, `grep '"note_id": "<note_id>"' ~/Library/Logs/po-agent/runs.log` gives the Note's `"outcome": "booked"` line with its `pln` and `task_id` (or `grep '"name":"booked"' ~/Library/Logs/po-agent/trace/<YYYY-MM-DD>.jsonl` for that day's bookings). Open project `<pln>` (3.3), Tasks tab, and find `<task_id>`.
+- **In MySys:** if the project's **Log** shows a person un-held it on purpose (the builder called up), there is nothing to do. Otherwise hold it again by hand as in 3.5 step 3, with your own account, and tell Joey: it may be the silent release seen on 11 Nov 2026, whose cause Joey is asking the MySys admin. "Not found": look for the task on the project (3.3) and tell Joey; never create one.
+- **Restart:** nothing stopped. Each run alerts again while the task is not held and was booked today or on the previous working day; then the re-check no longer reads it. In the issue comment, give only the run_id and what you did (on live no pln or task number: the repository is public).
 - **Told:** Joey (automatic).
 
 ### LOGIN_FAILED (exit 2)
