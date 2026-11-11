@@ -54,6 +54,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Unchanged:** the run cap is checked before each Note; the time cap; the Note Pool list is read once per run, page 1 only.
 - **Two Notes for one PO:** still "the first one processed is booked; any other copy skips `DUPLICATE_TASK`". The first processed is now the newest copy; an older copy, processed after it in the same run or in a later run, finds the task and skips. The rule doesn't depend on the order.
 - **Tests (Must never #8):** the order test now expects newest first; every other offline test that relied on oldest first has its Note IDs reversed, so each Note keeps its place in the order and the test its meaning (`test:` commit). The seam-2 tests don't depend on the order.
+- **No seam 2 (Joey: "Skip seam 2", as for the Note body fix):** CLAUDE.md "Done means" #3 is skipped for this PR. Only the order of eligible Notes changes, and it matters only with more eligible Notes than the cap; the proof is the offline tests, then the next live run.
 - **Loosens?** No.
 - Carried in: `SPEC.md` v1.37 (Opening each Note order, Two Notes for one PO), `tasks/plan.md` (4.5's order line).
 
