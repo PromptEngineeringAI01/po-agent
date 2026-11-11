@@ -7,7 +7,8 @@ The agent can't stop that, but it can see it. Every booking writes a
 `booked` event to the safe trace with its pln, task number and internal
 number. At the start of each `run` and `run --decide-only`, before any Note
 is taken, the agent reads the trace files of today and the previous working
-day (Perth), takes the bookings newest first, at most 10, and re-reads each
+day (Perth), takes that site's bookings newest first (test and live share
+the Mac Mini's trace folder), at most 10, and re-reads each
 task's row on its project, read only: Un-Hold plus a Status starting
 "On-hold" is held; Cancelled is a person's choice and not an alert; any
 other state, or the task not found, is `ALERT HOLD_LOST` with the booking's
@@ -33,10 +34,11 @@ from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, Page, sync_playwright
 
 from po_agent import cli
+from po_agent.b1.models import MySysLookup, SearchRow
 from po_agent.core import controls, run, trace
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import booking
+from po_agent.mysys import booking, driver
 
 _spec = importlib.util.spec_from_file_location(
     "seam2_fake_mysys_for_hold_recheck",
@@ -122,13 +124,21 @@ def mysys(env, tmp_path):
     return install
 
 
-def seed(tmp_path: Path, day: date, *bookings: tuple[str, str, str, str]) -> None:
+def seed(
+    tmp_path: Path, day: date, *bookings: tuple[str, str, str, str], site="test"
+) -> None:
     """Writes `booked` events, as an earlier run would, to `day`'s file."""
     trace_dir(tmp_path).parent.mkdir(exist_ok=True)  # as the Mac Mini has it
     log = trace.Trace(SEED_RUN)
     log.start(trace_dir(tmp_path), day)
     for note_id, pln, task_id, internal_no in bookings:
-        log.booked(note_id=note_id, pln=pln, task_id=task_id, internal_no=internal_no)
+        log.booked(
+            note_id=note_id,
+            pln=pln,
+            task_id=task_id,
+            internal_no=internal_no,
+            site=site,
+        )
 
 
 def booked(n: int) -> tuple[str, str, str, str]:
@@ -192,12 +202,13 @@ def test_a_booking_writes_a_booked_event_with_its_pln_task_and_internal_no(
         "W5",
         "pass",
     )
-    assert (event["pln"], event["task_id"], event["internal_no"]) == (
+    assert (event["pln"], event["task_id"], event["internal_no"], event["site"]) == (
         "pln_10001",
         "tsk_200002",
         "2600001B",
+        "test",
     )
-    assert set(event) == KEYS | {"pln", "task_id", "internal_no"}
+    assert set(event) == KEYS | {"pln", "task_id", "internal_no", "site"}
     # Every other event keeps exactly the 7.3 fields.
     assert all(set(e) == KEYS for e in events if e["name"] != "booked")
 
@@ -211,16 +222,18 @@ def test_booked_values_outside_their_closed_type_are_dropped(tmp_path):
         pln="Lot 123 Sample Lane",
         task_id="tsk_200001 | Compaction Test",
         internal_no="2600001B/048 Sampleville",
+        site="Sampleville",
     )
 
     (line,) = (tmp_path / f"{FRIDAY.isoformat()}.jsonl").read_text("utf-8").splitlines()
     event = json.loads(line)
     assert event["name"] == "booked"
     assert "Sample" not in line and "Compaction" not in line
-    assert all(event.get(key) is None for key in ("pln", "task_id", "internal_no"))
+    keys = ("pln", "task_id", "internal_no", "site")
+    assert all(event.get(key) is None for key in keys)
     # A booking missing a value can't be re-checked: it isn't listed.
     log.start(tmp_path, MONDAY)
-    assert log.recent_bookings() == ()
+    assert log.recent_bookings("test") == ()
 
 
 # --- which bookings are re-checked -----------------------------------------------
@@ -240,7 +253,7 @@ def test_recent_bookings_are_today_and_the_previous_working_day_newest_first(
     log = trace.Trace("20261102T020000Z-0001")
     log.start(trace_dir(tmp_path), MONDAY)
 
-    found = log.recent_bookings()
+    found = log.recent_bookings("test")
     assert [b.task_id for b in found] == ["tsk_200004", "tsk_200003", "tsk_200002"]
     first = found[0]
     assert (first.note_id, first.pln, first.internal_no) == (
@@ -257,7 +270,7 @@ def test_on_a_tuesday_the_previous_working_day_is_monday(tmp_path):
     log = trace.Trace("20261103T020000Z-0001")
     log.start(trace_dir(tmp_path), date(2026, 11, 3))
 
-    assert [b.task_id for b in log.recent_bookings()] == ["tsk_200002"]
+    assert [b.task_id for b in log.recent_bookings("test")] == ["tsk_200002"]
 
 
 def test_a_task_booked_twice_in_the_files_is_listed_once(tmp_path):
@@ -267,14 +280,26 @@ def test_a_task_booked_twice_in_the_files_is_listed_once(tmp_path):
     log = trace.Trace("20261102T020000Z-0001")
     log.start(trace_dir(tmp_path), MONDAY)
 
-    assert [b.task_id for b in log.recent_bookings()] == ["tsk_200001"]
+    assert [b.task_id for b in log.recent_bookings("test")] == ["tsk_200001"]
+
+
+def test_only_the_runs_own_sites_bookings_are_listed(tmp_path):
+    # Review finding 1: test and live share the Mac Mini's trace folder.
+    seed(tmp_path, FRIDAY, booked(1), site="live")
+    seed(tmp_path, FRIDAY, booked(2), site="test")
+
+    log = trace.Trace("20261102T020000Z-0001")
+    log.start(trace_dir(tmp_path), MONDAY)
+
+    assert [b.task_id for b in log.recent_bookings("test")] == ["tsk_200002"]
+    assert [b.task_id for b in log.recent_bookings("live")] == ["tsk_200001"]
 
 
 def test_no_trace_folder_lists_no_bookings(tmp_path):
     log = trace.Trace("20261102T020000Z-0001")
     log.start(tmp_path / "missing" / "trace", MONDAY)
 
-    assert log.recent_bookings() == ()
+    assert log.recent_bookings("test") == ()
 
 
 # --- the re-check in a run -------------------------------------------------------
@@ -369,6 +394,18 @@ def test_a_read_that_fails_stops_the_run_before_any_note(mysys, capsys, tmp_path
     assert [kind for kind, _ in alerts_of(lines)] == ["UNEXPECTED_SCREEN"]
     assert "open_note_pool" not in fake.calls
     assert not [c for c in fake.calls if "300002" in c]
+
+
+def test_a_test_run_never_rechecks_a_live_booking(mysys, capsys, tmp_path):
+    seed(tmp_path, FRIDAY, booked(8), site="live")
+    seed(tmp_path, FRIDAY, booked(9))
+    fake = mysys({})
+
+    assert book_run() == 0
+
+    lines = stdout_of(capsys)
+    assert rechecked(fake) == ["tsk_200009"]
+    assert "INFO  hold re-check: 1 checked, 0 not on hold" in lines
 
 
 def test_no_booking_in_the_trace_rechecks_nothing_and_prints_nothing(
@@ -483,3 +520,56 @@ def test_read_hold_reads_the_tasks_own_row(page, task, state):
     project = booking.project_window(page, "pln_10001")
 
     assert booking.read_hold(project, task) == state
+
+
+# --- which project the re-check reads (driver.recheck_hold) ----------------------
+
+
+BOOKED = trace.Booking(
+    note_id="300001", pln="pln_10001", task_id="tsk_200001", internal_no="2600001B"
+)
+
+
+def lookup_of(*plns: str, internal_no: str = "2600001B") -> MySysLookup:
+    return MySysLookup(
+        search_rows=tuple(
+            SearchRow(pln=pln, client_ref_no="2600001B", company="B1 Homes")
+            for pln in plns
+        ),
+        more_pages=False,
+        project_internal_no=internal_no if plns else "",
+    )
+
+
+@pytest.mark.parametrize(
+    ("lookup", "window"),
+    [
+        (lookup_of("pln_10002"), "project"),  # the match is another project
+        (lookup_of(), None),  # no match
+        (lookup_of("pln_10001", "pln_10002"), None),  # ambiguous
+        (lookup_of("pln_10001", internal_no="2600009B"), "project"),
+    ],
+)
+def test_a_project_that_isnt_the_booked_one_is_not_found(monkeypatch, lookup, window):
+    # Review finding 2. Step 8's reads (`_lookup_and_window`) are seam 2's;
+    # here only what recheck_hold makes of their answer.
+    monkeypatch.setattr(driver, "_lookup_and_window", lambda *a, **k: (lookup, window))
+    read = []
+    monkeypatch.setattr(booking, "read_hold", lambda *a: read.append(a) or "on_hold")
+
+    state = driver.recheck_hold(None, None, "url", "user", "pw", BOOKED, "test")
+
+    assert (state, read) == ("not_found", [])
+
+
+def test_the_booked_project_is_read_for_the_task(monkeypatch):
+    monkeypatch.setattr(
+        driver,
+        "_lookup_and_window",
+        lambda *a, **k: (lookup_of("pln_10001"), "project"),
+    )
+    monkeypatch.setattr(booking, "read_hold", lambda project, task: f"{project} {task}")
+
+    state = driver.recheck_hold(None, None, "url", "user", "pw", BOOKED, "test")
+
+    assert state == "project tsk_200001"
