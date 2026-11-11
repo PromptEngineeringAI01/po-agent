@@ -187,7 +187,7 @@ def verify_address(
         return SkipReason.ADDRESS_UNVERIFIABLE
     label_line, under, after = lines
     match = _BLOCK_LOT.fullmatch(label_line)
-    if match is None or _non_ascii_letter(project_address, label_line, under, after):
+    if match is None or _non_ascii_letter(project_address, label_line, under):
         return SkipReason.ADDRESS_UNVERIFIABLE
     rest, under_words = normalise(match.group(2)).split(), normalise(under).split()
     if not rest and not under_words:
@@ -195,6 +195,10 @@ def verify_address(
     address = project.rest.split()
     house = None if rest else _HOUSE_LINE.fullmatch(under)
     if house is not None:
+        # The line after is read only here (pypdf's normal layout has the
+        # Supervisor line there).
+        if _non_ascii_letter(after):
+            return SkipReason.ADDRESS_UNVERIFIABLE
         after_words = normalise(after).split()
         same_house = house.group(2).casefold() == project_house_number(project_address)
         if exact_line_under:
