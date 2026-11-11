@@ -29,6 +29,15 @@ on (a PartialWrite, AccuracyBreach or GuardRefusal with step W2-W5; W2's
 Note is never returned to the pool, where it would look unbooked: its ALERT
 names it, RUN_SUMMARY counts it as partial and the run stops; the stale-Note
 stop holds every later run until Joey clears it (D6).
+
+Hold re-check (decisions, 11 Nov 2026, hold re-check): right after login,
+before the stale-Note read and before any Note, both modes re-read the
+tasks the safe trace says were booked today and on the previous working
+day, newest first, at most HOLD_RECHECK_CAP, read only. A task no longer
+held, or not found, prints ALERT HOLD_LOST with the booking's Note ID and
+the run goes on; Cancelled is not an alert. Each booking writes its trace
+event after W5 for the next runs. No trace, no bookings: nothing is read
+or printed.
 """
 
 import argparse
@@ -63,7 +72,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.runlog import RunLog
 from po_agent.core.secrets import SecretName, mysys_names
-from po_agent.core.trace import Trace
+from po_agent.core.trace import Booking, Trace
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -79,6 +88,12 @@ SUBMITTED_TYPES = (PartialWrite, AccuracyBreach, GuardRefusal)
 # included); any other error that names one of these steps is still a
 # partial write.
 AFTER_W2 = ("W3", "W4", "W5")
+# The hold re-check: tasks read per run, newest first (about 15-20 s each).
+HOLD_RECHECK_CAP = 10
+HOLD_LOST_DETAIL = {
+    "not_on_hold": "booked task not on hold",
+    "not_found": "booked task not found",
+}
 
 
 @dataclass(frozen=True)
@@ -269,6 +284,8 @@ def _note_loop(
             driver.go_home(page, login[0])
             driver.login(guard, page, login[1], login[2])
             output.info("logged in")
+            if trace is not None:
+                _hold_recheck(guard, page, config, login, log, trace.recent_bookings())
             if config.stale_read == "my_notes":
                 # Live: the agent's My Notes, between two reloads, so the
                 # Note Pool opens from a fresh page (decisions, 10 Nov 2026,
@@ -375,6 +392,54 @@ def _note_loop(
     return 0
 
 
+def _hold_recheck(
+    guard: ActionGuard,
+    page: Page,
+    config: Config,
+    login: tuple[str, str, str],
+    log: RunLog,
+    bookings: Sequence[Booking],
+) -> None:
+    """Re-reads each recent booking's task, read only (driver.recheck_hold),
+    then reloads so the Note Pool opens from a fresh page. The reads' guard
+    actions are traced with no Note; each result is a hold_check event under
+    the booking's Note. A read that fails raises, as any read does, before
+    any Note is taken."""
+    if not bookings:
+        return
+    checked = bookings[:HOLD_RECHECK_CAP]
+    lost = 0
+    for booked in checked:
+        state = driver.recheck_hold(guard, page, *login, booked, config.site)
+        held = state not in HOLD_LOST_DETAIL
+        try:
+            log.flush(note_id=None, step="0")
+            log.event("hold_check", note_id=booked.note_id, step="0", ok=held)
+        except OSError:
+            pass  # the ALERT still goes out
+        if not held:
+            lost += 1
+            output.alert(
+                "HOLD_LOST",
+                output.Alert(
+                    note_id=booked.note_id,
+                    step="hold_check",
+                    detail=HOLD_LOST_DETAIL[state],
+                ),
+            )
+    output.info(
+        "hold re-check: {checked} checked, {lost} not on hold",
+        checked=len(checked),
+        lost=lost,
+    )
+    if len(bookings) > len(checked):
+        output.info(
+            "hold re-check cap reached: {left} tasks not checked",
+            left=len(bookings) - len(checked),
+        )
+    driver.reload_home(guard, page, *login)
+
+
 def _po_number(note: EligibleNote) -> str:
     return f"{note.internal_no}/{rules.PO_SUFFIX}"
 
@@ -429,7 +494,14 @@ def _one_note(
             raise
         progress.taken = False  # booked: linked and Solved, never returned
         try:
-            log.flush(note_id=note_id, step="W5")
+            # Flushes W5's guard actions, then the trace's booked event for
+            # the next runs' hold re-check.
+            log.booked(
+                note_id=note_id,
+                pln=decision.pln,
+                task_id=task_no,
+                internal_no=note.internal_no,
+            )
         except OSError:
             pass  # the NOTE line still goes out
         return output.Note(

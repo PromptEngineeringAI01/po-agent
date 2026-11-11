@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 11 Nov 2026, address house-number line)
+# PO Agent - decision log (updated 11 Nov 2026, hold re-check)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -50,6 +50,23 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **11 Nov 2026: G.7's first run stopped at W2's document Type; live switched off** (entry below).
 - **11 Nov 2026: live document Type is Purchase Order; live on again** (Joey; entry below).
 - **11 Nov 2026: address check takes a house-number line and a state inside the MySys address** (Joey: "fix it now"; entry below).
+- **11 Nov 2026: hold re-check** (Joey; entry below): each run re-reads the tasks booked today and on the previous working day and alerts `HOLD_LOST` for one no longer On Hold.
+
+## 11 Nov 2026 - Hold re-check: ALERT HOLD_LOST for a booked task no longer On Hold (Joey; changes what the agent reads and prints)
+
+- **What happened:** in the watched live runs (G.7, tag c45495d) the agent booked three POs; each task was put On Hold at W3 and read back On-hold. Later one of them was back at Status "New Project" with the Hold button. The project Log, the Note's log and the safe trace show nothing touched it after the booking (no Un-Hold entry), so MySys released the hold silently, for a cause not yet known (Joey is asking the MySys admin). Joey held it again by hand. The agent can't stop a silent release, but it can see one, and should before unattended hourly live runs (G.8).
+- **Decision (Joey chose each recommended option):**
+  - **Which tasks:** every booking writes one more safe-trace event, `booked` (step W5, outcome pass), which also holds the task's `pln`, `task_id` and `internal_no`, each a closed identifier type: the same values as the run output's NOTE "booked" line. Every other trace event is unchanged. The run reads them back from the trace; no other source (not My Notes, not `runs.log`).
+  - **How far back:** the trace files of today and the previous working day (Perth; Monday reads Friday's), newest first, each task once, at most 10 per run (about 15-20 s each); more prints `INFO hold re-check cap reached: <n> tasks not checked`.
+  - **When:** in `run` and `run --decide-only`, right after login, before the stale-Note read and before any Note is taken; then a reload. Not in `spike`.
+  - **What it reads (read only):** step 8's reads (reload, Projects search by the internal number, the match rule, the project by its pln link), then the task's own header row and Status in the settled task table (rows 07, 12). Held = **Un-Hold** in its row and a Status starting "On-hold", whatever the hold note (a person may hold it again with another one). **Cancelled is not an alert** (a person's choice). Not held, the task not on the project, or a project that no longer matches the booked pln: `ALERT HOLD_LOST` with the booking's `note_id`, step `hold_check` and a fixed detail ("booked task not on hold" / "booked task not found"); no pln or task number in the line, so the public alert issue carries neither (the wrapper cuts the `note_id` as for every alert).
+  - **What then:** alert only; the run goes on and books as usual (exit 0, unless something else stops it). A person's Un-Hold after a call-up would also alert, so stopping the run could block booking until the task fell out of the window. Each run alerts again while the task is not held and still in the window. A read that fails (a screen not as mapped) is `UNEXPECTED_SCREEN`, exit 1, before any Note, as any read.
+  - **Trace:** each re-check is a `hold_check` event (step 0, the booking's `note_id`, pass or fail); its guard actions are traced with no Note.
+- **No state between runs (assumption 5):** loosened for this read only. A missing or unreadable trace (the laptop, CI) re-checks nothing and prints nothing; nothing is written for it but the trace event.
+- **Never:** no Hold, Un-Hold or other write; no new guard action (every read is one step 8 already uses).
+- **Tests:** offline (`tests/test_hold_recheck.py`: the booked event, which files are read, the run order, the alert, the cap, Cancelled, the read on a local project page) and seam 2 on the test site (`tests/seam2/test_hold_read.py`, read only, any state: each trial task's hold state agrees with its Status, and a task the project hasn't got is not found). `test:` commits first.
+- **Loosens?** No safety control: nothing is written and the run's other checks are unchanged. It adds a read before the Note loop and a new alert kind; it reads the safe trace back, which runs didn't before.
+- Carried in: `SPEC.md` v1.40 (assumption 5, run output contract, Production -> Safe trace), `docs/ops-runbook.md` (HOLD_LOST).
 
 ## 11 Nov 2026 - Address check: a house-number line and a state inside the MySys address (Joey: "fix it now"; changes what the agent decides)
 

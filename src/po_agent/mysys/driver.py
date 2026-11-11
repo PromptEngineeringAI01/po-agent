@@ -23,6 +23,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import (
@@ -52,7 +53,11 @@ from po_agent.core.errors import (
     WriteNotStarted,
 )
 from po_agent.core.runlog import RunLog
+from po_agent.core.trace import Booking
 from po_agent.mysys.guard import ActionGuard
+
+if TYPE_CHECKING:  # booking imports this module
+    from po_agent.mysys.booking import HoldState
 
 LOAD_TIMEOUT_MS = 15_000
 MENU_TRIES = 3
@@ -1159,6 +1164,33 @@ def reopen_project(
     if rules.live_tasks({task.task_no: task.status for task in lookup.tasks}):
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
     return window
+
+
+def recheck_hold(
+    guard: ActionGuard,
+    page: Page,
+    base_url: str,
+    username: str,
+    password: str,
+    booked: Booking,
+    site: Site,
+) -> "HoldState":
+    """The hold re-check of one earlier booking (decisions, 11 Nov 2026,
+    hold re-check), read only: step 8's reads (reload, Projects search by
+    the internal number, the match rule, the project opened by its pln
+    link), then the task's row (booking.read_hold). A project that no longer
+    matches, or matches another pln, is "not_found". A screen not as mapped
+    is UnexpectedScreen, as in every read."""
+    from po_agent.mysys import booking  # booking imports this module
+
+    lookup, window = _lookup_and_window(
+        guard, page, base_url, username, password, booked.internal_no, site
+    )
+    if window is None or check_project(lookup, booked.internal_no, site) != (
+        booked.pln
+    ):
+        return "not_found"
+    return booking.read_hold(window, booked.task_id)
 
 
 def _lookup_and_window(

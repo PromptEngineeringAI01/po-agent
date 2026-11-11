@@ -32,6 +32,8 @@ InfoMessage = Literal[
     "kill switch on: run stopped",
     "outside the run window: run not started",
     "run cap reached: {left} notes left for the next run",
+    "hold re-check: {checked} checked, {lost} not on hold",
+    "hold re-check cap reached: {left} tasks not checked",
     "demo: note found",
     "demo: note taken",
     "demo: attachment downloaded",
@@ -64,6 +66,7 @@ AlertKind = Literal[
     "GUARD_REFUSAL",
     "UNEXPECTED_SCREEN",
     "MORE_PAGES",
+    "HOLD_LOST",
     "LOGIN_FAILED",
     "CONFIG",
 ]

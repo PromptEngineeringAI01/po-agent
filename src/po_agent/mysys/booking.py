@@ -20,6 +20,7 @@ import re
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Literal
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Locator, Page
@@ -1028,3 +1029,30 @@ def check_on_hold(project: Locator, task_id: str) -> None:
     status = rules.compaction_tasks(task_rows(project)).get(task_id, "")
     if not status.startswith("On-hold") or HOLD_NOTE not in status:
         raise PartialWrite("task not on hold")
+
+
+# The hold re-check (decisions, 11 Nov 2026, hold re-check; rows 07, 12)
+
+HoldState = Literal["on_hold", "cancelled", "not_on_hold", "not_found"]
+
+
+def read_hold(project: Locator, task_id: str) -> HoldState:
+    """Read only: the task's row in the settled task table. Status Cancelled
+    is "cancelled" (a person's choice); Un-Hold in its own header row and a
+    Status starting "On-hold" is "on_hold" (whatever the hold note: a person
+    may hold it again by hand); no such task is "not_found"; anything else
+    (the 11 Nov live revert: Hold and "New Project") is "not_on_hold".
+    Nothing is clicked."""
+    status = driver.settled_tasks(project).get(task_id)
+    if status is None:
+        return "not_found"
+    if status == rules.CANCELLED:
+        return "cancelled"
+    un_hold = _task_header(project, task_id).get_by_role(
+        "button", name="Un-Hold", exact=True
+    )
+    try:
+        held = un_hold.count() == 1
+    except PlaywrightError:
+        raise UnexpectedScreen("task row not readable") from None
+    return "on_hold" if held and status.startswith("On-hold") else "not_on_hold"
