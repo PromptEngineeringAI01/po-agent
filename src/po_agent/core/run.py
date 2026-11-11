@@ -32,9 +32,9 @@ stop holds every later run until Joey clears it (D6).
 
 Hold re-check (decisions, 11 Nov 2026, hold re-check): right after login,
 before the stale-Note read and before any Note, both modes re-read the
-tasks the safe trace says were booked today and on the previous working
-day, newest first, at most HOLD_RECHECK_CAP, read only. A task no longer
-held, or not found, prints ALERT HOLD_LOST with the booking's Note ID and
+tasks the safe trace says were booked on this site today and on the
+previous working day, newest first, at most HOLD_RECHECK_CAP, read only. A
+task no longer held, or not found, prints ALERT HOLD_LOST with the booking's Note ID and
 the run goes on; Cancelled is not an alert. Each booking writes its trace
 event after W5 for the next runs. No trace, no bookings: nothing is read
 or printed.
@@ -285,7 +285,8 @@ def _note_loop(
             driver.login(guard, page, login[1], login[2])
             output.info("logged in")
             if trace is not None:
-                _hold_recheck(guard, page, config, login, log, trace.recent_bookings())
+                bookings = trace.recent_bookings(config.site)
+                _hold_recheck(guard, page, config, login, log, bookings)
             if config.stale_read == "my_notes":
                 # Live: the agent's My Notes, between two reloads, so the
                 # Note Pool opens from a fresh page (decisions, 10 Nov 2026,
@@ -501,6 +502,7 @@ def _one_note(
                 pln=decision.pln,
                 task_id=task_no,
                 internal_no=note.internal_no,
+                site=config.site,
             )
         except OSError:
             pass  # the NOTE line still goes out

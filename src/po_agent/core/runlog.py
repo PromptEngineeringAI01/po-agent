@@ -17,8 +17,8 @@ for the error that ends the run), so it also works before a RunLog exists.
 Every event but the traceback also goes to the safe trace (core/trace.py,
 task 7.3), with or without --detailed-log: its name and pass/fail, the skip
 reason or the error type, never more. The one exception is `booked`: the
-trace's booked event also holds the task's pln, task number and internal
-number, for the next runs' hold re-check (decisions, 11 Nov 2026, hold
+trace's booked event also holds the task's pln, task number, internal
+number and site, for the next runs' hold re-check (decisions, 11 Nov 2026, hold
 re-check).
 """
 
@@ -75,18 +75,24 @@ class RunLog:
         names = {key: identifier(value) for key, value in name.items()}
         self._write(event, note_id, step, ok, names)
 
-    def booked(self, *, note_id: str, pln: str, task_id: str, internal_no: str) -> None:
+    def booked(
+        self, *, note_id: str, pln: str, task_id: str, internal_no: str, site: str
+    ) -> None:
         """A booking that passed W5: the run log's "booked" event (with
         --detailed-log) and the trace's booked event, which the next runs'
         hold re-check reads."""
         self.flush(note_id=note_id, step="W5")
         if self.trace is not None:
             self.trace.booked(
-                note_id=note_id, pln=pln, task_id=task_id, internal_no=internal_no
+                note_id=note_id,
+                pln=pln,
+                task_id=task_id,
+                internal_no=internal_no,
+                site=site,
             )
         if self.path is None:
             return
-        ids = {"pln": pln, "task_id": task_id, "internal_no": internal_no}
+        ids = {"pln": pln, "task_id": task_id, "internal_no": internal_no, "site": site}
         names = {key: identifier(value) for key, value in ids.items()}
         _append(self.path, _line(self.run_id, "booked", note_id, "W5", True, names))
 

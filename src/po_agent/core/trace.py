@@ -11,12 +11,13 @@ so page text, a PDF line, an address or a Note body can't be written even if
 code passed one. No traceback, no message, no typed value.
 
 A booking (run mode, after W5) is one `booked` event that also carries the
-task's pln, task number and internal number, each a closed identifier type
+task's pln, task number, internal number and site, each a closed type
 (decisions, 11 Nov 2026, hold re-check): the same values as the run
 output's NOTE line, never more. Every other event has none of the three
-keys. At the start of each run, `recent_bookings()` reads them back from the
-files of today and the previous working day, so the run can re-check that
-each booked task is still On Hold.
+keys. At the start of each run, `recent_bookings(site)` reads that site's
+back from the files of today and the previous working day (test and live
+share the Mac Mini's trace folder), so the run can re-check that each
+booked task is still On Hold.
 
 The day's file is named by the date in the run window's time zone, so one
 working day is one file. At run start, files named <date>.jsonl older than
@@ -29,7 +30,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     AfterValidator,
@@ -78,7 +79,7 @@ _PLN = re.compile(r"pln_[0-9]{1,12}")
 _TASK_ID = re.compile(r"tsk_[0-9]{1,12}")
 _INTERNAL_NO = re.compile(r"[0-9A-Z]{1,16}")
 # The booked event's own keys, written only when set.
-BOOKED_KEYS = frozenset({"pln", "task_id", "internal_no"})
+BOOKED_KEYS = frozenset({"pln", "task_id", "internal_no", "site"})
 
 
 def _one_of(allowed: frozenset[str]):
@@ -112,6 +113,7 @@ Outcome = Annotated[str, AfterValidator(_outcome)]
 Pln = Annotated[str, _matches(_PLN)]
 TaskId = Annotated[str, _matches(_TASK_ID)]
 InternalNo = Annotated[str, _matches(_INTERNAL_NO)]
+Site = Literal["test", "live"]
 
 
 class TraceEvent(BaseModel):
@@ -129,6 +131,7 @@ class TraceEvent(BaseModel):
     pln: Pln | None = None
     task_id: TaskId | None = None
     internal_no: InternalNo | None = None
+    site: Site | None = None
 
     @field_serializer("ts")
     def _iso(self, ts: datetime) -> str:
@@ -146,6 +149,7 @@ _FIELD_TYPES: dict[str, TypeAdapter[str | None]] = {
     "pln": TypeAdapter(Pln | None),
     "task_id": TypeAdapter(TaskId | None),
     "internal_no": TypeAdapter(InternalNo | None),
+    "site": TypeAdapter(Site | None),
 }
 
 
@@ -202,7 +206,7 @@ class Trace:
         outcome: str | None,
         **booked: str,
     ) -> None:
-        """`booked`: the booked event's pln, task_id and internal_no only."""
+        """`booked`: the booked event's pln, task_id, internal_no and site."""
         if self.path is None:
             return
         now = time.monotonic()
@@ -236,7 +240,9 @@ class Trace:
             outcome="pass" if error is None else type(error).__name__,
         )
 
-    def booked(self, *, note_id: str, pln: str, task_id: str, internal_no: str) -> None:
+    def booked(
+        self, *, note_id: str, pln: str, task_id: str, internal_no: str, site: str
+    ) -> None:
         """A booking that passed W5: its task, for the next runs' hold
         re-check. A value outside its closed type is dropped, and a booking
         missing one is never re-checked."""
@@ -248,11 +254,12 @@ class Trace:
             pln=pln,
             task_id=task_id,
             internal_no=internal_no,
+            site=site,
         )
 
-    def recent_bookings(self) -> tuple[Booking, ...]:
-        """The booked events of today's file and the previous working day's
-        (Monday: Friday's), newest first, each task once. No trace, a
+    def recent_bookings(self, site: str) -> tuple[Booking, ...]:
+        """`site`'s booked events in today's file and the previous working
+        day's (Monday: Friday's), newest first, each task once. No trace, a
         missing or unreadable file, or a line that isn't a whole booked
         event: left out, never an error."""
         if self.path is None or self.today is None:
@@ -268,18 +275,18 @@ class Trace:
             except OSError:
                 continue
             for line in reversed(lines):
-                booking = _booking(line)
+                booking = _booking(line, site)
                 if booking is not None and booking.task_id not in found:
                     found[booking.task_id] = booking
         return tuple(found.values())
 
 
-def _booking(line: str) -> Booking | None:
+def _booking(line: str, site: str) -> Booking | None:
     try:
         event = TraceEvent.model_validate_json(line)
     except ValidationError:
         return None
-    if event.name != "booked" or event.outcome != "pass":
+    if event.name != "booked" or event.outcome != "pass" or event.site != site:
         return None
     if None in (event.note_id, event.pln, event.task_id, event.internal_no):
         return None
