@@ -9,7 +9,7 @@ agent_user_name = "Agent 1 (MySys Only)"
 title_rule = "live-b1-title"
 enabled = true                    # kill switch, read from main and from the tagged commit: on again with the document Type fix (decisions, 11 Nov 2026, live document Type); false on main stops the next run
 duplicate_ignores_cancelled = false   # every task status counts on live
-max_notes_per_run = 1             # one watched PO per run (G.7); 10 for hourly runs (G.8), its own PR
+max_notes_per_run = 10            # hourly runs (G.8; decisions, 12 Nov 2026, G.8); the watched G.7 runs took 1
 max_run_minutes = 12
 run_window = { days = "Mon-Fri", start = "07:00", end = "18:00", tz = "Australia/Perth" }
 stale_read = "my_notes"           # live lists 28 pages at All Users and its Assigned User list has no agent: read the agent's own My Notes
