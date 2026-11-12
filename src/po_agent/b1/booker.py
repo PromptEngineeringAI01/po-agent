@@ -8,8 +8,9 @@ click. Every page action goes through the guard.
 
 W1: `before_write(note_id, "W1")` (the assignee check reloads, so step 10's
 project window is gone) -> the project reopened by its pln and checked again
--> Create New Task: Creator, - Compaction Test, PO Number, the PDF to PO
-Documents from memory (D2), Note = the email body -> the full read-back.
+-> Create New Task: Creator, - Compaction Test, PO Number, the PDF to
+Documents from memory (D2; the task's own Client Documents, decisions,
+12 Nov 2026), Note = the email body -> the full read-back.
 Nothing is submitted in W1: any problem once the form is open closes the
 browser context, which abandons the form (the upload is saved only by
 Submit, M0b.2), and is WriteNotStarted.

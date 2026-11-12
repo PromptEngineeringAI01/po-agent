@@ -20,7 +20,7 @@ faked, as in tests/test_assignee_offline.py. The `Proceed` comes from
 - Then: `before_write(note_id, "W1")` -> reopen the project by its pln and
   check it again (the pln the search matches, Client Internal No., the
   settled Compaction Test tasks equal to the Proceed's) -> Create New Task:
-  Creator, - Compaction Test, PO Number, the PDF to PO Documents from memory,
+  Creator, - Compaction Test, PO Number, the PDF to Documents from memory,
   Note = the email body -> the full read-back. Any mismatch is
   WriteNotStarted; once the form is open the browser context is closed.
 - With stop_after="W1" Submit is never pressed.
@@ -31,7 +31,7 @@ faked, as in tests/test_assignee_offline.py. The `Proceed` comes from
   W2. The new task is the one Compaction Test number not in step 10's set;
   its detail screen is opened from its own details row and must name it;
   PO Number, Lodged By, Notes and Task Creator are read there, then back to
-  the project, the new task's Documents section (one Purchase Order row,
+  the project, the new task's Documents section (one Client Documents row,
   the PDF's file), then Tasks. A wrong value is AccuracyBreach; a screen not
   as mapped is PartialWrite.
 - W3 (4.3): `before_write(note_id, "W3")` (no assignee check, D7; a kill
@@ -147,6 +147,9 @@ DETAIL = {
     "notes": CLEAN.note.body,
     "task_creator": "Perth Scheduling",
 }
+# The new task's row in the project's Documents tab: the Documents block's
+# upload is filed as Client Documents (decisions, 12 Nov 2026).
+DOC_ROW = ("Client Documents", FILE)
 PO_ROW = ("Purchase Order", FILE)
 # Row 11: the Hold Task dialog as mapped. `ticked` names the boxes that
 # start ticked besides the reminder: related_0, related_hidden (a row the
@@ -190,7 +193,7 @@ def fake_mysys(
     form_closes: bool = True,
     opens_as: str | None = None,
     detail: dict[str, str] | None = None,
-    documents: tuple[tuple[str, str], ...] | None = (PO_ROW,),
+    documents: tuple[tuple[str, str], ...] | None = (DOC_ROW,),
     documents_buttons: int = 1,
     hold: dict[str, object] | None = None,
 ) -> str:
@@ -208,7 +211,8 @@ def fake_mysys(
     so only the task number tells them apart.
 
     `mangle`: the form changes that one field after the agent sets it
-    (creator, po_number, note), adds a second PO file (po_documents) or
+    (creator, po_number, note), adds a second file to Documents
+    (documents), puts the file in PO Documents too (po_documents) or
     opens with another Sale Office (sale_office).
 
     W3: a new task's Hold opens the Hold Task dialog as mapped (row 11),
@@ -300,9 +304,10 @@ function search(text) {{
   }}, 200);
 }}
 function addDoc(input, area) {{
-  const names = [input.files[0].name];
-  if (area === 'po_docs' && FAKE.mangle === 'po_documents') names.push('2600009B_048_1.pdf');
-  for (const name of names) document.getElementById(area).insertAdjacentHTML('beforeend',
+  const rows = [[area, input.files[0].name]];
+  if (area === 'docs' && FAKE.mangle === 'documents') rows.push(['docs', '2600009B_048_1.pdf']);
+  if (area === 'docs' && FAKE.mangle === 'po_documents') rows.push(['po_docs', input.files[0].name]);
+  for (const [id, name] of rows) document.getElementById(id).insertAdjacentHTML('beforeend',
     '<table><tbody><tr><td>' + name + '</td><td>close</td></tr></tbody></table>');
 }}
 const byId = (id) => document.getElementById(id);
@@ -504,7 +509,7 @@ def run_book(
     note_id: str = NOTE_ID,
     stop_after: str = "W1",
     config_dir: Path = CONFIG_DIR,
-    document_type: str = "Purchase Order",
+    document_type: str = "Client Documents",
 ) -> str | None:
     page, login = served
     gate = controls.Controls(
@@ -563,9 +568,11 @@ def test_w1_checks_the_note_reopens_the_project_and_fills_the_form_without_submi
     assert search.actions_before == [0]
     assert actions(guard) == REOPEN + FILL
     assert page.locator("body").get_attribute("data-submitted") is None
-    # The PDF went to PO Documents, from memory; the Documents area has none.
-    assert page.locator("#po_docs td").first.inner_text() == FILE
-    assert page.locator("#docs table").count() == 0
+    # The PDF went to Documents, from memory (the admin's block, so it shows
+    # in the task's Client Documents; decisions, 12 Nov 2026); PO Documents
+    # has none.
+    assert page.locator("#docs td").first.inner_text() == FILE
+    assert page.locator("#po_docs table").count() == 0
     form = page.locator("#form")
     assert form.locator("select").nth(0).input_value() == "Perth Scheduling"
     assert form.locator("#sub_form input").nth(1).input_value() == "2600001B/048"
@@ -610,7 +617,8 @@ def test_a_read_back_mismatch_closes_the_browser_context_and_does_not_submit(
 
 
 @pytest.mark.parametrize(
-    "field", ["po_number", "note", "po_documents", "creator", "sale_office"]
+    "field",
+    ["po_number", "note", "documents", "po_documents", "creator", "sale_office"],
 )
 def test_each_read_back_mismatch_is_write_not_started_and_never_submits(
     serve, guard, search, field
@@ -706,9 +714,10 @@ def test_after_submit_a_screen_not_as_mapped_is_a_partial_write(
         {"detail": {"task_creator": "Someone Else"}},
         # "No Document Found": the PDF is missing.
         {"documents": ()},
-        {"documents": (PO_ROW, PO_ROW)},
-        {"documents": (("Invoice", FILE),)},
-        {"documents": (("Purchase Order", "2600009B_048_1.pdf"),)},
+        {"documents": (DOC_ROW, DOC_ROW)},
+        # The PO Documents block's Type: the PDF is not in Client Documents.
+        {"documents": (PO_ROW,)},
+        {"documents": (("Client Documents", "2600009B_048_1.pdf"),)},
     ],
     ids=[
         "row-task-creator",
@@ -740,13 +749,13 @@ def test_after_submit_a_wrong_value_is_an_accuracy_breach(
     ("document_type", "documents", "passes"),
     [
         # The Type is a profile value; any value other than the row's fails.
-        # Live turned out to show Purchase Order too (decisions, 11 Nov 2026,
-        # live document Type); these cases keep testing the profile value.
+        # Both sites now expect Client Documents (decisions, 12 Nov 2026);
+        # these cases keep testing the profile value.
         ("Client Documents", (("Client Documents", FILE),), True),
         ("Client Documents", (PO_ROW,), False),
         ("Purchase Order", (("Client Documents", FILE),), False),
     ],
-    ids=["live-type", "test-type-on-live", "live-type-on-test"],
+    ids=["client-documents", "purchase-order-row", "purchase-order-profile"],
 )
 def test_w2_reads_back_the_profiles_document_type(
     serve, guard, search, monkeypatch, document_type, documents, passes

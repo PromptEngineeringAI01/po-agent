@@ -119,7 +119,7 @@ For a Note the agent left after the **Submit** click (step W2 to W5). The goal i
    - **None:** the Submit didn't create one. Return the Note (3.4) and stop here.
    - **More than one:** keep one (the one with every value right) and **Cancel** the others.
    - **One:** go on.
-2. **Check the task** (open it from its details row): PO Number `<internal no>/048`; Task Creator **Perth Scheduling**; **- Compaction Test** the only service ticked; Notes = the Note's body text; and on the project's **Documents** tab, under that task, one row with the Note's PDF, Type **Purchase Order** (on both sites). Fix a wrong value by hand. If you can't, Cancel the task and book it by hand (3.6).
+2. **Check the task** (open it from its details row): PO Number `<internal no>/048`; Task Creator **Perth Scheduling**; **- Compaction Test** the only service ticked; Notes = the Note's body text; the task's own **Documents** tab lists the Note's PDF under **Client Documents**; and on the project's **Documents** tab, under that task, one row with the Note's PDF, Type **Client Documents** (on both sites; tasks booked before 12 Nov 2026 show Purchase Order and no Client Documents). Fix a wrong value by hand. If you can't, Cancel the task and book it by hand (3.6).
 3. **Hold** (if its Status doesn't start "On-hold"): press **Hold** on that task's row. In the "Hold Task: `<task no>`" window, type `ON HOLD UNTIL CALL UP` in Note. Check that no related job is ticked (only this task is held), then press that window's **Hold**. The Status now starts "On-hold" and shows the note.
 4. **Link** (if the Note has no project button showing `<pln>`): open the Note, untick **Send Email Notification**, press **Link to Project**, search `<pln>` and select it. If the Note is linked to a **different** project, use Change Project to put it on `<pln>`.
 5. **Solved** (if the Note isn't Solved): untick **Send Email Notification**, then Status → **Solved**.
@@ -127,7 +127,7 @@ For a Note the agent left after the **Submit** click (step W2 to W5). The goal i
 
 ### 3.6 Book a PO by hand
 
-Only when a task had to be cancelled in 3.5. On project `<pln>`: **Create New Task**. Creator (Client section) = **Perth Scheduling**; tick **- Compaction Test**; PO Number = `<internal no>/048`; upload the Note's PDF to **PO Documents** (not the separate Documents upload); Note = the Note's body text; leave everything else as it is; **Submit**. Then 3.5 steps 3 to 6.
+Only when a task had to be cancelled in 3.5. On project `<pln>`: **Create New Task**. Creator (Client section) = **Perth Scheduling**; tick **- Compaction Test**; PO Number = `<internal no>/048`; upload the Note's PDF to **Documents** (not PO Documents, which never reaches the task's Client Documents; decisions, 12 Nov 2026); Note = the Note's body text; leave everything else as it is; **Submit**. Then 3.5 steps 3 to 6.
 
 ### 3.7 Change the MySys password in the Keychain
 

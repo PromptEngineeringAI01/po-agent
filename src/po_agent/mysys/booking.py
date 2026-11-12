@@ -660,7 +660,9 @@ def fill_task_form(
     data: bytes,
 ) -> None:
     """Step 6 up to Submit: Creator, - Compaction Test, PO Number, the PDF to
-    PO Documents from memory, Note = the email body; then every read-back."""
+    Documents from memory (the admin's block: the task's own Client
+    Documents; decisions, 12 Nov 2026), Note = the email body; then every
+    read-back."""
     guard.act("set_creator", form, _field(form, "Creator", "select"), CREATOR)
     compaction = form.get_by_role("checkbox", name="- Compaction Test", exact=True)
     guard.act("tick_compaction_test", form, compaction)
@@ -668,7 +670,7 @@ def fill_task_form(
     if not _shows(po_box, LOAD_TIMEOUT_MS):
         raise WriteNotStarted("Compaction Test form did not open")
     guard.act("set_po_number", form, po_box, po_number)
-    upload = _field(form, "PO Documents", 'input[type="file"]')
+    upload = _field(form, "Documents", 'input[type="file"]')
     payload = {"name": file_name, "mimeType": "application/pdf", "buffer": data}
     guard.act("upload_document", form, upload, payload)
     guard.act("set_task_note", form, _field(form, "Note", "textarea"), body)
@@ -677,11 +679,11 @@ def fill_task_form(
 
 def check_task_form(form: Locator, po_number: str, body: str, file_name: str) -> None:
     """Row 09 read-back before Submit; any mismatch -> WriteNotStarted."""
-    po_docs = _container(form, "PO Documents", 'input[type="file"]')
-    if not _shows(po_docs.get_by_text(file_name, exact=True), LOAD_TIMEOUT_MS):
-        raise WriteNotStarted("task form not as expected", field="po_documents")
-    # No file row (a header row is not one); not found once is not empty.
     documents = _container(form, "Documents", 'input[type="file"]')
+    if not _shows(documents.get_by_text(file_name, exact=True), LOAD_TIMEOUT_MS):
+        raise WriteNotStarted("task form not as expected", field="documents")
+    # No file row (a header row is not one); not found once is not empty.
+    po_docs = _container(form, "PO Documents", 'input[type="file"]')
     try:
         checks = {
             "creator": _chosen(_field(form, "Creator", "select")) == CREATOR,
@@ -696,9 +698,8 @@ def check_task_form(form: Locator, po_number: str, body: str, file_name: str) ->
             ).input_value()
             == "",
             "po_number": _field(form, "PO Number", "input").input_value() == po_number,
-            "po_documents": po_docs.locator("tr").count() == 1,
-            "documents": documents.count() == 1
-            and documents.locator("td").count() == 0,
+            "documents": documents.locator("tr").count() == 1,
+            "po_documents": po_docs.count() == 1 and po_docs.locator("td").count() == 0,
             "note": _field(form, "Note", "textarea").input_value() == body,
             "sale_office": _chosen(_field(form, "Sale Office", "select")) == OFFICE,
             "po_contact": _chosen(_field(form, "PO Contact", "select")) == NOT_CHOSEN,
@@ -894,8 +895,8 @@ def check_project_document(
 ) -> Locator:
     """Row 19: the project's Documents tab, the section headed by the new
     task number (older tasks have their own copies): exactly one row, Type
-    `document_type` (the profile's: Purchase Order on test, Client Documents
-    on live; decisions, 10 Nov 2026, live profile), File starting with the
+    `document_type` (the profile's: Client Documents on both sites, the
+    Documents block's Type; decisions, 12 Nov 2026), File starting with the
     PDF's file name. No section ->
     PartialWrite; "No Document Found" or any other row -> AccuracyBreach.
     Then the Tasks button, back to the task table for W3; returns the

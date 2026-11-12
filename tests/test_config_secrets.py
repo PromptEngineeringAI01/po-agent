@@ -214,16 +214,16 @@ def test_repo_live_config_loads_as_the_live_profile():
     assert config.enabled is True
     assert config.max_notes_per_run == 1  # the watched runs (G.7)
     assert config.stale_read == "my_notes"  # decisions, 10 Nov 2026, My Notes
-    # Live's project Documents tab shows Type Purchase Order, as on test
-    # (G.7's first run; decisions, 11 Nov 2026, live document Type).
-    assert config.project_document_type == "Purchase Order"
+    # The Documents block's upload is filed as Client Documents, as the
+    # admin's tasks show (decisions, 12 Nov 2026, upload to Documents).
+    assert config.project_document_type == "Client Documents"
 
 
 def test_the_test_profile_keeps_its_own_values():
     config = load_config("test")
 
     assert config.stale_read == "note_pool"
-    assert config.project_document_type == "Purchase Order"
+    assert config.project_document_type == "Client Documents"
 
 
 def test_load_config_reads_the_sites_own_file(tmp_path):

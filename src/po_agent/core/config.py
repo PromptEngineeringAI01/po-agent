@@ -91,7 +91,7 @@ class Config(_Section):
     # decisions, 10 Nov 2026, My Notes).
     stale_read: Literal["note_pool", "my_notes"]
     # W2's read-back: the Type of the new task's one row in the project's
-    # Documents tab ("Purchase Order" on test, "Client Documents" on live).
+    # Documents tab ("Client Documents" on both sites; decisions, 12 Nov 2026).
     project_document_type: str = Field(min_length=1)
     # The safe trace's folder (7.3); "~" is the user's home. Written only
     # when its parent folder exists (core/trace.py).

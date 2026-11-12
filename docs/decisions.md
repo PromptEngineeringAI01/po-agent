@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 11 Nov 2026, hold re-check)
+# PO Agent - decision log (updated 12 Nov 2026, upload to Documents)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -51,6 +51,22 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **11 Nov 2026: live document Type is Purchase Order; live on again** (Joey; entry below).
 - **11 Nov 2026: address check takes a house-number line and a state inside the MySys address** (Joey: "fix it now"; entry below).
 - **11 Nov 2026: hold re-check** (Joey; entry below): each run re-reads the tasks booked today and on the previous working day and alerts `HOLD_LOST` for one no longer On Hold.
+- **12 Nov 2026: upload to Documents; Type Client Documents** (Joey; entry below): the agent's tasks lacked the PDF in their own Client Documents.
+
+## 12 Nov 2026 - Upload to Documents; Type Client Documents (Joey; changes what the agent does and checks in MySys)
+
+- **What Joey saw (after the 11 Nov watched live runs):** the 5 tasks the agent booked show "Client Documents (0)" in the task's own Documents tab; a task the MySys admin made by hand shows the PO PDF there ("Client Documents (1)"). The admin uploads into the Create New Task form's **Documents** block, not **PO Documents** (Joey's screenshot of the admin's form). In the project's Documents tab the admin's upload is Type **Client Documents**, Document Client Documents; the agent's is Type Purchase Order. The test site showed the same gap from the start (screen-map row 19, "The PO PDF is not on the task").
+- **Decision (Joey: "upload in the Documents. Type should be Client Documents"):** W1 uploads the PDF to **Documents** only; PO Documents stays empty. This reverses the 10 Nov answer "PO Documents, as on test" (open question 11) and the 11 Nov "Purchase Order" Type, which was right only for a PO Documents upload.
+  - **W1 read-back before Submit:** Documents shows exactly one row, the PDF's file name; PO Documents holds no file row and must be found (not found once is not empty). The rest is unchanged.
+  - **W2:** `project_document_type = "Client Documents"` in both `config/test.toml` and `config/live.toml`; the check itself (the new task's section, exactly one row, the Type, File starting with the PDF's name) is unchanged. The agent doesn't open the task's own Documents tab: that needs a new guard action, and the project tab's Client Documents row is the same upload.
+- **Test-site mapping (12 Nov 2026, Playwright CLI, observe only; Joey clicked and uploaded a blank fake PDF):** after an upload the Documents block holds a table with one row, cells `<file name>` and `close`, exactly like PO Documents; PO Documents then has no table. The form was abandoned by closing the browser context; the project's Documents tab then showed no new document, so a Documents upload is saved only by Submit too.
+- **Code freeze:** a fix for what go-live found (9 Nov 2026, go-live plan). No guard change: the same `upload_document` action, a file input found by its exact label.
+- **The 5 live tasks already booked** are fixed by hand (Joey or the admin), not by the agent; the duplicate check would skip them anyway.
+- **Tests (Must never #8):** the offline W1 and read-back cases expect the PDF in Documents and none in PO Documents; the W2 cases default to Client Documents; both profile tests expect Client Documents (`test:` commit).
+- **No seam 2 (Joey: "i prefer not doing in test site anymore, just do it in production site"):** CLAUDE.md "Done means" #3 is skipped, and so is the `docs/macmini-setup.md` rule that a commit runs on the test site before the `production` tag moves to it. The proof is the test-site mapping above (the Documents block's table, nothing left by an abandoned form), the offline tests and `scripts/check.py`, then Joey's first watched live run. A wrong guess fails closed: a Documents read-back that doesn't match stops W1 before Submit (`WRITE_NOT_STARTED`, the Note goes back to the pool); a project Documents Type that doesn't match is `ACCURACY_BREACH` after Submit (the task exists; Joey finishes it by hand, `docs/ops-runbook.md` 3.5).
+- **Before the next live run:** Joey moves the `production` tag to this merge commit and starts one watched live run (one PO) himself; he checks the new task's own Documents tab for the PDF under Client Documents.
+- **Loosens?** Yes: "Done means" #3 and the test-site run before a tag move are skipped for this PR (Joey).
+- Carried in: `SPEC.md` v1.41 (config sample and live differences, denylist wording, W1 upload and read-back, W2 document, trial conditions, gate 2, open question 11), `docs/screen-map.md` (rows 09 and 19, the danger list, open questions 3 and 11), `docs/ops-runbook.md` (checking a booked task).
 
 ## 11 Nov 2026 - Hold re-check: ALERT HOLD_LOST for a booked task no longer On Hold (Joey; changes what the agent reads and prints)
 
