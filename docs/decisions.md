@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 12 Nov 2026, G.8)
+# PO Agent - decision log (updated 12 Nov 2026, kept Projects search)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -53,6 +53,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **11 Nov 2026: hold re-check** (Joey; entry below): each run re-reads the tasks booked today and on the previous working day and alerts `HOLD_LOST` for one no longer On Hold.
 - **12 Nov 2026: upload to Documents; Type Client Documents** (Joey; entry below): the agent's tasks lacked the PDF in their own Client Documents.
 - **12 Nov 2026: G.7 done; G.8: hourly live runs, up to 10 Notes per run** (entry below).
+- **12 Nov 2026: a not-found Projects search clears the kept one first** (entry below): two not-found Notes in a row no longer stop the run.
+
+## 12 Nov 2026 - A kept "No record found." is cleared before the Projects search (changes what the agent does in MySys)
+
+- **Found:** the first hourly live run (20261112T060702Z-1d24, tag 024f81e, cap 10) booked 2 POs, skipped a Note `PROJECT_NOT_FOUND`, then stopped with `ALERT UNEXPECTED_SCREEN` "project search did not finish" on the next Note, also not found; no write was made for it. On the test site (12 Nov 2026): a reload keeps the Projects search text and its "No record found.", so the next Note's search starts from it; a different not-found number shows a loading state for about half a second (the 500 ms poll can miss it), and the same text again sends no search at all. The search never took a list equal to the one before it unless every row held the number, so a second "No record found." in a row could never count. With one Note per run (before G.8) a run never searched twice.
+- **Decided:** the list is read settled before searching (two equal reads, as after the search). When it shows "No record found.", the agent first searches an empty box (the same `search_project` fill and Enter, no new guard action), which lists every project, and waits for a settled list of rows; then it searches the internal number as before. A "No record found." after that is always this Note's own result. A false not-found only returns a real PO to the pool, but a kept not-found must never count, so a search that never runs is still `UNEXPECTED_SCREEN`, never `PROJECT_NOT_FOUND`. Read only; nothing in MySys changes.
+- **Faster list read (same change):** the empty search lists 50 rows, and reading them one row at a time took 8 s per read, so clearing cost about 20 s per Note. The polling read now takes the row texts in one call (plus a cell count, so a loading row is still no list), and only the settled result is parsed cell by cell and must read the same again. On the test site: about 10 s for a search that clears, 5 s for one that doesn't.
+- **Tests:** `tests/test_booking.py`: a second not-found in a row and the same not-found number again are no rows; a project found after a kept not-found is read; a search that never runs is `UnexpectedScreen`. The stale-list fake now lists a project on an empty search, as the test site does, and the booker fake (`tests/test_booker_offline.py`) opens Projects on every project, as the test site does after login, instead of on "No record found." (two `test:` commits).
 
 ## 12 Nov 2026 - G.7 done; G.8: hourly live runs, up to 10 Notes per run (Joey; loosens a safety control)
 
