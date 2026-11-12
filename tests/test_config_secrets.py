@@ -212,7 +212,8 @@ def test_repo_live_config_loads_as_the_live_profile():
     # 2026, G.5), off after G.7's first run stopped at W2, on again with the
     # document Type fix (decisions, 11 Nov 2026, live document Type).
     assert config.enabled is True
-    assert config.max_notes_per_run == 1  # the watched runs (G.7)
+    # Hourly runs take up to 10 Notes (G.8; the watched G.7 runs took 1).
+    assert config.max_notes_per_run == 10  # decisions, 12 Nov 2026, G.8
     assert config.stale_read == "my_notes"  # decisions, 10 Nov 2026, My Notes
     # The Documents block's upload is filed as Client Documents, as the
     # admin's tasks show (decisions, 12 Nov 2026, upload to Documents).
