@@ -1,6 +1,6 @@
 # MySys screen map (test site)
 
-**Version:** 1.3 · 3 Nov 2026 (1.3: slice M0b.2, rows 19, 20, 23 and 24, the label anchors for every weak Create New Task field and the Hold confirm button, the upload saved only by Submit; open items 2, 4, 5, 8 and 10 closed (decisions, 3 Nov 2026); 1.2: slice M0b.1, rows 25–28, 15b and the row-26 anchors; rows 21–22 not mapped and row 23 moved to M0b.2 (decisions, 25 Oct 2026); 1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026, slice M0b.1 (rows 15b, 25–28) on 25 Oct 2026, and slice M0b.2 (rows 19, 20, 23, 24) on 3 Nov 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
+**Version:** 1.4 · 12 Nov 2026 (1.4: the Documents upload block after an upload (row 09) and where its PDF lands (row 19): the agent uploads to Documents, not PO Documents (decisions, 12 Nov 2026, upload to Documents); 1.3: slice M0b.2, rows 19, 20, 23 and 24, the label anchors for every weak Create New Task field and the Hold confirm button, the upload saved only by Submit; open items 2, 4, 5, 8 and 10 closed (decisions, 3 Nov 2026); 1.2: slice M0b.1, rows 25–28, 15b and the row-26 anchors; rows 21–22 not mapped and row 23 moved to M0b.2 (decisions, 25 Oct 2026); 1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026, slice M0b.1 (rows 15b, 25–28) on 25 Oct 2026, and slice M0b.2 (rows 19, 20, 23, 24) on 3 Nov 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
 
 Every value below is **fake**. The real captures stay in `private/`. **The test site's 3 trial POs are real B1 POs** (16 Oct 2026), so test-site captures and screenshots are real data too: never commit them.
 
@@ -38,7 +38,7 @@ Names kept as they are, because the agent uses them: the agent's account **Agent
 | button "Cancel" | Project → task row | Cancels the task |
 | button "Undo Cancellation" | Project → cancelled task row | Reinstates a cancelled task |
 | button "Un-Hold" | Project → on-hold task row | Releases the hold |
-| cell "close" (×) beside the attached file | Create New Task → PO Documents | Removes the document |
+| cell "close" (×) beside the attached file | Create New Task → Documents (and PO Documents) | Removes the document |
 | "close" beside Task Client | Create New Task → Compaction Test | Clears the task client |
 | any checkbox | Hold Task dialog (reminder, reset turn-around time, related tasks) | Changes the hold or holds other jobs |
 | "close" ("Delete") and "edit" cells, row checkboxes, "Document Actions" | Project → Documents tab (row 19) | Deletes or changes a document |
@@ -187,17 +187,17 @@ Ticking **- Compaction Test** opens a sub-form under it. (**Creator** isn't in t
 | Task Name | textbox "Task Name" | `getByRole('textbox', { name: 'Task Name' })` | Empty |
 | PO Number | textbox (no name) | label anchor: the input in the block holding "PO Number" | **Empty** when the sub-form opens (row 24); `2600001B/048` |
 | PO Contact | combobox (no name) | label anchor: the select in the block holding "PO Contact" | Choose... |
-| **PO Documents** | "Upload" with button "Choose File" (the file input) | label anchor: the file input in the block holding "PO Documents" | After upload a table row: cell **"2600001B_048_1.pdf"** + cell **"close"** (removes it: **danger**). No table before an upload |
-| Documents | "Upload" with button "Choose File" (the file input) | label anchor: the file input in the block holding exactly "Documents" | A second, separate upload. The walkthrough used **PO Documents**. **Empty: no table at all** (M0b.2) |
+| PO Documents | "Upload" with button "Choose File" (the file input) | label anchor: the file input in the block holding "PO Documents" | After an upload a table row: cell "2600001B_048_1.pdf" + cell **"close"** (removes it: **danger**). **Empty: no table at all.** The walkthrough used it, but MySys files it only on the project, as Type Purchase Order: never on the task (row 19). **The agent leaves it empty** (decisions, 12 Nov 2026) |
+| **Documents** | "Upload" with button "Choose File" (the file input) | label anchor: the file input in the block holding exactly "Documents" | **The admin's upload, and the agent's** (decisions, 12 Nov 2026). Empty: no table at all (M0b.2). After an upload (12 Nov 2026) a table with one row: cell **"2600001B_048_1.pdf"** + cell **"close"** (removes it: **danger**), the same shape as PO Documents. Filed as Type **Client Documents** and shown in the task's own Client Documents (row 19) |
 | Sale Office | combobox (no name) | label anchor: the select in the block holding "Sale Office" | **Prompt Engineering Pty Ltd** |
 | Delivery Office | combobox (no name) | label anchor: the select in the block holding "Delivery Office" | Choose... |
 | Note | textbox (no name) | label anchor: the textarea in the block holding "Note" | **Empty in the walkthrough.** The SOP says Note = email body |
 
 **Label anchors (M0b.2, 3 Nov 2026):** every field above sits in its own small block that holds only its label text and its control (for PO Documents also the upload table). The agent finds the **innermost** element in the `Create New Task` window holding the exact label text and the control, then the control inside it (`_container` / `_field` in `mysys/booking.py`). Label texts are matched exactly, so "Documents" never matches "PO Documents". Playwright's own `generate-locator` still offers only `nth`, `:nth-child` or generated ids (`[id="<digits>.<digits>_s_po_1_6"]`, `[id="p_<digits>.<digits>"]`) for all of them: never used.
-**The upload is saved only by Submit:** with the PDF in PO Documents and the form not yet submitted, the project's Documents tab showed no new copy; after Submit it did (row 19). Abandoning the form leaves nothing behind.
+**The upload is saved only by Submit:** with the PDF in PO Documents (3 Nov) or in Documents (12 Nov) and the form not yet submitted, then abandoned by closing the browser context, the project's Documents tab showed no new copy; after Submit it did (row 19). Abandoning the form leaves nothing behind.
 **After Submit** a hidden textbox holding the Note text is left at the end of the page, outside every window. Reads stay scoped to their window, so it is never read.
 
-**Read back before Submit:** Creator = Perth Scheduling; Compaction Test ticked and **nothing else ticked**; PO Number; the file name in the PO Documents table; Note = email body; Task Client = Same as Project. Any mismatch → close the browser context (`WRITE_NOT_STARTED`).
+**Read back before Submit:** Creator = Perth Scheduling; Compaction Test ticked and **nothing else ticked**; PO Number; the file name in the Documents table, and no file row in PO Documents; Note = email body; Task Client = Same as Project. Any mismatch → close the browser context (`WRITE_NOT_STARTED`).
 
 ### Row 10 · After Submit
 
@@ -361,22 +361,22 @@ Joey clicked in the Playwright window, logged in as the agent, and booked one tr
 | Section "Active Stage" | Due date, "Unassigned", button **"Complete"**, "Report Analysis", button "Assign Logs (0)" | **Complete is danger** |
 | Tab buttons | Certify Form (shown first), Stage Table, Communication, Documents, Result, Log, Timesheet, Dev Comm, AP Check | The agent's account; a person's account shows more tabs |
 | Certify Form | button **"Save"**, Engineer Signature select, Certify Date with "Edit", Merge Result checkbox (ticked), Invoice Statement, Note to Senior Analyst; "Client Documents (0)", "Certified Documents (0)", "Internal Documents (0)", each with an Upload; Preview Merged Doc, Select Library Documents | **Every control here is danger**: the agent only reads the left side |
-| Documents tab | The same three document areas, all **(0)** | **The PO PDF is not on the task** |
+| Documents tab | The same three document areas. A PO Documents upload leaves them all **(0)**; a **Documents** upload is listed under **Client Documents (1)** (a row: date, the file name, Remove ×: **danger**), as on the admin's tasks (12 Nov 2026) | Not opened by the agent |
 
-**Where the PO PDF is:** the **project's** Documents tab (project window → button "Documents"). It lists documents in sections: a heading "pln_10001" (the project's own, "No Document Found"), then one heading **"tsk_…"** per task with "Document Actions" and either "No Document Found" or a table:
+**Where the PO PDF is also listed:** the **project's** Documents tab (project window → button "Documents"). It lists documents in sections: a heading "pln_10001" (the project's own, "No Document Found"), then one heading **"tsk_…"** per task with "Document Actions" and either "No Document Found" or a table:
 
 | Column | For the new task |
 |---|---|
 | (checkbox) | Unticked: never touched |
-| Type | **Purchase Order** |
+| Type | **Client Documents** for a Documents upload (the agent's since 12 Nov 2026, and the admin's); Purchase Order for a PO Documents upload (older bookings) |
 | File | **2600001B_048_1.pdf** plus a link "file_download <size>" |
-| Document | Purchase Order |
+| Document | The same as Type |
 | Note | empty |
 | Creator | **Agent 1 (MySys Only)** |
 | Create Date | today, with the time |
 | (actions) | cell "edit" ("Edit") and cell **"close" ("Delete")**: **danger**, on the denylist (close) |
 
-Every earlier booking's task has its own section with its own copy, so the read-back is the section headed by the **new** task number: exactly one row, Type Purchase Order, File starting with the PDF's file name. The tab also has a "Search/filter" box and two selects: not used. The project's **Tasks** button brings the task table back.
+Every earlier booking's task has its own section with its own copy, so the read-back is the section headed by the **new** task number: exactly one row, Type Client Documents (the profile's `project_document_type`), File starting with the PDF's file name. The tab also has a "Search/filter" box and two selects: not used. The project's **Tasks** button brings the task table back.
 
 ### Row 20 · Link to Project: search and select
 
@@ -421,7 +421,7 @@ Joey looked at live with the agent account and sent screenshots; Claude saw no l
 
 1. ~~Duplicate Notes per PO~~ **Done:** the first copy processed is booked, any other skips `DUPLICATE_TASK` (`SPEC.md` → MySys screen rules → Note Pool).
 2. ~~Read back PO number and document after Submit~~ **Done (M0b.2, row 19):** PO number and Note on the task detail screen, the PDF in the project's Documents tab under the new task's section. The MVP's duplicate check still counts any non-Cancelled Compaction Test task (it doesn't open each task).
-3. **Note field and upload:** Note = the Note's body (`SPEC.md` → MySys screen rules). Upload: SPEC uses **PO Documents**, as in the walkthrough; PO admin to confirm (`SPEC.md` open question 11). The upload is saved only by Submit (M0b.2).
+3. **Note field and upload:** Note = the Note's body (`SPEC.md` → MySys screen rules). Upload: **Documents**, as the admin does (decisions, 12 Nov 2026; `SPEC.md` open question 11); the walkthrough's PO Documents never reaches the task. The upload is saved only by Submit (M0b.2).
 4. ~~Creator and PO Number~~ **Done:** one Creator field (row 08), set to Perth Scheduling; PO Number is not prefilled (row 24).
 5. ~~Link to Project search screens~~ **Done (M0b.2, row 20).**
 6. **Note-to-task link:** the Note links to the project only (Task `---`). That's what `SPEC.md` S4 checks.
