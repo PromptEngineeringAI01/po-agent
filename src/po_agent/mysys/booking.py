@@ -536,8 +536,10 @@ def _check_project_filters(panel: Locator) -> None:
 
 def _project_list(panel: Locator) -> tuple | None:
     """The list as a hashable state: ("none",) for "No record found.",
-    ("rows", rows, pages) for rows under a recognised footer, None while it
-    reloads (a loading row, no footer, a re-render under the read)."""
+    ("rows", row texts, pages) for rows under a recognised footer, None while
+    it reloads (a loading row, no footer, a re-render under the read). Three
+    reads whatever the row count (one per row took 8 s on 50 rows, test site,
+    12 Nov 2026); _table parses the settled result."""
     try:
         if panel.get_by_text(PROJECTS_NO_RECORD, exact=True).visible.count():
             return ("none",) if panel.locator("tbody tr").count() == 0 else None
@@ -547,8 +549,15 @@ def _project_list(panel: Locator) -> tuple | None:
         match = driver.FOOTER.match((footer.text_content() or "").strip())
         if match is None:
             return None
-        rows = tuple(tuple(row.items()) for row in _table(panel))
-    except (PlaywrightError, UnexpectedScreen):
+        headers = panel.locator("thead th").count()
+        rows = tuple(
+            " ".join(text.split())
+            for text in panel.locator("tbody tr").all_inner_texts()
+        )
+        # A loading row (one wide cell) is not a row of the table.
+        if panel.locator("tbody tr td").count() != len(rows) * headers:
+            return None
+    except PlaywrightError:
         return None
     return ("rows", rows, int(match.group(2)))
 
@@ -578,30 +587,61 @@ def search_project_rows(
     match_project picks the row; the same row twice -> match_project counts
     projects, not rows; a filter left set -> refused before searching. A
     settled list is the same in two reads in a row. Returns page 1's rows
-    and the number of results pages."""
+    and the number of results pages.
+
+    A reload keeps the search text and its result (test site, 12 Nov 2026),
+    and the same text again runs no search. So the list is read settled
+    first, and a "No record found." showing then (the previous Note's, or
+    this number's own) is cleared by an empty search, which lists every
+    project, before this Note's search: a not-found is then always new."""
     _check_project_filters(panel)
-    before = _project_list(panel)
     search = panel.get_by_role("textbox", name="Search...", exact=True)
+    before = _settled_list(page, panel, lambda state: True, _search_deadline())
+    if before == ("none",):
+        guard.act("search_project", panel, search, "")
+        guard.act("submit_project_search", panel, search, "Enter")
+        before = _settled_list(
+            page, panel, lambda state: state[0] == "rows", _search_deadline()
+        )
     guard.act("search_project", panel, search, internal_no)
     guard.act("submit_project_search", panel, search, "Enter")
     wanted = internal_no.lower()
-    deadline = time.monotonic() + SEARCH_TIMEOUT_MS / 1000
+
+    def result(state: tuple) -> bool:
+        holds_it = state[0] == "rows" and all(wanted in row.lower() for row in state[1])
+        return state != before or holds_it
+
+    deadline = _search_deadline()
+    while True:
+        state = _settled_list(page, panel, result, deadline)
+        if state[0] == "none":
+            return [], 1
+        # The settled rows, parsed and read again unchanged (a re-render
+        # between the reads is read again).
+        try:
+            rows = _table(panel)
+        except (PlaywrightError, UnexpectedScreen):
+            rows = None
+        if rows is not None and len(rows) == len(state[1]):
+            if _project_list(panel) == state:
+                return rows, state[2]
+
+
+def _search_deadline() -> float:
+    return time.monotonic() + SEARCH_TIMEOUT_MS / 1000
+
+
+def _settled_list(
+    page: Page, panel: Locator, counts: Callable[[tuple], bool], deadline: float
+) -> tuple:
+    """The list once two reads in a row are equal and `counts` takes it,
+    before `deadline`; else UnexpectedScreen."""
     last = None
     while True:
         state = _project_list(panel)
-        holds_it = (
-            state is not None
-            and state[0] == "rows"
-            and all(
-                wanted in " ".join(value for _, value in row).lower()
-                for row in state[1]
-            )
-        )
-        if state is not None and (state != before or holds_it):
+        if state is not None and counts(state):
             if state == last:
-                if state[0] == "none":
-                    return [], 1
-                return [dict(row) for row in state[1]], state[2]
+                return state
             last = state
         else:
             last = None

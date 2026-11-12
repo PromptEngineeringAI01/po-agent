@@ -676,6 +676,10 @@ PROJECT_ROWS = {
     "pln_10001": ("2600001B", "Cancelled"),
     "pln_10009": ("2600009B", "New Project"),  # a hit on a field not shown
 }
+OTHER_ROW = (
+    "<tr><td><a href='#'>pln_10500</a></td><td>2600500B</td><td>Draft</td>"
+    "<td>Other Homes</td></tr>"
+)
 
 
 def projects_page(
@@ -700,14 +704,7 @@ def projects_page(
         f"<option{' selected' if s == status else ''}>{s}</option>"
         for s in ("All Projects", "On-hold")
     )
-    old = (
-        ""
-        if stale_none
-        else (
-            "<tr><td><a href='#'>pln_10500</a></td><td>2600500B</td><td>Draft</td>"
-            "<td>Other Homes</td></tr>"
-        )
-    )
+    old = "" if stale_none else OTHER_ROW
     return f"""
 <div>
   <button>Reset Filter</button>
@@ -723,6 +720,12 @@ def projects_page(
 </div>
 <script>
 function go(text) {{
+  if (text === '') {{  // an empty search lists every project (test site)
+    document.getElementById('none').hidden = true;
+    document.getElementById('rows').innerHTML = `{OTHER_ROW}`;
+    document.getElementById('footer').textContent = 'Page 1 of 1(1 Items)';
+    return;
+  }}
   if (text !== '2600001B') return;
   setTimeout(() => {{
     document.getElementById('none').hidden = true;
@@ -755,6 +758,91 @@ def test_search_projects_waits_out_a_stale_no_record(page, guard):
         guard, page, booking.projects_panel(page), "2600001B"
     )
     assert "pln_10001" in plns(rows)
+
+
+# First hourly live run, 12 Nov 2026: a Note skipped PROJECT_NOT_FOUND, then
+# the next Note's search, also not found, timed out as UNEXPECTED_SCREEN. A
+# reload keeps the Projects search text and its "No record found." (test site,
+# 12 Nov 2026), and searching the same text again sends nothing. This fake
+# does both: the panel starts on the previous Note's not-found search.
+
+
+def kept_search_page(*, kept: str = "2600777B", searches: bool = True) -> str:
+    return f"""
+<div>
+  <button>Reset Filter</button>
+  <div><div>Search</div><input aria-label="Search..." value="{kept}"
+    onkeydown="if (event.key === 'Enter') go(this.value)"></div>
+  <div><div>Status</div><select><option selected>All Projects</option></select></div>
+  <div><div>Eng Type</div><select><option selected>All Eng Types</option></select></div>
+  <div><div>Sales Type</div><select><option selected>All Sales Types</option></select></div>
+  <table><thead><tr><th>Project No.</th><th>Client Ref No.</th><th>Status</th>
+    <th>Company</th></tr></thead><tbody id="rows"></tbody></table>
+  <div id="none">No record found.</div>
+  <div id="footer"></div>
+</div>
+<script>
+let last = '{kept}';
+function go(text) {{
+  if ({"false" if searches else "true"} || text === last) return;
+  last = text;
+  setTimeout(() => {{
+    document.getElementById('none').hidden = true;
+    document.getElementById('rows').innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+  }}, 50);
+  setTimeout(() => {{
+    const rows = document.getElementById('rows');
+    const footer = document.getElementById('footer');
+    if (text === '') {{
+      rows.innerHTML = `{OTHER_ROW}`;
+      footer.textContent = 'Page 1 of 3(60 Items)';
+    }} else if (text === '2600001B') {{
+      rows.innerHTML = `<tr><td><a href='#'>pln_10001</a></td><td>2600001B</td>
+        <td>Cancelled</td><td>B1 Homes</td></tr>`;
+      footer.textContent = 'Page 1 of 1(1 Items)';
+    }} else {{
+      rows.innerHTML = '';
+      footer.textContent = '';
+      document.getElementById('none').hidden = false;
+    }}
+  }}, 300);
+}}
+</script>"""
+
+
+@pytest.fixture
+def short_search(monkeypatch):
+    monkeypatch.setattr(booking, "SEARCH_TIMEOUT_MS", 5000)
+
+
+def test_a_second_not_found_in_a_row_is_no_rows(page, guard, short_search):
+    page.set_content(kept_search_page())
+    panel = booking.projects_panel(page)
+    assert booking.search_project_rows(guard, page, panel, "2600888B") == ([], 1)
+
+
+def test_the_same_not_found_number_again_is_no_rows(page, guard, short_search):
+    page.set_content(kept_search_page(kept="2600888B"))
+    panel = booking.projects_panel(page)
+    assert booking.search_project_rows(guard, page, panel, "2600888B") == ([], 1)
+
+
+def test_a_found_project_after_a_kept_not_found_is_read(page, guard, short_search):
+    page.set_content(kept_search_page())
+    rows = booking.search_projects(
+        guard, page, booking.projects_panel(page), "2600001B"
+    )
+    assert plns(rows) == ["pln_10001"]
+
+
+def test_a_kept_not_found_is_never_this_notes_result(page, guard, short_search):
+    """A search that never runs leaves the previous Note's "No record
+    found." showing: that is not this Note's result."""
+    page.set_content(kept_search_page(searches=False))
+    with pytest.raises(UnexpectedScreen):
+        booking.search_project_rows(
+            guard, page, booking.projects_panel(page), "2600888B"
+        )
 
 
 def test_search_projects_waits_longer_than_a_page_load(page, guard, monkeypatch):
