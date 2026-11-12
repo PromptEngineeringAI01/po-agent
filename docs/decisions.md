@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 12 Nov 2026, upload to Documents)
+# PO Agent - decision log (updated 12 Nov 2026, G.8)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -52,6 +52,27 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **11 Nov 2026: address check takes a house-number line and a state inside the MySys address** (Joey: "fix it now"; entry below).
 - **11 Nov 2026: hold re-check** (Joey; entry below): each run re-reads the tasks booked today and on the previous working day and alerts `HOLD_LOST` for one no longer On Hold.
 - **12 Nov 2026: upload to Documents; Type Client Documents** (Joey; entry below): the agent's tasks lacked the PDF in their own Client Documents.
+- **12 Nov 2026: G.7 done; G.8: hourly live runs, up to 10 Notes per run** (entry below).
+
+## 12 Nov 2026 - G.7 done; G.8: hourly live runs, up to 10 Notes per run (Joey; loosens a safety control)
+
+- **G.7 done (watched one-PO runs on live, Joey at the Mac Mini):**
+  - Run 20261111T024815Z-3f4d (tag 75605bc) stopped at W2's document Type, and run 20261111T041353Z-f50b (tag daef58e) skipped `ADDRESS_MISMATCH` on an address format the rule didn't know (entries below). Both were fixed before the next run.
+  - Runs 20261111T051803Z-ae6a, 20261111T053714Z-e650, 20261111T055556Z-a03c, 20261111T071302Z-b4db and 20261111T072006Z-0b99 (tag c45495d) each booked one PO: no skip, no ALERT, exit 0, about 2 minutes each. The 5.2 trace check passed on the first. The MySys admin keeps the booked tasks On Hold (nothing is deleted).
+  - One booked task was later back at Status "New Project", no longer On Hold. W3 had read it back On-hold, and the agent has no path that releases a hold (W4 and W5 work only in the Note window; the guard denies Un-Hold). Joey put it On Hold again and asked the MySys admin why; the hold re-check (entry below) now alerts on this. At Joey's 16:30 check all five tasks were On Hold.
+  - The five tasks had the PDF in the project's Documents tab only, not in the task's own Client Documents, where the admin puts it: fixed by uploading to the Documents block (entry below, PR 107). Joey or the admin adds the PDF to those five by hand.
+  - Run 20261112T031847Z-a04f (tag 5928ae4, with that fix) booked one PO: exit 0, W2 read Type Client Documents, the 5.2 trace check passed, the trace's `booked` event was written for the hold re-check, and Joey saw the PDF in the new task's Client Documents.
+- **Decision (G.8):** the Mac Mini runs live unattended, hourly, from the launchd job (the plist's `run` `live`), with `max_notes_per_run = 10` in `config/live.toml`. `max_run_minutes = 12` is unchanged: after 12 minutes the run starts no new Note (about 4-5 bookings at about 2 minutes each, after the hold re-check), and the Notes left wait for the next hour.
+- **Order (Joey, by hand; Claude never runs anything on live):**
+  1. Name the backup admin (gate 4): an admin account on the Mac Mini, its password in the company password manager (`docs/macmini-setup.md`).
+  2. `gh workflow enable heartbeat` (it is disabled now); the `po-agent-heartbeat` issue stays the one open issue with that label.
+  3. Move the `production` tag to this PR's merge commit: the agent reads the cap from the tagged commit, so until then a run takes 1 Note.
+  4. Copy the plist again to `~/Library/LaunchAgents/` (the old copy's bare `run` is refused) and `launchctl bootstrap` it (`docs/macmini-setup.md` section 8).
+  5. Watch the first hourly run: paste its `runs.log` block to the advisor and check that the heartbeat issue's body shows that run.
+- **Stop rule:** any ALERT (`HOLD_LOST` included), a wrong booking or a missed heartbeat: Joey follows `docs/ops-runbook.md`; for a wrong booking or a lost hold, `enabled = false` on `main` stops the next run without a tag move.
+- **Loosens?** Yes: live runs unattended, up to 10 Notes per run instead of 1 watched. The guard, every check before a write, the read-backs, the hold re-check, the alerts, the heartbeat and the kill switch are unchanged. The code freeze ends once the hourly job is loaded (8.1 next).
+- **Tests (Must never #8):** the live profile test expects 10 (`test:` commit).
+- Carried in: `SPEC.md` v1.42 (live profile values), `config/live.toml`, `tasks/todo.md` (G.7 ticked, G.8's steps).
 
 ## 12 Nov 2026 - Upload to Documents; Type Client Documents (Joey; changes what the agent does and checks in MySys)
 
