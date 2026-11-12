@@ -127,7 +127,7 @@ For a Note the agent left after the **Submit** click (step W2 to W5). The goal i
 
 ### 3.6 Book a PO by hand
 
-Only when a task had to be cancelled in 3.5. On project `<pln>`: **Create New Task**. Creator (Client section) = **Perth Scheduling**; tick **- Compaction Test**; PO Number = `<internal no>/048`; upload the Note's PDF to **PO Documents** (not the separate Documents upload); Note = the Note's body text; leave everything else as it is; **Submit**. Then 3.5 steps 3 to 6.
+Only when a task had to be cancelled in 3.5. On project `<pln>`: **Create New Task**. Creator (Client section) = **Perth Scheduling**; tick **- Compaction Test**; PO Number = `<internal no>/048`; upload the Note's PDF to **Documents** (not PO Documents, which never reaches the task's Client Documents; decisions, 12 Nov 2026); Note = the Note's body text; leave everything else as it is; **Submit**. Then 3.5 steps 3 to 6.
 
 ### 3.7 Change the MySys password in the Keychain
 

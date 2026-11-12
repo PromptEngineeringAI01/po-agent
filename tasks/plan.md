@@ -562,7 +562,7 @@ Each W-step test books **only as far as its step** on the test site and leaves t
 **Acceptance:**
 - At the start, the job is loaded (`launchctl bootstrap`, `docs/macmini-setup.md` §8); at the end it's unloaded again (`bootout`) until M6 (D1). Scheduled runs may fire in between; that's acceptable because the controls from 3.5–3.6 exist and only one trial Note is in the pool at a time. No laptop test-site run while the job is loaded (Cross-cutting rules → One agent at a time).
 - For each run, only that trial PO's Note is in the Agent Pool (the others are moved out, because the run cap of 10 would otherwise book all three at once). Then `launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent`.
-- Each pln has exactly one non-Cancelled Compaction Test task with the right PO number, the PDF in PO Documents, Creator Perth Scheduling, Note = email body and On Hold "ON HOLD UNTIL CALL UP". Each Note is linked and Solved. `runs.log` shows `exit_code: 0` and no ALERT.
+- Each pln has exactly one non-Cancelled Compaction Test task with the right PO number, the PDF in Documents (Client Documents; decisions, 12 Nov 2026), Creator Perth Scheduling, Note = email body and On Hold "ON HOLD UNTIL CALL UP". Each Note is linked and Solved. `runs.log` shows `exit_code: 0` and no ALERT.
 - Reset afterwards (workflow 6.1).
 
 **Verify:** Joey checks each pln and Note in MySys, and `runs.log`.
