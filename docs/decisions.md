@@ -63,8 +63,9 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Code freeze:** a fix for what go-live found (9 Nov 2026, go-live plan). No guard change: the same `upload_document` action, a file input found by its exact label.
 - **The 5 live tasks already booked** are fixed by hand (Joey or the admin), not by the agent; the duplicate check would skip them anyway.
 - **Tests (Must never #8):** the offline W1 and read-back cases expect the PDF in Documents and none in PO Documents; the W2 cases default to Client Documents; both profile tests expect Client Documents (`test:` commit).
-- **Before the next live run:** Joey moves the `production` tag to this merge commit; the first watched run after it is checked by hand for the PDF in the task's Client Documents.
-- **Loosens?** No.
+- **No seam 2 (Joey: "i prefer not doing in test site anymore, just do it in production site"):** CLAUDE.md "Done means" #3 is skipped, and so is the `docs/macmini-setup.md` rule that a commit runs on the test site before the `production` tag moves to it. The proof is the test-site mapping above (the Documents block's table, nothing left by an abandoned form), the offline tests and `scripts/check.py`, then Joey's first watched live run. A wrong guess fails closed: a Documents read-back that doesn't match stops W1 before Submit (`WRITE_NOT_STARTED`, the Note goes back to the pool); a project Documents Type that doesn't match is `ACCURACY_BREACH` after Submit (the task exists; Joey finishes it by hand, `docs/ops-runbook.md` 3.5).
+- **Before the next live run:** Joey moves the `production` tag to this merge commit and starts one watched live run (one PO) himself; he checks the new task's own Documents tab for the PDF under Client Documents.
+- **Loosens?** Yes: "Done means" #3 and the test-site run before a tag move are skipped for this PR (Joey).
 - Carried in: `SPEC.md` v1.41 (config sample and live differences, denylist wording, W1 upload and read-back, W2 document, trial conditions, gate 2, open question 11), `docs/screen-map.md` (rows 09 and 19, the danger list, open questions 3 and 11), `docs/ops-runbook.md` (checking a booked task).
 
 ## 11 Nov 2026 - Hold re-check: ALERT HOLD_LOST for a booked task no longer On Hold (Joey; changes what the agent reads and prints)
