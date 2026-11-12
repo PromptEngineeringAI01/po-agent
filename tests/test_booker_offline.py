@@ -247,9 +247,10 @@ def fake_mysys(
   <div><div>Eng Type</div><select><option selected>All Eng Types</option></select></div>
   <div><div>Sales Type</div><select><option selected>All Sales Types</option></select></div>
   <table><thead><tr><th>Project No.</th><th>Client Ref No.</th><th>Status</th>
-    <th>Company</th></tr></thead><tbody id="rows"></tbody></table>
-  <div id="none">No record found.</div>
-  <div id="footer"></div>
+    <th>Company</th></tr></thead><tbody id="rows"><tr><td><a href="#">pln_10500</a></td>
+    <td>2600500B</td><td>Draft</td><td>Other Homes</td></tr></tbody></table>
+  <div id="none" hidden>No record found.</div>
+  <div id="footer">Page 1 of 1(1 Items)</div>
 </div>
 <div id="project" hidden><div>
   <h3 id="heading">{PLN} B1 Homes Sample Lane, Sampleville WA 6000</h3>
@@ -294,6 +295,13 @@ function showProjects() {{
   document.getElementById('projects').hidden = false;
 }}
 function search(text) {{
+  if (text === '') {{  // an empty search lists every project (test site)
+    document.getElementById('none').hidden = true;
+    document.getElementById('rows').innerHTML =
+      '<tr><td><a href="#">pln_10500</a></td><td>2600500B</td><td>Draft</td><td>Other Homes</td></tr>';
+    document.getElementById('footer').textContent = 'Page 1 of 1(1 Items)';
+    return;
+  }}
   if (text !== '{INTERNAL_NO}') return;
   setTimeout(() => {{
     document.getElementById('none').hidden = true;
