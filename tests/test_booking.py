@@ -278,6 +278,10 @@ def test_task_form_is_filled_and_read_back(page, guard):
     booking.fill_task_form(guard, form, "2600001B/048", BODY, FILE, PDF)
     assert page.locator("body").get_attribute("data-submitted") is None
     assert "upload_document" in actions(guard)
+    # The PDF goes to Documents (the task's Client Documents), not PO
+    # Documents (decisions, 12 Nov 2026).
+    assert page.locator("#doc_rows td").first.inner_text() == FILE
+    assert page.locator("#po_rows td").count() == 0
     booking.submit_task(guard, form)
     assert page.locator("body").get_attribute("data-submitted") == "yes"
 
@@ -947,16 +951,16 @@ def test_wait_new_task_reads_past_a_half_added_row(
     assert booking.wait_new_task(form, project, before) == "tsk_200009"
 
 
-def test_task_form_without_a_documents_block_does_not_submit(page, guard):
-    # Fail closed: a Documents area not found once is not "empty".
-    documents = (
-        '<div><div>Documents</div><div><span>Upload <input type="file" '
-        "onchange=\"addDoc(this, 'doc_rows')\"></span>\n"
-        '      <table><tbody id="doc_rows"></tbody></table></div></div>'
+def test_task_form_without_a_po_documents_block_does_not_submit(page, guard):
+    # Fail closed: a PO Documents area not found once is not "empty".
+    po_documents = (
+        '<div><div>PO Documents</div><div><span>Upload <input type="file" '
+        "onchange=\"addDoc(this, 'po_rows')\"></span>\n"
+        '      <table><tbody id="po_rows"></tbody></table></div></div>'
     )
     html = task_form_page()
-    assert documents in html
-    page.set_content(html.replace(documents, ""))
+    assert po_documents in html
+    page.set_content(html.replace(po_documents, ""))
     with pytest.raises(WriteNotStarted):
         booking.fill_task_form(
             guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
@@ -964,10 +968,10 @@ def test_task_form_without_a_documents_block_does_not_submit(page, guard):
     assert "submit_task" not in actions(guard)
 
 
-def test_task_form_documents_with_only_a_header_row_reads_as_empty(page, guard):
-    # SPEC -> W1: the Documents area holds no file row; a header is not one.
-    empty = '<table><tbody id="doc_rows"></tbody></table>'
-    header = '<table><thead><tr><th>File</th></tr></thead><tbody id="doc_rows"></tbody></table>'
+def test_task_form_po_documents_with_only_a_header_row_reads_as_empty(page, guard):
+    # SPEC -> W1: the PO Documents area holds no file row; a header is not one.
+    empty = '<table><tbody id="po_rows"></tbody></table>'
+    header = '<table><thead><tr><th>File</th></tr></thead><tbody id="po_rows"></tbody></table>'
     html = task_form_page()
     assert empty in html
     page.set_content(html.replace(empty, header))
