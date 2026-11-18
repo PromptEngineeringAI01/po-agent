@@ -153,6 +153,7 @@ scripts/macmini-run.sh          Mac Mini wrapper `<mode> <test|live>`: fetch, en
 scripts/au.com.prompteng.po-agent.plist   launchd job (Mon–Fri 07:07–17:07), `run live` after go-live
 tests/seam1/                    decision seam; fixtures/ = generated fake PDFs + case files (never a real or trial PDF)
 tests/seam2/                    run seam on the test site (marker testsite)
+tests/fakes/, tests/conftest.py offline fakes of MySys (the driver seam's FakeMySys, Playwright helpers) and their shared fixtures
 private/                        GIT-IGNORED, laptop only: real data
   pdfs/                         real B1 PO PDFs, including the 3 trial POs
   fixtures/cases.toml           expected results for real POs and the 3 trial POs, entered by Joey from MySys
