@@ -28,7 +28,7 @@ Every alert is a GitHub issue labelled `po-agent-alert`, and GitHub sends an ema
 |---|---|---|
 | `po-agent alert <run_id>` | The Mac Mini, after a run that printed an `ALERT` line or exited non-zero | The `ALERT` lines without Note IDs, sometimes a `wrapper:` line, and `exit code: <n>` |
 | `po-agent alert no run_id` | The Mac Mini, when the agent didn't start or printed no summary | A `wrapper:` line and `exit code: <n>` |
-| `po-agent heartbeat missed` | GitHub itself (`.github/workflows/heartbeat.yml`) | No run has finished for more than 2 hours inside the schedule |
+| `po-agent heartbeat missed` | GitHub itself (`.github/workflows/heartbeat.yml`) | No run has finished for more than 2 hours inside the schedule. Checked about once each weekday afternoon, so it can arrive hours after runs stopped |
 
 An `ALERT` line looks like this (placeholders in `<>`):
 
@@ -67,7 +67,7 @@ Either one stops the next run. After an `ACCURACY_BREACH`, do both.
    Check: `launchctl print gui/$(id -u)/au.com.prompteng.po-agent` (as `poagent`) now says it can't find the service. If a run was going (from :07, for up to 20 minutes), it is stopped too and may leave a Note with the agent: check for one (3.3) before you restart. Between about :30 and :05 no run is going.
 2. **The kill switch** (Joey): `enabled = false` in the site's config on `main` (`config/live.toml` after go-live, `config/test.toml` for test runs), through a pull request. The next run reads it from `main` whatever commit the `production` tag is on, logs `wrapper: enabled = false on main, agent not run`, runs nothing, opens no alert and exits 0.
 
-While the job is unloaded, the heartbeat check will open `po-agent heartbeat missed` after 2 hours inside the schedule. That is expected: leave it open until runs are back.
+While the job is unloaded, the heartbeat check will open `po-agent heartbeat missed` once 2 hours inside the schedule have passed, at its next weekday-afternoon check. That is expected: leave it open until runs are back.
 
 ### 3.2 Restart the agent
 
@@ -230,7 +230,7 @@ Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was neve
 
 ### Missed heartbeat (`po-agent heartbeat missed`)
 
-- **Means:** no run has finished for more than 2 hours inside the schedule (07:07 to 17:30 Perth, weekdays). Every run, even a failed one, updates the issue labelled `po-agent-heartbeat`, so this means runs aren't happening or can't reach GitHub. Nothing alerts at night, at weekends or in the first 2 hours of a day.
+- **Means:** no run has finished for more than 2 hours inside the schedule (07:07 to 17:30 Perth, weekdays). Every run, even a failed one, updates the issue labelled `po-agent-heartbeat`, so this means runs aren't happening or can't reach GitHub. Nothing alerts at night, at weekends or in the first 2 hours of a day. GitHub runs the check about once each weekday afternoon (decisions, 18 Nov 2026), so runs that stopped in the morning are alerted about that afternoon, and runs that stopped after the day's check, the next weekday afternoon: they may have been down for most of a working day.
 - **Check, in this order:**
   1. **Did someone unload the job on purpose** (after an earlier alert)? Then this is expected: leave it open until runs are back.
   2. **At the Mac:** if it shows the FileVault unlock screen (after a power cut or restart), unlock it with the **`poagent`** account, then lock the screen (Control-Command-Q). If it is off, turn it on and do the same.
@@ -260,6 +260,6 @@ The issue (`po-agent alert no run_id`) holds `wrapper: setup failed (<step>), ag
 
 - **`wrapper: agent killed at the 1200s limit`** (exit 1, in the alert issue): the run took over 20 minutes and was stopped. Usual causes: a Keychain dialog waiting for a click (3.7 step 4) or MySys very slow. A Note it was working on may be left with the agent: the next run then stops with `UNEXPECTED_SCREEN` "a Note is still assigned to the agent from an earlier run"; follow that entry.
 - **`wrapper: alert issue not opened`** (in `runs.log` only): GitHub couldn't be reached, so an alert wasn't raised. Read the `ALERT` lines just above it in `runs.log` and act on them as if the issue had opened. Then check the internet and the GitHub token (`git fetch` above).
-- **`wrapper: heartbeat not sent`** (in `runs.log` only): the run's ping didn't reach GitHub. Two hours of this inside the schedule opens `po-agent heartbeat missed`.
+- **`wrapper: heartbeat not sent`** (in `runs.log` only): the run's ping didn't reach GitHub. Two hours of this inside the schedule opens `po-agent heartbeat missed` at the next weekday-afternoon check.
 - **`wrapper: enabled = false on main, agent not run`**: not an alert. The kill switch is on; runs start again when Joey sets it back to `true`.
 - **`wrapper: leftover Playwright browser killed`**: not an alert. Housekeeping after a run.

@@ -12,7 +12,9 @@ DST); the 17:07 run's ping comes by 17:30, after its 20-minute limit. The
 check counts only today's schedule time (07:07-17:30 Perth) since the last
 ping, and more than 2 hours of it is a miss. So nothing alerts at night, at
 the weekend or in a day's first 2 hours, a late or skipped cron firing only
-delays the alert, and a normal end of day never alerts.
+delays the alert, and a normal end of day never alerts. A firing that comes
+after Perth midnight sees the new day's schedule and checks nothing; GitHub
+delivers about one firing each weekday afternoon (decisions, 18 Nov 2026).
 
 A miss opens one po-agent-alert issue (GitHub emails Joey). An open one that
 was opened after the last ping already covers this outage, so no second one;
