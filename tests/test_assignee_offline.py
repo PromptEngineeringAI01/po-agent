@@ -5,7 +5,8 @@ Not `testsite`. The assignee check runs for real inside
 the Note Pool lists for the search (a substring filter, so 300001 also lists
 3000012), and the check must pick the row whose ID cell equals the Note ID.
 The stale-Note stop runs through cli.main on seam 2's fake MySys (tests/
-seam2/test_run_loop_offline.py), which records every call. Values are fake.
+fakes/mysys.py, with tests/conftest.py's `env` and `mysys`), which records
+every call. Values are fake.
 
 - Before W1 and W4: a fresh search (reload, All Pools, the Note ID); the one
   row whose ID equals the Note ID must have Assignee `agent_user_name`.
@@ -22,12 +23,11 @@ seam2/test_run_loop_offline.py), which records every call. Values are fake.
   (7.2; decisions, 5 Nov 2026). `spike` skips the read.
 """
 
-import importlib.util
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
+from fakes.mysys import AGENT, PERSON, POOL, FakeNote
 
 from po_agent import cli
 from po_agent.b1.models import NotePoolRow
@@ -42,19 +42,6 @@ from po_agent.core.errors import (
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
-_spec = importlib.util.spec_from_file_location(
-    "seam2_fake_mysys_for_assignee",
-    Path(__file__).parent / "seam2" / "test_run_loop_offline.py",
-)
-fake_mysys = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fake_mysys)
-FakeNote = fake_mysys.FakeNote
-env = fake_mysys.env
-mysys = fake_mysys.mysys
-
-AGENT = fake_mysys.AGENT
-POOL = fake_mysys.POOL
-PERSON = fake_mysys.PERSON
 NOTE_ID = "300001"
 LOGIN = ("https://test.invalid/", "fake-user", "fake-password")
 STALE_DETAIL = "a Note is still assigned to the agent from an earlier run"

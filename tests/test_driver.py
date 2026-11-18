@@ -13,7 +13,7 @@ import json
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Page
 
 from po_agent.core.errors import LoginFailed, UnexpectedScreen
 from po_agent.mysys import driver
@@ -178,12 +178,7 @@ render();
 """
 
 
-@pytest.fixture(scope="module")
-def browser() -> Iterator[Browser]:
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        yield browser
-        browser.close()
+# `browser` is tests/conftest.py's: one headless Chromium per module.
 
 
 @pytest.fixture

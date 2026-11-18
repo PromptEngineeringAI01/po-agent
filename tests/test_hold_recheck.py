@@ -15,13 +15,12 @@ other state, or the task not found, is `ALERT HOLD_LOST` with the booking's
 Note ID. The run goes on (exit 0). No trace (the laptop, CI): nothing is
 re-checked and nothing is printed.
 
-The run tests use seam 2's fake MySys (tests/seam2/test_run_loop_offline.py)
-with `driver.recheck_hold` faked; the page tests use headless Chromium on a
+The run tests use seam 2's fake MySys (tests/fakes/mysys.py) with
+`driver.recheck_hold` faked; the page tests use headless Chromium on a
 local fake of the project window (screen map rows 07, 10, 12). Values are
 fake.
 """
 
-import importlib.util
 import json
 import tempfile
 from collections.abc import Iterator
@@ -30,8 +29,9 @@ from pathlib import Path
 
 import keyring
 import pytest
+from fakes.mysys import FakeMySys, FakeNote, install, row
 from keyring.backends.null import Keyring as NullKeyring
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Page
 
 from po_agent import cli
 from po_agent.b1.models import MySysLookup, SearchRow
@@ -39,14 +39,6 @@ from po_agent.core import controls, run, trace
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys import booking, driver
-
-_spec = importlib.util.spec_from_file_location(
-    "seam2_fake_mysys_for_hold_recheck",
-    Path(__file__).parent / "seam2" / "test_run_loop_offline.py",
-)
-fake_mysys = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fake_mysys)
-FakeNote = fake_mysys.FakeNote
 
 KEYS = {"run_id", "ts", "note_id", "step", "name", "outcome", "duration_ms"}
 MONDAY_10_PERTH = datetime(2026, 11, 2, 2, 0, tzinfo=UTC)
@@ -95,19 +87,16 @@ def mysys(env, tmp_path):
     per task number is `states` (default held). Each re-check is a call
     `recheck <task>` and one guard action, as the real one's reads are."""
 
-    def install(notes: dict, states: dict | None = None, **kwargs):
-        rows = tuple(fake_mysys.row(n, note.internal_no) for n, note in notes.items())
-        fake = fake_mysys.FakeMySys(
+    def install_fake(notes: dict, states: dict | None = None, **kwargs):
+        rows = tuple(row(n, note.internal_no) for n, note in notes.items())
+        fake = FakeMySys(
             notes=notes,
             rows=rows,
             config_dir=tmp_path / "config",
             logs_dir=tmp_path / "logs",
             **kwargs,
         )
-        for name in fake_mysys.DRIVER_NAMES + fake_mysys.BOOKER_DRIVER_NAMES:
-            env.setattr(run.driver, name, getattr(fake, name), raising=False)
-        for name in fake_mysys.BOOKING_NAMES:
-            env.setattr(booking, name, getattr(fake, name))
+        install(env, fake)
         answers = states or {}
 
         def recheck_hold(guard, page, base_url, username, password, booked, site):
@@ -118,10 +107,10 @@ def mysys(env, tmp_path):
                 raise answer
             return answer
 
-        env.setattr(run.driver, "recheck_hold", recheck_hold, raising=False)
+        env.setattr(run.driver, "recheck_hold", recheck_hold)
         return fake
 
-    return install
+    return install_fake
 
 
 def seed(
@@ -446,12 +435,7 @@ def test_the_trace_has_each_recheck_under_its_note_and_the_reads_under_none(
 # --- reading the task's row (screen map rows 07, 10, 12) -------------------------
 
 
-@pytest.fixture(scope="module")
-def browser() -> Iterator[Browser]:
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        yield browser
-        browser.close()
+# `browser` is tests/conftest.py's: one headless Chromium per module.
 
 
 @pytest.fixture

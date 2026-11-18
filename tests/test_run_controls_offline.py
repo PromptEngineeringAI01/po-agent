@@ -1,8 +1,8 @@
 """The run controls (task 3.5): kill switch, Perth window, run cap and
 `before_write`, offline.
 
-Not `testsite`: the driver is seam 2's fake MySys (tests/seam2/
-test_run_loop_offline.py), which records every call, so "no browser
+Not `testsite`: the driver is seam 2's fake MySys (tests/fakes/mysys.py),
+which records every call, so "no browser
 launched" and "no MySys contact" mean it recorded nothing. The clock is a
 fake patched in as `controls.now`. Values are fake.
 
@@ -17,7 +17,6 @@ fake patched in as `controls.now`. Values are fake.
   from W3 on -> PartialWrite.
 """
 
-import importlib.util
 import json
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -25,21 +24,13 @@ from pathlib import Path
 
 import keyring
 import pytest
+from fakes.mysys import POOL, FakeMySys, FakeNote, install, row
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
 from po_agent.core import controls, run
 from po_agent.core.config import CONFIG_DIR, load_config
 from po_agent.core.errors import ConfigError, PartialWrite
-
-_spec = importlib.util.spec_from_file_location(
-    "seam2_fake_mysys_for_controls",
-    Path(__file__).parent / "seam2" / "test_run_loop_offline.py",
-)
-fake_mysys = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fake_mysys)
-FakeNote = fake_mysys.FakeNote
-POOL = fake_mysys.POOL
 
 # Australia/Perth is UTC+8 all year (no daylight saving).
 MONDAY_10_PERTH = datetime(2026, 11, 2, 2, 0, tzinfo=UTC)
@@ -88,14 +79,12 @@ def env(monkeypatch, tmp_path):
 def mysys(env):
     monkeypatch, _, _ = env
 
-    def install(notes: dict[str, FakeNote]) -> "fake_mysys.FakeMySys":
-        rows = tuple(fake_mysys.row(n, note.internal_no) for n, note in notes.items())
-        fake = fake_mysys.FakeMySys(notes=notes, rows=rows)
-        for name in fake_mysys.DRIVER_NAMES:
-            monkeypatch.setattr(run.driver, name, getattr(fake, name), raising=False)
-        return fake
+    def install_fake(notes: dict[str, FakeNote]) -> FakeMySys:
+        rows = tuple(row(n, note.internal_no) for n, note in notes.items())
+        fake = FakeMySys(notes=notes, rows=rows)
+        return install(monkeypatch, fake, booker=False)
 
-    return install
+    return install_fake
 
 
 def lines_of(capsys) -> list[str]:
