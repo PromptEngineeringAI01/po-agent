@@ -17,8 +17,7 @@ DRIVER = "src/po_agent/mysys/driver.py"
 ERRORS_SOURCE = (ROOT / "src/po_agent/core/errors.py").read_text(encoding="utf-8")
 
 
-@pytest.fixture(scope="module")
-def guard_check():
+def _load_guard_check():
     # scripts/ isn't a package, so load the file directly.
     spec = importlib.util.spec_from_file_location(
         "guard_check", ROOT / "scripts" / "guard_check.py"
@@ -26,6 +25,15 @@ def guard_check():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+# Loaded at import too, so the per-name tests below can parametrize over BANNED.
+GUARD_CHECK = _load_guard_check()
+
+
+@pytest.fixture(scope="module")
+def guard_check():
+    return GUARD_CHECK
 
 
 def tree(root: Path, files: dict[str, str]) -> Path:
@@ -184,6 +192,176 @@ def test_every_violation_is_reported(tmp_path, guard_check):
     found = scan(guard_check, tmp_path, "scripts/tool.py", source)
 
     assert [line.split(":")[1] for line in found] == ["1", "2", "3"]
+
+
+# --- every banned name, one by one (audit N5) --------------------------------
+
+# Written out here, not read from guard_check.BANNED: a name dropped from BANNED
+# must fail these tests, and one added to BANNED is tested through the union.
+BANNED_NAMES = frozenset(
+    {
+        # Page actions
+        "click",
+        "dblclick",
+        "tap",
+        "fill",
+        "clear",
+        "type",
+        "press",
+        "press_sequentially",
+        "check",
+        "uncheck",
+        "set_checked",
+        "select_option",
+        "select_text",
+        "set_input_files",
+        "set_files",
+        "hover",
+        "focus",
+        "drag_to",
+        "drag_and_drop",
+        "dispatch_event",
+        # Scripts and dialogs
+        "evaluate",
+        "evaluate_handle",
+        "evaluate_all",
+        "add_init_script",
+        "add_script_tag",
+        "expose_function",
+        "expose_binding",
+        "accept",
+        "dismiss",
+        # Network and navigation
+        "route",
+        "route_from_har",
+        "request",
+        "goto",
+        "reload",
+        "go_back",
+        "go_forward",
+        # Disk
+        "storage_state",
+        "tracing",
+        "screenshot",
+        "record_video_dir",
+        "record_har_path",
+        # Raw input devices
+        "keyboard",
+        "mouse",
+        "touchscreen",
+    }
+)
+ALL_BANNED = sorted(BANNED_NAMES | GUARD_CHECK.BANNED)
+# The only exemptions (scripts/guard_check.py EXEMPT), also written out here.
+ACT_ALLOWED = frozenset(
+    {
+        "click",
+        "fill",
+        "check",
+        "uncheck",
+        "select_option",
+        "set_input_files",
+        "press",
+        "hover",
+    }
+)
+GO_HOME_ALLOWED = frozenset({"goto", "reload"})
+
+
+@pytest.mark.parametrize(
+    "template, label",
+    [
+        ("x.{name}\n", "{name}"),  # a reference
+        ("x.{name}()\n", "{name}"),  # a call
+        ("getattr(x, '{name}')\n", "getattr {name}"),
+    ],
+    ids=["reference", "call", "getattr"],
+)
+@pytest.mark.parametrize(
+    "rel",
+    ["src/po_agent/mysys/booker.py", "scripts/tool.py", "tests/test_x.py"],
+)
+@pytest.mark.parametrize("name", ALL_BANNED)
+def test_every_banned_name_fails_anywhere(
+    tmp_path, guard_check, name, rel, template, label
+):
+    found = scan(guard_check, tmp_path, rel, template.format(name=name))
+
+    assert len(found) == 1
+    assert found[0].startswith(f"{rel}:1: {label.format(name=name)}: ")
+
+
+@pytest.mark.parametrize("name", ALL_BANNED)
+def test_inside_guard_act_only_the_eight_action_methods_pass(
+    tmp_path, guard_check, name
+):
+    found = scan(guard_check, tmp_path, GUARD, ACT.format(call=f"{name}()"))
+
+    if name in ACT_ALLOWED:
+        assert found == []
+    else:
+        assert len(found) == 1
+        assert found[0].startswith(f"{GUARD}:4: {name}: ")
+
+
+VET = """\
+class ActionGuard:
+    def vet(self, action, scope, target, value=None):
+        target.{call}
+"""
+# (file, source with {call}, line of the call): everywhere but act() in guard.py.
+OUTSIDE_ACT = {
+    "guard.py module level": (GUARD, "element.{call}\n", 1),
+    "guard.py vet()": (GUARD, VET, 3),
+    "act() in another file": ("src/po_agent/mysys/other.py", ACT, 4),
+    "go_home() in driver.py": (DRIVER, GO_HOME, 2),
+}
+
+
+@pytest.mark.parametrize(
+    "rel, source, line", OUTSIDE_ACT.values(), ids=list(OUTSIDE_ACT)
+)
+@pytest.mark.parametrize("name", sorted(ACT_ALLOWED))
+def test_the_eight_action_methods_fail_outside_guard_act(
+    tmp_path, guard_check, name, rel, source, line
+):
+    found = scan(guard_check, tmp_path, rel, source.format(call=f"{name}()"))
+
+    assert len(found) == 1
+    assert found[0].startswith(f"{rel}:{line}: {name}: ")
+
+
+@pytest.mark.parametrize("name", ALL_BANNED)
+def test_inside_driver_go_home_only_goto_and_reload_pass(tmp_path, guard_check, name):
+    found = scan(guard_check, tmp_path, DRIVER, GO_HOME.format(call=f"{name}()"))
+
+    if name in GO_HOME_ALLOWED:
+        assert found == []
+    else:
+        assert len(found) == 1
+        assert found[0].startswith(f"{DRIVER}:2: {name}: ")
+
+
+# (file, source with {call}, line of the call): everywhere but go_home() in driver.py.
+OUTSIDE_GO_HOME = {
+    "driver.py module level": (DRIVER, "page.{call}\n", 1),
+    "driver.py open_note()": (DRIVER, "def open_note(page):\n    page.{call}\n", 2),
+    "go_home() in another file": ("src/po_agent/mysys/booker.py", GO_HOME, 2),
+    "act() in guard.py": (GUARD, ACT, 4),
+}
+
+
+@pytest.mark.parametrize(
+    "rel, source, line", OUTSIDE_GO_HOME.values(), ids=list(OUTSIDE_GO_HOME)
+)
+@pytest.mark.parametrize("name", sorted(GO_HOME_ALLOWED))
+def test_goto_and_reload_fail_outside_driver_go_home(
+    tmp_path, guard_check, name, rel, source, line
+):
+    found = scan(guard_check, tmp_path, rel, source.format(call=f"{name}()"))
+
+    assert len(found) == 1
+    assert found[0].startswith(f"{rel}:{line}: {name}: ")
 
 
 # --- error details are fixed strings (1.5 review) ---------------------------
