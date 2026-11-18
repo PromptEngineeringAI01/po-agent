@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 12 Nov 2026, kept Projects search)
+# PO Agent - decision log (updated 18 Nov 2026, heartbeat once a weekday afternoon)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -54,6 +54,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **12 Nov 2026: upload to Documents; Type Client Documents** (Joey; entry below): the agent's tasks lacked the PDF in their own Client Documents.
 - **12 Nov 2026: G.7 done; G.8: hourly live runs, up to 10 Notes per run** (entry below).
 - **12 Nov 2026: a not-found Projects search clears the kept one first** (entry below): two not-found Notes in a row no longer stop the run.
+- **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
+
+## 18 Nov 2026 - Heartbeat checks about once a weekday afternoon (Joey; accepts a known gap)
+
+- **Measured (advisor, 18 Nov 2026, `gh run list --workflow heartbeat.yml`):** 11 runs of the missed-heartbeat check since it was enabled on 12 Nov (G.8), where the cron asks for every 30 minutes, 09:07-19:37 Perth on weekdays. 12 Nov: 4 runs inside the schedule, 13:32-16:57 Perth. 13, 16 and 17 Nov: exactly one run each inside the schedule (07:47, 07:52 and 09:02 UTC = 15:47, 15:52 and 17:02 Perth). Each of those four days also had one run hours late, after Perth midnight (01:30, 00:08, 02:20 and 02:26 Perth the next day), where `scripts/heartbeat_check.py` (`schedule_time`) counts only the new day's schedule and so checks nothing. GitHub's scheduled workflows are best-effort.
+- **Consequence:** runs that stop in the morning are alerted about that afternoon; runs that stop after the day's check are alerted the next weekday afternoon. The docs promised an alert about 2 hours after the last ping.
+- **Decision (Joey, 18 Nov 2026: "choose this", on accepting a check once a day and changing only the docs):** keep `.github/workflows/heartbeat.yml` and `scripts/heartbeat_check.py` as they are; every doc now says the check runs about once each weekday afternoon. No cost and no new service.
+- **Accepted worst case:** the Mac Mini stops just after the day's check and nobody notices before the next weekday afternoon's alert: about one working day of hourly runs is missed (a morning stop: about half a day). Nothing goes wrong in MySys: the Notes wait in the pool, where the admin can book them by hand, and the POs are booked late. A weekday on which GitHub runs no check inside the schedule (not seen yet) would push the alert a day later again.
+- **Loosens?** No code change; documents a weaker guarantee than gate 6 assumed ("emails Joey when no run has finished for 2 hours inside the schedule").
+- Carried in: `SPEC.md` v1.44 (Production, gate 6), `docs/macmini-setup.md` section 8 and section 10, `docs/ops-runbook.md` (the alert table, unloading the job, Missed heartbeat, `wrapper: heartbeat not sent`), the comments in `.github/workflows/heartbeat.yml` and the `scripts/heartbeat_check.py` docstring.
 
 ## 12 Nov 2026 - A kept "No record found." is cleared before the Projects search (changes what the agent does in MySys)
 
