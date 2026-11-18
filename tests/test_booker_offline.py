@@ -65,7 +65,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, ConsoleMessage, Page, sync_playwright
+from fakes.browser import set_load_timeout
+from playwright.sync_api import Browser, ConsoleMessage, Page
 
 from po_agent.b1 import booker
 from po_agent.b1 import reader_rules as rules
@@ -454,12 +455,7 @@ function confirmHold(task) {{
 </script>"""
 
 
-@pytest.fixture(scope="module")
-def browser() -> Iterator[Browser]:
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        yield browser
-        browser.close()
+# `browser` is tests/conftest.py's: one headless Chromium per module.
 
 
 @pytest.fixture
@@ -701,8 +697,7 @@ def test_w2_submits_once_finds_the_new_task_and_reads_it_back(serve, guard, sear
 def test_after_submit_a_screen_not_as_mapped_is_a_partial_write(
     serve, guard, search, monkeypatch, fake
 ):
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    set_load_timeout(monkeypatch, 2000)
     served = serve(tasks=[CANCELLED], **fake)
 
     with pytest.raises(PartialWrite) as caught:
@@ -742,8 +737,7 @@ def test_after_submit_a_screen_not_as_mapped_is_a_partial_write(
 def test_after_submit_a_wrong_value_is_an_accuracy_breach(
     serve, guard, search, monkeypatch, fake
 ):
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    set_load_timeout(monkeypatch, 2000)
     served = serve(tasks=[CANCELLED], **fake)
 
     with pytest.raises(AccuracyBreach) as caught:
@@ -768,8 +762,7 @@ def test_after_submit_a_wrong_value_is_an_accuracy_breach(
 def test_w2_reads_back_the_profiles_document_type(
     serve, guard, search, monkeypatch, document_type, documents, passes
 ):
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    set_load_timeout(monkeypatch, 2000)
     served = serve(tasks=[CANCELLED], documents=documents)
 
     def book() -> str | None:
@@ -892,8 +885,7 @@ def test_w3_holds_the_new_task_once_and_reads_it_back(serve, guard, search):
 def test_a_hold_dialog_not_as_mapped_closes_the_context_and_is_never_confirmed(
     serve, guard, search, monkeypatch, hold
 ):
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    set_load_timeout(monkeypatch, 2000)
     served = serve(tasks=[CANCELLED], hold=hold)
     page = served[0]
 
@@ -924,8 +916,7 @@ def test_a_hold_dialog_not_as_mapped_closes_the_context_and_is_never_confirmed(
 def test_after_the_hold_confirm_a_read_back_not_as_mapped_is_a_partial_write(
     serve, guard, search, monkeypatch, hold
 ):
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    set_load_timeout(monkeypatch, 2000)
     served = serve(tasks=[CANCELLED], hold=hold)
     page = served[0]
 
@@ -1187,8 +1178,7 @@ class FakeNotePool:
 
 @pytest.fixture
 def short_waits(monkeypatch) -> None:
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 2000)
+    set_load_timeout(monkeypatch, 2000)
     monkeypatch.setattr(booking, "LINK_TIMEOUT_MS", 2000)
 
 

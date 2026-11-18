@@ -2,8 +2,8 @@
 
 Every path goes through `cli.main` and the real run loop (`core/run.py`),
 the real booker and the real guard; only MySys is faked: seam 2's fake
-(tests/seam2/test_run_loop_offline.py) stands in for the driver and the
-booking steps. Values are fake.
+(tests/fakes/mysys.py) stands in for the driver and the booking steps.
+Values are fake.
 
 - LoginFailed / ConfigError -> exit 2; UnexpectedScreen / WriteNotStarted /
   PartialWrite / GuardRefusal -> exit 1; AccuracyBreach -> exit 3; each with
@@ -15,13 +15,13 @@ booking steps. Values are fake.
   stderr.
 """
 
-import importlib.util
 import json
 import tempfile
 from pathlib import Path
 
 import keyring
 import pytest
+from fakes.mysys import AGENT, POOL, FakeNote, FakePage
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
@@ -36,16 +36,6 @@ from po_agent.core.errors import (
 )
 from po_agent.mysys import booking
 from po_agent.mysys.guard import ActionGuard
-
-_spec = importlib.util.spec_from_file_location(
-    "seam2_fake_mysys_for_exit_codes",
-    Path(__file__).parent / "seam2" / "test_run_loop_offline.py",
-)
-fake_mysys = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fake_mysys)
-FakeNote = fake_mysys.FakeNote
-POOL = fake_mysys.POOL
-AGENT = fake_mysys.AGENT
 
 # Stand-ins for what a page or Playwright message can quote: PDF text and a
 # job address. Neither may reach stdout or stderr.
@@ -76,23 +66,7 @@ def env(monkeypatch, tmp_path):
     keyring.set_keyring(previous)
 
 
-@pytest.fixture
-def mysys(env, tmp_path):
-    def install(notes: dict[str, "FakeNote"]) -> "fake_mysys.FakeMySys":
-        rows = tuple(fake_mysys.row(n, note.internal_no) for n, note in notes.items())
-        fake = fake_mysys.FakeMySys(
-            notes=notes,
-            rows=rows,
-            config_dir=tmp_path / "config",
-            logs_dir=tmp_path / "logs",
-        )
-        for name in fake_mysys.DRIVER_NAMES + fake_mysys.BOOKER_DRIVER_NAMES:
-            env.setattr(run.driver, name, getattr(fake, name), raising=False)
-        for name in fake_mysys.BOOKING_NAMES:
-            env.setattr(booking, name, getattr(fake, name))
-        return fake
-
-    return install
+# `mysys` is tests/conftest.py's; it uses this module's `env`.
 
 
 def two_notes(**changes) -> dict[str, "FakeNote"]:
@@ -351,7 +325,7 @@ def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path
     with pytest.raises(WriteNotStarted) as error:
         run._book(
             ActionGuard(),
-            fake_mysys.FakePage(fake.calls),
+            FakePage(fake.calls),
             load_config("test", config_dir),
             ("https://fake.test", "fake-user", "fake-password"),
             other,

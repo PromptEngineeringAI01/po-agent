@@ -9,12 +9,11 @@ run start. The trace is on only when `trace_dir` is set in config and its
 parent folder exists (the Mac Mini wrapper makes ~/Library/Logs/po-agent);
 it never changes the run output.
 
-The driver is seam 2's fake MySys (tests/seam2/test_run_loop_offline.py);
-the decision engine and both PDF readers run for real on its fake PDF. The
-clock is a fake patched in as `controls.now`. Values are fake.
+The driver is seam 2's fake MySys (tests/fakes/mysys.py); the decision
+engine and both PDF readers run for real on its fake PDF. The clock is a
+fake patched in as `controls.now`. Values are fake.
 """
 
-import importlib.util
 import json
 import tempfile
 from datetime import UTC, date, datetime
@@ -22,22 +21,13 @@ from pathlib import Path
 
 import keyring
 import pytest
+from fakes.mysys import CLEAN, FakeNote
 from keyring.backends.null import Keyring as NullKeyring
 from pydantic import ValidationError
 
 from po_agent import cli
 from po_agent.core import controls, run, trace
 from po_agent.core.config import CONFIG_DIR, load_config
-from po_agent.mysys import booking
-
-_spec = importlib.util.spec_from_file_location(
-    "seam2_fake_mysys_for_trace",
-    Path(__file__).parent / "seam2" / "test_run_loop_offline.py",
-)
-fake_mysys = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fake_mysys)
-FakeNote = fake_mysys.FakeNote
-CLEAN = fake_mysys.CLEAN
 
 KEYS = {"run_id", "ts", "note_id", "step", "name", "outcome", "duration_ms"}
 MONDAY_10_PERTH = datetime(2026, 11, 2, 2, 0, tzinfo=UTC)
@@ -87,24 +77,7 @@ def write_config(config_dir: Path, trace_dir: Path, **changes: str) -> None:
     (config_dir / "test.toml").write_text(toml, "utf-8")
 
 
-@pytest.fixture
-def mysys(env, tmp_path):
-    def install(notes: dict, **kwargs):
-        rows = tuple(fake_mysys.row(n, note.internal_no) for n, note in notes.items())
-        fake = fake_mysys.FakeMySys(
-            notes=notes,
-            rows=rows,
-            config_dir=tmp_path / "config",
-            logs_dir=tmp_path / "logs",
-            **kwargs,
-        )
-        for name in fake_mysys.DRIVER_NAMES + fake_mysys.BOOKER_DRIVER_NAMES:
-            env.setattr(run.driver, name, getattr(fake, name), raising=False)
-        for name in fake_mysys.BOOKING_NAMES:
-            env.setattr(booking, name, getattr(fake, name))
-        return fake
-
-    return install
+# `mysys` is tests/conftest.py's; it uses this module's `env`.
 
 
 def stdout_of(capsys) -> list[str]:

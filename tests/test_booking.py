@@ -12,7 +12,7 @@ page themselves (guard_check.py): a click shows up through inline JS.
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Page
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.core.errors import (
@@ -33,12 +33,7 @@ CLOSE = '<div><span title="Close">close</span></div>'
 PDF = b"%PDF-1.4 fake"
 
 
-@pytest.fixture(scope="module")
-def browser() -> Iterator[Browser]:
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        yield browser
-        browser.close()
+# `browser` is tests/conftest.py's: one headless Chromium per module.
 
 
 @pytest.fixture

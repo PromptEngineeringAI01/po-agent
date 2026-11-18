@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from urllib.parse import quote
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Page
 
 from po_agent.b1.models import NotePoolRow
 from po_agent.core import runlog
@@ -33,12 +33,7 @@ USER = "fake-user"
 PASSWORD = "fake-Password-42"
 
 
-@pytest.fixture(scope="module")
-def browser() -> Iterator[Browser]:
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        yield browser
-        browser.close()
+# `browser` is tests/conftest.py's: one headless Chromium per module.
 
 
 @pytest.fixture
