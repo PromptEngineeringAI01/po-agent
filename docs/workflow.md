@@ -164,6 +164,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    - The fewest tests that pin the task's acceptance criteria and its Must-never points. No test that restates the implementation, and no mocking of our own code; fakes only at the edges (MySys pages, the clock), as the seams already do.
    - The session commits the tests as `test:` and carries on: no review stop (5 Nov 2026). It stops for Joey only when the tests force a behaviour choice that is his (e.g. what the run prints for a stopped Note), asked in plain words, one question at a time, with a recommendation.
    - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it.
+   - A refactor (8.x, or acceptance "behaviour unchanged") first proves the tests guard the code it moves: hand-written mutants in a scratch copy, a test row for each survivor (`.claude/skills/start-task/SKILL.md` -> Refactor tasks; decisions, 18 Nov 2026, refactor safety net).
    - When Claude makes the same kind of mistake twice: one targeted regression test plus a line under **Lessons** in `CLAUDE.md` (Joey commits that line).
 4. **Code** until `uv run scripts/check.py` prints "check: all passed", the task's tests pass and nothing under `tests/` changed since the `test:` commit. `/goal` is optional (offline code only).
    - Never `/goal` on anything that touches the test site (seam 2, decide-only, booking): no retry loops against MySys. Those runs stay one at a time, watched.

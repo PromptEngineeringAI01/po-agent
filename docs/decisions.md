@@ -54,6 +54,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **12 Nov 2026: upload to Documents; Type Client Documents** (Joey; entry below): the agent's tasks lacked the PDF in their own Client Documents.
 - **12 Nov 2026: G.7 done; G.8: hourly live runs, up to 10 Notes per run** (entry below).
 - **12 Nov 2026: a not-found Projects search clears the kept one first** (entry below): two not-found Notes in a row no longer stop the run.
+- **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 
 ## 18 Nov 2026 - Heartbeat checks about once a weekday afternoon (Joey; accepts a known gap)
@@ -64,6 +65,12 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Accepted worst case:** the Mac Mini stops just after the day's check and nobody notices before the next weekday afternoon's alert: about one working day of hourly runs is missed (a morning stop: about half a day). Nothing goes wrong in MySys: the Notes wait in the pool, where the admin can book them by hand, and the POs are booked late. A weekday on which GitHub runs no check inside the schedule (not seen yet) would push the alert a day later again.
 - **Loosens?** No code change; documents a weaker guarantee than gate 6 assumed ("emails Joey when no run has finished for 2 hours inside the schedule").
 - Carried in: `SPEC.md` v1.44 (Production, gate 6), `docs/macmini-setup.md` section 8 and section 10, `docs/ops-runbook.md` (the alert table, unloading the job, Missed heartbeat, `wrapper: heartbeat not sent`), the comments in `.github/workflows/heartbeat.yml` and the `scripts/heartbeat_check.py` docstring.
+
+## 18 Nov 2026 - Refactor safety net: hand-written mutants before a behaviour-preserving refactor (Joey: "fix them"; tightens a dev-tooling rule)
+
+- **Found (advisor audit against CMU 17-313, 18 Nov 2026):** `docs/architecture-review.md` calls the run loop's custody rules "well tested", yet a mutant removing `GuardRefusal` from `SUBMITTED_TYPES` (`src/po_agent/core/run.py`) survived every offline test. Refactors 8.1, 8.3 and 8.4 move code like this and lean on the existing tests to say behaviour is unchanged.
+- **Decided:** a refactor task (8.x, or any task whose acceptance says behaviour unchanged) first lists the functions it will move or rewrite, hand-writes 1-2 plausible mutants per function in a scratch copy outside the repo, runs the offline tests that cover each, and adds the missing test row for each survivor in its `test:` commit. The PR's Testing section reports killed/survived per mutant. A mutant is never applied in the worktree. The rule lives in the `/start-task` brief (Refactor tasks) and `docs/workflow.md` step 3.
+- **Scope:** this narrows CLAUDE.md's "no mutation probes" to routine tasks; refactor tasks are the one exception. CLAUDE.md is Joey's, so its line is unchanged here.
 
 ## 12 Nov 2026 - A kept "No record found." is cleared before the Projects search (changes what the agent does in MySys)
 
