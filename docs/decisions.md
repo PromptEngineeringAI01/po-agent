@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 12 Nov 2026, kept Projects search)
+# PO Agent - decision log (updated 18 Nov 2026, refactor safety net)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -54,6 +54,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **12 Nov 2026: upload to Documents; Type Client Documents** (Joey; entry below): the agent's tasks lacked the PDF in their own Client Documents.
 - **12 Nov 2026: G.7 done; G.8: hourly live runs, up to 10 Notes per run** (entry below).
 - **12 Nov 2026: a not-found Projects search clears the kept one first** (entry below): two not-found Notes in a row no longer stop the run.
+- **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
+
+## 18 Nov 2026 - Refactor safety net: hand-written mutants before a behaviour-preserving refactor (Joey: "fix them"; tightens a dev-tooling rule)
+
+- **Found (advisor audit against CMU 17-313, 18 Nov 2026):** `docs/architecture-review.md` calls the run loop's custody rules "well tested", yet a mutant removing `GuardRefusal` from `SUBMITTED_TYPES` (`src/po_agent/core/run.py`) survived every offline test. Refactors 8.1, 8.3 and 8.4 move code like this and lean on the existing tests to say behaviour is unchanged.
+- **Decided:** a refactor task (8.x, or any task whose acceptance says behaviour unchanged) first lists the functions it will move or rewrite, hand-writes 1-2 plausible mutants per function in a scratch copy outside the repo, runs the offline tests that cover each, and adds the missing test row for each survivor in its `test:` commit. The PR's Testing section reports killed/survived per mutant. A mutant is never applied in the worktree. The rule lives in the `/start-task` brief (Refactor tasks) and `docs/workflow.md` step 3.
+- **Scope:** this narrows CLAUDE.md's "no mutation probes" to routine tasks; refactor tasks are the one exception. CLAUDE.md is Joey's, so its line is unchanged here.
 
 ## 12 Nov 2026 - A kept "No record found." is cleared before the Projects search (changes what the agent does in MySys)
 
