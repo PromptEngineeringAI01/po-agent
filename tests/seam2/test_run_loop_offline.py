@@ -36,9 +36,16 @@ from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
 from po_agent.b1.models import MySysLookup, NotePoolRow
-from po_agent.core import run
+from po_agent.core import controls, run
 from po_agent.core.config import CONFIG_DIR
-from po_agent.core.errors import AccuracyBreach, GuardRefusal, UnexpectedScreen
+from po_agent.core.errors import (
+    AccuracyBreach,
+    ConfigError,
+    GuardRefusal,
+    PartialWrite,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
 from po_agent.mysys import booking, driver
 
 _spec = importlib.util.spec_from_file_location(
@@ -61,7 +68,9 @@ PDF = seam1_cases.text_pdf(
 
 @dataclass
 class FakeNote:
-    """One Note as the fake MySys holds it."""
+    """One Note as the fake MySys holds it. `fail_at`, `person_takes_at` and
+    `kill_at` name a call ("check": every call of that name) or one call by
+    its count for this Note ("check#2": the second)."""
 
     internal_no: str
     assignee: str = POOL
@@ -103,6 +112,7 @@ class FakeMySys:
     calls: list[str] = field(default_factory=list)
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
+    counts: Counter = field(default_factory=Counter)  # (Note ID, call name)
 
     def _note(self, window: str) -> tuple[str, FakeNote]:
         note_id = window.removeprefix("window-")
@@ -112,10 +122,12 @@ class FakeMySys:
         self.calls.append(f"{name} {note_id}" if note_id else name)
         if note_id:
             self.current = note_id
+            self.counts[note_id, name] += 1
         note = self.notes.get(note_id) if note_id else None
-        if note and note.person_takes_at == name:
+        named = (name, f"{name}#{self.counts[note_id, name]}")
+        if note and note.person_takes_at in named:
             note.assignee = PERSON
-        if note and note.kill_at == name:
+        if note and note.kill_at in named:
             toml = self.config_dir / "test.toml"
             text = toml.read_text("utf-8")
             assert "enabled = true" in text
@@ -126,7 +138,7 @@ class FakeMySys:
             (log,) = self.logs_dir.glob("*.jsonl")
             log.unlink()
             log.mkdir()
-        if note and note.fail_at == name:
+        if note and note.fail_at in named:
             if note.fail_with is UnexpectedScreen:
                 raise UnexpectedScreen("fake failure", note_id=note_id)
             raise note.fail_with("fake failure")
@@ -1126,6 +1138,264 @@ def test_from_the_submit_click_on_the_note_is_never_returned_and_the_run_stops(
     summary = summary_of(lines)
     assert (summary["booked"], summary["partial"]) == (0, 1)
     assert summary["exit_code"] == exit_code
+
+
+# --- run mode: the custody matrix (decisions, 5 Nov 2026, run mode) ----------------
+# From the Submit click on (W2-W5) a Note is never returned to the pool: its
+# ALERT names it, RUN_SUMMARY counts it as partial, the run stops. Before
+# the click (W1, W2's before_write) a stopped Note is returned. Every way
+# the booker can stop x every fake call it makes.
+
+# The fake's calls from the Submit click on, by the booker's step. W4's
+# assignee check and its find-again are this Note's second call of that
+# name (the first: W1's check, step 2's find).
+AFTER_CLICK_CALLS = {
+    "W2": (
+        "submit",
+        "new_task",
+        "task_row",
+        "open_detail",
+        "detail",
+        "back",
+        "document",
+    ),
+    "W3": ("project_window", "open_hold", "fill_hold", "confirm_hold", "on_hold"),
+    "W4": ("check#2", "find_again#2", "link"),
+    "W5": ("log_count", "solved", "solved_log", "gone"),
+}
+# W1's calls, the form never submitted.
+BEFORE_CLICK_CALLS = ("check#1", "reopen", "form", "fill")
+# A MySys step raising: UnexpectedScreen stands for any PoAgentError the
+# booker converts; RuntimeError for a Playwright error; Ctrl+C.
+RAISED = (
+    UnexpectedScreen,
+    AccuracyBreach,
+    GuardRefusal,
+    RuntimeError,
+    KeyboardInterrupt,
+)
+KILL_SWITCH = "kill-switch"
+PERSON_TAKES = "person-takes"
+NEXT_STEP = {"W2": "W3", "W3": "W4", "W4": "W5", "W5": None}
+
+
+def _after_click_expected(trigger, step: str, call: str) -> tuple[str, str, int] | str:
+    """By the rule: (ALERT kind, its step, exit code), or why the code can't
+    stop there. GuardRefusal and AccuracyBreach keep their kind, every other
+    error is PARTIAL_WRITE; exit 3 for an accuracy breach, else 1."""
+    if trigger == KILL_SWITCH:
+        # Re-read by each step's before_write: it stops the next step.
+        if NEXT_STEP[step] is None:
+            return "no before_write after W5's: the booking finishes"
+        return ("PARTIAL_WRITE", NEXT_STEP[step], 1)
+    if trigger == PERSON_TAKES:
+        # D7: the assignee is checked before W1 and W4 only.
+        if step == "W5" or (step == "W4" and call != "check#2"):
+            return "no assignee check after W4's (D7): the booking finishes"
+        return ("PARTIAL_WRITE", "W4", 1)
+    if call == "check#2":
+        # W4's assignee check: any failure is PartialWrite (D7; booker W4).
+        return ("PARTIAL_WRITE", "W4", 1)
+    if trigger is AccuracyBreach:
+        return ("ACCURACY_BREACH", step, 3)
+    if trigger is GuardRefusal:
+        return ("GUARD_REFUSAL", step, 1)
+    return ("PARTIAL_WRITE", step, 1)
+
+
+def _trigger_changes(trigger, call: str) -> dict:
+    if trigger == KILL_SWITCH:
+        return {"kill_at": call}
+    if trigger == PERSON_TAKES:
+        return {"person_takes_at": call}
+    return {"fail_at": call, "fail_with": trigger}
+
+
+def _trigger_id(trigger) -> str:
+    return trigger if isinstance(trigger, str) else trigger.__name__
+
+
+def _after_click_cases() -> list:
+    cases = []
+    for trigger in (*RAISED, KILL_SWITCH, PERSON_TAKES):
+        for step, calls in AFTER_CLICK_CALLS.items():
+            for call in calls:
+                expected = _after_click_expected(trigger, step, call)
+                marks = ()
+                if isinstance(expected, str):
+                    marks = pytest.mark.skip(reason=expected)
+                    expected = (None, None, None)
+                cases.append(
+                    pytest.param(
+                        trigger,
+                        call,
+                        *expected,
+                        id=f"{_trigger_id(trigger)}-{step}-{call}",
+                        marks=marks,
+                    )
+                )
+    return cases
+
+
+@pytest.mark.parametrize(
+    ("trigger", "call", "kind", "step", "exit_code"), _after_click_cases()
+)
+def test_custody_matrix_from_the_submit_click_on_the_note_is_never_returned(
+    mysys, capsys, trigger, call, kind, step, exit_code
+):
+    fake = mysys(
+        {
+            "300002": FakeNote("2600001B", **_trigger_changes(trigger, call)),
+            "300001": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert "submit 300002" in fake.calls
+    # No return attempted: no fresh browser, no Assign back to the pool.
+    assert fake.calls.count("open_browser") == 1
+    assert not [c for c in fake.calls if c.startswith("return")]
+    holder = PERSON if trigger == PERSON_TAKES else AGENT
+    assert fake.notes["300002"].assignee == holder
+    assert "300001" not in opened(fake)  # the run stopped
+    ((alert_kind, alert),) = alerts_of(lines)
+    assert (alert_kind, alert["note_id"], alert["step"]) == (kind, "300002", step)
+    assert notes_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"]) == (0, 1)
+    assert (code, summary["exit_code"]) == (exit_code, exit_code)
+
+
+@pytest.mark.parametrize("call", BEFORE_CLICK_CALLS)
+@pytest.mark.parametrize(
+    "trigger", [t for t in RAISED if t is not KeyboardInterrupt], ids=_trigger_id
+)
+def test_custody_matrix_before_the_submit_click_the_note_is_returned(
+    mysys, capsys, trigger, call
+):
+    fake = mysys(
+        {
+            "300002": FakeNote("2600001B", fail_at=call, fail_with=trigger),
+            "300001": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert "submit 300002" not in fake.calls
+    # One return, in a fresh browser context.
+    assert fake.calls.count("open_browser") == 2
+    assert [c for c in fake.calls if c.startswith("return")] == ["return 300002"]
+    assert fake.calls.index("return 300002") > fake.calls.index("closed")
+    assert fake.notes["300002"].assignee == POOL
+    assert "300001" not in opened(fake)  # the run stopped
+    ((alert_kind, alert),) = alerts_of(lines)
+    assert alert["note_id"] == "300002"
+    assert alert_kind != "PARTIAL_WRITE"
+    assert "not returned" not in alert["detail"]
+    assert notes_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"]) == (0, 0)
+    expected = 3 if alert_kind == "ACCURACY_BREACH" else 1
+    assert (code, summary["exit_code"]) == (expected, expected)
+
+
+@pytest.mark.parametrize("call", BEFORE_CLICK_CALLS)
+def test_custody_matrix_ctrl_c_before_the_submit_click_names_the_note_not_returned(
+    mysys, capsys, call
+):
+    # Ctrl+C skips the return (run.py), and the ALERT says which Note stays
+    # with the agent; nothing was submitted, so it is no partial write.
+    fake = mysys(
+        {
+            "300002": FakeNote("2600001B", fail_at=call, fail_with=KeyboardInterrupt),
+            "300001": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert "submit 300002" not in fake.calls
+    assert fake.calls.count("open_browser") == 1
+    assert not [c for c in fake.calls if c.startswith("return")]
+    assert fake.notes["300002"].assignee == AGENT
+    ((alert_kind, alert),) = alerts_of(lines)
+    assert (alert_kind, alert["note_id"]) == ("UNEXPECTED_SCREEN", "300002")
+    assert "not returned to the pool" in alert["detail"]
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"]) == (0, 0)
+    assert (code, summary["exit_code"]) == (1, 1)
+
+
+# The kill switch read by W1's before_write (set during the project read)
+# or W2's (set during any W1 call): before the click.
+@pytest.mark.parametrize("call", ["lookup", *BEFORE_CLICK_CALLS])
+def test_custody_matrix_a_kill_switch_before_the_submit_click_returns_the_note(
+    mysys, capsys, call
+):
+    fake = mysys(
+        {
+            "300002": FakeNote("2600001B", kill_at=call),
+            "300001": FakeNote("2600002B", names=()),
+        }
+    )
+
+    code = book_run()
+
+    lines = output(capsys)
+    assert "submit 300002" not in fake.calls
+    assert fake.calls.count("open_browser") == 2
+    assert [c for c in fake.calls if c.startswith("return")] == ["return 300002"]
+    assert fake.notes["300002"].assignee == POOL
+    assert "300001" not in opened(fake)
+    assert "INFO  kill switch on: run stopped" in lines
+    assert alerts_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["booked"], summary["partial"]) == (0, 0)
+    assert (code, summary["exit_code"]) == (0, 0)
+
+
+# The run loop's backstop (run._submitted): the booker gives every error
+# from the click on one of its three types, so no fake call reaches an
+# error of another type that names W3-W5. Pinned here directly.
+def _stop(error_type, step):
+    if error_type is controls.KillSwitch:
+        return controls.KillSwitch(note_id="300001", step=step)
+    if error_type is controls.NoteTaken:
+        return controls.NoteTaken(note_id="300001", step=step)
+    return error_type("fake stop", note_id="300001", step=step)
+
+
+AFTER_CLICK_TYPES = (PartialWrite, AccuracyBreach, GuardRefusal)
+OTHER_TYPES = (
+    UnexpectedScreen,
+    WriteNotStarted,
+    ConfigError,
+    controls.KillSwitch,
+    controls.NoteTaken,
+)
+
+
+@pytest.mark.parametrize("step", [None, "W1", "W2", "W3", "W4", "W5"])
+@pytest.mark.parametrize(
+    "error_type", AFTER_CLICK_TYPES + OTHER_TYPES, ids=lambda t: t.__name__
+)
+def test_custody_matrix_what_counts_as_past_the_submit_click(error_type, step):
+    # W3-W5: past the click, whatever the type. W2: only the booker's
+    # after-click types (its before_write errors also say W2).
+    past = step in ("W3", "W4", "W5") or (
+        step == "W2" and error_type in AFTER_CLICK_TYPES
+    )
+    assert run._submitted(_stop(error_type, step)) is past
+
+
+def test_custody_matrix_an_error_with_no_step_is_before_the_click():
+    assert run._submitted(RuntimeError("fake")) is False
+    assert run._submitted(KeyboardInterrupt()) is False
 
 
 # --- run mode: what the run knows about Submit, not the last exception (4.5 review)
