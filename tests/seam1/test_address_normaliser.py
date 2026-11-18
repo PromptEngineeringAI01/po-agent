@@ -409,6 +409,41 @@ def test_anything_else_after_the_suburb_is_a_mismatch(tail: str) -> None:
     assert verify_address(text, PROJECT) is SkipReason.ADDRESS_MISMATCH
 
 
+# The tail is nothing, a state, a 4-digit postcode, or both in either order:
+# at most one state and at most one postcode (SPEC.md -> MySys screen rules ->
+# Project address; audit item 6, 18 Nov 2026). Both modes, and the address on
+# the label line or on the line under it.
+
+
+@pytest.mark.parametrize(
+    ("pdf_text", "exact"),
+    [
+        (PDF_TEXT, False),
+        (PYPDF_TEXT, True),
+        ("Job Address: Lot 123 / Sample Lane Sampleville WA", False),
+        ("Job Address: Lot 123 / Sample Lane Sampleville WA", True),
+    ],
+    ids=[
+        "pdfplumber-line-under",
+        "pypdf-line-under",
+        "label-line",
+        "label-line-exact",
+    ],
+)
+@pytest.mark.parametrize("tail", [" WA NSW", " WA WA", " 6000 6000", " WA 6000 WA"])
+def test_a_tail_of_two_states_or_two_postcodes_is_a_mismatch(
+    pdf_text: str, exact: bool, tail: str
+) -> None:
+    # The layout passes with its one-state tail, so the tail decides.
+    assert verify_address(pdf_text, PROJECT, exact_line_under=exact) is None
+    text = pdf_text.replace(
+        "Sample Lane Sampleville WA", f"Sample Lane Sampleville{tail}"
+    )
+    assert text != pdf_text
+    result = verify_address(text, PROJECT, exact_line_under=exact)
+    assert result is SkipReason.ADDRESS_MISMATCH
+
+
 @pytest.mark.parametrize(
     "line",
     [
