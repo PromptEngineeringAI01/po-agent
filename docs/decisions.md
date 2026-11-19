@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage: `poagent` logged out)
+# PO Agent - decision log (updated 19 Nov 2026, CI once per commit)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -57,6 +57,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
+- **19 Nov 2026: CI once per commit** (Software Factory audit item 3; Joey: "yes, send them"; entry below): `check.yml` runs on PRs and on pushes to `main` only, and a newer commit cancels the older run.
+
+## 19 Nov 2026 - CI once per commit (Software Factory audit item 3; Joey: "yes, send them"; loosens a safety control slightly)
+
+- **Found:** `check.yml` ran on every `push` and every `pull_request`, so each PR commit ran the ~14-minute check twice (measured 1.58 runs per head SHA).
+- **Decided:** the trigger is `push: branches: [main]` plus `pull_request:`, with `concurrency: {group: check-${{ github.ref }}, cancel-in-progress: true}`. A PR commit runs once (the `pull_request` run); a merge to `main` runs once (the `push` run); a newer commit on the same PR or on `main` cancels the older, unfinished run.
+- **Branch protection:** `main` requires the `check` status from GitHub Actions. The `pull_request` run's job is still named `check`, so the required status still comes from it; nothing changes in the protection settings.
+- **What no longer runs CI:** a push to a branch with no PR, and a tag push. The Mac Mini's `production` tag is moved by Joey to a commit already merged to `main`, which the `push` run on `main` checked, so skipping it loses no check. A branch needs a PR before CI runs; every merge goes through a PR anyway (`/verify-pr`, Must never #9).
+- **Test:** `tests/test_precommit_ci.py::test_ci_runs_on_push_and_pull_request` becomes `test_ci_runs_once_per_commit` and also asserts the `main` filter and the concurrency group, in its own `test:` commit (Must never #8; decisions, 6 Nov 2026).
+- **Loosens?** Slightly: tag pushes and PR-less branch pushes no longer run CI. Neither can reach `main` without a PR, and `main`'s merges are still checked. `SPEC.md` (Boundaries, CI line) changes with this entry.
 
 ## 19 Nov 2026 - Mac Mini stopped after a macOS update: `poagent` logged out (Joey; ops rule, loosens nothing)
 
