@@ -18,6 +18,7 @@ git -C <repo> log --oneline -1 origin/main
 
 - If the previous task's PR is still open, say so in one line and stop: the next task builds on it.
 - If the main checkout is on `main` with no tracked changes, `git pull -q`. Never switch a branch another session is using.
+- **WIP limit: at most 2 coding task sessions at once** (advisor and read-only sessions don't count; Joey, 19 Nov 2026, the solo version of CMU 17-313 P2's one card in progress). Count linked sessions that are working or waiting on a task branch with no merged PR (`list_sessions` with `linked: true`). At 2, don't start: say in one line which two are open and that the next starts when one merges. Joey can lift it for one start by saying so.
 - Run `/cleanup-worktrees report`. Under 5 candidates: mention the count in the step 4 report line, nothing more. 5 or more: run `/cleanup-worktrees` (it asks Joey once) before step 2.
 
 ## 2. Pick the task
