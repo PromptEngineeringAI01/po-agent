@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 18 Nov 2026, heartbeat once a weekday afternoon)
+# PO Agent - decision log (updated 19 Nov 2026, Healthchecks.io heartbeat)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -56,6 +56,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **12 Nov 2026: a not-found Projects search clears the kept one first** (entry below): two not-found Notes in a row no longer stop the run.
 - **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
+- **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
+
+## 19 Nov 2026 - Healthchecks.io heartbeat (Joey: "Yes, build D"; adds an external service and a secret)
+
+- **Found:** on 18 and 19 Nov 2026 the Mac Mini stopped running for hours: a macOS update restarted it, then the screen lock was logging `poagent` out while an admin account stayed logged in. The missed-heartbeat alert came only that afternoon, as the 18 Nov entry below expects. Two more limits of the GitHub check: its schedule is best-effort (about one useful firing a weekday, measured 12-17 Nov), and GitHub disables scheduled workflows in a public repo after 60 days without activity, which nobody can promise to prevent.
+- **Compared (advisor, 19 Nov 2026):** a keepalive workflow, the Mac Mini re-enabling the workflow, and Healthchecks.io. Joey chose Healthchecks.io's free Hobbyist plan: 20 checks, a cron schedule with a timezone and a grace time, email alerts. An alert comes within about an hour of a missed run, and each future agent (2 more clients are planned) can have its own check. No multi-client code now.
+- **Decided:** at the end of every run, after the GitHub ping (`scripts/macmini-run.sh`, `healthchecks_ping`), the wrapper sends a **plain** ping (a GET of the check's ping URL, never `<url>/<exit code>`), whatever the exit code. Healthchecks.io answers only "did it run": failed runs already open an alert issue, and a failure signal would email twice about the same run. The URL comes from `PO_AGENT_HEALTHCHECKS_PING_URL` (the tests only; never set on the Mac Mini), else `poagent`'s login Keychain, service `po-agent`, account `healthchecks_ping_url`, read with `security find-generic-password -w`. It is sent with `curl -fsS -m 20 --retry 2 --retry-max-time 40`, the URL as curl config on stdin (so not in the process list), all curl output to `/dev/null`. No URL logs `wrapper: healthchecks ping not configured`; a failed ping (or a URL that isn't one plain `https://` word) logs `wrapper: healthchecks ping not sent`. Neither changes the exit code or skips the GitHub ping. The URL never reaches `runs.log`, `launchd.log`, stdout or stderr.
+- **The check (Joey, by hand, `docs/macmini-setup.md` section 1):** cron `7 7-17 * * 1-5`, timezone `Australia/Perth`, grace 40 minutes (a run lasts up to 20 minutes, plus setup and two `gh` calls of up to 60 seconds each, and the ping comes at the end), email alerts to Joey. A missed run alerts about 45 minutes after its :07 start. A `spike` run by hand pings too, which is harmless.
+- **The GitHub heartbeat stays** (`.github/workflows/heartbeat.yml`, the `po-agent-heartbeat` issue) unchanged, as a backup for now. Dropping it is a later choice of Joey's once Healthchecks.io has proved itself.
+- **Reverses:** "not healthchecks.io" (5 Nov 2026, heartbeat built: no new service, no new secret) and "no extra service" (18 Nov 2026, heartbeat once a weekday afternoon). The 18 Nov accepted worst case (about a working day unseen) no longer holds once the check is set up and the `production` tag is on this change.
+- **Loosens?** Yes: a new external service (Healthchecks.io learns only when a run ended; no PO data, no exit code) and a new secret (the ping URL: whoever has it can ping the check and hide a stop, so it lives only in `poagent`'s Keychain, never in a file, log or chat). Takes effect only once Joey has created the check, stored the URL and moved the `production` tag.
+- Carried in: `SPEC.md` v1.45 (Secrets, Production gate 6), `docs/macmini-setup.md` (sections 1, 7, 8, 9 and 10), `docs/ops-runbook.md` (the alert table, unloading the job, who is told, Healthchecks.io down email, the new `wrapper:` lines), `tests/test_macmini_wrapper.py`.
 
 ## 18 Nov 2026 - Heartbeat checks about once a weekday afternoon (Joey; accepts a known gap)
 

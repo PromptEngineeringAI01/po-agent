@@ -31,6 +31,10 @@
 #    heartbeat workflow (.github/workflows/heartbeat.yml) opens an alert when
 #    no ping arrives for 2 hours inside the schedule. A failed ping only logs
 #    a fixed line; it never changes the exit code.
+# 6. Then, every run too, pings the run's Healthchecks.io check (decisions,
+#    19 Nov 2026), whose URL is in poagent's Keychain; Healthchecks.io emails
+#    Joey when a scheduled run doesn't ping. No URL, or a failed ping, only
+#    logs a fixed line; it never changes the exit code.
 #
 # Written for macOS's /bin/bash 3.2: no GNU timeout, no setsid.
 
@@ -168,6 +172,42 @@ run_id: ${run_id:-none}" > /dev/null 2>&1; then
   fi
 }
 
+# The Healthchecks.io ping (step 6; decisions, 19 Nov 2026): a plain GET of
+# the check's ping URL, whatever the exit code (failed runs already open an
+# alert issue). The URL is a secret: from PO_AGENT_HEALTHCHECKS_PING_URL (the
+# tests), else poagent's login Keychain (service po-agent, the store keyring
+# uses). It goes to curl as config on stdin, so it is never in the process
+# list, and curl's output goes nowhere, so it never reaches a log. curl's own
+# limits (20 s an attempt, 2 retries, no retry after 40 s) keep a hung
+# network from holding the wrapper.
+healthchecks_ping() {
+  local url="${PO_AGENT_HEALTHCHECKS_PING_URL:-}"
+  if [ -z "$url" ]; then
+    url="$(security find-generic-password -s po-agent -a healthchecks_ping_url \
+      -w 2> /dev/null)" || url=""
+  fi
+  case "$url" in
+    *'"'* | *'\'* | *[[:space:]]*) # would break the curl config line
+      log "wrapper: healthchecks ping not sent"
+      return 0
+      ;;
+    https://*) ;;
+    "")
+      log "wrapper: healthchecks ping not configured"
+      return 0
+      ;;
+    *)
+      log "wrapper: healthchecks ping not sent"
+      return 0
+      ;;
+  esac
+  if ! printf 'url = "%s"\n' "$url" |
+    curl -fsS -m 20 --retry 2 --retry-max-time 40 -o /dev/null -K - \
+      > /dev/null 2>&1; then
+    log "wrapper: healthchecks ping not sent"
+  fi
+}
+
 cleanup() {
   stop_group
   [ -z "$OUT" ] || rm -f "$OUT"
@@ -181,6 +221,7 @@ on_exit() {
   trap '' INT TERM HUP
   cleanup
   heartbeat "$code"
+  healthchecks_ping
   exit "$code"
 }
 trap on_exit EXIT

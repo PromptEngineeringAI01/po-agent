@@ -28,7 +28,9 @@ Every alert is a GitHub issue labelled `po-agent-alert`, and GitHub sends an ema
 |---|---|---|
 | `po-agent alert <run_id>` | The Mac Mini, after a run that printed an `ALERT` line or exited non-zero | The `ALERT` lines without Note IDs, sometimes a `wrapper:` line, and `exit code: <n>` |
 | `po-agent alert no run_id` | The Mac Mini, when the agent didn't start or printed no summary | A `wrapper:` line and `exit code: <n>` |
-| `po-agent heartbeat missed` | GitHub itself (`.github/workflows/heartbeat.yml`) | No run has finished for more than 2 hours inside the schedule. Checked about once each weekday afternoon, so it can arrive hours after runs stopped |
+| `po-agent heartbeat missed` | GitHub itself (`.github/workflows/heartbeat.yml`) | No run has finished for more than 2 hours inside the schedule. Checked about once each weekday afternoon, so it can arrive hours after runs stopped. A backup since 19 Nov 2026 |
+
+**One alert is an email, not an issue:** Healthchecks.io emails Joey when the check `po-agent b1-homes` goes **down**: no run has ended within 40 minutes of a scheduled :07 (decisions, 19 Nov 2026). It comes within about an hour of a stop; see "Healthchecks.io down" in section 4. It emails again when the check is **up**.
 
 An `ALERT` line looks like this (placeholders in `<>`):
 
@@ -67,7 +69,7 @@ Either one stops the next run. After an `ACCURACY_BREACH`, do both.
    Check: `launchctl print gui/$(id -u)/au.com.prompteng.po-agent` (as `poagent`) now says it can't find the service. If a run was going (from :07, for up to 20 minutes), it is stopped too and may leave a Note with the agent: check for one (3.3) before you restart. Between about :30 and :05 no run is going.
 2. **The kill switch** (Joey): `enabled = false` in the site's config on `main` (`config/live.toml` after go-live, `config/test.toml` for test runs), through a pull request. The next run reads it from `main` whatever commit the `production` tag is on, logs `wrapper: enabled = false on main, agent not run`, runs nothing, opens no alert and exits 0.
 
-While the job is unloaded, the heartbeat check will open `po-agent heartbeat missed` once 2 hours inside the schedule have passed, at its next weekday-afternoon check. That is expected: leave it open until runs are back.
+While the job is unloaded, the heartbeat check will open `po-agent heartbeat missed` once 2 hours inside the schedule have passed, at its next weekday-afternoon check. That is expected: leave it open until runs are back. The Healthchecks.io check goes down within about an hour too and emails Joey; if the stop is planned, Joey can **Pause** the check in Healthchecks.io (the next ping resumes it). The kill switch doesn't trip either alert: each run still ends and pings.
 
 ### 3.2 Restart the agent
 
@@ -149,7 +151,7 @@ The username works the same way with `mysys_live_username`. For the test site, u
 
 ### 3.8 Who is told
 
-- **Joey:** GitHub emails him about every alert issue, automatically.
+- **Joey:** GitHub emails him about every alert issue, automatically, and Healthchecks.io emails him when its check is down or up again (his account; nobody else gets those).
 - **The backup admin:** gets the same email by watching the repository's issues (section 1). Acts when Joey is away, and comments on the issue so Joey knows what was done.
 - **The CEO:** only after an `ACCURACY_BREACH`. The agent restarts only with the CEO's agreement.
 - On the test site no client is affected and the PO admin isn't involved, so nobody else needs telling. On live, who else is told is Joey's call (not decided yet).
@@ -241,6 +243,14 @@ Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was neve
 - **Restart:** once a run has finished (`RUN_SUMMARY` in `runs.log`), **close** the `po-agent heartbeat missed` issue (or ask Joey to, if your GitHub account can't). Another one opens if runs stop again.
 - **Told:** Joey (automatic; GitHub emails him about this issue directly).
 
+### Healthchecks.io down (an email, not an issue)
+
+- **Means:** Healthchecks.io's check `po-agent b1-homes` got no ping within 40 minutes of a scheduled run (07:07 to 17:07 Perth, weekdays; decisions, 19 Nov 2026). Every run pings at its end, even a failed one, so runs aren't happening, or they run but can't reach Healthchecks.io. Comes within about an hour of the stop. A failed run is not this alert: it opens its own issue.
+- **Check:** the same steps as Missed heartbeat above (an unload on purpose, the FileVault screen or a logged-out `poagent`, the job loaded, a Keychain dialog), except in step 4: if recent runs in `runs.log` show `wrapper: healthchecks ping not sent`, runs work but Healthchecks.io can't be reached (the internet, or Healthchecks.io itself); `wrapper: healthchecks ping not configured` means the URL is missing from `poagent`'s Keychain (Joey stores it again, `docs/macmini-setup.md` section 7). Runs with neither line and a `RUN_SUMMARY` mean the ping went: look at the check's page for its last ping.
+- **In MySys:** nothing to undo. Notes wait in the pool until runs are back.
+- **Restart:** as in 3.2 (log `poagent` in, lock the screen with Control-Command-Q, load the job if it is gone). Nothing to close: the next run's ping turns the check **up**, and Healthchecks.io emails that too. If the GitHub backup also opened `po-agent heartbeat missed`, close that once a run has finished.
+- **Told:** Joey (automatic; only his Healthchecks.io account gets the email). The backup admin sees no email for this one: Joey asks them to go to the Mac if he is away.
+
 ### Wrapper setup failed (exit 2)
 
 The issue (`po-agent alert no run_id`) holds `wrapper: setup failed (<step>), agent not run` and `exit code: 2`. The Mac Mini fetches the code and checks the switch before each run; when that fails, the agent doesn't run at all and never falls back to older code on disk. Nothing in MySys changed. For more, as `poagent`: `tail -50 ~/Library/Logs/po-agent/launchd.log`.
@@ -261,5 +271,7 @@ The issue (`po-agent alert no run_id`) holds `wrapper: setup failed (<step>), ag
 - **`wrapper: agent killed at the 1200s limit`** (exit 1, in the alert issue): the run took over 20 minutes and was stopped. Usual causes: a Keychain dialog waiting for a click (3.7 step 4) or MySys very slow. A Note it was working on may be left with the agent: the next run then stops with `UNEXPECTED_SCREEN` "a Note is still assigned to the agent from an earlier run"; follow that entry.
 - **`wrapper: alert issue not opened`** (in `runs.log` only): GitHub couldn't be reached, so an alert wasn't raised. Read the `ALERT` lines just above it in `runs.log` and act on them as if the issue had opened. Then check the internet and the GitHub token (`git fetch` above).
 - **`wrapper: heartbeat not sent`** (in `runs.log` only): the run's ping didn't reach GitHub. Two hours of this inside the schedule opens `po-agent heartbeat missed` at the next weekday-afternoon check.
+- **`wrapper: healthchecks ping not sent`** (in `runs.log` only): the run's Healthchecks.io ping failed (no internet, or Healthchecks.io down). The run itself is unaffected. Once in a while is fine; on every run the check goes down and emails Joey.
+- **`wrapper: healthchecks ping not configured`** (in `runs.log` only): no Healthchecks.io ping URL in `poagent`'s Keychain, so no ping is sent. Expected until Joey stores it (`docs/macmini-setup.md` sections 1 and 7); after that, Joey stores it again.
 - **`wrapper: enabled = false on main, agent not run`**: not an alert. The kill switch is on; runs start again when Joey sets it back to `true`.
 - **`wrapper: leftover Playwright browser killed`**: not an alert. Housekeeping after a run.
