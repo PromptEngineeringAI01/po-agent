@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.49 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.50 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -162,7 +162,7 @@ private/                        GIT-IGNORED, laptop only: real data
   fixtures/cases.toml           expected results for real POs and the 3 trial POs, entered by Joey from MySys
   captures/                     Playwright CLI snapshots and screenshots (test), live screenshots
 docs/                           intent, decisions, workflow, Mac Mini setup, screen map, v1 spec pack
-.claude/settings.json, hooks/   permissions (incl. the Playwright CLI deny list; routine git and gh allowed, risky git and gh ask, decisions 19 Nov 2026) and hooks (added in M1; protect_paths writes outside the repo only to ~/.claude/plans/, the project memory folder and <temp>/claude/; inside a Claude Code worktree at .claude/worktrees/<name>/ the repo rules apply from that worktree's root, decisions 30 Oct 2026)
+.claude/settings.json, hooks/   permissions (incl. the Playwright CLI deny list; routine git and gh allowed, data-deleting git and gh api writes denied, other risky git and gh ask, decisions 19 Nov 2026) and hooks (added in M1; protect_paths writes outside the repo only to ~/.claude/plans/, the project memory folder and <temp>/claude/; inside a Claude Code worktree at .claude/worktrees/<name>/ the repo rules apply from that worktree's root, decisions 30 Oct 2026)
 .playwright/cli.config.json     Playwright CLI config for screen mapping (in-memory profile, live origin blocked)
 .github/workflows/check.yml     CI: uv sync --locked, check, gitleaks; no secrets
 ```

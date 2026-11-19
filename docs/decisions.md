@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions; context diet; parallel check)
+# PO Agent - decision log (updated 19 Nov 2026, risk is computed, not self-declared; data-deleting git commands denied; parallel check)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -58,8 +58,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
 - **19 Nov 2026: the check runs the offline tests in parallel** (Joey: "照順序開始"; entry below): pytest-xdist added; `check.py --quick <test paths>` added; seam 2 never runs in parallel.
+- **19 Nov 2026: data-deleting git commands denied** (Joey: "Move to deny + fix docs"; entry below): ask rules did not prompt in Desktop auto mode, so destructive git commands and `gh api` writes move to deny.
 - **19 Nov 2026: committed permissions** (Joey: "照順序開始"; entry below): routine git and gh commands are allowed in `.claude/settings.json` for every worktree; risky ones always ask; `settings.local.json` is emptied.
 - **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
+- **19 Nov 2026: risk is computed, not self-declared** (Software Factory audit item 1; entry below): `scripts/risk.py` gives a PR's risk level from its changed files.
+
+## 19 Nov 2026 - Risk is computed, not self-declared (Joey: "yes, send them"; tightens a dev-tooling rule)
+
+- **Found (Software Factory audit, 19 Nov 2026):** a PR's risk level sets its review depth (`docs/workflow.md` step 5-6), but the session that wrote the code declared it, and `/verify-pr` compared it with the table by reading the file list.
+- **Decided:** `uv run scripts/risk.py [<ref>]` diffs the branch (default `HEAD`) against its merge base with `origin/main` and prints `risk: low|medium|high` and the file that set it; the highest file wins. High: `src/po_agent/mysys/`, the booker, `reader_rules.py`, `decision.py`, `address.py`, `scripts/guard_check.py`, `scripts/check.py` (= CI), `.claude/hooks/`, `.claude/settings*.json`, `.github/workflows/`. Medium: any other file under `src/` or `scripts/`. Low: everything else. Over 400 changed lines it also prints a warning. The PR's Risk section states at least the computed level; a lower stated level is Important in `/verify-pr` step 4 once Joey applies that change to the skill (its patch is in the PR that adds the script). A session may still declare a higher level than computed, e.g. for `config/live.toml`.
+- **Loosens?** No: it tightens a dev-tooling rule. Nothing changes in what the agent does in MySys or prints.
 
 ## 19 Nov 2026 - Parallel offline tests in the check; `--quick` (Joey: "照順序開始"; new dev dependency, loosens nothing)
 
@@ -68,7 +76,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Safety net:** `tests/xdist_guard.py` (loaded by `tests/conftest.py`) stops any run that selects a `testsite` test when `-n` is set or inside an xdist worker, `--collect-only` included: seam 2 drives the one test site with one account, one test at a time. `tests/test_xdist_guard.py` proves it.
 - **Tests changed (Must never #8):** `tests/test_check.py` expects the pytest step's new arguments and the `--quick` mode.
 - **Loosens?** No: the same tests run with the same marker filter; only their order and process change.
-- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `tests/conftest.py`, `SPEC.md` v1.49 (Commands).
+- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `tests/conftest.py`, `SPEC.md` v1.50 (Commands).
 
 ## 19 Nov 2026 - SPEC history and Must never #3 details move out of the always-read files (Joey: "照順序開始"; loosens nothing)
 
@@ -77,12 +85,20 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Loosens?** No: no rule is dropped or reworded in meaning; only where the text lives changes.
 - Carried in: `CLAUDE.md` Must never #3, `docs/spec-changelog.md`, `SPEC.md` v1.47 (status line) and v1.48 (Boundaries, Live site).
 
+## 19 Nov 2026 - Ask rules don't prompt in Desktop auto mode; data-deleting git commands move to deny (Joey: "Move to deny + fix docs"; tightens a safety control)
+
+- **Found (setup advisor, 19 Nov 2026, CMU 17-313 P1A "prove each automation fires"):** after the committed-permissions merge (`4303fb9`), a fresh auto-mode session in the Claude Desktop Code tab, started from the main checkout on that commit, ran `git config --get core.autocrlf` with no prompt, although `.claude/settings.json` lists `Bash(git config *)` under `ask`. The Claude Code docs say ask rules still force a prompt in auto mode; the Desktop app did not. Deny rules do work there: a Read of `./.env.probe` was refused by `Read(./.env*)`.
+- **Decided:** commands that delete local work, rewrite history, change git config or write through the GitHub API move from `ask` to `deny`, which is enforced in every mode: `git config`, `git reset --hard`, `git clean`, `git restore`, `git checkout -- <path>` and `git checkout .`, `git stash drop|clear`, `git rebase`, `git branch -D`, `git worktree remove --force|-f`, and `gh api` with `-X`, `--method`, `-f`, `-F`, `--field`, `--raw-field` or `--input` (with `git -C <dir>` forms where they apply). Joey runs any of these by hand when he needs one.
+- **Still ask** (prompts in the CLI; in Desktop auto mode the classifier decides): read-only `gh api`, `gh issue create|comment|close|edit`, `gh pr close|edit`, `gh workflow enable|disable|run`, `gh release`, `git checkout`, `git reset` (not `--hard`), `git stash`, `git tag`, `git worktree remove|prune`, `git branch -d`. `/cleanup-worktrees` keeps working: it uses only `git worktree remove` without `--force` and `git branch -d`, after Joey's yes.
+- **Unchanged:** `guard_bash.py` and `protect_paths.py` run on every call in every mode (push to `main`, force push, the pinned merge, live host, secrets, `rm -rf`).
+- **Loosens?** No: tightens. Carried in: `.claude/settings.json`, `SPEC.md` v1.49 (Project Structure, `.claude/settings.json` line; version note in `docs/spec-changelog.md`).
+
 ## 19 Nov 2026 - Committed permissions for routine git and gh (Joey: "照順序開始"; loosens a safety control)
 
 - **Found (setup advisor, 19 Nov 2026):** the allow rules for `gh pr`, `gh api`, `gh issue`, `git config`, `git fetch` and `git pull` lived only in the gitignored `.claude/settings.local.json` of the main checkout, plus one-off rules. Only 7 of 44 worktrees had a copy, so task sessions asked (or went through the auto-mode classifier) for routine commands. The most frequent Bash commands without a committed allow: `gh pr` (388 times in recent sessions), `git fetch` (110), `git pull` (72), `git switch` (60), `git checkout` (51), `git show` (40), `git worktree` (26), `git push` (23).
 - **Decided:** `.claude/settings.json` (committed, so every worktree has it):
   - **allow** read-only and routine commands: `git fetch`, `git pull`, `git show`, `git rev-parse`, `git merge-base`, `git ls-files`, `git branch --show-current`/`--list`/`-vv`, `git worktree list`, `git -C <dir> fetch|pull|status|log`, `git switch -c <branch>`, `git switch main`, `git push origin <branch>` and `git push -u origin <branch>`; `gh pr view|list|checks|diff|status|create`, `gh run list|view|watch`, `gh issue list|view`, `gh workflow list|view`; `uv run scripts/check.py <args>`.
-  - **ask** (always prompts, also in auto mode): `gh api`, `gh issue create|comment|close|edit`, `gh pr close|edit`, `gh workflow enable|disable|run`, `gh release`, `git config`, `git checkout`, `git reset`, `git restore`, `git clean`, `git stash`, `git rebase`, `git tag`, `git worktree remove|prune`, `git branch -d|-D`.
+  - **ask** (meant to prompt, also in auto mode; tested 19 Nov 2026: in the Claude Desktop Code tab's auto mode they did not, see the entry above): `gh api`, `gh issue create|comment|close|edit`, `gh pr close|edit`, `gh workflow enable|disable|run`, `gh release`, `git config`, `git checkout`, `git reset`, `git restore`, `git clean`, `git stash`, `git rebase`, `git tag`, `git worktree remove|prune`, `git branch -d|-D`.
   - **deny** unchanged. Joey empties `settings.local.json` on each machine.
 - **Unchanged controls:** `guard_bash.py` still runs on every Bash command, allowed or not: no push to `main`, no force push, only the pinned merge form after `/verify-pr`, no live host, no secrets. The merge command is not in the allow list. `protect_paths.py` still blocks `.claude/**` edits.
 - **Loosens?** Yes: pushes to a task branch, PR creation, `git pull` and `git switch -c` no longer prompt in any worktree. A push only reaches a non-main branch (the hook), and nothing merges without `/verify-pr`. Tightens too: `git config` and `gh api` move from allow (local file) to ask.
