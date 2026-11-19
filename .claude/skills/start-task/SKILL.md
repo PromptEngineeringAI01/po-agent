@@ -18,6 +18,7 @@ git -C <repo> log --oneline -1 origin/main
 
 - If the previous task's PR is still open, say so in one line and stop: the next task builds on it.
 - If the main checkout is on `main` with no tracked changes, `git pull -q`. Never switch a branch another session is using.
+- Run `/cleanup-worktrees report`. Under 5 candidates: mention the count in the step 4 report line, nothing more. 5 or more: run `/cleanup-worktrees` (it asks Joey once) before step 2.
 
 ## 2. Pick the task
 
