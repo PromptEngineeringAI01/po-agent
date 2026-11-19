@@ -139,11 +139,21 @@ def test_gitleaks_allows_only_the_fake_key_in_the_hook_test(gitleaks, fake_key):
 # --- CI ---
 
 
-def test_ci_runs_on_push_and_pull_request():
-    workflow = (ROOT / ".github/workflows/check.yml").read_text(encoding="utf-8")
+def test_ci_runs_once_per_commit():
+    # Once per PR commit (pull_request) and once per merge to main (push);
+    # a newer commit on the same ref cancels the older run (decisions, 19 Nov 2026).
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/check.yml").read_text(encoding="utf-8")
+    )
     # PyYAML reads the bare key `on` as True.
-    triggers = yaml.safe_load(workflow)[True]
+    triggers = workflow[True]
     assert set(triggers) == {"push", "pull_request"}
+    assert triggers["push"] == {"branches": ["main"]}
+    assert triggers["pull_request"] is None
+    assert workflow["concurrency"] == {
+        "group": "check-${{ github.ref }}",
+        "cancel-in-progress": True,
+    }
 
 
 def test_ci_steps_in_order(ci_steps):

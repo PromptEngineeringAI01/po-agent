@@ -1,8 +1,13 @@
-# The check on every push and PR. No secrets but the automatic GITHUB_TOKEN.
+# The check once per PR commit and once per merge to main (decisions, 19 Nov 2026).
+# No secrets but the automatic GITHUB_TOKEN.
 name: check
 on:
   push:
+    branches: [main]
   pull_request:
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true # a newer commit on the same PR or main cancels the older run
 permissions:
   contents: read
   pull-requests: read

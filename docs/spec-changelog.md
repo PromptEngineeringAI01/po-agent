@@ -2,6 +2,7 @@
 
 Version history of `SPEC.md`, moved verbatim from its status line on 19 Nov 2026 (v1.47). Newest first, one line per version; each line cites the `docs/decisions.md` entry behind it, where there is one. Add the next version here, at the top, in the same commit as the `SPEC.md` change, and bump the version on `SPEC.md` line 3.
 
+- 1.50: CI (`check.yml`) runs once per PR commit and once per push to `main`, and a newer commit on the same ref cancels the older run; tag pushes and PR-less branch pushes no longer run it (decisions, 19 Nov 2026, CI once per commit)
 - 1.49: data-deleting git commands (`git config`, `git reset --hard`, `git clean`, `git restore`, `git rebase`, `git branch -D`, ...) and `gh api` writes are denied in `.claude/settings.json`, since ask rules did not prompt in the Desktop app's auto mode (decisions, 19 Nov 2026, data-deleting git commands denied)
 - 1.48: Boundaries gets a Live site subsection holding the full text of CLAUDE.md Must never #3 (every exception and limit, verbatim); #3 keeps the core rule and points to it (decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
 - 1.47: the version history moves verbatim from the `SPEC.md` status line to `docs/spec-changelog.md`, newest first (decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
