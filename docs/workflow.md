@@ -8,7 +8,7 @@
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes, opens and, once verified, merges PRs (`gh pr merge <n> --merge --match-head-commit <sha>`, decisions, 2 Nov 2026).
 
-**v5.20:** review and testing by risk (from four agentic-engineering talks, see Sources). Every PR states a risk level (low, medium, high) with evidence; medium and high get one review by a second model (Opus in a fresh sub-agent; Fable 5.1 only with usage credits), high also a fresh-session `/code-review`; each finding is rated for harm and likelihood, then triaged "must-fix or overthinking" once. Tests: the fewest that pin the acceptance, real code over mocks, one targeted test when a mistake repeats. Session reports open with a recap and ask one question at a time. Second-model review: Appendix C.
+**v5.20:** review and testing by risk (from four agentic-engineering talks, see Sources). Every PR states a risk level (low, medium, high) with evidence; medium and high get one review by a second model (Opus in a fresh sub-agent; Fable 5.1 only with usage credits), high also a fresh-session `/code-review`; each finding is rated for harm and likelihood, then triaged "must-fix or overthinking" once. Tests: the fewest that pin the acceptance, real code over mocks, one targeted test when a mistake repeats. Session reports open with a recap and ask one question at a time. Second-model review: Appendix C. (Review part superseded 5 Nov 2026, lighter process: one review round by risk, medium = `/agent-skills:review`, high = one second-model review, no fresh-session `/code-review`; Production build loop step 6.)
 
 **v5.19:** production build loop (from task 2.3): each task session in its own worktree; `/goal` only for the code half after Joey approves the tests, never on the test site; a fresh-session `/code-review` on 2.4, 2.5, M3, M4 and 5.2; `/verify-pr` before every merge; when to start a fresh advisor chat.
 
@@ -171,7 +171,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 5. **Evidence and risk.** Before review, the session writes the PR description with four sections:
    - **Intent:** the task, the SPEC slice, and the decisions made with Joey. It opens with three to five plain-language lines for Joey: what changed and what the tests prove.
    - **What changed:** each file and why; which commits touch tests (`test:` only); anything near a Must-never rule.
-   - **Risk: low, medium or high,** with one line on why. **High:** anything in `mysys/` or the booker, the guard, hooks or CI, the readers or decision engine, the address rules, the model ID or prompt, anything that writes to MySys. **Medium:** any other change under `src/` or `scripts/`. **Low:** docs, tests-only and tooling that doesn't touch a safety control. When unsure, pick the higher level.
+   - **Risk: low, medium or high,** with one line on why. **High:** anything in `mysys/` or the booker, the guard, hooks or CI, the readers or decision engine, the address rules, the model ID or prompt, anything that writes to MySys. **Medium:** any other change under `src/` or `scripts/`. **Low:** docs, tests-only and tooling that doesn't touch a safety control. When unsure, pick the higher level. Compute it with `uv run scripts/risk.py` (highest changed file wins, warns over 400 lines); state at least that level (decisions, 19 Nov 2026, risk is computed).
    - **Testing:** the evidence, pasted: the tail of `uv run scripts/check.py`, the seam-1 counts, and where they apply `false PROCEED: 0` and the seam-2 or decide-only stdout. Only the stdout contract goes in; never screenshots, captures, PDF text, addresses or Note bodies (Must never #6).
 6. **Review, once, by risk:**
 
@@ -250,7 +250,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    /agent-skills:review
    ```
 
-   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. On medium and high risk, add the second-model review and the must-fix triage (Production build loop step 6). One review round plus its fixes is enough; don't review again unless the fixes were large.
+   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. Review by risk (Production build loop step 6): low = none; medium = this `/agent-skills:review`; high = one second-model review instead (Appendix C), with the must-fix triage. One review round plus its fixes is enough; don't review again unless the fixes were large.
 8. **Push and open the PR.** If `main` has moved since you branched, Claude merges it in first:
 
    ```text

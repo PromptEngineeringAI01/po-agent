@@ -18,6 +18,7 @@ git -C <repo> log --oneline -1 origin/main
 
 - If the previous task's PR is still open, say so in one line and stop: the next task builds on it.
 - If the main checkout is on `main` with no tracked changes, `git pull -q`. Never switch a branch another session is using.
+- **WIP limit: at most 2 coding task sessions at once** (advisor and read-only sessions don't count; Joey, 19 Nov 2026, the solo version of CMU 17-313 P2's one card in progress). Count linked sessions that are working or waiting on a task branch with no merged PR (`list_sessions` with `linked: true`). At 2, don't start: say in one line which two are open and that the next starts when one merges. Joey can lift it for one start by saying so.
 - Run `/cleanup-worktrees report`. Under 5 candidates: mention the count in the step 4 report line, nothing more. 5 or more: run `/cleanup-worktrees` (it asks Joey once) before step 2.
 
 ## 2. Pick the task
@@ -58,8 +59,8 @@ Workflow (docs/workflow.md, Production build loop):
 ```
 
 No task has a review stop since 5 Nov 2026 (decisions, lighter process). Add when they apply:
-- **Ask-first points** from the task (address rules 2.4, prompt and model ID 2.5, prices 2.6, any new dependency): `Stop and ask Joey before <point>.` Skip any the decision batch already answered.
-- **Touches readers, prompt, model ID or address rules:** `Run the live-Claude seam (uv run pytest tests/seam1 -m live_claude) after Joey OKs it and show false PROCEED: 0.`
+- **Ask-first points** from the task (address rules, any new dependency): `Stop and ask Joey before <point>.` Skip any the decision batch already answered.
+- **Touches the readers or address rules:** `Run uv run pytest tests/seam1 -s and show false PROCEED: 0, then the real-PO seam on the laptop (uv run pytest tests/seam1 -m real_data).`
 - **Touches the test site** (`mysys/`, the booker, seam 2, decide-only): `No /goal for anything that touches the test site: run seam 2 once, watched, and report the result. Reset the test site first per docs/demo-runbook.md (Joey does the reset). Don't ask Joey for the reset yourself: tell the advisor what you need to run (the -k selection); the advisor batches test-site runs behind one reset (test-site queue, decisions, 6 Nov 2026).`
 - **Real data** (`-m real_data`, `private/`): `Laptop only. Nothing from private/ goes into a committed file or the PR.`
 - **Refactor tasks** (8.x, or any task whose acceptance says behaviour unchanged; decisions, 18 Nov 2026, refactor safety net): `Before the first refactor commit, list the functions you will move or rewrite. In a scratch copy outside the repo, hand-write 1-2 plausible mutants per function (a dropped condition, a wrong tuple member, an off-by-one) and run the offline tests that cover it. For each survivor, add the missing test row in the test: commit first. Report killed/survived per mutant in the PR's Testing section. Never apply a mutant in the worktree.`

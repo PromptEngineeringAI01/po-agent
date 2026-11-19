@@ -2,7 +2,7 @@
 
 Full acceptance criteria, verify steps and files: `tasks/plan.md`. One task per session; branch per task from up-to-date `main`. Pace: **step** = `/agent-skills:build task <N>`, plan mode first · **auto** = `/agent-skills:build auto` (M2 only, after M1 merged) · **by hand** = Joey does it (Claude observes or writes docs only).
 
-Every code task: failing test first → stop for Joey → `test:` commit → code → `uv run scripts/check.py` shows `check: all passed`.
+Every code task: failing test first → `test:` commit (no review stop since 5 Nov 2026) → code → `uv run scripts/check.py` shows `check: all passed`.
 
 Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the doubt review; they go into `docs/decisions.md` and SPEC at the freeze.
 
@@ -17,7 +17,7 @@ The MVP demo was shown on 28 Oct 2026 (Demo, below). Production builds the untic
 - [x] **P3** Run controls and decide-only: 3.1, 3.2, 3.3, 3.5, 3.6, then 3.4
 - [x] **P4** Real booker from `mysys/booking.py`: M0b.2, doubt-driven design review, then 4.1-4.5
 - [x] **P5** (tasks built; the hourly week skipped, decisions 9 Nov 2026, go-live plan) Unattended on the test site: 1.9, 1.10, 4.6, 5.1, 5.2, 7.1, 7.2
-- [ ] **P6** Go live (decisions, 9 Nov 2026, go-live plan): the G tasks below, in order. Code frozen until G.8: only fixes for what go-live finds
+- [x] **P6** (done: live hourly since 12 Nov 2026; G.8 ticked 19 Nov 2026) Go live (decisions, 9 Nov 2026, go-live plan): the G tasks below, in order. Code frozen until G.8: only fixes for what go-live finds
 
 ## Go live (added 9 Nov 2026; `SPEC.md` -> Production)
 
@@ -30,8 +30,8 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 - [x] **G.5** (done 10 Nov 2026: spike exit 0, 10 eligible) The one-line PR flipping `enabled = true` in `config/live.toml` (advisor verifies and merges after Joey's go-ahead), then Joey moves the `production` tag to that merge commit (the agent reads `enabled` from the tagged commit too), then the live read-only `spike` from the Mac Mini · by hand (Joey runs, pastes `runs.log` lines)
 - [x] **G.6** (done 11 Nov 2026: runs 20261111T014436Z-dd9a and 20261111T014801Z-e75a, exit 0) Live `run --decide-only`; Joey reads its NOTE lines against the Notes · by hand. First try stopped with `set_user_filter` OPTION_NOT_FOUND (nothing written); the stale read now uses My Notes (decisions, 10 Nov 2026, My Notes): merge, move the tag, rerun
 - [x] **G.7** (done 11 Nov 2026: five watched runs booked one PO each, exit 0; all five tasks still On Hold at Joey's 16:30 check; the 5.2 trace check passed on the first; their PDF went to PO Documents, not the task's Client Documents: fixed 12 Nov, PR 107, and proven by a live booking) Live `run`, one PO per run, watched; the 5.2 trace check on the first (Joey pastes the `grep <run_id>` trace lines, Claude checks) · by hand · decisions, 11 Nov 2026, G.7
-- [ ] **G.8** Backup admin named (gate 4), `gh workflow enable heartbeat`, the `production` tag moved to the G.8 PR's merge commit (cap 10), then the plist copied again to `~/Library/LaunchAgents/` (it now runs `run live`; the old copy's bare `run` is refused) and the hourly job loaded on live; Joey watches the first hourly run · by hand · decisions, 12 Nov 2026, G.8
-- [ ] **H.1** Healthchecks.io heartbeat: Joey creates the check and stores its ping URL as `poagent` (`docs/macmini-setup.md` sections 1 and 7), then moves the `production` tag to a commit with the wrapper change; healthy when `runs.log` has no `wrapper: healthchecks ping` line and the check shows up · by hand · decisions, 19 Nov 2026, Healthchecks.io heartbeat
+- [x] **G.8** (done: hourly live runs since 12 Nov 2026; after the 18-19 Nov outage the scheduled runs at 12:07, 13:07 and 14:07 on 19 Nov ran on their own, exit 0; decisions, 19 Nov 2026, Mac Mini outage) Backup admin named (gate 4), `gh workflow enable heartbeat`, the `production` tag moved to the G.8 PR's merge commit (cap 10), then the plist copied again to `~/Library/LaunchAgents/` (it now runs `run live`; the old copy's bare `run` is refused) and the hourly job loaded on live; Joey watches the first hourly run · by hand · decisions, 12 Nov 2026, G.8
+- [x] **H.1** (done 19 Nov 2026: `production` at e1b1c4f, the check went up at 15:08 Perth and pinged again at 16:08; `runs.log` has no `wrapper: healthchecks ping` line) Healthchecks.io heartbeat: Joey creates the check and stores its ping URL as `poagent` (`docs/macmini-setup.md` sections 1 and 7), then moves the `production` tag to a commit with the wrapper change; healthy when `runs.log` has no `wrapper: healthchecks ping` line and the check shows up · by hand · decisions, 19 Nov 2026, Healthchecks.io heartbeat
 
 ## Freeze — before any build
 
@@ -118,7 +118,7 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 
 ## Architecture (added 9 Nov 2026; `docs/architecture-review.md` -> Round 2)
 
-**Code freeze (decisions, 9 Nov 2026, go-live plan):** 8.1, 8.3 and 8.4 wait until live runs hourly (G.8). 8.2 was merged before the freeze (PR 88).
+**Code freeze (decisions, 9 Nov 2026, go-live plan):** 8.1, 8.3 and 8.4 waited until live ran hourly (G.8); G.8 is done (19 Nov 2026), so they can start, in the order 8.1, 8.3, 8.4. 8.2 was merged before the freeze (PR 88).
 
 - [ ] **8.1** One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after G.8
 - [x] **8.2** (done: PR 88, before the freeze) One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step
@@ -136,9 +136,9 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 
 **Superseded by the Demo above:** 6.1-6.4 were written for the unattended run and weren't done as written. **Dropped (decisions, 9 Nov 2026, go-live plan).**
 
-- [ ] **6.1** `/agent-skills:ship` go/no-go; load the job again, then rehearse `enabled = false` and `launchctl bootout` (S6) · by hand
-- [ ] **6.2** Demo 1: scheduled run (S4), fresh 2609034B copy (S5), controls (S6), evidence (S7) · by hand
-- [ ] **6.3** Demos 2 and 3 with no change between (S8); one from the laptop headed, with the Mac Mini job unloaded for it · by hand
-- [ ] **6.4** One-page demo note for the CEO (cost per PO, S3 result, trial conditions, concerns) · by hand
+- [x] **6.1** (dropped, decisions 9 Nov 2026) `/agent-skills:ship` go/no-go; load the job again, then rehearse `enabled = false` and `launchctl bootout` (S6) · by hand
+- [x] **6.2** (dropped, decisions 9 Nov 2026) Demo 1: scheduled run (S4), fresh 2609034B copy (S5), controls (S6), evidence (S7) · by hand
+- [x] **6.3** (dropped, decisions 9 Nov 2026) Demos 2 and 3 with no change between (S8); one from the laptop headed, with the Mac Mini job unloaded for it · by hand
+- [x] **6.4** (dropped, decisions 9 Nov 2026) One-page demo note for the CEO (cost per PO, S3 result, trial conditions, concerns) · by hand
 
 **Checkpoint complete:** S1–S8 met; CEO note sent; next is `docs/workflow.md` Stage 8.
