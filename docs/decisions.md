@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, data-deleting git commands denied)
+# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions; context diet; data-deleting git commands denied)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -59,6 +59,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
 - **19 Nov 2026: data-deleting git commands denied** (Joey: "Move to deny + fix docs"; entry below): ask rules did not prompt in Desktop auto mode, so destructive git commands and `gh api` writes move to deny.
 - **19 Nov 2026: committed permissions** (Joey: "照順序開始"; entry below): routine git and gh commands are allowed in `.claude/settings.json` for every worktree; risky ones always ask; `settings.local.json` is emptied.
+- **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
+
+## 19 Nov 2026 - SPEC history and Must never #3 details move out of the always-read files (Joey: "照順序開始"; loosens nothing)
+
+- **Why (setup advisor plan, task F, approved by Joey 19 Nov 2026):** `CLAUDE.md` loads into every session and `SPEC.md` is read often. `SPEC.md` line 3 had grown to about 11,000 characters of version history, and `CLAUDE.md` Must never #3 to about 1,080 characters of nested exceptions.
+- **Decided:** the `SPEC.md` version history moves verbatim, newest first, one line per version, to `docs/spec-changelog.md`; line 3 keeps only the status and current version. New versions are added at the top of that file. Must never #3 keeps the core rule; its exceptions, verbatim with every limit and decisions reference, move to `SPEC.md` -> Boundaries -> Live site, which #3 names.
+- **Loosens?** No: no rule is dropped or reworded in meaning; only where the text lives changes.
+- Carried in: `CLAUDE.md` Must never #3, `docs/spec-changelog.md`, `SPEC.md` v1.47 (status line) and v1.48 (Boundaries, Live site).
 
 ## 19 Nov 2026 - Ask rules don't prompt in Desktop auto mode; data-deleting git commands move to deny (Joey: "Move to deny + fix docs"; tightens a safety control)
 
@@ -66,7 +74,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Decided:** commands that delete local work, rewrite history, change git config or write through the GitHub API move from `ask` to `deny`, which is enforced in every mode: `git config`, `git reset --hard`, `git clean`, `git restore`, `git checkout -- <path>` and `git checkout .`, `git stash drop|clear`, `git rebase`, `git branch -D`, `git worktree remove --force|-f`, and `gh api` with `-X`, `--method`, `-f`, `-F`, `--field`, `--raw-field` or `--input` (with `git -C <dir>` forms where they apply). Joey runs any of these by hand when he needs one.
 - **Still ask** (prompts in the CLI; in Desktop auto mode the classifier decides): read-only `gh api`, `gh issue create|comment|close|edit`, `gh pr close|edit`, `gh workflow enable|disable|run`, `gh release`, `git checkout`, `git reset` (not `--hard`), `git stash`, `git tag`, `git worktree remove|prune`, `git branch -d`. `/cleanup-worktrees` keeps working: it uses only `git worktree remove` without `--force` and `git branch -d`, after Joey's yes.
 - **Unchanged:** `guard_bash.py` and `protect_paths.py` run on every call in every mode (push to `main`, force push, the pinned merge, live host, secrets, `rm -rf`).
-- **Loosens?** No: tightens. Carried in: `.claude/settings.json`, `SPEC.md` v1.47 (Project Structure, `.claude/settings.json` line).
+- **Loosens?** No: tightens. Carried in: `.claude/settings.json`, `SPEC.md` v1.49 (Project Structure, `.claude/settings.json` line; version note in `docs/spec-changelog.md`).
 
 ## 19 Nov 2026 - Committed permissions for routine git and gh (Joey: "照順序開始"; loosens a safety control)
 
