@@ -126,6 +126,7 @@ def test_take_note_unticks_email_and_reads_back_the_agent(page, guard):
     ]
 
 
+@pytest.mark.usefixtures("short_waits")
 def test_take_note_that_does_not_read_back_stops(page, guard):
     page.set_content(note_page(assign_works=False))
     with pytest.raises(UnexpectedScreen):

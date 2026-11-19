@@ -83,6 +83,7 @@ def test_an_empty_table_while_the_select_lists_a_task_is_an_unexpected_screen(
         driver.settled_tasks(window)
 
 
+@pytest.mark.usefixtures("short_waits")
 def test_a_project_with_no_tasks_reads_as_none(page):
     page.set_content(project_page(options=(), rows="", late_ms=None))
     window = booking.project_window(page, "pln_10001")

@@ -7,6 +7,8 @@
   defines its own `env`, which `mysys` then uses.
 - `mysys`: `install(notes, rows=None, **kwargs)` builds seam 2's fake MySys
   (tests/fakes/mysys.py) and patches it in for the driver and the booker.
+- `short_waits`: every MySys wait shortened, for page tests whose fail paths
+  would otherwise sit out the live 15-60 s waits (tests/fakes/browser.py).
 
 Values are fake.
 """
@@ -16,6 +18,7 @@ from collections.abc import Iterator
 
 import keyring
 import pytest
+from fakes.browser import shorten_waits
 from fakes.mysys import FakeMySys, FakeNote, install, row
 from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, sync_playwright
@@ -30,6 +33,13 @@ def browser() -> Iterator[Browser]:
         browser = playwright.chromium.launch()
         yield browser
         browser.close()
+
+
+@pytest.fixture
+def short_waits(monkeypatch) -> None:
+    """Every MySys wait shortened for a page test on a local fake
+    (tests/fakes/browser.py, `shorten_waits`)."""
+    shorten_waits(monkeypatch)
 
 
 @pytest.fixture
