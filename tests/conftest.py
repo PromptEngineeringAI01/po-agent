@@ -25,10 +25,12 @@ from fakes.browser import shorten_waits
 from fakes.mysys import FakeMySys, FakeNote, install, row
 from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, sync_playwright
-from xdist_guard import pytest_collection_modifyitems  # noqa: F401 (a hook)
 
 from po_agent import cli
 from po_agent.core.config import CONFIG_DIR
+
+# Both hooks of the xdist guard, as a plugin (tests/test_xdist_guard.py).
+pytest_plugins = ("xdist_guard",)
 
 
 @pytest.fixture(scope="module")
