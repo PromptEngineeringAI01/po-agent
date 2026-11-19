@@ -11,8 +11,8 @@ Runs each step in order, stops on the first failure, and prints
 - `--repo-data-only`: just the repo-data rule (the pre-commit hook).
 
 `-n` lives here, never in pyproject `addopts`, so a plain `uv run pytest`
-(seam 2 included) stays serial; tests/xdist_guard.py refuses a parallel run
-that selects a `testsite` test.
+(seam 2 included) stays serial; tests/xdist_guard.py fails any `testsite`
+test inside an xdist worker, before its fixtures.
 """
 
 import argparse
@@ -162,7 +162,11 @@ def quick_steps(paths: list[str]) -> list[Step]:
 
     return [
         *FAST_STEPS,
-        (f'pytest {" ".join(paths)} -m "{PYTEST_MARKERS}"', run_tests),
+        (
+            f'pytest {" ".join(paths)} -m "{PYTEST_MARKERS}"'
+            f" (+ {' '.join(PYTEST_PARALLEL)} past {QUICK_PARALLEL_MIN} tests)",
+            run_tests,
+        ),
     ]
 
 
