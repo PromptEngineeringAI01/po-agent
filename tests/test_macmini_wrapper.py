@@ -111,6 +111,33 @@ if [ "$2" = list ]; then printf '%s\\n' "${STUB_HEARTBEAT_ISSUE-7}"; fi
 exit 0
 """
 PING_CALLS = ["gh issue list", "gh issue edit"]
+# The Healthchecks.io ping (decisions, 19 Nov 2026). They log to their own
+# files, not `calls`. `security` prints STUB_KEYCHAIN_URL for the one item the
+# wrapper reads, else fails as macOS does for a missing item (exit 44). `curl`
+# keeps its arguments and its stdin (the wrapper passes the URL as curl
+# config on stdin) and fails with STUB_CURL_EXIT, saying the URL on stderr as
+# the real curl can.
+STUB_SECURITY = """#!/bin/bash
+printf '%s\\0' "$@" >> "$STUB_DIR/security.args"
+if [ -n "${STUB_KEYCHAIN_URL:-}" ] && [ "$*" = \\
+  "find-generic-password -s po-agent -a healthchecks_ping_url -w" ]; then
+  printf '%s\\n' "$STUB_KEYCHAIN_URL"
+  exit 0
+fi
+echo "security: SecKeychainSearchCopyNext: The specified item could not be found." >&2
+exit 44
+"""
+STUB_CURL = """#!/bin/bash
+printf '%s\\0' "$@" > "$STUB_DIR/curl.args"
+cat > "$STUB_DIR/curl.stdin"
+echo ping >> "$STUB_DIR/curl.calls"
+if [ "${STUB_CURL_EXIT:-0}" != 0 ]; then
+  echo "curl: (22) error 404 for $(cat "$STUB_DIR/curl.stdin")" >&2
+  exit "$STUB_CURL_EXIT"
+fi
+echo OK
+"""
+HC_URL = "https://hc-ping.example/00000000-fake-uuid-not-a-real-check"
 FETCH_CALLS = [
     "git fetch --force --prune --prune-tags origin",
     "git show origin/main:config/test.toml",
@@ -157,6 +184,8 @@ class Box:
             ("uv", STUB_UV),
             ("gh", STUB_GH),
             ("pkill", STUB_PKILL),
+            ("security", STUB_SECURITY),
+            ("curl", STUB_CURL),
         ):
             stub = self.stubs / name
             stub.write_text(body, newline="\n")
@@ -167,8 +196,10 @@ class Box:
         (self.repo / "config" / "test.toml").write_text(REAL_CONFIG, newline="\n")
         self.home = tmp / "home"
         self.home.mkdir()
+        environ = dict(os.environ)
+        environ.pop("PO_AGENT_HEALTHCHECKS_PING_URL", None)
         self.env = {
-            **os.environ,
+            **environ,
             "MACMINI_RUN_PATH_PREFIX": posix(self.stubs),
             "STUB_DIR": posix(self.stubs),
             "STUB_TAG_SHA": TAG_SHA,
@@ -547,6 +578,127 @@ def test_hung_gh_is_killed_and_keeps_the_exit_code(box):
     log = box.runs_log().splitlines()
     assert "wrapper: alert issue not opened" in log
     assert "wrapper: heartbeat not sent" in log
+
+
+# Healthchecks.io ping (decisions, 19 Nov 2026): after the GitHub ping, at the
+# end of every run, a plain ping to the check's URL from the Keychain.
+
+
+def hc_pings(box: Box) -> int:
+    path = box.stubs / "curl.calls"
+    return len(path.read_text().splitlines()) if path.exists() else 0
+
+
+def hc_url_sent(box: Box) -> str:
+    """The URL curl was given: as curl config on stdin, never as an argument."""
+    config = (box.stubs / "curl.stdin").read_text().strip()
+    match = re.fullmatch(r'url = "([^"]*)"', config)
+    assert match, config
+    return match.group(1)
+
+
+def curl_args(box: Box) -> list[str]:
+    return (box.stubs / "curl.args").read_bytes().decode().split("\0")[:-1]
+
+
+@pytest.mark.parametrize("exit_code", (0, 1, 3))
+def test_every_run_pings_healthchecks_once_with_the_plain_url(box, exit_code):
+    box.agent([INFO, summary(exit_code)], exit_code)
+
+    result = box.run("run", "test", PO_AGENT_HEALTHCHECKS_PING_URL=HC_URL)
+
+    assert result.returncode == exit_code
+    assert hc_pings(box) == 1
+    # A plain "it ran" ping, whatever the exit code: failed runs already open
+    # an alert issue.
+    assert hc_url_sent(box) == HC_URL
+    args = curl_args(box)
+    assert HC_URL not in " ".join(args)  # not in the process list
+    assert args[args.index("-m") + 1] == "20"
+    assert args[args.index("--retry") + 1] == "2"
+    assert args[args.index("--retry-max-time") + 1] == "40"
+    assert args[args.index("-K") + 1] == "-"
+    # The GitHub ping still happens, before it.
+    ping_body(box)
+    assert not any("healthchecks" in line for line in box.runs_log().splitlines())
+
+
+def test_failed_setup_still_pings_healthchecks(box):
+    box.agent([summary(0)], 0)
+
+    result = box.run(
+        "run", "test", STUB_FETCH_EXIT="1", PO_AGENT_HEALTHCHECKS_PING_URL=HC_URL
+    )
+
+    assert result.returncode == 2
+    assert hc_pings(box) == 1
+
+
+def test_healthchecks_url_comes_from_the_keychain(box):
+    box.agent([summary(0)], 0)
+
+    result = box.run("run", "test", STUB_KEYCHAIN_URL=HC_URL)
+
+    assert result.returncode == 0
+    assert hc_pings(box) == 1
+    assert hc_url_sent(box) == HC_URL
+    security = (box.stubs / "security.args").read_bytes().decode().split("\0")[:-1]
+    assert security == [
+        "find-generic-password",
+        "-s",
+        "po-agent",
+        "-a",
+        "healthchecks_ping_url",
+        "-w",
+    ]
+
+
+@pytest.mark.parametrize("exit_code", (0, 3))
+def test_missing_healthchecks_url_logs_and_keeps_the_exit_code(box, exit_code):
+    box.agent([summary(exit_code)], exit_code)
+
+    result = box.run("run", "test")
+
+    assert result.returncode == exit_code
+    assert hc_pings(box) == 0
+    assert "wrapper: healthchecks ping not configured" in box.runs_log().splitlines()
+    assert "security" not in result.stderr  # the Keychain's error goes nowhere
+    ping_body(box)
+
+
+@pytest.mark.parametrize("exit_code", (0, 3))
+@pytest.mark.parametrize(
+    "source",
+    ({"PO_AGENT_HEALTHCHECKS_PING_URL": HC_URL}, {"STUB_KEYCHAIN_URL": HC_URL}),
+)
+def test_failed_healthchecks_ping_logs_and_keeps_the_exit_code(box, exit_code, source):
+    box.agent([summary(exit_code)], exit_code)
+
+    result = box.run("run", "test", STUB_CURL_EXIT="22", **source)
+
+    assert result.returncode == exit_code
+    assert hc_pings(box) == 1
+    assert "wrapper: healthchecks ping not sent" in box.runs_log().splitlines()
+    ping_body(box)
+
+
+@pytest.mark.parametrize("curl_exit", ("0", "22"))
+@pytest.mark.parametrize(
+    "source",
+    ({"PO_AGENT_HEALTHCHECKS_PING_URL": HC_URL}, {"STUB_KEYCHAIN_URL": HC_URL}),
+)
+def test_healthchecks_url_never_reaches_the_logs(box, curl_exit, source):
+    # The URL is a secret (CLAUDE.md Must never #5): not in runs.log, nor in
+    # the wrapper's stdout or stderr, which launchd writes to launchd.log.
+    box.agent([summary(0)], 0)
+
+    result = box.run("run", "test", STUB_CURL_EXIT=curl_exit, **source)
+
+    assert hc_pings(box) == 1
+    secret = HC_URL.rsplit("/", 1)[1]
+    for text in (box.runs_log(), result.stdout, result.stderr):
+        assert secret not in text
+        assert "hc-ping" not in text
 
 
 def test_plist_schedules_55_weekday_runs():
