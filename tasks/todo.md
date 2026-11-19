@@ -2,7 +2,7 @@
 
 Full acceptance criteria, verify steps and files: `tasks/plan.md`. One task per session; branch per task from up-to-date `main`. Pace: **step** = `/agent-skills:build task <N>`, plan mode first · **auto** = `/agent-skills:build auto` (M2 only, after M1 merged) · **by hand** = Joey does it (Claude observes or writes docs only).
 
-Every code task: failing test first → stop for Joey → `test:` commit → code → `uv run scripts/check.py` shows `check: all passed`.
+Every code task: failing test first → `test:` commit (no review stop since 5 Nov 2026) → code → `uv run scripts/check.py` shows `check: all passed`.
 
 Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the doubt review; they go into `docs/decisions.md` and SPEC at the freeze.
 
