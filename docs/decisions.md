@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions; context diet; data-deleting git commands denied)
+# PO Agent - decision log (updated 19 Nov 2026, risk is computed, not self-declared; data-deleting git commands denied)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -60,6 +60,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **19 Nov 2026: data-deleting git commands denied** (Joey: "Move to deny + fix docs"; entry below): ask rules did not prompt in Desktop auto mode, so destructive git commands and `gh api` writes move to deny.
 - **19 Nov 2026: committed permissions** (Joey: "照順序開始"; entry below): routine git and gh commands are allowed in `.claude/settings.json` for every worktree; risky ones always ask; `settings.local.json` is emptied.
 - **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
+- **19 Nov 2026: risk is computed, not self-declared** (Software Factory audit item 1; entry below): `scripts/risk.py` gives a PR's risk level from its changed files.
+
+## 19 Nov 2026 - Risk is computed, not self-declared (Joey: "yes, send them"; tightens a dev-tooling rule)
+
+- **Found (Software Factory audit, 19 Nov 2026):** a PR's risk level sets its review depth (`docs/workflow.md` step 5-6), but the session that wrote the code declared it, and `/verify-pr` compared it with the table by reading the file list.
+- **Decided:** `uv run scripts/risk.py [<ref>]` diffs the branch (default `HEAD`) against its merge base with `origin/main` and prints `risk: low|medium|high` and the file that set it; the highest file wins. High: `src/po_agent/mysys/`, the booker, `reader_rules.py`, `decision.py`, `address.py`, `scripts/guard_check.py`, `scripts/check.py` (= CI), `.claude/hooks/`, `.claude/settings*.json`, `.github/workflows/`. Medium: any other file under `src/` or `scripts/`. Low: everything else. Over 400 changed lines it also prints a warning. The PR's Risk section states at least the computed level; a lower stated level is Important in `/verify-pr` step 4 once Joey applies that change to the skill (its patch is in the PR that adds the script). A session may still declare a higher level than computed, e.g. for `config/live.toml`.
+- **Loosens?** No: it tightens a dev-tooling rule. Nothing changes in what the agent does in MySys or prints.
 
 ## 19 Nov 2026 - SPEC history and Must never #3 details move out of the always-read files (Joey: "照順序開始"; loosens nothing)
 
