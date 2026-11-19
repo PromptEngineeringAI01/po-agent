@@ -1,8 +1,18 @@
 """The one check command (= CI): `uv run scripts/check.py`.
 
 Runs each step in order, stops on the first failure, and prints
-"check: all passed" when every step passes. `--repo-data-only` runs just the
-repo-data rule (the pre-commit hook).
+"check: all passed" when every step passes:
+
+- default: ruff format --check, ruff check, guard check, repo data, then the
+  offline tests in parallel (pytest-xdist; decisions, 19 Nov 2026).
+- `--quick <test paths>`: the same fast steps on the whole repo, then pytest
+  on only those paths with the same marker filter, in parallel only past
+  QUICK_PARALLEL_MIN selected tests. An inner-loop check, not the gate.
+- `--repo-data-only`: just the repo-data rule (the pre-commit hook).
+
+`-n` lives here, never in pyproject `addopts`, so a plain `uv run pytest`
+(seam 2 included) stays serial; tests/xdist_guard.py refuses a parallel run
+that selects a `testsite` test.
 """
 
 import argparse
@@ -14,6 +24,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PYTEST_MARKERS = "not live_claude and not testsite and not real_data"
+# One worker per CPU, at most 12: on the laptop's 24 logical CPUs, 24 workers
+# made the 2 s short page waits time out (decisions, 19 Nov 2026).
+PYTEST_PARALLEL = ("-n", "auto", "--maxprocesses", "12", "--dist", "load")
+QUICK_PARALLEL_MIN = 50
 
 # Everything below is matched lowercased, so any case is caught.
 # Folder names that must never be tracked, at any depth (as in .gitignore).
@@ -110,16 +124,46 @@ def script(path: str) -> Callable[[], bool]:
     return run
 
 
-STEPS: list[Step] = [
+FAST_STEPS: list[Step] = [
     ("ruff format --check .", command("ruff", "format", "--check", ".")),
     ("ruff check .", command("ruff", "check", ".")),
     ("guard check", script("scripts/guard_check.py")),
     ("repo data", repo_data),
+]
+
+STEPS: list[Step] = [
+    *FAST_STEPS,
     (
-        f'pytest tests -m "{PYTEST_MARKERS}"',
-        command("pytest", "tests", "-m", PYTEST_MARKERS),
+        f'pytest tests -m "{PYTEST_MARKERS}" {" ".join(PYTEST_PARALLEL)}',
+        command("pytest", "tests", "-m", PYTEST_MARKERS, *PYTEST_PARALLEL),
     ),
 ]
+
+
+def selected_tests(paths: list[str]) -> int:
+    """How many tests `--quick` would run (0 if collection fails: the run
+    itself then reports the error)."""
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "-m", PYTEST_MARKERS]
+        + paths,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return sum("::" in line for line in result.stdout.splitlines())
+
+
+def quick_steps(paths: list[str]) -> list[Step]:
+    def run_tests() -> bool:
+        parallel = selected_tests(paths) > QUICK_PARALLEL_MIN
+        extra = PYTEST_PARALLEL if parallel else ()
+        return command("pytest", *paths, "-m", PYTEST_MARKERS, *extra)()
+
+    return [
+        *FAST_STEPS,
+        (f'pytest {" ".join(paths)} -m "{PYTEST_MARKERS}"', run_tests),
+    ]
 
 
 def run_checks(steps: list[Step]) -> int:
@@ -134,13 +178,26 @@ def run_checks(steps: list[Step]) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="The one check command (= CI).")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--repo-data-only",
         action="store_true",
         help="run only the repo-data rule on the index (the pre-commit hook)",
     )
+    mode.add_argument(
+        "--quick",
+        nargs="+",
+        metavar="TEST_PATH",
+        help="ruff, guard check and repo data on the repo, then pytest on only "
+        "these test paths (same marker filter); not the gate",
+    )
     args = parser.parse_args(argv)
-    steps = [("repo data", repo_data)] if args.repo_data_only else STEPS
+    if args.repo_data_only:
+        steps = [("repo data", repo_data)]
+    elif args.quick:
+        steps = quick_steps(args.quick)
+    else:
+        steps = STEPS
     sys.exit(run_checks(steps))
 
 

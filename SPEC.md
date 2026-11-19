@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.48 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.49 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -98,7 +98,8 @@ No Anthropic key: the Claude reader was dropped (decisions, 2 Nov 2026). `ANTHRO
 Install:             uv sync --locked
 Browser (laptop):    uv run playwright install chromium
 Check (= CI):        uv run scripts/check.py        healthy: last line "check: all passed", exit 0
-Run seam, test site: uv run pytest tests/seam2 -m testsite
+Quick check:         uv run scripts/check.py --quick <test paths>   fast steps + only those tests; not the gate
+Run seam, test site: uv run pytest tests/seam2 -m testsite   always serial (never -n)
 Spike (read-only):   uv run po-agent spike --site test       login, filter Agent Pool + Locked, list eligible Notes
 Screen mapping (M0): playwright-cli open --headed "<test-site URL>"   Claude opens it; YOU log in and click; Claude runs snapshot / screenshot
 Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses the main checkout's private/fixtures (or SEAM1_PRIVATE_DIR); skipped when absent, an error with -m real_data; never in CI
@@ -112,7 +113,7 @@ Live (Joey only):    on the Mac Mini, through the wrapper or launchd (`run live`
 Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
 ```
 
-`scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check .` → `ruff check .` → `python scripts/guard_check.py` → repo data check (nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml` other than the committed `config/live.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case) → `pytest tests -m "not live_claude and not testsite and not real_data"`.
+`scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check .` → `ruff check .` → `python scripts/guard_check.py` → repo data check (nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml` other than the committed `config/live.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case) → `pytest tests -m "not live_claude and not testsite and not real_data" -n auto --maxprocesses 12 --dist load` (pytest-xdist, at most 12 workers; decisions, 19 Nov 2026). `--quick <test paths>` runs the same first four steps, then pytest on only those paths with the same marker filter (in parallel past 50 selected tests); it is an inner-loop check, not the gate. `-n` is never in pyproject `addopts`, so a plain `uv run pytest` stays serial, and `tests/xdist_guard.py` refuses any parallel run that selects a `testsite` test.
 
 **Screen mapping with Playwright CLI** (`@playwright/cli`, M0 and whenever a screen changes; laptop, test site only). Joey opens a headed browser and does every click and every typed value himself, including the login. Claude Code only **observes**: `playwright-cli snapshot` (the accessibility tree, with the role and name of every element, which is what the guard's lookups use), `screenshot`, `find` and `generate-locator`. Claude never runs a command that acts on the page (click, fill, type, press, hover, check, select, upload, drag, drop, eval, run-code, dialog, goto, reload), saves state or cookies, or lists network requests; `.claude/settings.json` denies them and, from M1, the `guard_bash.py` hook allows only the observe commands. `.playwright/cli.config.json` keeps the browser profile in memory, blocks the live origin and writes output to `private/captures/test/`; `.playwright-cli/` (snapshot files) is git-ignored. Fallback if Node.js can't be installed: the classic recorder that ships with Playwright for Python (`playwright codegen`), plus screenshots.
 

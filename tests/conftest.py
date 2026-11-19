@@ -10,6 +10,9 @@
 - `short_waits`: every MySys wait shortened, for page tests whose fail paths
   would otherwise sit out the live 15-60 s waits (tests/fakes/browser.py).
 
+The xdist guard (tests/xdist_guard.py) refuses any parallel run that selects
+a `testsite` test.
+
 Values are fake.
 """
 
@@ -22,6 +25,7 @@ from fakes.browser import shorten_waits
 from fakes.mysys import FakeMySys, FakeNote, install, row
 from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, sync_playwright
+from xdist_guard import pytest_collection_modifyitems  # noqa: F401 (a hook)
 
 from po_agent import cli
 from po_agent.core.config import CONFIG_DIR
