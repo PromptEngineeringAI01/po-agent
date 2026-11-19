@@ -47,7 +47,7 @@ Hooks, permissions, `guard.py` and `check.py` enforce most of these; the rule st
 4. Review the diff against Must never, `SPEC.md` and `tasks/plan.md` at the depth its risk sets (`docs/workflow.md`, build loop steps 5-6). Important = breaks behaviour, writes a wrong value to MySys, leaks data or breaks a Must-never rule. At most five Nits.
 5. Flag it when the change makes this file, `SPEC.md` or `docs/macmini-setup.md` out of date.
 
-Do only what the task asks: no mutation probes, no second review round unless the fixes were large.
+Do only what the task asks: no mutation probes (except refactor tasks: `/start-task` -> Refactor tasks), no second review round unless the fixes were large.
 
 <!-- Team norms that apply to every task. Multi-step procedures (start a task, verify and merge a PR) live in skills, not here. Candidates to move to ruff/check.py: the print rule and the em-dash rule. -->
 ## How we work
