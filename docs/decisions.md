@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage: `poagent` logged out)
+# PO Agent - decision log (updated 19 Nov 2026, risk is computed, not self-declared)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -57,6 +57,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
+- **19 Nov 2026: risk is computed, not self-declared** (Software Factory audit item 1; entry below): `scripts/risk.py` gives a PR's risk level from its changed files.
+
+## 19 Nov 2026 - Risk is computed, not self-declared (Joey: "yes, send them"; tightens a dev-tooling rule)
+
+- **Found (Software Factory audit, 19 Nov 2026):** a PR's risk level sets its review depth (`docs/workflow.md` step 5-6), but the session that wrote the code declared it, and `/verify-pr` compared it with the table by reading the file list.
+- **Decided:** `uv run scripts/risk.py [<ref>]` diffs the branch (default `HEAD`) against its merge base with `origin/main` and prints `risk: low|medium|high` and the file that set it; the highest file wins. High: `src/po_agent/mysys/`, the booker, `reader_rules.py`, `decision.py`, `address.py`, `scripts/guard_check.py`, `scripts/check.py` (= CI), `.claude/hooks/`, `.claude/settings*.json`, `.github/workflows/`. Medium: any other file under `src/` or `scripts/`. Low: everything else. Over 400 changed lines it also prints a warning. The PR's Risk section states at least the computed level; a lower stated level is Important in `/verify-pr` step 4 once Joey applies that change to the skill (its patch is in the PR that adds the script). A session may still declare a higher level than computed, e.g. for `config/live.toml`.
+- **Loosens?** No: it tightens a dev-tooling rule. Nothing changes in what the agent does in MySys or prints.
 
 ## 19 Nov 2026 - Mac Mini stopped after a macOS update: `poagent` logged out (Joey; ops rule, loosens nothing)
 
