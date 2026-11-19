@@ -148,3 +148,10 @@ def test_main_empty_diff_is_low(risk, capsys):
     run, _ = fake_git("")
     assert risk.main(run_git=run) == 0
     assert capsys.readouterr().out.splitlines()[0] == "risk: low"
+
+
+def test_main_takes_a_head_ref(risk, capsys):
+    # /verify-pr runs it from the advisor's checkout on the PR's branch.
+    run, calls = fake_git("1\t0\tdocs/a.md\n")
+    assert risk.main(["origin/feat/x"], run_git=run) == 0
+    assert any("origin/main...origin/feat/x" in args for args in calls)
