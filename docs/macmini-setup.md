@@ -90,7 +90,7 @@ System Settings → General → Software Update → **Automatic updates** (ⓘ):
 - **Check for updates**: on. **Download new updates when available**: on.
 - **Install macOS updates**: off. **Install application updates from the App Store**: off. **Install Security Responses and system files**: off.
 
-Nothing installs by itself, so nothing restarts the Mac during run hours. Joey (or the backup admin) installs updates **after 18:00 on a weekday or at the weekend**, at least monthly and within 7 days of a security update, then logs back in as `poagent` and locks the screen (section 10).
+Nothing installs by itself, so nothing restarts the Mac during run hours. Joey (or the backup admin) installs updates **after 18:00 on a weekday or at the weekend**, at least monthly and within 7 days of a security update, then logs the admin account **out**, unlocks as `poagent`, locks the screen and checks the next run (section 10). After an update, check the settings above are still off.
 
 ## 6. Software for the agent
 
@@ -224,13 +224,19 @@ There is **no state between runs** in the MVP (`SPEC.md` assumption 5): the agen
 
 ## 10. After a restart
 
-After a power cut or any restart, the Mac Mini powers back on and **waits at the FileVault unlock screen**. Nothing runs until someone logs in as `poagent`:
+After a power cut, a macOS update or any restart, the Mac Mini powers back on and **waits at the FileVault unlock screen**. Nothing runs until someone logs in as `poagent`:
 
 1. At the Mac, unlock with the **`poagent`** account (not an admin account), so its session and Keychain open and the job is loaded.
 2. Lock the screen: Control-Command-Q. The session keeps running while locked. (System Settings → Lock Screen: require the password **immediately** after the display turns off.)
-3. Check the next run appears in `runs.log`.
+3. Check the next run appears in `runs.log`: as `poagent`, after the next :07, `tail -20 ~/Library/Logs/po-agent/runs.log` shows a new `RUN_SUMMARY` line.
 
-Missed runs only delay POs: the Notes stay in the pool, where the admin can handle them. If nobody logs in, the Healthchecks.io check (section 8) emails Joey within about an hour of the first missed run; the backup missed-heartbeat check emails him once 2 hours inside the schedule pass without a run, at its next run: about that weekday afternoon, or the next weekday afternoon if the runs stopped after that day's check.
+**Only `poagent` stays logged in** (decisions, 19 Nov 2026, Mac Mini outage). On 18-19 Nov 2026 a macOS update restarted the Mac, the admin account stayed logged in afterwards, and the screen lock logged `poagent` out: no run for about 15 working hours. So:
+
+- An admin who logs in at the Mac (to install an update or change a setting) **logs out** before leaving (Apple menu → Log Out), never just switches users or locks the screen with the admin session still open. Then unlock as `poagent` and lock the screen (steps 1-3).
+- After installing a **macOS update** (section 5): the Mac restarts into the FileVault screen; unlock as `poagent`, lock the screen, and check the next run. Also check section 5's Automatic updates settings are still off: an update can change them.
+- To check from the admin account who is logged in: `who` lists the sessions; `poagent` must be one of them, on `console`.
+
+Missed runs only delay POs: the Notes stay in the pool, where the admin can handle them. If nobody logs in, the Healthchecks.io check (section 8) emails Joey within about an hour of the first missed run; the backup missed-heartbeat check emails him once 2 hours inside the schedule pass without a run, at its next run: about that weekday afternoon, or the next weekday afternoon if the runs stopped after that day's check. The steps for either alert: `docs/ops-runbook.md`, "`poagent` logged out, or an admin session left on".
 
 ## 11. Stop it
 

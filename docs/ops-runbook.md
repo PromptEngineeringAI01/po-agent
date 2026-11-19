@@ -235,7 +235,7 @@ Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was neve
 - **Means:** no run has finished for more than 2 hours inside the schedule (07:07 to 17:30 Perth, weekdays). Every run, even a failed one, updates the issue labelled `po-agent-heartbeat`, so this means runs aren't happening or can't reach GitHub. Nothing alerts at night, at weekends or in the first 2 hours of a day. GitHub runs the check about once each weekday afternoon (decisions, 18 Nov 2026), so runs that stopped in the morning are alerted about that afternoon, and runs that stopped after the day's check, the next weekday afternoon: they may have been down for most of a working day.
 - **Check, in this order:**
   1. **Did someone unload the job on purpose** (after an earlier alert)? Then this is expected: leave it open until runs are back.
-  2. **At the Mac:** if it shows the FileVault unlock screen (after a power cut or restart), unlock it with the **`poagent`** account, then lock the screen (Control-Command-Q). If it is off, turn it on and do the same.
+  2. **At the Mac** (the most likely cause; 18-19 Nov 2026): if it shows the FileVault unlock screen (after a power cut, restart or macOS update), or an admin account is logged in, or `poagent` isn't, follow "`poagent` logged out, or an admin session left on" below. If it is off, turn it on and do the same.
   3. **As `poagent`:** `launchctl print gui/$(id -u)/au.com.prompteng.po-agent | head -30`. If it can't find the service and nobody unloaded it on purpose, load it (3.2 step 4).
   4. `tail -50 ~/Library/Logs/po-agent/runs.log`: if recent runs are there with `wrapper: heartbeat not sent`, runs work but GitHub can't be reached: check the internet, and whether the Mac Mini's GitHub token has expired (it lasts 90 days; see the setup failure for `git fetch` below).
   5. A dialog on `poagent`'s screen asking for Keychain access: choose **Always Allow** (3.7 step 4).
@@ -246,10 +246,25 @@ Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was neve
 ### Healthchecks.io down (an email, not an issue)
 
 - **Means:** Healthchecks.io's check `po-agent b1-homes` got no ping within 40 minutes of a scheduled run (07:07 to 17:07 Perth, weekdays; decisions, 19 Nov 2026). Every run pings at its end, even a failed one, so runs aren't happening, or they run but can't reach Healthchecks.io. Comes within about an hour of the stop. A failed run is not this alert: it opens its own issue.
-- **Check:** the same steps as Missed heartbeat above (an unload on purpose, the FileVault screen or a logged-out `poagent`, the job loaded, a Keychain dialog), except in step 4: if recent runs in `runs.log` show `wrapper: healthchecks ping not sent`, runs work but Healthchecks.io can't be reached (the internet, or Healthchecks.io itself); `wrapper: healthchecks ping not configured` means the URL is missing from `poagent`'s Keychain (Joey stores it again, `docs/macmini-setup.md` section 7). Runs with neither line and a `RUN_SUMMARY` mean the ping went: look at the check's page for its last ping.
+- **Check:** the same steps as Missed heartbeat above (an unload on purpose, the FileVault screen, a logged-out `poagent` or an admin left logged in (next entry), the job loaded, a Keychain dialog), except in step 4: if recent runs in `runs.log` show `wrapper: healthchecks ping not sent`, runs work but Healthchecks.io can't be reached (the internet, or Healthchecks.io itself); `wrapper: healthchecks ping not configured` means the URL is missing from `poagent`'s Keychain (Joey stores it again, `docs/macmini-setup.md` section 7). Runs with neither line and a `RUN_SUMMARY` mean the ping went: look at the check's page for its last ping.
 - **In MySys:** nothing to undo. Notes wait in the pool until runs are back.
 - **Restart:** as in 3.2 (log `poagent` in, lock the screen with Control-Command-Q, load the job if it is gone). Nothing to close: the next run's ping turns the check **up**, and Healthchecks.io emails that too. If the GitHub backup also opened `po-agent heartbeat missed`, close that once a run has finished.
 - **Told:** Joey (automatic; only his Healthchecks.io account gets the email). The backup admin sees no email for this one: Joey asks them to go to the Mac if he is away.
+
+### `poagent` logged out, or an admin session left on
+
+- **Means:** the job is a LaunchAgent in `poagent`'s session and needs its login Keychain, so it runs only while `poagent` is logged in (locked is fine). On 18-19 Nov 2026 a macOS update restarted the Mac, the admin account stayed logged in, and the screen lock logged `poagent` out: no run for about 15 working hours (decisions, 19 Nov 2026, Mac Mini outage). The same happens after a power cut or any restart, until someone unlocks as `poagent`.
+- **Signs:** a Healthchecks.io down email or a `po-agent heartbeat missed` issue; no new lines in `runs.log` after a :07; the Mac shows the FileVault unlock screen, or a login window listing `poagent` and an admin; from an admin account, `who` doesn't list `poagent` on `console`.
+- **Fix, at the Mac:**
+  1. If an admin account is logged in: unlock it and **log it out** (Apple menu → Log Out). Don't just switch users.
+  2. Unlock as **`poagent`** (from the FileVault screen or the login window).
+  3. As `poagent`: `launchctl print gui/$(id -u)/au.com.prompteng.po-agent | head -30`. If it can't find the service, load it (3.2 step 4).
+  4. Lock the screen: Control-Command-Q. Don't log `poagent` out.
+  5. After the next :07, as `poagent`: `tail -20 ~/Library/Logs/po-agent/runs.log` shows a new `RUN_SUMMARY`. To not wait, start one now with `launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent` (3.2 step 5; not within a few minutes of :07).
+- **In MySys:** nothing to undo. Notes wait in the pool until runs are back.
+- **Restart:** once a run has finished, close the `po-agent heartbeat missed` issue if one opened; the Healthchecks.io check turns **up** by itself.
+- **Prevent:** only `poagent` stays logged in; an admin logs out before leaving the Mac; after a macOS update, unlock as `poagent` and lock the screen (`docs/macmini-setup.md` sections 5 and 10).
+- **Told:** Joey (automatic, through either alert).
 
 ### Wrapper setup failed (exit 2)
 
