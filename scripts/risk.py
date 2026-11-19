@@ -10,7 +10,8 @@ The table is docs/workflow.md, Production build loop step 5 (decisions,
 - medium: any other file under `src/` or `scripts/`;
 - low: everything else (docs, tests, skills, tasks).
 
-It diffs HEAD against its merge base with origin/main (fetch first), prints
+It diffs HEAD (or the ref given, e.g. `uv run scripts/risk.py origin/<branch>`)
+against its merge base with origin/main (fetch first), prints
 `risk: <level>` and the file that set it, and a warning when the PR changes
 more than 400 lines. A stated risk lower than this one is an Important
 finding in /verify-pr. Standard library and git only.
@@ -79,11 +80,16 @@ def _run_git(args: list[str]) -> str:
     ).stdout
 
 
-def main(run_git: Callable[[list[str]], str] = _run_git) -> int:
+def main(
+    argv: list[str] | None = None, run_git: Callable[[list[str]], str] = _run_git
+) -> int:
+    head = argv[0] if argv else "HEAD"
     # --no-renames: a move shows both paths, so moving a file out of a high
     # folder is still high.
     try:
-        numstat = run_git(["diff", "--numstat", "--no-renames", "origin/main...HEAD"])
+        numstat = run_git(
+            ["diff", "--numstat", "--no-renames", f"origin/main...{head}"]
+        )
     except (OSError, subprocess.CalledProcessError) as exc:
         print(f"risk: unknown (git diff failed: {exc})")
         return 2
@@ -104,4 +110,4 @@ def main(run_git: Callable[[list[str]], str] = _run_git) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
