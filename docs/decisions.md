@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions)
+# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions; context diet)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -58,6 +58,14 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
 - **19 Nov 2026: committed permissions** (Joey: "照順序開始"; entry below): routine git and gh commands are allowed in `.claude/settings.json` for every worktree; risky ones always ask; `settings.local.json` is emptied.
+- **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
+
+## 19 Nov 2026 - SPEC history and Must never #3 details move out of the always-read files (Joey: "照順序開始"; loosens nothing)
+
+- **Why (setup advisor plan, task F, approved by Joey 19 Nov 2026):** `CLAUDE.md` loads into every session and `SPEC.md` is read often. `SPEC.md` line 3 had grown to about 11,000 characters of version history, and `CLAUDE.md` Must never #3 to about 1,080 characters of nested exceptions.
+- **Decided:** the `SPEC.md` version history moves verbatim, newest first, one line per version, to `docs/spec-changelog.md`; line 3 keeps only the status and current version. New versions are added at the top of that file. Must never #3 keeps the core rule; its exceptions, verbatim with every limit and decisions reference, move to `SPEC.md` -> Boundaries -> Live site, which #3 names.
+- **Loosens?** No: no rule is dropped or reworded in meaning; only where the text lives changes.
+- Carried in: `CLAUDE.md` Must never #3, `docs/spec-changelog.md`, `SPEC.md` v1.47 (status line) and v1.48 (Boundaries, Live site).
 
 ## 19 Nov 2026 - Committed permissions for routine git and gh (Joey: "照順序開始"; loosens a safety control)
 
