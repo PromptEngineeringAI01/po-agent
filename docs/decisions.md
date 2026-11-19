@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Healthchecks.io heartbeat)
+# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage: `poagent` logged out)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -57,6 +57,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
+
+## 19 Nov 2026 - Mac Mini stopped after a macOS update: `poagent` logged out (Joey; ops rule, loosens nothing)
+
+- **Found:** the last scheduled run was 17 Nov 2026 17:07 Perth. Every scheduled run on 18 Nov and 07:07-11:07 on 19 Nov was missed, about 15 working hours. The missed-heartbeat issue (#120) opened only on the afternoon of 18 Nov, as the 18 Nov entry below expects. Joey's manual kickstart at 09:16 on 19 Nov booked 0, so no bookable Note was missed; the Notes waited in the pool.
+- **Cause:** a macOS update restarted the Mac Mini. Afterwards the admin account `joey` stayed logged in, and with it the screen lock was logging `poagent` out. The job is a LaunchAgent in `poagent`'s session and needs its login Keychain, so with `poagent` logged out nothing ran. At 10:07 on 19 Nov `joey` was still logged in and `poagent` had been logged out; at 11:07 the Mac had just restarted (10:34) and `poagent` logged in only at 11:15.
+- **Ruled out (19 Nov):** a test launchd job at 11:27 fired on time; the po-agent job was loaded; no other user was logged in; automatic logout was off.
+- **Fixed:** restart, log in as `poagent` only, lock the screen (Control-Command-Q). The scheduled runs at 12:07, 13:07 and 14:07 on 19 Nov ran on their own, exit 0, and #120 was closed.
+- **Rule from now on:** only `poagent` stays logged in on the Mac Mini. An admin who logs in at the Mac (to install an update, change a setting) logs out again before leaving, never just switches users or locks the screen. After any restart or macOS update: unlock as `poagent`, lock the screen, and check the next run's `RUN_SUMMARY` in `runs.log` (`docs/macmini-setup.md` sections 5 and 10). Why the update installed and restarted during run hours isn't known yet: Joey checks section 5's Automatic updates settings at the next update, since an update can turn them back on.
+- **Alerting:** the Healthchecks.io check (entry below) emails within about an hour of a missed run once the `production` tag is on it, so a stop like this one is seen the same morning.
+- **Loosens?** No. Docs only: `docs/macmini-setup.md` (sections 5 and 10), `docs/ops-runbook.md` (Missed heartbeat, Healthchecks.io down, new entry "`poagent` logged out, or an admin session left on").
 
 ## 19 Nov 2026 - Healthchecks.io heartbeat (Joey: "Yes, build D"; adds an external service and a secret)
 
