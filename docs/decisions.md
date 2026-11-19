@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions; context diet)
+# PO Agent - decision log (updated 19 Nov 2026, Mac Mini outage; committed permissions; context diet; parallel check)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -57,8 +57,18 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **18 Nov 2026: refactor safety net** (audit item 3; entry below): refactor tasks prove their tests with hand-written mutants first.
 - **18 Nov 2026: heartbeat checked about once a weekday afternoon** (Joey; entry below): the docs now say what GitHub's schedule really does; no code change.
 - **19 Nov 2026: Healthchecks.io heartbeat** (Joey: "Yes, build D"; entry below): the wrapper also pings a Healthchecks.io check, which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup.
+- **19 Nov 2026: the check runs the offline tests in parallel** (Joey: "照順序開始"; entry below): pytest-xdist added; `check.py --quick <test paths>` added; seam 2 never runs in parallel.
 - **19 Nov 2026: committed permissions** (Joey: "照順序開始"; entry below): routine git and gh commands are allowed in `.claude/settings.json` for every worktree; risky ones always ask; `settings.local.json` is emptied.
 - **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
+
+## 19 Nov 2026 - Parallel offline tests in the check; `--quick` (Joey: "照順序開始"; new dev dependency, loosens nothing)
+
+- **Why (setup advisor plan, task B, approved by Joey 19 Nov 2026):** the full `uv run scripts/check.py` took about 19.5 minutes on the laptop (12-18 on CI) and Claude runs it dozens of times a week. Asked "照這個順序開始，並同意加 pytest-xdist 和 mypy？", Joey answered "照順序開始".
+- **Decided:** pytest-xdist is a dev dependency. `scripts/check.py`'s pytest step runs `pytest tests -m "not live_claude and not testsite and not real_data" -n auto --maxprocesses 12 --dist load` (measured on the laptop, 24 logical CPUs: `-n auto` (24 workers) 3.5 min but two booker page tests timed out on the 2 s short load wait; `-n 12` 4.1 min, green; `--dist loadfile` and `-n 4` about 7 min). `scripts/check.py --quick <test paths>` runs ruff format --check, ruff check, the guard check and repo data on the repo, then pytest on only the given paths with the same marker filter, in parallel only past 50 selected tests. `-n` is never in pyproject `addopts`: a plain `uv run pytest` stays serial.
+- **Safety net:** `tests/xdist_guard.py` (loaded by `tests/conftest.py`) stops any run that selects a `testsite` test when `-n` is set or inside an xdist worker, `--collect-only` included: seam 2 drives the one test site with one account, one test at a time. `tests/test_xdist_guard.py` proves it.
+- **Tests changed (Must never #8):** `tests/test_check.py` expects the pytest step's new arguments and the `--quick` mode.
+- **Loosens?** No: the same tests run with the same marker filter; only their order and process change.
+- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `tests/conftest.py`, `SPEC.md` v1.49 (Commands).
 
 ## 19 Nov 2026 - SPEC history and Must never #3 details move out of the always-read files (Joey: "照順序開始"; loosens nothing)
 
