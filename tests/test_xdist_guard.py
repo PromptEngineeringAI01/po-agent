@@ -88,3 +88,19 @@ def test_parallel_run_with_testsite_deselected_passes(tmp_path):
     assert result.returncode == 0, out
     assert "1 passed" in out
     assert GUARD_MESSAGE not in out
+
+
+def guard_hooks(config, name: str) -> list:
+    caller = getattr(config.pluginmanager.hook, name)
+    return [
+        impl.function
+        for impl in caller.get_hookimpls()
+        if impl.function.__module__ == "xdist_guard"
+    ]
+
+
+def test_the_repo_conftest_registers_both_guard_hooks(request):
+    # The dummy-project tests above load the guard with `-p xdist_guard`;
+    # this one checks the repo's own wiring, in process (never a seam-2 run).
+    assert guard_hooks(request.config, "pytest_collection_modifyitems")
+    assert guard_hooks(request.config, "pytest_runtest_setup")
