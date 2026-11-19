@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.47 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.48 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -353,7 +353,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Anything that would tie `src/` to the Mac Mini or macOS.
 
 **Never**
-- Run anything against the live site (`prompt.mysys.com.au`), or name its host anywhere but `LIVE_HOST`, `config/live.toml` and the deny rules (CLAUDE.md Must never #3): only Joey runs the agent on live, on the Mac Mini.
+- Run anything against the live site (`prompt.mysys.com.au`), or name its host anywhere but `LIVE_HOST`, `config/live.toml` and the deny rules (CLAUDE.md Must never #3; Live site below): only Joey runs the agent on live, on the Mac Mini.
 - Call click, fill, check, set_input_files, evaluate or dispatch_event outside `mysys/guard.py`. Never target Discard, Unlink, Cancel, Undo Cancellation, Un-Hold, Change Project, Unassign, Remove, Delete, anything named "close" (the attached PDF's remove cell, Task Client's clear, window Close), the Note's Pending button or any Hold-dialog checkbox. Abandon a dialog by closing the browser context.
 - Add an AI or paid-API reader, or let any reading choose what to click (decisions, 2 Nov 2026).
 - Run a Playwright CLI command that acts on the page, saves state or cookies, or lists network requests; or point Playwright CLI at anything but the test site.
@@ -361,6 +361,11 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Put a secret anywhere but keyring (the laptop's Credential Manager, `poagent`'s Keychain on the Mac Mini) or a `PO_AGENT_*` environment variable.
 - Commit anything from `private/`, or copy real client data into a committed file, a PR, an issue, run output or the Mac Mini (exceptions: the trial POs' identifiers, assumption 2, and the Mac Mini reading the trial POs from the test site, with each PDF on disk only from its download until it's read, Trial conditions).
 - Push to `main` or force-push. Merge only with `gh pr merge <n> --merge --match-head-commit <sha>` (the commit `/verify-pr` checked), after `/verify-pr` passes and CI is green; a PR that touches the hooks, settings, the verify-pr skill, CI, the guard or the check, or loosens a safety control, stays Joey's (decisions, 2 Nov 2026).
+
+**Live site** (the full text of CLAUDE.md Must never #3, which keeps the core rule and points here; moved verbatim on 19 Nov 2026: decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
+- Never touch the live site (`prompt.mysys.com.au`) in code, config, tests or commands. Only exceptions: the `LIVE_HOST` constant in `src/po_agent/core/config.py`, `config/live.toml`, and the deny rules in `.claude/hooks/guard_bash.py` and `.playwright/cli.config.json` and their tests (decisions, 10 Nov 2026, hooks for the live profile).
+- Never run the agent or the wrapper on live (`--site live`, `macmini-run.sh <mode> live`), log in to live from any test, command or seam, or read or set a live secret (`mysys_live_*`): only Joey does, on the Mac Mini.
+- One exception (decisions, 10 Nov 2026, live lookups for the real-PO seam): in the built-in browser pane, after Joey logs in to live himself with the agent account, Claude may read the Projects search, a project's page and its Tasks list, typing only an internal number into the Projects search and clicking only the search, a result row and tabs. Nothing else on live: no Note Pool or Note window, no button that saves or writes, nothing in #2 (CLAUDE.md Must never #2). Claude never types a live password, and every value read goes only into `private/`.
 
 ## Trial conditions
 

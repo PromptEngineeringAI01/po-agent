@@ -2,6 +2,7 @@
 
 Version history of `SPEC.md`, moved verbatim from its status line on 19 Nov 2026 (v1.47). Newest first, one line per version; each line cites the `docs/decisions.md` entry behind it, where there is one. Add the next version here, at the top, in the same commit as the `SPEC.md` change, and bump the version on `SPEC.md` line 3.
 
+- 1.48: Boundaries gets a Live site subsection holding the full text of CLAUDE.md Must never #3 (every exception and limit, verbatim); #3 keeps the core rule and points to it (decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
 - 1.47: the version history moves verbatim from the `SPEC.md` status line to `docs/spec-changelog.md`, newest first (decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
 - 1.46: `.claude/settings.json` allows routine git and gh commands for every worktree and asks before risky ones (`gh api`, `git config`, `git checkout`, `git reset`, `git worktree remove`, `git branch -d`, ...); `settings.local.json` is emptied (decisions, 19 Nov 2026, committed permissions)
 - 1.45: the wrapper also pings a Healthchecks.io check (plain ping, every run, URL in `poagent`'s Keychain as `healthchecks_ping_url`), which emails Joey within about an hour of a missed run; the GitHub heartbeat stays as a backup (decisions, 19 Nov 2026, Healthchecks.io heartbeat)
