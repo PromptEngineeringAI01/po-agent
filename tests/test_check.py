@@ -247,6 +247,24 @@ def test_project_config():
     assert python_version.strip().startswith("3.12")
 
 
+# What `mypy --strict` enables (mypy 2.4 --help), less the global-only
+# warn_redundant_casts.
+STRICT_FLAGS = {
+    "disallow_any_generics": True,
+    "disallow_subclassing_any": True,
+    "disallow_untyped_calls": True,
+    "disallow_untyped_defs": True,
+    "disallow_incomplete_defs": True,
+    "check_untyped_defs": True,
+    "disallow_untyped_decorators": True,
+    "warn_unused_ignores": True,
+    "warn_return_any": True,
+    "implicit_reexport": False,
+    "strict_equality": True,
+    "extra_checks": True,
+}
+
+
 def test_mypy_config():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     mypy = pyproject["tool"]["mypy"]
@@ -255,8 +273,14 @@ def test_mypy_config():
     assert mypy["files"] == ["src", "scripts"]
     # Libraries without stubs are listed one by one, never ignored globally.
     assert "ignore_missing_imports" not in mypy
-    strict = [o for o in mypy["overrides"] if o.get("strict") is True]
+    # `strict` in an override turns strict on for every module (mypy 2.4),
+    # so the override spells out the per-module flags --strict enables.
+    assert "strict" not in mypy
+    assert mypy["warn_redundant_casts"] is True  # global only
+    assert all("strict" not in o for o in mypy["overrides"])
+    strict = [o for o in mypy["overrides"] if o.get("disallow_untyped_defs")]
     assert len(strict) == 1 and strict[0]["module"]
+    assert {k: v for k, v in strict[0].items() if k != "module"} == STRICT_FLAGS
 
 
 @pytest.mark.parametrize("bad", ["private/notes.txt", "stray.pdf"])
