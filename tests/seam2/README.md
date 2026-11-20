@@ -6,8 +6,10 @@ with the output of every run shown (task 5.2).
 
 Before the first run:
 
-- The Mac Mini job is unloaded, and nothing else runs against the test site
-  (one agent at a time).
+- Nothing else runs against the test site (one agent at a time): no other
+  laptop seam-2 run, `run` or `spike`, and no manual Mac Mini test-site run.
+  The Mac Mini's live job keeps running: it uses another site, account and
+  secrets (decisions, 20 Nov 2026, one Send Email control).
   On the laptop a second seam-2 run from any worktree stops at collection,
   naming the run that holds the lock (`tests/testsite_lock.py`).
 - The test site is reset (`docs/workflow.md` 6.1, Joey, by hand, with his own

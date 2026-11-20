@@ -6,7 +6,7 @@ Every code task: failing test first → `test:` commit (no review stop since 5 N
 
 Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the doubt review; they go into `docs/decisions.md` and SPEC at the freeze.
 
-**One agent at a time:** laptop test-site runs (seam-2 tests, `run`, `spike`) go one at a time (the cross-worktree seam-2 lock), and no manual Mac Mini test-site run while a laptop run is going. The Mac Mini's live job keeps running: it uses another site, account and secrets (Joey, 20 Nov 2026; decisions, 20 Nov 2026, one Send Email control).
+**One agent at a time:** one laptop test-site run at a time (seam-2 tests, `run`, `spike`): the cross-worktree lock keeps seam-2 pytest runs apart, and no laptop `run` or `spike` starts while another test-site run is going (the lock doesn't cover them); no manual Mac Mini test-site run while a laptop run is going. The Mac Mini's live job keeps running: it uses another site, account and secrets (Joey, 20 Nov 2026; decisions, 20 Nov 2026, one Send Email control).
 
 ## Production order (from 29 Oct 2026; plan -> Phase P, `SPEC.md` -> Production)
 
