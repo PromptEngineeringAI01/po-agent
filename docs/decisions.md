@@ -1,9 +1,20 @@
-# PO Agent - decision log (updated 20 Nov 2026, one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 20 Nov 2026, one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **20 Nov 2026: one Send Email control** (task 8.1; Joey's settled design of 9 Nov; entry below): take, return, W4 and W5 untick and check Send Email Notification through one control in `driver.py`; a box still ticked at W4 or W5 now records `ok=false` in the trace before the stop. A laptop test-site run no longer needs the live Mac Mini job unloaded.
 - **20 Nov 2026: merge rule in SPEC** (Joey: "You can merge"; entry below): SPEC Boundaries now says what decisions 6 Nov 2026 already said; PRs touching `scripts/check.py` are merged after `/verify-pr`.
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 20 Nov 2026 - One Send Email control for every Note-window write (task 8.1; Joey's settled design, 9 Nov 2026, `docs/architecture-review.md` Round 2 D; tightens the trace; loosens a safety control: laptop test-site runs no longer unload the live job)
+
+- **Before:** Send Email Notification was unticked and read back in two implementations: the driver's take and return (an `email_notification_unticked` event, `ok` true or false, before the stop) and `booking.py`'s W4 and W5, which logged through a booker callback that only ever logged `ok=true`. A box still ticked at W4 or W5 stopped the run with no event; W5 read the box twice.
+- **Now:** one control in `src/po_agent/mysys/driver.py` with two operations: `untick_send_email` (unticks if ticked; no event) and `check_send_email` (reads it back right before a committing click, records `email_notification_unticked` with `ok` true or false, and raises `UnexpectedScreen` with the Note ID and step if still ticked). Called at the same points as before, so the guarded click sequence is unchanged: take and return (untick, check right before Assign), W4 (untick and check before Link to Project, check again before the select), W5 (untick and check before Solved; the duplicate read goes). The demo uses it too and records no event (no run log). `booking.link_project`, `mark_solved` and `_search_choose_project` take the run log and Note ID; `booker._unticked` is deleted. A run-log write that fails still never stops W4 or W5 (`log_may_fail`), and still stops take and return, as before.
+- **What changes in the trace:** a box still ticked at W4 or W5 now records `ok=false` before the stop. Success-path events and their order are unchanged, so the 5.2 trace check still holds. The ALERT and its detail are unchanged (the booker retypes the error as before).
+- **Tests (Must never #8):** the offline MySys fake's `link_project` and `mark_solved` take `log` and `note_id` instead of the `unticked` callback, in their own `test:` commit; the events they record and every guard-history assertion are unchanged.
+- **Not in scope:** making the guard refuse a Note-window committing click without a prior check (a guard change, high risk; revisit only if a missed check ever happens).
+- **Carry-over (Joey, 20 Nov 2026):** `po_agent.mysys.guard` and `po_agent.mysys.booking` join the mypy strict list; their 6 errors are fixed with type-only edits (`_hold_window_open(page: Page)`, a `ListState` alias for the Projects list state). No behaviour change, no bug found.
+- **Laptop test-site runs and the live job (Joey, 20 Nov 2026, question B):** a laptop seam-2 run on the test site does not unload the Mac Mini's live job: different site, account and secrets. This loosens the one-agent-at-a-time rule for the live job only. Laptop test-site runs still go one at a time: the cross-worktree seam-2 lock (entry below) keeps seam-2 pytest runs apart, and by rule no laptop `run` or `spike` starts while another test-site run is going (the lock doesn't cover them). Changed in the same PR: the "One agent at a time" lines in `SPEC.md` (v1.55), `tasks/todo.md`, `tasks/plan.md`, `docs/macmini-setup.md` (v1.4), `docs/ops-runbook.md`, `docs/workflow.md`, `docs/specs/spec.md` and `tests/seam2/README.md`. The architecture review is a dated snapshot and keeps its "Mac Mini job unloaded" wording.
 
 ## 20 Nov 2026 - Merge rule in SPEC matches the decisions (Joey: "You can merge"; loosens nothing)
 
@@ -73,6 +84,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **19 Nov 2026: CI once per commit** (Software Factory audit item 3; Joey: "yes, send them"; entry below): `check.yml` runs on PRs and on pushes to `main` only, and a newer commit cancels the older run.
 - **20 Nov 2026: mypy in the check** (Joey: "照順序開始"; entry below): `scripts/check.py` runs mypy with the pydantic plugin on `src` and `scripts`; reverses the 9 Nov "Not adopted: mypy".
 - **20 Nov 2026: one seam-2 run at a time across worktrees** (entry below): a cross-process lock in the user's temp dir stops a second `testsite` run on the laptop.
+- **20 Nov 2026: one Send Email control** (task 8.1; entry below): take, return, W4 and W5 share one untick and one check; a box still ticked at W4 or W5 records `ok=false` before the stop; laptop test-site runs no longer unload the live job.
 
 ## 20 Nov 2026 - One seam-2 run at a time across worktrees (second-model review of PR #136; tightens a safety control)
 

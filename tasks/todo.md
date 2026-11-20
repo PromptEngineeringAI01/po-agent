@@ -6,7 +6,7 @@ Every code task: failing test first → `test:` commit (no review stop since 5 N
 
 Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the doubt review; they go into `docs/decisions.md` and SPEC at the freeze.
 
-**One agent at a time:** no laptop test-site run (seam-2 tests, `run`, `spike`) while the Mac Mini job is loaded, and no manual Mac Mini run while a laptop run is going (plan → Cross-cutting rules).
+**One agent at a time:** one laptop test-site run at a time (seam-2 tests, `run`, `spike`): the cross-worktree lock keeps seam-2 pytest runs apart, and no laptop `run` or `spike` starts while another test-site run is going (the lock doesn't cover them); no manual Mac Mini test-site run while a laptop run is going. The Mac Mini's live job keeps running: it uses another site, account and secrets (Joey, 20 Nov 2026; decisions, 20 Nov 2026, one Send Email control).
 
 ## Production order (from 29 Oct 2026; plan -> Phase P, `SPEC.md` -> Production)
 
@@ -120,7 +120,7 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 
 **Code freeze (decisions, 9 Nov 2026, go-live plan):** 8.1, 8.3 and 8.4 waited until live ran hourly (G.8); G.8 is done (19 Nov 2026), so they can start, in the order 8.1, 8.3, 8.4. 8.2 was merged before the freeze (PR 88).
 
-- [ ] **8.1** One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after G.8
+- [x] **8.1** (done 20 Nov 2026; decisions, 20 Nov 2026, one Send Email control) One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after G.8
 - [x] **8.2** (done: PR 88, before the freeze) One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step
 - [ ] **8.3** The two readers as one module, and `decide()` calls the project lookup itself (Round 2, candidate A, with round 1's proposal 6) · step · after 8.1
 - [ ] **8.4** One MySys wait module; its retry refuses committing clicks (Round 2, candidate C) · step · after 8.3 (after G.8)

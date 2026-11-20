@@ -20,7 +20,7 @@ import re
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import FilePayload, Locator, Page
@@ -32,6 +32,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
+from po_agent.core.runlog import RunLog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -57,6 +58,9 @@ ALL_LOCKED = driver.ALL_LOCKED
 PROJECTS_NO_RECORD = driver.PROJECTS_NO_RECORD
 NEW_TASK_STATUSES = ("New Project", "Inspection Analysis")
 SNAPSHOT_DIR = Path(__file__).resolve().parents[3] / "private" / "captures" / "test"
+# The Projects list as a hashable state (_project_list): ("none",) or
+# ("rows", row texts, pages).
+ListState = tuple[Any, ...]
 
 
 # Finding windows and fields; the shared ones live in driver.py.
@@ -141,29 +145,10 @@ def has_link_to_project(window: Locator) -> bool:
         raise UnexpectedScreen("Note window not readable") from None
 
 
-def _email_box(window: Locator) -> Locator:
-    return window.get_by_role("checkbox", name="Send Email Notification", exact=True)
-
-
-def _email_unticked(window: Locator) -> None:
-    try:
-        ticked = _email_box(window).is_checked()
-    except PlaywrightError:
-        raise UnexpectedScreen("Send Email Notification not readable") from None
-    if ticked:
-        raise UnexpectedScreen("Send Email Notification still ticked")
-
-
-def untick_send_email(guard: ActionGuard, window: Locator) -> None:
-    """Unticks Send Email Notification (ticked whenever a Note window opens)
-    and reads it back unticked."""
-    try:
-        ticked = _email_box(window).is_checked()
-    except PlaywrightError:
-        raise UnexpectedScreen("Send Email Notification not readable") from None
-    if ticked:
-        guard.act("untick_send_email_notification", window, _email_box(window))
-    _email_unticked(window)
+# Send Email Notification: the driver's one control (decisions, 20 Nov
+# 2026, one Send Email control); the demo records no event (no run log).
+untick_send_email = driver.untick_send_email
+check_send_email = driver.check_send_email
 
 
 def _list(window: Locator, placeholder: str) -> Locator:
@@ -189,13 +174,13 @@ def _reads(window: Locator, label: str, wanted: str) -> bool:
 
 def _assign(guard: ActionGuard, window: Locator, assignee: str) -> None:
     """Assign, then wait for "Assignee:" to read `assignee`."""
-    _email_unticked(window)  # right before the committing click
+    check_send_email(window, None, None, None)  # right before the committing click
     guard.act(
         "assign_note", window, window.get_by_role("button", name="Assign", exact=True)
     )
     if not _reads(window, "Assignee:", assignee):
         raise UnexpectedScreen("assignee did not read back")
-    _email_unticked(window)
+    check_send_email(window, None, None, None)
 
 
 def take_note(guard: ActionGuard, window: Locator, agent: str) -> None:
@@ -255,15 +240,14 @@ def mark_solved(
     guard: ActionGuard,
     window: Locator,
     agent: str,
-    unticked: Callable[[], None] | None = None,
+    *,
+    log: RunLog | None = None,
+    note_id: str | None = None,
 ) -> None:
-    """Step 9: Solved; read back "Solved by <agent>" and Solved disabled.
-    `unticked` is called once Send Email reads back unticked, right before
-    the click (the booker's run-log event)."""
+    """Step 9 / W5: Send Email unticked and checked right before Solved (an
+    event in `log`); read back "Solved by <agent>" and Solved disabled."""
     untick_send_email(guard, window)
-    _email_unticked(window)
-    if unticked is not None:
-        unticked()
+    check_send_email(window, log, note_id, "W5", log_may_fail=True)
     solved = window.get_by_role("button", name="Solved", exact=True)
     guard.act("mark_solved", window, solved)
     if not _reads(window, "Status:", f"Solved by {agent}"):
@@ -357,15 +341,15 @@ def _search_choose_project(
     window: Locator,
     pln: str,
     snapshots: bool,
-    unticked: Callable[[], None] | None = None,
+    log: RunLog | None = None,
+    note_id: str | None = None,
 ) -> Locator:
-    """Send Email unticked (`unticked` is then called), Link to Project, then
-    in Choose Project (up to 60 s to load): fill its own Search/filter with
-    the pln and run the search. Only reads and opens: nothing is linked until
-    a result is selected."""
+    """Send Email unticked and checked (an event in `log`), Link to Project,
+    then in Choose Project (up to 60 s to load): fill its own Search/filter
+    with the pln and run the search. Only reads and opens: nothing is linked
+    until a result is selected."""
     untick_send_email(guard, window)
-    if unticked is not None:
-        unticked()
+    check_send_email(window, log, note_id, "W4", log_may_fail=True)
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
@@ -399,23 +383,23 @@ def link_project(
     page: Page,
     window: Locator,
     pln: str,
-    unticked: Callable[[], None] | None = None,
+    *,
+    log: RunLog | None = None,
+    note_id: str | None = None,
 ) -> None:
-    """Step 8 / W4: Send Email unticked and read back, Link to Project ->
-    Choose Project: search the pln (Enter), Send Email read back again (it
+    """Step 8 / W4: Send Email unticked and checked, Link to Project ->
+    Choose Project: search the pln (Enter), Send Email checked again (it
     ticks itself whenever a Note window opens, row 02), then the pln cell,
     once; read back the Note's project button and a Status that still starts
     "Pending" (live it reads "Pending by <user>"). Another pln on the button
-    is a wrong project: AccuracyBreach (docs/specs/spec.md §6). `unticked`
-    is called each time Send Email reads back unticked, right before Link to
-    Project and right before the select (the booker's run-log events)."""
+    is a wrong project: AccuracyBreach (docs/specs/spec.md §6). Each check
+    is an `email_notification_unticked` event in `log`."""
     picker = _search_choose_project(
-        guard, page, window, pln, snapshots=False, unticked=unticked
+        guard, page, window, pln, snapshots=False, log=log, note_id=note_id
     )
     cell = _pln_cell(picker, pln)
-    _email_unticked(window)  # right before the committing select
-    if unticked is not None:
-        unticked()
+    # Right before the committing select.
+    check_send_email(window, log, note_id, "W4", log_may_fail=True)
     guard.act("link_select_project", picker, cell)
     project = window.get_by_role("button", name=driver.PROJECT_BUTTON)
     if not _shows(project.first, LOAD_TIMEOUT_MS):
@@ -534,7 +518,7 @@ def _check_project_filters(panel: Locator) -> None:
         raise UnexpectedScreen("Projects filters not readable") from None
 
 
-def _project_list(panel: Locator) -> tuple | None:
+def _project_list(panel: Locator) -> ListState | None:
     """The list as a hashable state: ("none",) for "No record found.",
     ("rows", row texts, pages) for rows under a recognised footer, None while
     it reloads (a loading row, no footer, a re-render under the read). Three
@@ -607,7 +591,7 @@ def search_project_rows(
     guard.act("submit_project_search", panel, search, "Enter")
     wanted = internal_no.lower()
 
-    def result(state: tuple) -> bool:
+    def result(state: ListState) -> bool:
         holds_it = state[0] == "rows" and all(wanted in row.lower() for row in state[1])
         return state != before or holds_it
 
@@ -632,8 +616,11 @@ def _search_deadline() -> float:
 
 
 def _settled_list(
-    page: Page, panel: Locator, counts: Callable[[tuple], bool], deadline: float
-) -> tuple:
+    page: Page,
+    panel: Locator,
+    counts: Callable[[ListState], bool],
+    deadline: float,
+) -> ListState:
     """The list once two reads in a row are equal and `counts` takes it,
     before `deadline`; else UnexpectedScreen."""
     last = None

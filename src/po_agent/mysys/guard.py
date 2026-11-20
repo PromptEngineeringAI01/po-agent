@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import cast
 
-from playwright.sync_api import ElementHandle, FilePayload, Locator
+from playwright.sync_api import ElementHandle, FilePayload, Locator, Page
 from playwright.sync_api import Error as PlaywrightError
 
 from po_agent.core.errors import GuardRefusal, UnexpectedScreen
@@ -373,7 +373,7 @@ class ActionGuard:
         self.history.append((action, "done"))
 
     @staticmethod
-    def _hold_window_open(page) -> bool:
+    def _hold_window_open(page: Page) -> bool:
         # Any visible Hold Task window on the page, whatever the scope.
         heading = page.get_by_role("heading", name=HOLD_HEADING)
         return heading.visible.count() > 0

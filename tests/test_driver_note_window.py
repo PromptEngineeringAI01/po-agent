@@ -185,6 +185,22 @@ def test_email_ticked_again_before_assign_stops_without_assigning(page, guard, l
     assert body_data(page, "assigns") == "0"
 
 
+def test_email_ticked_again_before_assign_is_logged_before_the_stop(
+    page, guard, log, tmp_path
+):
+    # The trace's evidence for Must never #4: ok=false, then the stop.
+    window = window_of(page, note_page(reticks_email=True))
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.take_note(guard, window, AGENT, log, NOTE_ID)
+    unticked = [
+        (e["step"], e["ok"])
+        for e in events(tmp_path)
+        if e["event"] == "email_notification_unticked"
+    ]
+    assert unticked == [("2", False)]
+    assert (caught.value.note_id, caught.value.step) == (NOTE_ID, "2")
+
+
 # --- Step 2a --------------------------------------------------------------------
 
 
