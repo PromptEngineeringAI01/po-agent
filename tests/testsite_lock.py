@@ -18,8 +18,10 @@ The file is never deleted: a run that opened it just before a delete could
 lock the old file while another locks a new one. `--collect-only` and xdist
 workers (which tests/xdist_guard.py fails) take no lock.
 
-Hooked into tests/seam2/conftest.py; tests/test_testsite_lock.py loads it
-with `-p testsite_lock` in dummy projects.
+Registered by tests/conftest.py (`pytest_plugins`), where every `testsite`
+test lives, not by tests/seam2/conftest.py, which tests/test_seam2_report.py
+copies on its own. tests/test_testsite_lock.py checks that and loads it with
+`-p testsite_lock` in dummy projects.
 """
 
 import json
