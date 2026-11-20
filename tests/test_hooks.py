@@ -641,6 +641,18 @@ def test_format_python_reports_lint_it_cannot_fix(tmp_path):
     assert "F821" in result.stderr
 
 
+def test_format_python_reports_lint_in_a_non_ascii_file(tmp_path):
+    # ruff quotes the source line in UTF-8; read with a cp1252 console that
+    # crashed the hook's reader thread (19 Nov 2026), so it blocked instead of
+    # reporting the lint.
+    source = tmp_path / "chinese.py"
+    source.write_text('note = "照順序開始"\nprint(undefined_name)\n', "utf-8")
+    result = run_hook("format_python", post_edit(source))
+    assert result.returncode == 2
+    assert "format_python: ruff left problems" in result.stderr
+    assert "F821" in result.stderr
+
+
 def test_format_python_ignores_other_files(tmp_path):
     notes = tmp_path / "notes.md"
     notes.write_text("x=[1,2 ,3]\n")
