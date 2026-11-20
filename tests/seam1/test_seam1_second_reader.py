@@ -2,11 +2,12 @@
 again, and its reading must equal pdfplumber's.
 
 `reader_rules.pypdf_text_layer()` is pypdf's text, "" when pypdf can't read
-the bytes. `check_second_reader()` compares the two texts: issuer (the first
-non-empty line), COMPACTION, the one PO number and the Job Address label line
-(normalised) must be equal, else READERS_DISAGREE; no pypdf text is
-PDF_UNREADABLE. The line under the label is left to the address check, which
-runs on both texts: pypdf reads the Supplier column apart from it.
+the bytes. `readers.check_second_reader()` compares the two texts (one
+`PdfTexts` since task 8.3; `check_second_reader` below wraps two strings):
+issuer (the first non-empty line), COMPACTION, the one PO number and the Job
+Address label line (normalised) must be equal, else READERS_DISAGREE; no
+pypdf text is PDF_UNREADABLE. The line under the label is left to the address
+check, which runs on both texts: pypdf reads the Supplier column apart from it.
 """
 
 import subprocess
@@ -16,8 +17,9 @@ import pytest
 from seam1_cases import pdf_bytes, text_pdf
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.decision import check_second_reader
+from po_agent.b1 import readers
 from po_agent.b1.models import Skip, SkipReason
+from po_agent.b1.readers import PdfTexts
 
 # pdfplumber's layout: the Job Address block shares its lines with Supplier.
 PLUMBER = """B1 Homes Pty Ltd
@@ -49,6 +51,10 @@ LINES = [
 
 def skip(reason: SkipReason) -> Skip:
     return Skip(reason=reason)
+
+
+def check_second_reader(plumber: str, pypdf: str) -> Skip | None:
+    return readers.check_second_reader(PdfTexts(plumber=plumber, pypdf=pypdf, data=b""))
 
 
 # --- pypdf's text ---

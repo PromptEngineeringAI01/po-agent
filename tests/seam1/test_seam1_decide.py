@@ -3,9 +3,10 @@ end with zero false PROCEED, and section 2 order: steps 2a-4, the second
 reader's agreement, the project lookup (8), the address check against the
 project's address in MySys (9), the duplicate check (10), PROCEED.
 
-`decide()` takes both readers' text layers, pdfplumber's (`pdf_text`) and
-pypdf's (`pypdf_text`), each "" when its library reads none. No Claude, no
-API key, no reader mode.
+`decide()` takes both readers' text layers as one `PdfTexts` (task 8.3),
+pdfplumber's and pypdf's, each "" when its library reads none, and the
+project lookup as a callable it calls only once the Note and PDF checks pass.
+No Claude, no API key, no reader mode.
 """
 
 import inspect
@@ -13,10 +14,10 @@ import inspect
 import pytest
 from seam1_cases import CASES, POOL, Seam1Case, pdf_bytes
 
-from po_agent.b1 import decision
-from po_agent.b1 import reader_rules as rules
+from po_agent.b1 import decision, readers
 from po_agent.b1.decision import decide, eligible_internal_no
 from po_agent.b1.models import CompactionTask, MySysLookup, Proceed, Skip, SkipReason
+from po_agent.b1.readers import PdfTexts
 
 PDF_BYTES = b"%PDF-stand-in"
 
@@ -25,8 +26,8 @@ def texts(case: Seam1Case) -> tuple[str, str]:
     """Both readers' text: the case's fake text layers, or the libraries'
     reading of the bytes for the corrupt and image-only cases."""
     if case.pdf in ("corrupt", "image-only"):
-        data = pdf_bytes(case.pdf)
-        return rules.text_layer(data), rules.pypdf_text_layer(data)
+        texts = readers.read(pdf_bytes(case.pdf))
+        return texts.plumber, texts.pypdf
     return case.pdf_text, case.pypdf_text
 
 
@@ -41,13 +42,16 @@ def run(
     if internal_no is None:
         return None
     plumber, pypdf = texts(case)
+    found = case.lookup if lookup is None else lookup
     return decide(
         case.note,
         internal_no,
-        plumber if pdf_text is None else pdf_text,
-        pypdf if pypdf_text is None else pypdf_text,
-        PDF_BYTES,
-        case.lookup if lookup is None else lookup,
+        PdfTexts(
+            plumber=plumber if pdf_text is None else pdf_text,
+            pypdf=pypdf if pypdf_text is None else pypdf_text,
+            data=PDF_BYTES,
+        ),
+        lambda: found,
         site=case.config.site,
         duplicate_ignores_cancelled=case.config.duplicate_ignores_cancelled,
     )
@@ -130,9 +134,7 @@ def test_decide_takes_both_texts_and_no_reader_or_mode() -> None:
     assert list(inspect.signature(decide).parameters) == [
         "note",
         "internal_no",
-        "pdf_text",
-        "pypdf_text",
-        "pdf_bytes",
+        "texts",
         "lookup",
         "site",
         "duplicate_ignores_cancelled",
@@ -240,6 +242,82 @@ def test_the_address_check_runs_on_both_texts_before_the_duplicate_check(
     pypdf = CLEAN.pypdf_text.replace(pypdf_old, pypdf_new) if pypdf_old else None
     result = run(CLEAN, lookup=WITH_TASK, pdf_text=plumber, pypdf_text=pypdf)
     assert result == skip(reason)
+
+
+# --- the lookup is a MySys read: called only once steps 2a-4 and the second
+# reader pass (task 8.3) ---
+
+
+class CountingLookup:
+    """A fake MySys project read that counts its calls."""
+
+    def __init__(self, lookup: MySysLookup) -> None:
+        self.lookup = lookup
+        self.calls = 0
+
+    def __call__(self) -> MySysLookup:
+        self.calls += 1
+        return self.lookup
+
+
+def decide_counting(
+    note_changes: dict[str, object], plumber: str, pypdf: str
+) -> tuple[Skip | Proceed, int]:
+    lookup = CountingLookup(CLEAN.lookup)
+    result = decide(
+        CLEAN.note.model_copy(update=note_changes),
+        "2600001B",
+        PdfTexts(plumber=plumber, pypdf=pypdf, data=PDF_BYTES),
+        lookup,
+        site="test",
+        duplicate_ignores_cancelled=True,
+    )
+    return result, lookup.calls
+
+
+@pytest.mark.parametrize(
+    ("note_changes", "plumber", "pypdf", "reason"),
+    [
+        (
+            {"project_linked": True},
+            CLEAN.pdf_text,
+            CLEAN.pypdf_text,
+            SkipReason.NOTE_ALREADY_LINKED,
+        ),
+        ({"attachment_names": ()}, CLEAN.pdf_text, CLEAN.pypdf_text, SkipReason.NO_PDF),
+        ({}, "", CLEAN.pypdf_text, SkipReason.PDF_UNREADABLE),
+        (
+            {},
+            CLEAN.pdf_text.replace("COMPACTION", "C0MPACTION"),
+            "",
+            SkipReason.NOT_COMPACTION,
+        ),
+        (
+            {},
+            CLEAN.pdf_text.replace("2600001B/048", "2600002B/048"),
+            CLEAN.pypdf_text,
+            SkipReason.PO_MISMATCH,
+        ),
+        ({}, CLEAN.pdf_text, "", SkipReason.PDF_UNREADABLE),
+        (
+            {},
+            CLEAN.pdf_text,
+            CLEAN.pypdf_text.replace("Lot 123", "Lot 128"),
+            SkipReason.READERS_DISAGREE,
+        ),
+    ],
+    ids=["linked", "no-pdf", "no-text", "compaction", "po", "no-pypdf", "disagree"],
+)
+def test_the_lookup_is_not_called_on_an_early_skip(
+    note_changes: dict[str, object], plumber: str, pypdf: str, reason: SkipReason
+) -> None:
+    assert decide_counting(note_changes, plumber, pypdf) == (skip(reason), 0)
+
+
+def test_the_lookup_is_called_once_when_the_note_and_pdf_checks_pass() -> None:
+    result, calls = decide_counting({}, CLEAN.pdf_text, CLEAN.pypdf_text)
+    assert isinstance(result, Proceed)
+    assert calls == 1
 
 
 def test_the_project_address_is_read_in_decide() -> None:

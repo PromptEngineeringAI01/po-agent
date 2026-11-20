@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.address import job_address_line, normalise, verify_address
+from po_agent.b1 import readers
 from po_agent.b1.decision import decide, eligible_internal_no
 from po_agent.b1.models import (
     MySysLookup,
@@ -154,26 +154,8 @@ def _case_ids(raw_cases: list[dict[str, Any]]) -> list[str]:
     return ids
 
 
-def _agreement(plumber: str, pypdf: str, address: str | None) -> dict[str, bool]:
-    """Per field: do both readers' texts give the same thing (no values)."""
-    a, b = rules.read_pdf(plumber, "", ""), rules.read_pdf(pypdf, "", "")
-    line_a, line_b = job_address_line(plumber), job_address_line(pypdf)
-    agree = {
-        "issuer": a.issuer == b.issuer,
-        "compaction": a.contains_compaction == b.contains_compaction,
-        "po number": a.po_number == b.po_number,
-        "job address line": (None if line_a is None else normalise(line_a))
-        == (None if line_b is None else normalise(line_b)),
-    }
-    if address is not None:
-        agree["address check"] = verify_address(plumber, address) == verify_address(
-            pypdf, address, exact_line_under=True
-        )
-    return agree
-
-
 def _decide(
-    raw: dict[str, Any], case_id: str, plumber: str, pypdf: str, data: bytes
+    raw: dict[str, Any], case_id: str, texts: readers.PdfTexts
 ) -> Skip | Proceed | None:
     """decide() on the case; None when step 0 leaves the Note untouched."""
     note = NoteSnapshot(
@@ -195,19 +177,18 @@ def _decide(
     if internal_no is None:
         return None
     lookup = raw["lookup"]
+    found = MySysLookup.model_validate(
+        {
+            **lookup,
+            "search_rows": tuple(lookup["search_rows"]),
+            "tasks": tuple(lookup.get("tasks", ())),
+        }
+    )
     return decide(
         note,
         internal_no,
-        plumber,
-        pypdf,
-        data,
-        MySysLookup.model_validate(
-            {
-                **lookup,
-                "search_rows": tuple(lookup["search_rows"]),
-                "tasks": tuple(lookup.get("tasks", ())),
-            }
-        ),
+        texts,
+        lambda: found,
         site=raw.get("site", "test"),
         duplicate_ignores_cancelled=True,  # config/test.toml
     )
@@ -234,7 +215,7 @@ def evaluate(folder: Path) -> list[CaseResult]:
     for raw, case_id in zip(raw_cases, _case_ids(raw_cases), strict=True):
         expect, expect_reason = _expectation(raw, case_id)
         data = (folder / "pdfs" / raw["pdf"]).read_bytes()
-        plumber, pypdf = rules.text_layer(data), rules.pypdf_text_layer(data)
+        texts = readers.read(data)
         mysys_shape = MYSYS_FIELDS <= set(raw["lookup"])
         address = raw["lookup"]["address"] if mysys_shape else None
         result = CaseResult(
@@ -244,10 +225,10 @@ def evaluate(folder: Path) -> list[CaseResult]:
             expect_pln=raw.get("expect_pln", ""),
             expect_po=_file_name_po(raw["pdf"]),
             mysys_shape=mysys_shape,
-            agree=_agreement(plumber, pypdf, address),
+            agree=readers.agreement(texts, address),
         )
         if mysys_shape:
-            result.result = _decide(raw, case_id, plumber, pypdf, data)
+            result.result = _decide(raw, case_id, texts)
             result.untouched = result.result is None
         results.append(result)
     return results
