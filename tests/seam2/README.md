@@ -8,6 +8,8 @@ Before the first run:
 
 - The Mac Mini job is unloaded, and nothing else runs against the test site
   (one agent at a time).
+  On the laptop a second seam-2 run from any worktree stops at collection,
+  naming the run that holds the lock (`tests/testsite_lock.py`).
 - The test site is reset (`docs/workflow.md` 6.1, Joey, by hand, with his own
   account): no non-cancelled Compaction Test task on the 3 trial plns, exactly
   one Pending, unlinked Note per trial PO in the Agent Pool, nothing assigned

@@ -11,7 +11,8 @@
   would otherwise sit out the live 15-60 s waits (tests/fakes/browser.py).
 
 The xdist guard (tests/xdist_guard.py) refuses any parallel run that selects
-a `testsite` test.
+a `testsite` test; the test-site lock (tests/testsite_lock.py) refuses a
+second seam-2 run from any worktree while one is going.
 
 Values are fake.
 """
@@ -29,8 +30,9 @@ from playwright.sync_api import Browser, sync_playwright
 from po_agent import cli
 from po_agent.core.config import CONFIG_DIR
 
-# Both hooks of the xdist guard, as a plugin (tests/test_xdist_guard.py).
-pytest_plugins = ("xdist_guard",)
+# Both hooks of the xdist guard and of the test-site lock, as plugins
+# (tests/test_xdist_guard.py, tests/test_testsite_lock.py).
+pytest_plugins = ("xdist_guard", "testsite_lock")
 
 
 @pytest.fixture(scope="module")
