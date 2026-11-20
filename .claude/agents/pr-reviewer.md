@@ -1,6 +1,6 @@
 ---
 name: pr-reviewer
-description: Second-model review of a PO Agent PR (medium and high risk). Read-only. Give it the task worktree path and the task number.
+description: Second-model review of a PO Agent PR (high risk only; medium gets /agent-skills:review). Read-only. Give it the task worktree path and the task number.
 model: opus
 tools: Read, Grep, Glob, Bash
 ---

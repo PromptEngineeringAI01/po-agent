@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 19 Nov 2026, risk is computed, not self-declared; data-deleting git commands denied; parallel check)
+# PO Agent - decision log (updated 19 Nov 2026, risk is computed, not self-declared; data-deleting git commands denied; CI once per commit; parallel check)
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
@@ -62,6 +62,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **19 Nov 2026: committed permissions** (Joey: "照順序開始"; entry below): routine git and gh commands are allowed in `.claude/settings.json` for every worktree; risky ones always ask; `settings.local.json` is emptied.
 - **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
 - **19 Nov 2026: risk is computed, not self-declared** (Software Factory audit item 1; entry below): `scripts/risk.py` gives a PR's risk level from its changed files.
+- **19 Nov 2026: CI once per commit** (Software Factory audit item 3; Joey: "yes, send them"; entry below): `check.yml` runs on PRs and on pushes to `main` only, and a newer commit cancels the older run.
+
+## 19 Nov 2026 - CI once per commit (Software Factory audit item 3; Joey: "yes, send them"; loosens a safety control slightly)
+
+- **Found:** `check.yml` ran on every `push` and every `pull_request`, so each PR commit ran the ~14-minute check twice (measured 1.58 runs per head SHA).
+- **Decided:** the trigger is `push: branches: [main]` plus `pull_request:`, with `concurrency: {group: check-${{ github.ref }}, cancel-in-progress: true}`. A PR commit runs once (the `pull_request` run); a merge to `main` runs once (the `push` run); a newer commit on the same PR or on `main` cancels the older, unfinished run.
+- **Branch protection:** `main` requires the `check` status from GitHub Actions. The `pull_request` run's job is still named `check`, so the required status still comes from it; nothing changes in the protection settings.
+- **What no longer runs CI:** a push to a branch with no PR, and a tag push. The Mac Mini's `production` tag is moved by Joey to a commit already merged to `main`, which the `push` run on `main` checked, so skipping it loses no check. A branch needs a PR before CI runs; every merge goes through a PR anyway (`/verify-pr`, Must never #9).
+- **Test:** `tests/test_precommit_ci.py::test_ci_runs_on_push_and_pull_request` becomes `test_ci_runs_once_per_commit` and also asserts the `main` filter and the concurrency group, in its own `test:` commit (Must never #8; decisions, 6 Nov 2026).
+- **Loosens?** Slightly: tag pushes and PR-less branch pushes no longer run CI. Neither can reach `main` without a PR, and `main`'s merges are still checked. `SPEC.md` v1.50 (Boundaries, CI line) changes with this entry.
 
 ## 19 Nov 2026 - Risk is computed, not self-declared (Joey: "yes, send them"; tightens a dev-tooling rule)
 
@@ -76,7 +86,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Safety net:** `tests/xdist_guard.py` (registered by `tests/conftest.py` with `pytest_plugins`) fails every `testsite` test in setup, before any fixture, inside any xdist worker, and stops a `-n`/`--tx` run that selects one at collection (incl. `--collect-only`): seam 2 drives the one test site with one account, one test at a time. `tests/test_xdist_guard.py` proves it.
 - **Tests changed (Must never #8):** `tests/test_check.py` expects the pytest step's new arguments and the `--quick` mode.
 - **Loosens?** No: the same tests run with the same marker filter; only their order and process change.
-- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `tests/conftest.py`, `SPEC.md` v1.50 (Commands).
+- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `tests/conftest.py`, `SPEC.md` v1.51 (Commands).
 
 ## 19 Nov 2026 - SPEC history and Must never #3 details move out of the always-read files (Joey: "照順序開始"; loosens nothing)
 
