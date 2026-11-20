@@ -359,9 +359,14 @@ class FakeMySys:
 
 
 def _unticked(log, note_id, step):
-    # The real check's event for a box read back unticked.
-    if log is not None:
+    # The real check's event for a box read back unticked; at W4 and W5 a
+    # run-log write that fails never stops the booking (SPEC -> Safe trace).
+    if log is None:
+        return
+    try:
         log.event("email_notification_unticked", note_id=note_id, step=step, ok=True)
+    except OSError:
+        pass
 
 
 DRIVER_NAMES = (
