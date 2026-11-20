@@ -131,7 +131,7 @@ class RunLog:
         extra: dict[str, str | None],
     ) -> None:
         assert self.trace is not None
-        outcome = "pass" if ok else "fail"
+        outcome: str | None = "pass" if ok else "fail"
         # .get: a missing name key is written as null, never a KeyError.
         name: str | None
         if event == "guard_action":

@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Literal
 
 from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import Locator, Page
+from playwright.sync_api import FilePayload, Locator, Page
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.core.errors import (
@@ -711,7 +711,11 @@ def fill_task_form(
         raise WriteNotStarted("Compaction Test form did not open")
     guard.act("set_po_number", form, po_box, po_number)
     upload = _field(form, "Documents", 'input[type="file"]')
-    payload = {"name": file_name, "mimeType": "application/pdf", "buffer": data}
+    payload: FilePayload = {
+        "name": file_name,
+        "mimeType": "application/pdf",
+        "buffer": data,
+    }
     guard.act("upload_document", form, upload, payload)
     guard.act("set_task_note", form, _field(form, "Note", "textarea"), body)
     check_task_form(form, po_number, body, file_name)

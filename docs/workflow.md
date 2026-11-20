@@ -361,9 +361,10 @@ Not part of the MVP. In short: `/agent-skills:code-simplify` once; Matt Pocock's
 
 1. `ruff format --check .`
 2. `ruff check .`
-3. `python scripts/guard_check.py` (no browser action calls outside `act()` in `src/po_agent/mysys/guard.py`; the full banned list is in `tasks/plan.md` task 1.4)
-4. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case
-5. `pytest tests -m "not live_claude and not testsite and not real_data"`
+3. `mypy` (added 20 Nov 2026; config in pyproject `[tool.mypy]`)
+4. `python scripts/guard_check.py` (no browser action calls outside `act()` in `src/po_agent/mysys/guard.py`; the full banned list is in `tasks/plan.md` task 1.4)
+5. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case
+6. `pytest tests -m "not live_claude and not testsite and not real_data"`
 
 **Secrets:** `src/po_agent/core/secrets.py` reads `PO_AGENT_<NAME>` from the environment, else keyring service `po-agent`. Names: `mysys_test_username`, `mysys_test_password` (no Anthropic key since 2 Nov 2026). Never `ANTHROPIC_API_KEY`.
 

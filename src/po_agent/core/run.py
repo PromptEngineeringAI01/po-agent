@@ -525,15 +525,17 @@ def _one_note(
         guard, window, config.agent_user_name, config.pool_name, log, note_id
     )
     progress.taken = False
-    proceed = isinstance(decision, Proceed)
-    reason = DECIDE_ONLY if proceed else decision.reason.value
+    if isinstance(decision, Proceed):
+        reason, pln = DECIDE_ONLY, decision.pln
+    else:
+        reason, pln = decision.reason.value, None
     log.event("skip", note_id=note_id, step="decide", ok=True, reason=reason)
     return output.Note(
         note_id=note_id,
         outcome="skipped",
         reason=reason,
         po_number=po_number,
-        pln=decision.pln if proceed else None,
+        pln=pln,
     )
 
 

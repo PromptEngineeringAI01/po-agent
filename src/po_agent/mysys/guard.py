@@ -21,6 +21,7 @@ password>")`) and the locator (a heading can hold an address).
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import cast
 
 from playwright.sync_api import ElementHandle, FilePayload, Locator
 from playwright.sync_api import Error as PlaywrightError
@@ -336,6 +337,9 @@ class ActionGuard:
                 "guard refused the action", action=action, reason=verdict.reason
             )
         element = verdict.element
+        # The casts only tell mypy what vet() checked (_value_fits): FILL and
+        # SELECT get a str, PRESS only Enter, UPLOAD a dict with exactly the
+        # keys name, mimeType and buffer, and a bytes buffer.
         # ElementHandle actions on the pinned element; Playwright prefers
         # Locators, but a Locator would look the element up again (spec §5).
         # https://playwright.dev/python/docs/api/class-elementhandle
@@ -344,18 +348,18 @@ class ActionGuard:
                 case Kind.CLICK:
                     element.click()
                 case Kind.FILL:
-                    element.fill(value)
+                    element.fill(cast(str, value))
                 case Kind.CHECK:
                     element.check()
                 case Kind.UNCHECK:
                     element.uncheck()
                 case Kind.SELECT:
-                    element.select_option(label=value)
+                    element.select_option(label=cast(str, value))
                 case Kind.UPLOAD:
                     # A FilePayload uploads from memory, never from a path (D2).
-                    element.set_input_files(value)
+                    element.set_input_files(cast(FilePayload, value))
                 case Kind.PRESS:
-                    element.press(value)  # only Enter (_value_fits)
+                    element.press(cast(str, value))  # only Enter (_value_fits)
                 case Kind.MOVE:
                     # force: skip the actionability checks, whose
                     # "receives events" check is what the cover fails;

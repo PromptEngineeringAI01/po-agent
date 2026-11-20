@@ -172,6 +172,7 @@ def test_steps_are_in_spec_order(check_script):
     assert names == [
         "ruff format --check .",
         "ruff check .",
+        "mypy",
         "guard check",
         "repo data",
         f'pytest tests -m "{PYTEST_MARKERS}" {" ".join(PARALLEL)}',
@@ -194,6 +195,7 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
     assert calls == [
         ([*python_m, "ruff", "format", "--check", "."], check_script.ROOT),
         ([*python_m, "ruff", "check", "."], check_script.ROOT),
+        ([*python_m, "mypy"], check_script.ROOT),
         ([sys.executable, "scripts/guard_check.py"], check_script.ROOT),
         (
             [*python_m, "pytest", "tests", "-m", PYTEST_MARKERS, *PARALLEL],
@@ -243,6 +245,42 @@ def test_project_config():
     assert registered == {"live_claude", "testsite", "real_data"}
     python_version = (ROOT / ".python-version").read_text(encoding="utf-8")
     assert python_version.strip().startswith("3.12")
+
+
+# What `mypy --strict` enables (mypy 2.4 --help), less the global-only
+# warn_redundant_casts.
+STRICT_FLAGS = {
+    "disallow_any_generics": True,
+    "disallow_subclassing_any": True,
+    "disallow_untyped_calls": True,
+    "disallow_untyped_defs": True,
+    "disallow_incomplete_defs": True,
+    "check_untyped_defs": True,
+    "disallow_untyped_decorators": True,
+    "warn_unused_ignores": True,
+    "warn_return_any": True,
+    "implicit_reexport": False,
+    "strict_equality": True,
+    "extra_checks": True,
+}
+
+
+def test_mypy_config():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    mypy = pyproject["tool"]["mypy"]
+    assert mypy["python_version"] == "3.12"
+    assert mypy["plugins"] == ["pydantic.mypy"]
+    assert mypy["files"] == ["src", "scripts"]
+    # Libraries without stubs are listed one by one, never ignored globally.
+    assert "ignore_missing_imports" not in mypy
+    # `strict` in an override turns strict on for every module (mypy 2.4),
+    # so the override spells out the per-module flags --strict enables.
+    assert "strict" not in mypy
+    assert mypy["warn_redundant_casts"] is True  # global only
+    assert all("strict" not in o for o in mypy["overrides"])
+    strict = [o for o in mypy["overrides"] if o.get("disallow_untyped_defs")]
+    assert len(strict) == 1 and strict[0]["module"]
+    assert {k: v for k, v in strict[0].items() if k != "module"} == STRICT_FLAGS
 
 
 @pytest.mark.parametrize("bad", ["private/notes.txt", "stray.pdf"])
@@ -329,9 +367,10 @@ def test_quick_runs_the_fast_checks_then_only_the_given_tests(
     python_m = [sys.executable, "-m"]
     paths = ["tests/test_check.py", "tests/test_guard.py"]
     assert exit_info.value.code == 0
-    assert calls[:3] == [
+    assert calls[:4] == [
         [*python_m, "ruff", "format", "--check", "."],
         [*python_m, "ruff", "check", "."],
+        [*python_m, "mypy"],
         [sys.executable, "scripts/guard_check.py"],
     ]
     assert calls[-1] == [*python_m, "pytest", *paths, "-m", PYTEST_MARKERS]

@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 20 Nov 2026, merge rule in SPEC)
+# PO Agent - decision log (updated 20 Nov 2026, mypy in the check; merge rule in SPEC)
 - **20 Nov 2026: merge rule in SPEC** (Joey: "You can merge"; entry below): SPEC Boundaries now says what decisions 6 Nov 2026 already said; PRs touching `scripts/check.py` are merged after `/verify-pr`.
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
@@ -71,6 +71,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **19 Nov 2026: SPEC history and Must never #3 details move out of the always-read files** (Joey: "照順序開始"; entry below): no rule changes.
 - **19 Nov 2026: risk is computed, not self-declared** (Software Factory audit item 1; entry below): `scripts/risk.py` gives a PR's risk level from its changed files.
 - **19 Nov 2026: CI once per commit** (Software Factory audit item 3; Joey: "yes, send them"; entry below): `check.yml` runs on PRs and on pushes to `main` only, and a newer commit cancels the older run.
+- **20 Nov 2026: mypy in the check** (Joey: "照順序開始"; entry below): `scripts/check.py` runs mypy with the pydantic plugin on `src` and `scripts`; reverses the 9 Nov "Not adopted: mypy".
+
+## 20 Nov 2026 - mypy in the check (Joey: "照順序開始"; new dev dependency, reverses a 9 Nov "Not adopted", loosens nothing)
+
+- **Why (setup advisor plan, task H, approved by Joey 19 Nov 2026):** `CLAUDE.md` requires type hints but nothing checked them. Asked "照這個順序開始，並同意加 pytest-xdist 和 mypy？", Joey answered "照順序開始".
+- **What changed since 9 Nov ("CMU 06-643 practices", Not adopted: mypy):** that trial ran plain mypy and found 15 errors, mostly pydantic false positives. With the `pydantic.mypy` plugin, current `main` has 12 errors (11 in `src`, 1 in `scripts`), none of them pydantic and none a real bug: each was a gap the type checker cannot see (a value `vet()` already checked, a narrowing through a bool, a TypedDict literal, a field set before the flag that guards its use). Four of them are one `cast` each in `guard.py` `act()`, after `vet()` has checked the value fits the action.
+- **Decided:** mypy is a dev dependency, configured in `pyproject.toml` `[tool.mypy]`: Python 3.12, `plugins = ["pydantic.mypy"]`, `files = ["src", "scripts"]`, no `ignore_missing_imports` (every library resolves). `warn_redundant_casts` is on for all modules. One `[[tool.mypy.overrides]]` turns on the other twelve flags `--strict` enables, for every module that passes them; a new module is added to it. It lists the flags, not `strict = true`: mypy 2.4 applies `strict` in an override to every module. `scripts/check.py` runs `mypy` after `ruff check` and before the guard check, in the full check and in `--quick`. No `# type: ignore` without an error code and a reason.
+- **Tests changed (Must never #8):** `tests/test_check.py` expects the `mypy` step in both step lists and the `[tool.mypy]` config.
+- **Loosens?** No: one more check step. Nothing changes in what the agent does in MySys or prints.
+- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `SPEC.md` v1.53 (tech stack, Commands, Code Style).
 
 ## 19 Nov 2026 - CI once per commit (Software Factory audit item 3; Joey: "yes, send them"; loosens a safety control slightly)
 

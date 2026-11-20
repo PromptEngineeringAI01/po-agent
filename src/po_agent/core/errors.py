@@ -65,7 +65,7 @@ class PoAgentError(Exception):
 
 class UnexpectedScreen(PoAgentError):
     exit_code = 1
-    alert_kind = "UNEXPECTED_SCREEN"
+    alert_kind: ClassVar["AlertKind"] = "UNEXPECTED_SCREEN"
 
 
 class MorePages(UnexpectedScreen):

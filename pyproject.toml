@@ -33,6 +33,55 @@ select = ["E", "F", "W", "I", "UP", "B", "T10", "T20"]
 "!src/**" = ["T20"]
 "src/po_agent/core/output.py" = ["T20"]
 
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+files = ["src", "scripts"]
+warn_redundant_casts = true  # strict's one global-only flag
+# No ignore_missing_imports: every library resolves (playwright, pydantic,
+# pdfplumber, pypdf, keyring). A library without stubs gets its own override.
+
+# What --strict enables, for every module that passes it (decisions, 20 Nov
+# 2026); add each new module here. Not `strict = true`: in an override, mypy
+# 2.4 turns strict on for every module. Not yet strict: cli, core.config,
+# core.trace, mysys.booking, mysys.guard. scripts/*.py are modules by name.
+[[tool.mypy.overrides]]
+module = [
+    "check",
+    "guard_check",
+    "heartbeat_check",
+    "risk",
+    "po_agent",
+    "po_agent.b1",
+    "po_agent.b1.address",
+    "po_agent.b1.booker",
+    "po_agent.b1.decision",
+    "po_agent.b1.models",
+    "po_agent.b1.reader_rules",
+    "po_agent.core",
+    "po_agent.core.controls",
+    "po_agent.core.demo",
+    "po_agent.core.errors",
+    "po_agent.core.output",
+    "po_agent.core.run",
+    "po_agent.core.runlog",
+    "po_agent.core.secrets",
+    "po_agent.mysys",
+    "po_agent.mysys.driver",
+]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+implicit_reexport = false
+strict_equality = true
+extra_checks = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
@@ -44,6 +93,7 @@ markers = [
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-xdist>=3.8.0",
