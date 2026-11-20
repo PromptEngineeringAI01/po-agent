@@ -26,14 +26,14 @@ TESTS = ROOT / "tests"
 HELD_MESSAGE = "seam 2 is already running on this laptop"
 
 HOLDER = """
+import os
 import sys
 sys.path.insert(0, sys.argv[1])
 from pathlib import Path
 import testsite_lock
 lock = testsite_lock.acquire(Path(sys.argv[2]), sys.argv[3])
-print("held", flush=True)
+print("held", os.getpid(), flush=True)
 if sys.stdin.readline().strip() == "crash":
-    import os
     os._exit(3)
 lock.release()
 print("released", flush=True)
@@ -61,8 +61,13 @@ class Holder:
             env=env or clean_env(),
         )
         assert self.proc.stdout is not None
-        line = self.proc.stdout.readline().strip()
-        assert line == "held", self.proc.stderr.read() if self.proc.stderr else line
+        line = self.proc.stdout.readline().split()
+        assert line[:1] == ["held"], (
+            self.proc.stderr.read() if self.proc.stderr else line
+        )
+        # The holder's own PID: on Windows a venv's python.exe is a launcher,
+        # so Popen.pid is the launcher's, not the process holding the lock.
+        self.pid = int(line[1])
 
     def finish(self, command: str = "release") -> int:
         assert self.proc.stdin is not None
@@ -96,7 +101,7 @@ def test_a_second_process_is_refused_naming_the_holder(tmp_path, holders):
 
     message = str(refused.value)
     assert HELD_MESSAGE in message
-    assert f"PID {holder.proc.pid}" in message
+    assert f"PID {holder.pid}" in message
     assert "C:/fake/worktree-a" in message
     assert holder.finish() == 0
 
@@ -118,7 +123,7 @@ def test_the_lock_is_free_again_once_the_holder_releases(tmp_path, holders):
 def test_a_crashed_holder_is_detected_and_cleared(tmp_path, holders):
     path = tmp_path / "seam2.lock"
     holder = holders(path, "C:/fake/worktree-a")
-    crashed_pid = holder.proc.pid
+    crashed_pid = holder.pid
     assert holder.finish("crash") == 3  # no release: the holder info stays
 
     lock = testsite_lock.acquire(path, "C:/fake/worktree-b")
@@ -188,7 +193,7 @@ def test_a_testsite_run_stops_at_collection_while_another_holds_it(tmp_path, hol
     out = result.stdout + result.stderr
     assert result.returncode != 0
     assert HELD_MESSAGE in out
-    assert f"PID {holder.proc.pid}" in out
+    assert f"PID {holder.pid}" in out
     assert "C:/fake/other-worktree" in out
     assert "passed" not in out
 
