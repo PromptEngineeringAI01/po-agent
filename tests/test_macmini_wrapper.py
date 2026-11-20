@@ -501,6 +501,32 @@ def test_hung_agent_also_kills_detached_playwright_browsers(box):
     assert "-u" in args
 
 
+# Run lock (decisions, 20 Nov 2026): a run that finds the lock held prints the
+# fixed INFO line and exits 0. The wrapper must not then kill "leftover"
+# Playwright browsers: they belong to the run that holds the lock.
+LOCK_HELD = "INFO  run lock held: run not started"
+
+
+def test_run_skipped_for_the_lock_leaves_browsers_alone(box):
+    box.agent([LOCK_HELD, summary(0)], 0)
+
+    result = box.run("run", "test")
+
+    assert result.returncode == 0
+    assert not (box.stubs / "pkill.calls").exists()
+    assert box.gh_args() is None
+    assert box.calls()[-2:] == PING_CALLS
+    assert LOCK_HELD in box.runs_log()
+
+
+def test_clean_run_still_kills_leftover_browsers(box):
+    box.agent([INFO, summary(0)], 0)
+
+    box.run("run", "test")
+
+    assert (box.stubs / "pkill.calls").exists()
+
+
 # 7.1 heartbeat: one ping at the end of every run.
 
 
