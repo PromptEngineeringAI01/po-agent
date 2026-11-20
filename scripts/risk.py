@@ -33,6 +33,7 @@ HIGH_PREFIXES = (
 HIGH_FILES = (
     "src/po_agent/b1/booker.py",
     "src/po_agent/b1/reader_rules.py",
+    "src/po_agent/b1/readers.py",
     "src/po_agent/b1/decision.py",
     "src/po_agent/b1/address.py",
     "scripts/guard_check.py",

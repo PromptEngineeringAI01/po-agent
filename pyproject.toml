@@ -58,6 +58,7 @@ module = [
     "po_agent.b1.decision",
     "po_agent.b1.models",
     "po_agent.b1.reader_rules",
+    "po_agent.b1.readers",
     "po_agent.core",
     "po_agent.core.controls",
     "po_agent.core.demo",

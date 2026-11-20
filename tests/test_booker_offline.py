@@ -67,8 +67,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, ConsoleMessage, Page
 
-from po_agent.b1 import booker
-from po_agent.b1 import reader_rules as rules
+from po_agent.b1 import booker, readers
 from po_agent.b1.decision import decide
 from po_agent.b1.models import CompactionTask, NotePoolRow, Proceed
 from po_agent.core import controls
@@ -132,10 +131,8 @@ def proceed_for_p1() -> Proceed:
     decision = decide(
         CLEAN.note,
         INTERNAL_NO,
-        rules.text_layer(PDF),
-        rules.pypdf_text_layer(PDF),
-        PDF,
-        lookup,
+        readers.read(PDF),
+        lambda: lookup,
         site="test",
         duplicate_ignores_cancelled=True,
     )
