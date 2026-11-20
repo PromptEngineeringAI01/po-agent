@@ -1,8 +1,16 @@
-# PO Agent - decision log (updated 20 Nov 2026, mypy in the check; 19 Nov 2026, risk is computed, not self-declared; data-deleting git commands denied; CI once per commit; parallel check)
+# PO Agent - decision log (updated 20 Nov 2026, mypy in the check; merge rule in SPEC)
+- **20 Nov 2026: merge rule in SPEC** (Joey: "You can merge"; entry below): SPEC Boundaries now says what decisions 6 Nov 2026 already said; PRs touching `scripts/check.py` are merged after `/verify-pr`.
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 20 Nov 2026 - Merge rule in SPEC matches the decisions (Joey: "You can merge"; loosens nothing)
+
+- **Found (setup advisor, verifying PR #137):** `SPEC.md` Boundaries said a PR touching "the verify-pr skill ... or the check" stays Joey's (2 Nov 2026), while the 6 Nov 2026 entry (faster shipping, Who merges) says Claude merges every PR outside the guard, hooks, settings and CI, "including PRs touching `scripts/check.py` or the verify-pr skill". The decision log wins.
+- **Joey (20 Nov 2026), asked whether check.py PRs stay his:** "You can merge." PR #137 (parallel check) was merged after `/verify-pr`, a local check and CI.
+- **Changed:** the Boundaries merge line (`SPEC.md` v1.52). No hook, skill or setting changes: the hook already allows the pinned merge for any PR.
+- **Loosens?** No: the SPEC text now matches the rule in force since 6 Nov.
 
 ## Status
 
@@ -72,7 +80,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Decided:** mypy is a dev dependency, configured in `pyproject.toml` `[tool.mypy]`: Python 3.12, `plugins = ["pydantic.mypy"]`, `files = ["src", "scripts"]`, no `ignore_missing_imports` (every library resolves). `warn_redundant_casts` is on for all modules. One `[[tool.mypy.overrides]]` turns on the other twelve flags `--strict` enables, for every module that passes them; a new module is added to it. It lists the flags, not `strict = true`: mypy 2.4 applies `strict` in an override to every module. `scripts/check.py` runs `mypy` after `ruff check` and before the guard check, in the full check and in `--quick`. No `# type: ignore` without an error code and a reason.
 - **Tests changed (Must never #8):** `tests/test_check.py` expects the `mypy` step in both step lists and the `[tool.mypy]` config.
 - **Loosens?** No: one more check step. Nothing changes in what the agent does in MySys or prints.
-- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `SPEC.md` v1.52 (Commands, Code Style).
+- Carried in: `pyproject.toml`, `uv.lock`, `scripts/check.py`, `SPEC.md` v1.53 (tech stack, Commands, Code Style).
 
 ## 19 Nov 2026 - CI once per commit (Software Factory audit item 3; Joey: "yes, send them"; loosens a safety control slightly)
 

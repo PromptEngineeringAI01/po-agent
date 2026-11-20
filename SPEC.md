@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.52 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.53 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -361,7 +361,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Send, reply to, forward or delete email; touch Outlook.
 - Put a secret anywhere but keyring (the laptop's Credential Manager, `poagent`'s Keychain on the Mac Mini) or a `PO_AGENT_*` environment variable.
 - Commit anything from `private/`, or copy real client data into a committed file, a PR, an issue, run output or the Mac Mini (exceptions: the trial POs' identifiers, assumption 2, and the Mac Mini reading the trial POs from the test site, with each PDF on disk only from its download until it's read, Trial conditions).
-- Push to `main` or force-push. Merge only with `gh pr merge <n> --merge --match-head-commit <sha>` (the commit `/verify-pr` checked), after `/verify-pr` passes and CI is green; a PR that touches the hooks, settings, the verify-pr skill, CI, the guard or the check, or loosens a safety control, stays Joey's (decisions, 2 Nov 2026).
+- Push to `main` or force-push. Merge only with `gh pr merge <n> --merge --match-head-commit <sha>` (the commit `/verify-pr` checked), after `/verify-pr` passes and CI is green; a PR that touches the guard (`guard.py`, `scripts/guard_check.py`), the hooks or settings (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`) stays Joey's; every other PR, including `scripts/check.py`, the verify-pr skill and docs that loosen a rule with their decisions entry, is merged after `/verify-pr` (decisions, 6 Nov 2026, faster shipping; 20 Nov 2026, merge rule in SPEC).
 
 **Live site** (the full text of CLAUDE.md Must never #3, which keeps the core rule and points here; moved verbatim on 19 Nov 2026: decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
 - Never touch the live site (`prompt.mysys.com.au`) in code, config, tests or commands. Only exceptions: the `LIVE_HOST` constant in `src/po_agent/core/config.py`, `config/live.toml`, and the deny rules in `.claude/hooks/guard_bash.py` and `.playwright/cli.config.json` and their tests (decisions, 10 Nov 2026, hooks for the live profile).
