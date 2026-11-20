@@ -53,7 +53,6 @@ PartialWrite, except AccuracyBreach and GuardRefusal, which keep their type.
 Pending, Discard, Change Project and Unlink are never targeted.
 """
 
-from collections.abc import Callable
 from typing import NoReturn
 
 from playwright.sync_api import Locator, Page
@@ -298,24 +297,6 @@ def _stop_after_submit(
     ) from error
 
 
-def _unticked(log: RunLog | None, note_id: str, step: str) -> Callable[[], None]:
-    """The run-log event for Send Email read back unticked before `step`'s
-    Note-window write. The run log is evidence, not a control: a write that
-    fails never stops the booking."""
-
-    def logged() -> None:
-        if log is None:
-            return
-        try:
-            log.event(
-                "email_notification_unticked", note_id=note_id, step=step, ok=True
-            )
-        except OSError:
-            pass
-
-    return logged
-
-
 def _flush(log: RunLog | None, note_id: str, step: str) -> None:
     """Writes a finished step's guard actions with its own step name (the
     safe trace); a write that fails never stops the booking."""
@@ -339,9 +320,7 @@ def _w4(
     try:
         controls.before_write(note_id, "W4")  # the assignee check (D7)
         window = driver.find_note_again(guard, page, *login, note_id)  # row 25
-        booking.link_project(
-            guard, page, window, proceed.pln, unticked=_unticked(log, note_id, "W4")
-        )
+        booking.link_project(guard, page, window, proceed.pln, log=log, note_id=note_id)
         return window
     except BaseException as error:  # Ctrl+C too
         _stop_after_submit(page, error, note_id, "W4")
@@ -361,9 +340,7 @@ def _w5(
     try:
         controls.before_write(note_id, "W5")  # no assignee check (D7)
         before = driver.log_line_count(window)
-        booking.mark_solved(
-            guard, window, agent, unticked=_unticked(log, note_id, "W5")
-        )
+        booking.mark_solved(guard, window, agent, log=log, note_id=note_id)
         booking.check_solved_log(window, before)
         driver.gone_from_pending(guard, page, *login, note_id)
     except BaseException as error:  # Ctrl+C too

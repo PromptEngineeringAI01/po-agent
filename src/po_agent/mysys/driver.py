@@ -804,6 +804,12 @@ def is_unlinked(window: Locator, log: RunLog, note_id: str) -> bool:
     return links == 1
 
 
+# Send Email Notification: one control for every Note-window write (Must
+# never #4; decisions, 20 Nov 2026, one Send Email control). Two operations,
+# called at the same points by the run (take, return, W4, W5) and the demo:
+# untick it, then check it right before each committing click.
+
+
 def _email_box(window: Locator) -> Locator:
     return window.get_by_role("checkbox", name="Send Email Notification", exact=True)
 
@@ -813,6 +819,48 @@ def _email_ticked(window: Locator) -> bool:
         return _email_box(window).is_checked()
     except PlaywrightError:
         raise UnexpectedScreen("Send Email Notification not readable") from None
+
+
+def untick_send_email(guard: ActionGuard, window: Locator) -> None:
+    """Unticks Send Email Notification if it is ticked (it is whenever a
+    Note window opens, row 02). Records no event: `check_send_email` reads
+    it back before the click that commits."""
+    if _email_ticked(window):
+        guard.act("untick_send_email_notification", window, _email_box(window))
+
+
+def check_send_email(
+    window: Locator,
+    log: RunLog | None,
+    note_id: str | None,
+    step: str | None,
+    *,
+    log_may_fail: bool = False,
+) -> None:
+    """Right before a committing click: reads Send Email Notification back
+    unticked and records `email_notification_unticked` (ok true or false) in
+    `log`; still ticked -> UnexpectedScreen with `note_id` and `step`.
+
+    Without a run log (the demo) nothing is recorded and the error carries
+    no IDs, so the demo names its own step. With `log_may_fail` (the
+    booker) a run-log write that fails is ignored: the log is evidence, not
+    a control (SPEC -> Safe trace)."""
+    unticked = not _email_ticked(window)
+    if log is not None:
+        try:
+            log.event(
+                "email_notification_unticked", note_id=note_id, step=step, ok=unticked
+            )
+        except OSError:
+            if not log_may_fail:
+                raise
+    if unticked:
+        return
+    if log is None:
+        raise UnexpectedScreen("Send Email Notification still ticked")
+    raise UnexpectedScreen(
+        "Send Email Notification still ticked", note_id=note_id, step=step
+    )
 
 
 def _list(window: Locator, placeholder: str) -> Locator:
@@ -853,14 +901,9 @@ def _assign(
     was: str,
     now: str,
 ) -> None:
-    """Send Email read back unticked right before the one Assign (Must never
-    #4), then "Assignee:" and the new log line read back."""
-    unticked = not _email_ticked(window)
-    log.event("email_notification_unticked", note_id=note_id, step=step, ok=unticked)
-    if not unticked:
-        raise UnexpectedScreen(
-            "Send Email Notification still ticked", note_id=note_id, step=step
-        )
+    """Send Email checked right before the one Assign (Must never #4), then
+    "Assignee:" and the new log line read back."""
+    check_send_email(window, log, note_id, step)
     before = log_line_count(window)
     assign = window.get_by_role("button", name="Assign", exact=True)
     guard.act("assign_note", window, assign)
@@ -877,12 +920,6 @@ def _assign(
     )
 
 
-def _untick(guard: ActionGuard, window: Locator) -> None:
-    # Ticked whenever a Note window opens (row 02).
-    if _email_ticked(window):
-        guard.act("untick_send_email_notification", window, _email_box(window))
-
-
 def take_note(
     guard: ActionGuard, window: Locator, agent: str, log: RunLog, note_id: str
 ) -> None:
@@ -890,7 +927,7 @@ def take_note(
     --Select Pool--, one Assign; read back the assignee and the new log line
     "User Assigned: ... to <agent>"."""
     step = "2"
-    _untick(guard, window)
+    untick_send_email(guard, window)
     guard.act("select_note_user", window, _list(window, SELECT_USER), agent)
     if _chosen_in(_list(window, SELECT_POOL)) != SELECT_POOL:
         raise UnexpectedScreen("pool list not at its placeholder", note_id=note_id)
@@ -911,7 +948,7 @@ def return_note(
     to <pool>" and Status Pending. The lists reset and Assign is disabled
     afterwards, as expected."""
     step = "return"
-    _untick(guard, window)
+    untick_send_email(guard, window)
     guard.act("select_note_user", window, _list(window, SELECT_USER), SELECT_USER)
     guard.act("select_note_pool", window, _list(window, SELECT_POOL), pool)
     _assign(guard, window, log, note_id, step, was=agent, now=pool)
