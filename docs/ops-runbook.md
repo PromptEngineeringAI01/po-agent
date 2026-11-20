@@ -11,7 +11,7 @@ The agent runs on the office Mac Mini as the macOS user `poagent`, every weekday
 - Put an address, a client name or text from a PDF into a GitHub issue or comment. The repository is public. Nor a **live** Note ID or pln: those are real client data. A run_id and a step are fine (on the test site a Note ID and pln are too).
 - Leave **Send Email Notification** ticked when you change a Note in MySys by hand. Untick it before every Assign, Link to Project and Solved.
 - Edit files in `~/po-agent` on the Mac Mini, or move the `production` tag (only Joey moves it).
-- Run the agent from a laptop while the Mac Mini job is loaded (one agent at a time).
+- Run the agent from a laptop against the live site (only the Mac Mini runs on live). A laptop test-site run doesn't need the job unloaded.
 
 ## 1. Before you need this (once)
 
@@ -74,7 +74,7 @@ While the job is unloaded, the heartbeat check will open `po-agent heartbeat mis
 ### 3.2 Restart the agent
 
 1. Fix the cause first (the alert's entry in section 4), and make sure no Pending Note is still assigned to the agent (3.3), or the next run stops at the start.
-2. If code or the site's config had to change: Joey merges the fix to `main`, tries it on the test site from the laptop (job unloaded) and moves the `production` tag to it (`docs/macmini-setup.md` section 8). Nobody else moves the tag. If Joey set `enabled = false`, he sets it back to `true` on `main`. The agent also reads `enabled` from the tagged commit's config, so the tag must be on a commit whose config says `true`: if the tag was moved while `main` said `false`, Joey moves it again after setting `true`.
+2. If code or the site's config had to change: Joey merges the fix to `main`, tries it on the test site from the laptop (the live job keeps running) and moves the `production` tag to it (`docs/macmini-setup.md` section 8). Nobody else moves the tag. If Joey set `enabled = false`, he sets it back to `true` on `main`. The agent also reads `enabled` from the tagged commit's config, so the tag must be on a commit whose config says `true`: if the tag was moved while `main` said `false`, Joey moves it again after setting `true`.
 3. As `poagent` on the Mac, try a read-only run first. It logs in and lists the Notes, and takes none. Don't start it within a few minutes of :07.
    ```bash
    ~/po-agent/scripts/macmini-run.sh spike live

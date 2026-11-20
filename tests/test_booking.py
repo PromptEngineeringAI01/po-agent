@@ -60,7 +60,15 @@ def note_page(
     links: int = 1,
     assign_works: bool = True,
     body: str = f"<pre>{BODY}</pre>",
+    reticks: bool = False,
 ) -> str:
+    # `reticks`: choosing a user ticks Send Email Notification again (row 02:
+    # it ticks itself whenever the window renders).
+    retick = (
+        " onchange=\"document.getElementById('email').checked = true\""
+        if reticks
+        else ""
+    )
     link = f'<a href="index.php?option=com_cweb&download=1&user_note_id=95&file_name={FILE}">Download document</a>'
     works = "true" if assign_works else "false"
     return f"""
@@ -72,7 +80,7 @@ def note_page(
     <div role="group" aria-label="Status buttons">
       <button disabled id="pending">Pending</button><button id="solved" onclick="solve()">Solved</button><button>Discard</button>
     </div>
-    <select id="user"><option>--Select User--</option><option selected>{AGENT}</option><option>Fake Person</option></select>
+    <select id="user"{retick}><option>--Select User--</option><option selected>{AGENT}</option><option>Fake Person</option></select>
     <select id="pool"><option selected>--Select Pool--</option><option>{POOL}</option></select>
     <button onclick="assign()">Assign</button>
     <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"> Send Email Notification</span>
@@ -124,6 +132,15 @@ def test_take_note_unticks_email_and_reads_back_the_agent(page, guard):
         "select_note_user",
         "assign_note",
     ]
+
+
+def test_take_note_with_email_ticked_again_before_assign_does_not_assign(page, guard):
+    # The demo's check right before Assign (Must never #4).
+    page.set_content(note_page(reticks=True))
+    with pytest.raises(UnexpectedScreen):
+        booking.take_note(guard, booking.note_window(page, NOTE_ID), AGENT)
+    assert "assign_note" not in actions(guard)
+    assert page.locator("body").get_attribute("data-emailed") is None
 
 
 @pytest.mark.usefixtures("short_waits")

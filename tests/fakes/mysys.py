@@ -327,27 +327,27 @@ class FakeMySys:
     def check_on_hold(self, project, task_no):
         self._step("on_hold")  # Un-Hold and "On-hold" (screen-map row 12)
 
-    def link_project(self, guard, page, window, pln, unticked=None):
+    def link_project(self, guard, page, window, pln, *, log=None, note_id=None):
         # The real one reads Send Email back unticked right before Link to
-        # Project and again right before its committing select (`unticked`
-        # is told each time), as guard.act records them (decisions, 4 Nov
-        # 2026, W4 and W5; screen-map rows 13, 20).
+        # Project and again right before its committing select, each an
+        # `email_notification_unticked` event in `log`, as guard.act records
+        # them (decisions, 4 Nov 2026, W4 and W5; 20 Nov 2026, one Send Email
+        # control; screen-map rows 13, 20).
         self._step("link")
         for action in ("link_to_project", "link_select_project"):
-            if unticked is not None:
-                unticked()
+            _unticked(log, note_id, "W4")
             guard.history.append((action, "done"))
 
     def log_line_count(self, window):
         self._step("log_count")
         return 0
 
-    def mark_solved(self, guard, window, agent, unticked=None):
-        # Send Email read back unticked, then Solved once (decisions, 4 Nov
-        # 2026, W4 and W5; screen-map row 14).
+    def mark_solved(self, guard, window, agent, *, log=None, note_id=None):
+        # Send Email read back unticked (an event in `log`), then Solved once
+        # (decisions, 4 Nov 2026, W4 and W5; 20 Nov 2026, one Send Email
+        # control; screen-map row 14).
         self._step("solved")
-        if unticked is not None:
-            unticked()
+        _unticked(log, note_id, "W5")
         guard.history.append(("mark_solved", "done"))  # as guard.act records it
 
     def check_solved_log(self, window, before):
@@ -356,6 +356,17 @@ class FakeMySys:
     def gone_from_pending(self, guard, page, base_url, username, password, note_id):
         # A Solved Note leaves the Pending list (screen-map row 14).
         self._call("gone", note_id)
+
+
+def _unticked(log, note_id, step):
+    # The real check's event for a box read back unticked; at W4 and W5 a
+    # run-log write that fails never stops the booking (SPEC -> Safe trace).
+    if log is None:
+        return
+    try:
+        log.event("email_notification_unticked", note_id=note_id, step=step, ok=True)
+    except OSError:
+        pass
 
 
 DRIVER_NAMES = (

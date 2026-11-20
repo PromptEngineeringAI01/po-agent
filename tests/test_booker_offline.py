@@ -79,6 +79,7 @@ from po_agent.core.errors import (
     PartialWrite,
     WriteNotStarted,
 )
+from po_agent.core.runlog import RunLog
 from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard, Refusal
 
@@ -516,6 +517,7 @@ def run_book(
     stop_after: str = "W1",
     config_dir: Path = CONFIG_DIR,
     document_type: str = "Client Documents",
+    log: RunLog | None = None,
 ) -> str | None:
     page, login = served
     gate = controls.Controls(
@@ -534,6 +536,7 @@ def run_book(
         site="test",
         document_type=document_type,
         stop_after=stop_after,
+        log=log,
     )
 
 
@@ -992,7 +995,9 @@ SITE = "1 Sample Close Sampleville"
 # The Note window as reopened (rows 02, 13, 14, 20), changed by `note`:
 # `results` is the pln cell of each Choose Project result row; `linksTo` the
 # project button the select shows; `reticks` ticks Send Email Notification
-# again when the search runs; `extraLink` / `extraSolved` add a second Link
+# again when the search runs; `retickAfterLink` ticks it again once the
+# Note is linked and, when it is unticked, shows the window again with it
+# ticked (row 02: it ticks itself whenever the window renders); `extraLink` / `extraSolved` add a second Link
 # to Project / Solved button; after Solved: `solvedStatus`, `solvedLog` (a
 # new "Status changed" line) and `solvedDisables` (Solved off, Pending on).
 NOTE_WINDOW: dict[str, object] = {
@@ -1000,6 +1005,7 @@ NOTE_WINDOW: dict[str, object] = {
     "linksTo": PLN,
     "statusAfterLink": f"Pending by {AGENT}",
     "reticks": False,
+    "retickAfterLink": False,
     "extraLink": False,
     "extraSolved": False,
     "pickerOpens": True,
@@ -1061,7 +1067,7 @@ def note_pool_page(
     <select><option>--Select User--</option><option selected>{AGENT}</option></select>
     <select><option selected>--Select Pool--</option><option>Agent Pool</option></select>
     <button>Assign</button>
-    <span><input type="checkbox" id="email" checked aria-label="Send Email Notification"> Send Email Notification</span>
+    <span><input type="checkbox" id="email" checked aria-label="Send Email Notification" onchange="emailChanged(this)"> Send Email Notification</span>
     <span id="link"><button onclick="openPicker()">Link to Project</button>{extra_link}</span>
     <ul><li><strong>Status:</strong> <span id="status">Pending by {PERSON}</span></li></ul>
     <div><h4>Logs</h4><ul id="logs">
@@ -1077,6 +1083,16 @@ function count(name) {{
 }}
 function emailed() {{
   if (document.getElementById('email').checked) document.body.dataset.emailed = 'yes';
+}}
+function emailChanged(box) {{
+  if (!NOTE.retickAfterLink || !document.body.dataset.picked || box.checked) return;
+  // The window shows again, its box ticked; the old box stays, hidden.
+  const fresh = box.cloneNode();
+  fresh.checked = true;
+  box.removeAttribute('id');
+  box.removeAttribute('aria-label');
+  box.hidden = true;
+  box.after(fresh);
 }}
 function openPicker() {{
   if (!NOTE.pickerOpens) return;
@@ -1100,6 +1116,7 @@ function linkKey(event, text) {{
 function pick() {{
   count('picked');
   emailed();
+  if (NOTE.retickAfterLink) document.getElementById('email').checked = true;
   // Tells the W5 kill-switch test that the Note is linked.
   console.log('linked');
   document.getElementById('picker').innerHTML = '';
@@ -1223,6 +1240,53 @@ def test_before_the_link_select_a_screen_not_as_mapped_links_nothing(
 
     assert caught.value.step == "W4"
     assert "link_select_project" not in actions(guard)
+    assert served[0].is_closed()
+
+
+def email_events(tmp_path: Path) -> list[tuple[str, bool]]:
+    lines = (tmp_path / "logs" / "run.jsonl").read_text("utf-8").splitlines()
+    events = [json.loads(line) for line in lines]
+    return [
+        (e["step"], e["ok"])
+        for e in events
+        if e["event"] == "email_notification_unticked"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("note", "step", "expected", "last"),
+    [
+        # Ticked again by the search: read back before Link to Project,
+        # then still ticked before the select.
+        ({"reticks": True}, "W4", [("W4", True), ("W4", False)], "submit_link_search"),
+        # Ticked again once linked, and again when unticked: still ticked
+        # before Solved.
+        (
+            {"retickAfterLink": True},
+            "W5",
+            [("W4", True), ("W4", True), ("W5", False)],
+            "untick_send_email_notification",
+        ),
+    ],
+    ids=["W4", "W5"],
+)
+def test_send_email_still_ticked_at_w4_or_w5_is_logged_before_the_stop(
+    serve, guard, monkeypatch, tmp_path, note, step, expected, last
+):
+    # One control for every Note-window write (8.1): a box still ticked
+    # records ok=false, as take and return do; the stop is as before.
+    through_w5(monkeypatch, guard, note=note)
+    served = serve(tasks=[CANCELLED])
+    log = RunLog("run", guard, directory=tmp_path / "logs")
+
+    with pytest.raises(PartialWrite) as caught:
+        run_book(served, guard, proceed_for_p1(), stop_after="W5", log=log)
+
+    assert email_events(tmp_path) == expected
+    # The ALERT's detail is unchanged: the booker retypes the error.
+    unchanged = PartialWrite("Note not linked and solved", note_id=NOTE_ID, step=step)
+    assert str(caught.value) == str(unchanged)
+    assert actions(guard)[-1] == last
     assert served[0].is_closed()
 
 

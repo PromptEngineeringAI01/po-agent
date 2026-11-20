@@ -44,7 +44,7 @@ warn_redundant_casts = true  # strict's one global-only flag
 # What --strict enables, for every module that passes it (decisions, 20 Nov
 # 2026); add each new module here. Not `strict = true`: in an override, mypy
 # 2.4 turns strict on for every module. Not yet strict: cli, core.config,
-# core.trace, mysys.booking, mysys.guard. scripts/*.py are modules by name.
+# core.trace. scripts/*.py are modules by name.
 [[tool.mypy.overrides]]
 module = [
     "check",
@@ -67,7 +67,9 @@ module = [
     "po_agent.core.runlog",
     "po_agent.core.secrets",
     "po_agent.mysys",
+    "po_agent.mysys.booking",
     "po_agent.mysys.driver",
+    "po_agent.mysys.guard",
 ]
 disallow_any_generics = true
 disallow_subclassing_any = true
