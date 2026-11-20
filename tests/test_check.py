@@ -172,6 +172,7 @@ def test_steps_are_in_spec_order(check_script):
     assert names == [
         "ruff format --check .",
         "ruff check .",
+        "mypy",
         "guard check",
         "repo data",
         f'pytest tests -m "{PYTEST_MARKERS}" {" ".join(PARALLEL)}',
@@ -194,6 +195,7 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
     assert calls == [
         ([*python_m, "ruff", "format", "--check", "."], check_script.ROOT),
         ([*python_m, "ruff", "check", "."], check_script.ROOT),
+        ([*python_m, "mypy"], check_script.ROOT),
         ([sys.executable, "scripts/guard_check.py"], check_script.ROOT),
         (
             [*python_m, "pytest", "tests", "-m", PYTEST_MARKERS, *PARALLEL],
@@ -243,6 +245,18 @@ def test_project_config():
     assert registered == {"live_claude", "testsite", "real_data"}
     python_version = (ROOT / ".python-version").read_text(encoding="utf-8")
     assert python_version.strip().startswith("3.12")
+
+
+def test_mypy_config():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    mypy = pyproject["tool"]["mypy"]
+    assert mypy["python_version"] == "3.12"
+    assert mypy["plugins"] == ["pydantic.mypy"]
+    assert mypy["files"] == ["src", "scripts"]
+    # Libraries without stubs are listed one by one, never ignored globally.
+    assert "ignore_missing_imports" not in mypy
+    strict = [o for o in mypy["overrides"] if o.get("strict") is True]
+    assert len(strict) == 1 and strict[0]["module"]
 
 
 @pytest.mark.parametrize("bad", ["private/notes.txt", "stray.pdf"])
@@ -329,9 +343,10 @@ def test_quick_runs_the_fast_checks_then_only_the_given_tests(
     python_m = [sys.executable, "-m"]
     paths = ["tests/test_check.py", "tests/test_guard.py"]
     assert exit_info.value.code == 0
-    assert calls[:3] == [
+    assert calls[:4] == [
         [*python_m, "ruff", "format", "--check", "."],
         [*python_m, "ruff", "check", "."],
+        [*python_m, "mypy"],
         [sys.executable, "scripts/guard_check.py"],
     ]
     assert calls[-1] == [*python_m, "pytest", *paths, "-m", PYTEST_MARKERS]
