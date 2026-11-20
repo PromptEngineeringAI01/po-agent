@@ -10,6 +10,9 @@
 - `short_waits`: every MySys wait shortened, for page tests whose fail paths
   would otherwise sit out the live 15-60 s waits (tests/fakes/browser.py).
 
+The xdist guard (tests/xdist_guard.py) refuses any parallel run that selects
+a `testsite` test.
+
 Values are fake.
 """
 
@@ -25,6 +28,9 @@ from playwright.sync_api import Browser, sync_playwright
 
 from po_agent import cli
 from po_agent.core.config import CONFIG_DIR
+
+# Both hooks of the xdist guard, as a plugin (tests/test_xdist_guard.py).
+pytest_plugins = ("xdist_guard",)
 
 
 @pytest.fixture(scope="module")

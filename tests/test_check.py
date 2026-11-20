@@ -10,6 +10,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 PYTEST_MARKERS = "not live_claude and not testsite and not real_data"
+# The offline tests run in parallel (decisions, 19 Nov 2026, pytest-xdist).
+PARALLEL = ["-n", "auto", "--maxprocesses", "12", "--dist", "load"]
 
 
 @pytest.fixture(scope="module")
@@ -172,7 +174,7 @@ def test_steps_are_in_spec_order(check_script):
         "ruff check .",
         "guard check",
         "repo data",
-        f'pytest tests -m "{PYTEST_MARKERS}"',
+        f'pytest tests -m "{PYTEST_MARKERS}" {" ".join(PARALLEL)}',
     ]
 
 
@@ -193,7 +195,10 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
         ([*python_m, "ruff", "format", "--check", "."], check_script.ROOT),
         ([*python_m, "ruff", "check", "."], check_script.ROOT),
         ([sys.executable, "scripts/guard_check.py"], check_script.ROOT),
-        ([*python_m, "pytest", "tests", "-m", PYTEST_MARKERS], check_script.ROOT),
+        (
+            [*python_m, "pytest", "tests", "-m", PYTEST_MARKERS, *PARALLEL],
+            check_script.ROOT,
+        ),
     ]
 
 
@@ -279,4 +284,96 @@ def test_repo_data_only_runs_no_other_step(tmp_path, monkeypatch, capsys, check_
 def test_unknown_argument_is_refused(check_script):
     with pytest.raises(SystemExit) as exit_info:
         check_script.main(["--everything"])
+    assert exit_info.value.code != 0
+
+
+def test_plain_pytest_stays_serial():
+    # Only check.py adds -n: a plain `uv run pytest` (seam 2 included) runs
+    # one test at a time.
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    addopts = pyproject["tool"]["pytest"]["ini_options"]["addopts"].split()
+    assert not any(
+        opt.startswith(("-n", "--numprocesses", "--dist")) for opt in addopts
+    )
+    assert any(
+        dep.startswith("pytest-xdist") for dep in pyproject["dependency-groups"]["dev"]
+    )
+
+
+def fake_quick_run(monkeypatch, check_script, collected: int) -> list[list[str]]:
+    """Records every subprocess; a --collect-only run lists `collected` tests."""
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        stdout = ""
+        if "--collect-only" in args:
+            lines = [f"tests/test_x.py::test_{n}" for n in range(collected)]
+            lines += ["", f"{collected} tests collected in 0.10s", ""]
+            stdout = "\n".join(lines)
+        return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(check_script.subprocess, "run", fake_run)
+    monkeypatch.setattr(check_script, "repo_data_violations", lambda root: [])
+    return calls
+
+
+def test_quick_runs_the_fast_checks_then_only_the_given_tests(
+    monkeypatch, capsys, check_script
+):
+    calls = fake_quick_run(monkeypatch, check_script, collected=3)
+
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--quick", "tests/test_check.py", "tests/test_guard.py"])
+
+    python_m = [sys.executable, "-m"]
+    paths = ["tests/test_check.py", "tests/test_guard.py"]
+    assert exit_info.value.code == 0
+    assert calls[:3] == [
+        [*python_m, "ruff", "format", "--check", "."],
+        [*python_m, "ruff", "check", "."],
+        [sys.executable, "scripts/guard_check.py"],
+    ]
+    assert calls[-1] == [*python_m, "pytest", *paths, "-m", PYTEST_MARKERS]
+    out = capsys.readouterr().out.splitlines()
+    assert "check: repo data" in out
+    assert out[-1] == "check: all passed"
+
+
+def test_quick_runs_in_parallel_past_50_tests(monkeypatch, check_script):
+    calls = fake_quick_run(monkeypatch, check_script, collected=51)
+
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--quick", "tests"])
+
+    assert exit_info.value.code == 0
+    assert calls[-1] == [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests",
+        "-m",
+        PYTEST_MARKERS,
+        *PARALLEL,
+    ]
+
+
+def test_quick_stays_serial_at_50_tests(monkeypatch, check_script):
+    calls = fake_quick_run(monkeypatch, check_script, collected=50)
+
+    with pytest.raises(SystemExit):
+        check_script.main(["--quick", "tests"])
+
+    assert "-n" not in calls[-1]
+
+
+def test_quick_needs_a_test_path(check_script):
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--quick"])
+    assert exit_info.value.code != 0
+
+
+def test_quick_and_repo_data_only_are_exclusive(check_script):
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main(["--quick", "tests", "--repo-data-only"])
     assert exit_info.value.code != 0
