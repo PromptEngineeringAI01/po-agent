@@ -1,12 +1,14 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.21 · 20 Nov 2026 · **Owner:** Joey Wu
+**Version:** v5.22 · 20 Nov 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Now: production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 as a supervised `po-agent demo` (one trial PO, Joey's Enter before every write), from the laptop and the Mac Mini. The goal is now the agent running by itself, hourly, on the Mac Mini: unattended on the test site first, then on live after the go-live gates (`SPEC.md` -> Production; `tasks/plan.md` -> Phase P). The stages below still describe how each task is built.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes, opens and, once verified, merges PRs (`gh pr merge <n> --merge --match-head-commit <sha>`, decisions, 2 Nov 2026).
+
+**v5.22:** from mattpocock/skills, cursor pstack and addyosmani/agent-skills (decisions, 20 Nov 2026, process): a `diagnosing-bugs` skill for bugs that aren't obvious (step 3, Stage 5 step 6); test rules (no tautological test, cases by spec partition, a regression test per bug; step 3); sessions call agent-skills by skill name, since 0.6.14+ makes its slash commands Joey-only (Skills you'll use). Loosens nothing.
 
 **v5.21:** `docs/factory-handbook.md`: Lauren Tan's software-factory practices (trust curve, inverse pyramid, correction ladder, verification, skill evals) mapped onto PO Agent, with a checklist used at steps 6 and 9 and before any new automation. Adds no rule.
 
@@ -54,6 +56,8 @@
 
 Always type the full name (`/agent-skills:build`): a bare `/build` is "Unknown command", and bare `/plan` and `/review` are Claude Code's own built-ins.
 
+The slash commands below are for Joey to type. From agent-skills 0.6.14 a model can't run them (`disable-model-invocation`), so a task brief or a session names the skills instead: build = the `incremental-implementation` and `test-driven-development` skills, review = the `code-review-and-quality` skill. The repo's commit rule wins over the skills': the failing tests go in their own `test:` commit before the `feat:` or `fix:` commit, never one combined commit.
+
 | When | Type |
 |---|---|
 | Build a task (test-first, small commits) | `/agent-skills:build task <N>` (M2: `/agent-skills:build auto`); Stage 5 step 3 |
@@ -61,13 +65,13 @@ Always type the full name (`/agent-skills:build`): a bare `/build` is "Unknown c
 | Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4; plus the second-model review on medium and high risk (Stage 5, Production build loop step 6) |
 | Library calls (Playwright, pdfplumber, pypdf) | `Use the source-driven-development skill …` (M1, M2, M4) |
 | Challenge a risky design in a fresh session | `Use the doubt-driven-development skill on …` (before M4) |
-| A failure that isn't obvious | `Use the debugging-and-error-recovery skill on …` |
+| A bug or failure that isn't obvious | `Use the diagnosing-bugs skill on …` (`.claude/skills/diagnosing-bugs/`: a fast red-capable check first, ranked hypotheses, a regression test in its own `test:` commit) |
 | An open question you can't answer | `Use the interview-me skill on …` |
 | CLAUDE.md out of date | `Use the context-engineering skill …` (after M1) |
 | Before the MVP demo | `/agent-skills:ship` |
 | A change to what the agent does | `/agent-skills:spec`, then `/agent-skills:plan` (plan mode off) |
 
-Not used: `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`, `idea-refine`, loop engineering, parallel worktrees, Matt Pocock's skills (Stage 8 only).
+Not used: `/webperf`, `frontend-ui-engineering`, `browser-testing-with-devtools`, `idea-refine`, loop engineering, parallel worktrees, Matt Pocock's skills (Stage 8 only, except the copies in `.claude/skills/`, each with its LICENSE).
 
 ## Ground rules
 
@@ -164,8 +168,9 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 2. **Research and plan before code.** The session reads the task in `tasks/plan.md`, the code it builds on and the SPEC lines, then restates in a few lines what it will change and how it will prove it. Any open design choice goes to Joey **one question at a time**, each with the agent's recommendation (the `interview-me` skill when there are several). Decisions go into the PR's Intent section, not only the chat. If the design talk was long, the session compacts before coding with a line saying what to keep ("keep: the decisions, the files, the test plan").
 3. **Tests first,** within a test budget:
    - The fewest tests that pin the task's acceptance criteria and its Must-never points. No test that restates the implementation, and no mocking of our own code; fakes only at the edges (MySys pages, the clock), as the seams already do.
+   - No tautological test: an expected value is written out from `SPEC.md` or the plan, never computed the way the code computes it. Cases come from partitioning the spec (each rule's in, out and boundary), not from reading the code.
    - The session commits the tests as `test:` and carries on: no review stop (5 Nov 2026). It stops for Joey only when the tests force a behaviour choice that is his (e.g. what the run prints for a stopped Note), asked in plain words, one question at a time, with a recommendation.
-   - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it.
+   - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it. Every bug fix carries a regression test that fails without the fix, in its own `test:` commit. If the cause isn't obvious, use the `diagnosing-bugs` skill (fast failing check = one pytest node id or `uv run scripts/check.py --quick <path>`; after two failed fixes that share a premise, test the premise first; then look for the same bug elsewhere and report it).
    - A refactor (8.x, or acceptance "behaviour unchanged") first proves the tests guard the code it moves: hand-written mutants in a scratch copy, a test row for each survivor (`.claude/skills/start-task/SKILL.md` -> Refactor tasks; decisions, 18 Nov 2026, refactor safety net).
    - When Claude makes the same kind of mistake twice: one targeted regression test plus a line under **Lessons** in `CLAUDE.md` (Joey commits that line).
 4. **Code** until `uv run scripts/check.py` prints "check: all passed", the task's tests pass and nothing under `tests/` changed since the `test:` commit. `/goal` is optional (offline code only).
@@ -180,7 +185,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    | Risk | Review |
    |---|---|
    | Low | None beyond `check.py` and `/verify-pr`. |
-   | Medium | `/agent-skills:review` in the session. |
+   | Medium | The `code-review-and-quality` skill in the session (Joey types `/agent-skills:review`). |
    | High | One **second-model review** (Appendix C). No fresh-session `/code-review` (5 Nov 2026). |
 
    - The reviewers rate every finding on two scales, 1-5: **harm** if it happens and **likelihood**. Anything that could break a Must-never rule or write a wrong value to MySys is a must-fix, however unlikely.
@@ -246,7 +251,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 
 4. **Test first.** Claude writes the failing test and shows it failing. ✓ It fails because the code doesn't exist or doesn't handle the case yet, not because of a typo or an import error. On 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2 it stops for you: reply `Test looks right. Commit it and continue.` On the other tasks it commits the test and carries on; check the failure in its summary.
 5. **Verify.** ✓ `check: all passed`. If the readers or address rules changed: `false PROCEED: 0` from seam 1 (in the check) and the real-PO seam on the laptop. If `mysys/` or the booker changed: the seam 2 result on the test site (reset first, 6.1).
-6. **Debug** anything not obvious: `Use the debugging-and-error-recovery skill on this: <paste the error>`.
+6. **Debug** anything not obvious: `Use the diagnosing-bugs skill on this: <paste the error>`.
 7. **Review**, once:
 
    ```text
@@ -438,7 +443,7 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 
 Task sessions build on Opus; the second review runs on **Opus in a fresh sub-agent**, so it doesn't share the builder's context or assumptions. It needs no other account, and the code stays with Anthropic. Fable 5.1, a different model, would share fewer blind spots, but on Joey's plan it needs usage credits (2 Nov 2026), so it is used only if Joey buys them. A model from another lab would catch more; add one later if Joey gets a second plan.
 
-**Run it:** the advisor starts the `pr-reviewer` sub-agent (`.claude/agents/pr-reviewer.md`: model `opus`, tools Read, Grep and Glob, plus Bash, which its prompt limits to `git diff` and `git log` with `guard_bash` as the backstop; it has no Edit or Write tool, and its prompt forbids commits, pushes and reading outside the worktree), with the task's worktree path and task number. Its definition holds the prompt below, plus one check: a write that trusts the agent's own report instead of reading MySys back. It returns the findings to the advisor, which sends them to the task session for triage.
+**Run it:** the advisor starts the `pr-reviewer` sub-agent (`.claude/agents/pr-reviewer.md`: model `opus`, tools Read, Grep and Glob, plus Bash, which its prompt limits to `git diff` and `git log` with `guard_bash` as the backstop; it has no Edit or Write tool, and its prompt forbids commits, pushes and reading outside the worktree), with the task's worktree path and task number. Its definition holds the prompt below, plus one check: a write that trusts the agent's own report instead of reading MySys back. A patch adding a Spec pass (missing / not asked for / wrong, each quoting the `SPEC.md` or plan line) and an evidence rule (a finding counts only with a command and its output, or is marked unverified) waits for Joey (decisions, 20 Nov 2026, process); it also lets the reviewer run `git show` and `git grep` (read-only) for that evidence. Once applied, the definition wins over the prompt below. It returns the findings to the advisor, which sends them to the task session for triage.
 
 **Data rule:** the reviewer reads **only the task worktree** (worktrees hold tracked files only, so no `private/`, `logs/` or `state/`). Never point it at the main checkout, `private/`, captures or logs, and never paste real data into its prompt.
 
