@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.51 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.52 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -77,7 +77,7 @@ The MVP proves that:
 
 ## Tech Stack
 
-As `docs/specs/tech-stack.md`: Python 3.12 (uv, locked), Playwright for Python with Chromium (headless on the Mac Mini, headed on the laptop), pdfplumber (text layer only), pypdf (the second reader), pydantic v2, pytest, ruff, `zoneinfo`, `tomllib`, `keyring`.
+As `docs/specs/tech-stack.md`: Python 3.12 (uv, locked), Playwright for Python with Chromium (headless on the Mac Mini, headed on the laptop), pdfplumber (text layer only), pypdf (the second reader), pydantic v2, pytest, ruff, mypy, `zoneinfo`, `tomllib`, `keyring`.
 
 **Host for the MVP:** the office Mac Mini (CEO decision 3). A standard macOS user `poagent` runs `scripts/macmini-run.sh` from a launchd LaunchAgent at 7 minutes past each hour, 07:07–17:07 Monday–Friday, clock on Australia/Perth. FileVault on; no Claude Code for that user. Exact steps: `docs/macmini-setup.md`.
 
@@ -113,7 +113,7 @@ Live (Joey only):    on the Mac Mini, through the wrapper or launchd (`run live`
 Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
 ```
 
-`scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check .` → `ruff check .` → `python scripts/guard_check.py` → repo data check (nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml` other than the committed `config/live.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case) → `pytest tests -m "not live_claude and not testsite and not real_data" -n auto --maxprocesses 12 --dist load` (pytest-xdist, at most 12 workers; decisions, 19 Nov 2026). `--quick <test paths>` runs the same first four steps, then pytest on only those paths with the same marker filter (in parallel past 50 selected tests); it is an inner-loop check, not the gate. `-n` is never in pyproject `addopts`, so a plain `uv run pytest` stays serial, and `tests/xdist_guard.py` (registered by `tests/conftest.py`) fails every `testsite` test in setup, before any fixture, inside any xdist worker, and stops a `-n`/`--tx` run that selects one at collection (incl. `--collect-only`).
+`scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check .` → `ruff check .` → `mypy` (files and flags in pyproject `[tool.mypy]`; decisions, 20 Nov 2026) → `python scripts/guard_check.py` → repo data check (nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml` other than the committed `config/live.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case) → `pytest tests -m "not live_claude and not testsite and not real_data" -n auto --maxprocesses 12 --dist load` (pytest-xdist, at most 12 workers; decisions, 19 Nov 2026). `--quick <test paths>` runs the same first five steps, then pytest on only those paths with the same marker filter (in parallel past 50 selected tests); it is an inner-loop check, not the gate. `-n` is never in pyproject `addopts`, so a plain `uv run pytest` stays serial, and `tests/xdist_guard.py` (registered by `tests/conftest.py`) fails every `testsite` test in setup, before any fixture, inside any xdist worker, and stops a `-n`/`--tx` run that selects one at collection (incl. `--collect-only`).
 
 **Screen mapping with Playwright CLI** (`@playwright/cli`, M0 and whenever a screen changes; laptop, test site only). Joey opens a headed browser and does every click and every typed value himself, including the login. Claude Code only **observes**: `playwright-cli snapshot` (the accessibility tree, with the role and name of every element, which is what the guard's lookups use), `screenshot`, `find` and `generate-locator`. Claude never runs a command that acts on the page (click, fill, type, press, hover, check, select, upload, drag, drop, eval, run-code, dialog, goto, reload), saves state or cookies, or lists network requests; `.claude/settings.json` denies them and, from M1, the `guard_bash.py` hook allows only the observe commands. `.playwright/cli.config.json` keeps the browser profile in memory, blocks the live origin and writes output to `private/captures/test/`; `.playwright-cli/` (snapshot files) is git-ignored. Fallback if Node.js can't be installed: the classic recorder that ships with Playwright for Python (`playwright codegen`), plus screenshots.
 
@@ -189,7 +189,7 @@ trace_dir = "~/Library/Logs/po-agent/trace"   # the safe trace (7.3): written on
 
 ## Code Style
 
-Python 3.12, ruff format and ruff check, type hints throughout, pydantic models at every boundary, small pure functions in `b1/`. Every MySys write is a **named guarded action** on one element inside its window (see [MySys screen rules](#mysys-screen-rules) → Windows and locators), found by accessible role and name, or by its visible label where the screen map marks the field weak, then read back:
+Python 3.12, ruff format and ruff check, type hints throughout, checked by mypy with the pydantic plugin on `src` and `scripts` (strict flags for every module listed in the pyproject override; add each new module there; no `# type: ignore` without an error code and a reason), pydantic models at every boundary, small pure functions in `b1/`. Every MySys write is a **named guarded action** on one element inside its window (see [MySys screen rules](#mysys-screen-rules) → Windows and locators), found by accessible role and name, or by its visible label where the screen map marks the field weak, then read back:
 
 ```python
 # src/po_agent/b1/booker.py

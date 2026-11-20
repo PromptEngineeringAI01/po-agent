@@ -121,6 +121,9 @@ def _offer_return(
         output.info("demo: note not returned to the pool")
         return
     try:
+        # taken is set only after note_id (_steps); an assert stays
+        # inside the try, so it ends as "note not returned".
+        assert progress.note_id is not None
         window = booking.find_note_again(
             guard, page, str(config.base_url), progress.note_id
         )

@@ -3,7 +3,7 @@
 Runs each step in order, stops on the first failure, and prints
 "check: all passed" when every step passes:
 
-- default: ruff format --check, ruff check, guard check, repo data, then the
+- default: ruff format --check, ruff check, mypy, guard check, repo data, then the
   offline tests in parallel (pytest-xdist; decisions, 19 Nov 2026).
 - `--quick <test paths>`: the same fast steps on the whole repo, then pytest
   on only those paths with the same marker filter, in parallel only past
@@ -127,6 +127,7 @@ def script(path: str) -> Callable[[], bool]:
 FAST_STEPS: list[Step] = [
     ("ruff format --check .", command("ruff", "format", "--check", ".")),
     ("ruff check .", command("ruff", "check", ".")),
+    ("mypy", command("mypy")),  # files and flags: pyproject [tool.mypy]
     ("guard check", script("scripts/guard_check.py")),
     ("repo data", repo_data),
 ]
@@ -192,7 +193,7 @@ def main(argv: list[str] | None = None) -> None:
         "--quick",
         nargs="+",
         metavar="TEST_PATH",
-        help="ruff, guard check and repo data on the repo, then pytest on only "
+        help="ruff, mypy, guard check and repo data on the repo, then pytest on only "
         "these test paths (same marker filter); not the gate",
     )
     args = parser.parse_args(argv)

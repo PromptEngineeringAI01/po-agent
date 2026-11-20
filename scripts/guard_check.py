@@ -169,8 +169,8 @@ def scan_file(rel: str, source: str, errors: frozenset[str]) -> list[str]:
                 and isinstance(node.args[1], ast.Constant)
                 and node.args[1].value in BANNED
             ):
-                name = node.args[1].value
-                found.append(f"{rel}:{line}: getattr {name}: page action by name")
+                attr = node.args[1].value
+                found.append(f"{rel}:{line}: getattr {attr}: page action by name")
             name = _call_name(node)
             if check_errors and name in errors and not _is_fixed_string(_detail(node)):
                 found.append(
