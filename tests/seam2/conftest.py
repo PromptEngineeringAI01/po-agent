@@ -8,6 +8,10 @@ can't count as done.
 Failure reports of `testsite` and `real_data` tests are cut to the test name
 and the exception type (Must never #6): Playwright call logs, strict-mode and
 timeout text, assertion diffs and captured output can all quote page text.
+
+Only one seam-2 run at a time on this laptop: a run that selects a `testsite`
+test takes the cross-worktree lock in tests/testsite_lock.py before any
+fixture, and a second run stops naming the holder (decisions, 20 Nov 2026).
 """
 
 from collections.abc import Callable, Iterator
@@ -15,6 +19,7 @@ from datetime import UTC, datetime
 
 import pytest
 from playwright.sync_api import Page
+from testsite_lock import pytest_collection_modifyitems, pytest_unconfigure
 
 from po_agent.core import controls, secrets
 from po_agent.core.config import Config, load_config
@@ -25,6 +30,9 @@ SCRUBBED_MARKERS = ("testsite", "real_data")
 # The 3 trial POs (SPEC.md -> Trial conditions): internal numbers only.
 TRIAL_INTERNAL_NOS = ("2609017B", "2609034B", "2610002B")
 IN_WINDOW = datetime(2026, 11, 2, 2, 0, tzinfo=UTC)  # Monday 10:00 Perth
+
+# The cross-worktree test-site lock, as this conftest's own hooks.
+__all__ = ["pytest_collection_modifyitems", "pytest_unconfigure"]
 
 
 @pytest.hookimpl(wrapper=True)
