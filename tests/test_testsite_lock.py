@@ -2,7 +2,7 @@
 
 Two serial `pytest tests/seam2 -m testsite` runs from two worktrees would log
 in to the one MySys test site with the one agent account at once. The lock
-(tests/testsite_lock.py, hooked into tests/seam2/conftest.py) is an OS file
+(tests/testsite_lock.py, registered by tests/conftest.py) is an OS file
 lock in the user's temp dir: the first run holds it for its session; a second
 run stops at collection, naming the holder's PID and worktree. The OS frees
 the lock when its process dies, so a crashed run never blocks the next one.
@@ -11,7 +11,6 @@ Every run here is a subprocess on a lock file under tmp_path or a dummy test
 in tmp_path, so no test reaches MySys.
 """
 
-import importlib.util
 import json
 import os
 import subprocess
@@ -228,17 +227,19 @@ def test_runs_that_log_in_nowhere_ignore_the_lock(tmp_path, holders, args):
     assert HELD_MESSAGE not in out
 
 
-def test_the_seam2_conftest_takes_and_releases_the_lock():
-    # In process, never a seam-2 run: load the conftest module by path.
-    spec = importlib.util.spec_from_file_location(
-        "seam2_conftest_under_test", TESTS / "seam2" / "conftest.py"
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+def lock_hooks(config, name: str) -> list:
+    caller = getattr(config.pluginmanager.hook, name)
+    return [
+        impl.function
+        for impl in caller.get_hookimpls()
+        if impl.function.__module__ == "testsite_lock"
+    ]
 
-    assert (
-        module.pytest_collection_modifyitems
-        is testsite_lock.pytest_collection_modifyitems
-    )
-    assert module.pytest_unconfigure is testsite_lock.pytest_unconfigure
+
+def test_the_repo_conftest_registers_the_lock_hooks(request):
+    # The dummy-project tests above load the lock with `-p testsite_lock`;
+    # this one checks the repo's own wiring, in process (never a seam-2 run).
+    # Registered by tests/conftest.py, not tests/seam2/conftest.py, which
+    # tests/test_seam2_report.py copies on its own into a throwaway folder.
+    assert lock_hooks(request.config, "pytest_collection_modifyitems")
+    assert lock_hooks(request.config, "pytest_unconfigure")
