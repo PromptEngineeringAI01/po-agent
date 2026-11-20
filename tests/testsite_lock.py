@@ -12,7 +12,7 @@ per worktree):
   start time;
 - the OS frees the lock when its process dies, so a crashed run never blocks:
   the next run finds the crashed holder's info still in the file (a clean
-  release empties it), reports it as stale on the lock and overwrites it.
+  release empties it), marks the new lock `stale` and overwrites it.
 
 The file is never deleted: a run that opened it just before a delete could
 lock the old file while another locks a new one. `--collect-only` and xdist
