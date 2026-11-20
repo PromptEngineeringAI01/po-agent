@@ -1,4 +1,4 @@
-# PO Agent - decision log (updated 20 Nov 2026, mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 20 Nov 2026, one seam-2 run at a time; mypy in the check; merge rule in SPEC)
 - **20 Nov 2026: merge rule in SPEC** (Joey: "You can merge"; entry below): SPEC Boundaries now says what decisions 6 Nov 2026 already said; PRs touching `scripts/check.py` are merged after `/verify-pr`.
 
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
@@ -72,6 +72,16 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **19 Nov 2026: risk is computed, not self-declared** (Software Factory audit item 1; entry below): `scripts/risk.py` gives a PR's risk level from its changed files.
 - **19 Nov 2026: CI once per commit** (Software Factory audit item 3; Joey: "yes, send them"; entry below): `check.yml` runs on PRs and on pushes to `main` only, and a newer commit cancels the older run.
 - **20 Nov 2026: mypy in the check** (Joey: "照順序開始"; entry below): `scripts/check.py` runs mypy with the pydantic plugin on `src` and `scripts`; reverses the 9 Nov "Not adopted: mypy".
+- **20 Nov 2026: one seam-2 run at a time across worktrees** (entry below): a cross-process lock in the user's temp dir stops a second `testsite` run on the laptop.
+
+## 20 Nov 2026 - One seam-2 run at a time across worktrees (second-model review of PR #136; tightens a safety control)
+
+- **Found (second-model review of PR #136, 19 Nov 2026):** `tests/xdist_guard.py` stops seam 2 running in parallel inside one pytest run, but two serial `pytest tests/seam2 -m testsite` runs from two worktrees or sessions could still log in to the one test site with the one agent account at once ("one agent at a time", D7). Joey runs several Claude sessions in parallel worktrees.
+- **Decided:** `tests/testsite_lock.py` holds an OS file lock (`msvcrt` on Windows, `flock` elsewhere) on `po-agent-testsite.lock` in the user's temp dir, never the repo. `tests/seam2/conftest.py` takes it once collection and `-m` are done, before any fixture, in any run that selects a `testsite` test, and holds it until pytest exits. A second run stops with a usage error naming the holder's PID, worktree and start time. The OS frees the lock when its process dies; the crashed holder's info left in the file is reported as stale on the new lock and overwritten. `--collect-only`, runs with `testsite` deselected, and xdist workers (already failed by the xdist guard) take no lock. `tests/xdist_guard.py` stays whole.
+- **Tests:** `tests/test_testsite_lock.py`, offline only: two subprocesses on a lock under `tmp_path`, a crashed holder, and dummy pytest projects with `-p testsite_lock`; nothing reaches MySys. A second `test:` commit fixes the tests' own PID read (on Windows a venv's `python.exe` is a launcher, so `Popen.pid` is not the holder's PID); the assertions are unchanged.
+- **Scope:** this laptop only; the Mac Mini job and a laptop run are still kept apart by the "one agent at a time" rule (6 Nov 2026), not by this lock.
+- **Loosens?** No: it tightens a safety control. Nothing changes in what the agent does in MySys or prints.
+- Carried in: `tests/seam2/conftest.py`, `SPEC.md` v1.54 (Testing Strategy).
 
 ## 20 Nov 2026 - mypy in the check (Joey: "照順序開始"; new dev dependency, reverses a 9 Nov "Not adopted", loosens nothing)
 
