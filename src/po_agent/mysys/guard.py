@@ -337,7 +337,9 @@ class ActionGuard:
                 "guard refused the action", action=action, reason=verdict.reason
             )
         element = verdict.element
-        # Each cast below states what vet() already checked (_value_fits).
+        # The casts only tell mypy what vet() checked (_value_fits): FILL and
+        # SELECT get a str, PRESS only Enter, UPLOAD a dict with exactly the
+        # keys name, mimeType and buffer, and a bytes buffer.
         # ElementHandle actions on the pinned element; Playwright prefers
         # Locators, but a Locator would look the element up again (spec §5).
         # https://playwright.dev/python/docs/api/class-elementhandle

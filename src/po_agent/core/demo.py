@@ -35,7 +35,12 @@ from po_agent.b1 import reader_rules as rules
 from po_agent.core import output
 from po_agent.core import run as runs
 from po_agent.core.config import Config
-from po_agent.core.errors import PartialWrite, PoAgentError, WriteNotStarted
+from po_agent.core.errors import (
+    PartialWrite,
+    PoAgentError,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
 from po_agent.core.secrets import SecretName
 from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard
@@ -121,9 +126,10 @@ def _offer_return(
         output.info("demo: note not returned to the pool")
         return
     try:
-        # taken is set only after note_id (_steps); an assert stays
+        # Unreachable: taken is set only after note_id (_steps). Raised
         # inside the try, so it ends as "note not returned".
-        assert progress.note_id is not None
+        if progress.note_id is None:
+            raise UnexpectedScreen("note id missing")
         window = booking.find_note_again(
             guard, page, str(config.base_url), progress.note_id
         )
