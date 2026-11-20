@@ -19,12 +19,17 @@ def ruff(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "-m", "ruff", *args],
         capture_output=True,
-        text=True,
+        # ruff writes UTF-8; the default (cp1252 on Windows) crashed the
+        # reader thread on a non-ASCII source line, leaving stdout as None.
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
     )
 
 
 def main() -> None:
+    # The report may quote non-ASCII source; a cp1252 stderr can't write it.
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
         raw = (payload.get("tool_input") or {}).get("file_path") or ""
