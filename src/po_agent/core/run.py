@@ -49,15 +49,9 @@ from pathlib import Path
 
 from playwright.sync_api import Locator, Page
 
-from po_agent.b1 import booker
+from po_agent.b1 import booker, readers
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.decision import (
-    TitleRule,
-    check_note_and_pdf,
-    check_second_reader,
-    decide,
-    eligible_internal_no,
-)
+from po_agent.b1.decision import TitleRule, decide, eligible_internal_no
 from po_agent.b1.models import NotePoolRow, NoteSnapshot, Proceed, Skip, SkipReason
 from po_agent.core import controls, output
 from po_agent.core.config import Config
@@ -582,8 +576,8 @@ def _decide(
     note: EligibleNote,
     window: Locator,
 ) -> Skip | Proceed:
-    """Steps 2a-11 on what the Note window and MySys show. The project is
-    read only once the Note and PDF checks pass (that read reloads, so the
+    """Steps 2a-11 on what the Note window and MySys show. decide() reads the
+    project only once the Note and PDF checks pass (that read reloads, so the
     window is gone after it)."""
     note_id = note.note_id
     linked = not driver.is_unlinked(window, log, note_id)
@@ -592,7 +586,6 @@ def _decide(
     if not linked:
         names = driver.attachment_names(window)
         pdf = driver.download_pdf(guard, page, window)
-    data = pdf.data if pdf else b""
     snapshot = NoteSnapshot(
         note_id=note_id,
         title="",  # step 0 read the title rule on the Note Pool cell
@@ -600,26 +593,21 @@ def _decide(
         attachment_names=names,
         project_linked=linked,
     )
-    plumber = rules.text_layer(data) if pdf else ""
-    pypdf = rules.pypdf_text_layer(data) if pdf else ""
-    early = check_note_and_pdf(snapshot, note.internal_no, plumber)
-    if isinstance(early, Skip):
-        return early
-    second = check_second_reader(plumber, pypdf)
-    if second is not None:
-        return second
-    lookup = driver.project_lookup(guard, page, *login, note.internal_no, config.site)
-    decision = decide(
+    texts = (
+        readers.read(pdf.data)
+        if pdf
+        else readers.PdfTexts(plumber="", pypdf="", data=b"")
+    )
+    return decide(
         snapshot,
         note.internal_no,
-        plumber,
-        pypdf,
-        data,
-        lookup,
+        texts,
+        lambda: driver.project_lookup(
+            guard, page, *login, note.internal_no, config.site
+        ),
         site=config.site,
         duplicate_ignores_cancelled=config.duplicate_ignores_cancelled,
     )
-    return decision
 
 
 def _return_after_stop(

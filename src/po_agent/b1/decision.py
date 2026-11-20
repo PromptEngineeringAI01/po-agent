@@ -1,16 +1,18 @@
 """The decision engine (SPEC.md -> In the MVP; docs/specs/spec.md section 2).
 
-Pure functions, no browser code.
+Pure functions, no browser code. `decide()` takes the project lookup as a
+callable: the run passes the driver's read of MySys, seam 1 a fixture, and
+`decide()` calls it only once the Note and PDF checks pass (task 8.3).
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.address import job_address_line, normalise, verify_address
+from po_agent.b1 import readers
 from po_agent.b1.models import (
     CompactionTask,
     DeterministicReading,
@@ -173,39 +175,11 @@ def check_duplicate(
     return tuple(task.task_no for task in tasks)
 
 
-def _label_line(pdf_text: str) -> str | None:
-    line = job_address_line(pdf_text)
-    return None if line is None else normalise(line)
-
-
-def check_second_reader(pdf_text: str, pypdf_text: str) -> Skip | None:
-    """The second code reader (decisions, 2 Nov 2026): pypdf's text must read
-    as pdfplumber's. No pypdf text -> PDF_UNREADABLE. The issuer, COMPACTION,
-    the PO number and the Job Address label line (normalised) must be equal,
-    else READERS_DISAGREE. The line under the label is not compared: pypdf
-    reads the Supplier column apart from it, and decide() runs the address
-    check on both texts instead."""
-    if not pypdf_text.strip():
-        return Skip(reason=SkipReason.PDF_UNREADABLE)
-    plumber = rules.read_pdf(pdf_text, "", "")
-    pypdf = rules.read_pdf(pypdf_text, "", "")
-    if (
-        pypdf.issuer != plumber.issuer
-        or pypdf.contains_compaction != plumber.contains_compaction
-        or pypdf.po_number != plumber.po_number
-        or _label_line(pypdf_text) != _label_line(pdf_text)
-    ):
-        return Skip(reason=SkipReason.READERS_DISAGREE)
-    return None
-
-
 def decide(
     note: NoteSnapshot,
     internal_no: str,
-    pdf_text: str,
-    pypdf_text: str,
-    pdf_bytes: bytes,
-    lookup: MySysLookup,
+    texts: readers.PdfTexts,
+    lookup: Callable[[], MySysLookup],
     *,
     site: Site,
     duplicate_ignores_cancelled: bool,
@@ -215,28 +189,25 @@ def decide(
     address check against the project's address (9), the duplicate check
     (10). Code only, no Claude (decisions, 2 Nov 2026).
 
-    pdf_text is pdfplumber's text layer and pypdf_text pypdf's, each "" when
-    its library reads none. The address check runs on both, exact under the
-    label on pypdf's; if their results differ, READERS_DISAGREE.
+    texts holds both readers' text layers (readers.read). lookup is the
+    project read in MySys (step 8): called once, and only when steps 2a-4
+    and the second reader pass. The address check runs on both texts
+    (readers.check_address).
     """
-    checked = check_note_and_pdf(note, internal_no, pdf_text)
+    checked = check_note_and_pdf(note, internal_no, texts.plumber)
     if isinstance(checked, Skip):
         return checked
-    second = check_second_reader(pdf_text, pypdf_text)
+    second = readers.check_second_reader(texts)
     if second is not None:
         return second
-    pln = check_project(lookup, internal_no, site)
+    found = lookup()
+    pln = check_project(found, internal_no, site)
     if isinstance(pln, Skip):
         return pln
-    address = verify_address(pdf_text, lookup.address)
-    # pypdf reads the Supplier column apart, so its line under the label must
-    # be exactly the address (review, 2.5).
-    pypdf_address = verify_address(pypdf_text, lookup.address, exact_line_under=True)
-    if pypdf_address != address:
-        return Skip(reason=SkipReason.READERS_DISAGREE)
+    address = readers.check_address(texts, found.address)
     if address is not None:
         return Skip(reason=address)
-    task_nos = check_duplicate(lookup.tasks, duplicate_ignores_cancelled)
+    task_nos = check_duplicate(found.tasks, duplicate_ignores_cancelled)
     if isinstance(task_nos, Skip):
         return task_nos
     return Proceed(
@@ -246,6 +217,6 @@ def decide(
         po_number=checked.reading.po_number,
         email_body=checked.email_body,
         pdf_file_name=checked.pdf_file_name,
-        pdf_bytes=pdf_bytes,
+        pdf_bytes=texts.data,
         existing_task_nos=task_nos,
     )

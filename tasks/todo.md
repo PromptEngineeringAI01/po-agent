@@ -122,7 +122,7 @@ Each live step (G.5-G.8) gets its own dated `docs/decisions.md` entry first. Cla
 
 - [x] **8.1** (done 20 Nov 2026; decisions, 20 Nov 2026, one Send Email control) One Send Email Notification control for every Note-window write (Round 2, candidate D; its settled design is there) · step · after G.8
 - [x] **8.2** (done: PR 88, before the freeze) One error-report path: the ALERT kind on each error class, one traceback writer (Round 2, candidate B) · step
-- [ ] **8.3** The two readers as one module, and `decide()` calls the project lookup itself (Round 2, candidate A, with round 1's proposal 6) · step · after 8.1
+- [x] **8.3** The two readers as one module, and `decide()` calls the project lookup itself (Round 2, candidate A, with round 1's proposal 6) · step · after 8.1
 - [ ] **8.4** One MySys wait module; its retry refuses committing clicks (Round 2, candidate C) · step · after 8.3 (after G.8)
 
 **Carry-over for 8.1 and 8.4 (Joey, 20 Nov 2026: "之後順便做"):** the first of them that changes `src/po_agent/mysys/guard.py` or `src/po_agent/mysys/booking.py` also adds `po_agent.mysys.guard` and `po_agent.mysys.booking` to the mypy strict list in `pyproject.toml` (`[[tool.mypy.overrides]]`). On 20 Nov 2026 `uv run mypy --strict` on the two files gave 6 errors; e.g. `_hold_window_open(page)` in guard.py has no annotations, so mypy skips its body. No behaviour change; a real bug found this way gets its own `test:` commit first.
