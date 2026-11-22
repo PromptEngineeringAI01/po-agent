@@ -14,6 +14,7 @@ from po_agent.core.errors import (
     MorePages,
     PartialWrite,
     PoAgentError,
+    RunLockStuck,
     UnexpectedScreen,
     WriteNotStarted,
 )
@@ -37,6 +38,7 @@ def test_each_error_class_declares_its_alert_kind():
         GuardRefusal: "GUARD_REFUSAL",
         LoginFailed: "LOGIN_FAILED",
         ConfigError: "CONFIG",
+        RunLockStuck: "RUN_LOCK_STUCK",
         AccuracyBreach: "ACCURACY_BREACH",
     }
 
