@@ -184,7 +184,7 @@ It sets its own `PATH` (`~/.local/bin`, `/opt/homebrew/bin`, then the system fol
 - `StandardOutPath` / `StandardErrorPath`: `/Users/poagent/Library/Logs/po-agent/launchd.log` (the wrapper's own errors; launchd doesn't expand `~`).
 - No `RunAtLoad`, no `KeepAlive`.
 
-launchd never starts the job while it is still running, so scheduled runs can't overlap. The agent's own Perth-window check still applies (`run_window` in the site's config).
+launchd never starts the job while it is still running, and the agent's run lock (`state/run-<site>.lock` in the checkout; decisions, 21 Nov 2026) stops a manual run or any other process from overlapping it: the later run prints `INFO  run lock held: run not started` and exits 0. Don't delete the lock file; the OS frees the lock when its run ends, however it ends. The agent's own Perth-window check still applies (`run_window` in the site's config).
 
 As `poagent`:
 

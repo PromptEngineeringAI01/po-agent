@@ -73,6 +73,7 @@ esac
 MODE="$1"
 OUT=""
 AGENT_PID=""
+KEEP_BROWSERS=0 # 1: the agent skipped, another run holds the run lock
 run_id="" # from the agent's RUN_SUMMARY line, if it printed one
 
 cd "$(dirname "$0")/.." || exit 2
@@ -150,7 +151,10 @@ stop_group() {
     done
     kill -KILL -- "-$AGENT_PID" 2> /dev/null
   fi
-  if pkill -KILL -u "$(id -u)" -f 'ms-playwright/' 2> /dev/null; then
+  # Not when the agent skipped for the run lock: the browsers then belong to
+  # the run that holds it (decisions, 20 Nov 2026, run lock).
+  if [ "$KEEP_BROWSERS" -eq 0 ] &&
+    pkill -KILL -u "$(id -u)" -f 'ms-playwright/' 2> /dev/null; then
     log "wrapper: leftover Playwright browser killed"
   fi
   return 0
@@ -293,6 +297,9 @@ if [ "$timed_out" -eq 1 ]; then
 else
   wait "$AGENT_PID"
   code=$?
+  if grep -qx 'INFO  run lock held: run not started' "$OUT"; then
+    KEEP_BROWSERS=1
+  fi
   stop_group # anything the agent left behind, browsers included
 fi
 AGENT_PID=""

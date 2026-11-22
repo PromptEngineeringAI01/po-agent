@@ -226,6 +226,12 @@ The username works the same way with `mysys_live_username`. For the test site, u
 - **Restart:** after a Keychain or folder fix, run one spike (3.2 step 3); scheduled runs then go on. For a config fix, Joey restarts (3.2 step 2).
 - **Told:** Joey (automatic).
 
+### RUN_LOCK_STUCK (exit 1)
+
+- **Means:** another run has held the run lock for over an hour. Runs take minutes and the wrapper kills a scheduled run at 20 minutes, so this is a hung manual run (or a hung process outside the wrapper). Nothing in MySys changed by this run, which did not start. Every hourly run raises it again until the holder ends. A lock held for less than an hour is normal (a manual run overlapping) and prints only `INFO  run lock held: run not started`, exit 0, with no alert.
+- **Do:** as `poagent`, `ps aux | grep po-agent` finds the holder (its pid is in `state/run-<site>.lock` in the checkout). If it is a manual run Joey left open, end it; the lock frees itself. Don't delete the lock file.
+- **Told:** Joey (automatic).
+
 ### 7.2's alert: no separate alert
 
 Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was never added, because it could never fire (decisions, 5 Nov 2026): the run already stops on its first `UNEXPECTED_SCREEN`, and a second page of Notes is `MORE_PAGES`. Use those two entries.
