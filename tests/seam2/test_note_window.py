@@ -100,7 +100,7 @@ def test_note_window_takes_a_note_and_hands_it_back(
     assert driver.log_line_count(window) - lines_before == 2
 
     # Every action done; a covered-page click may fail first and be retried
-    # (opening and refreshing clicks only, driver._open_retried).
+    # (opening and refreshing clicks only, wait.retry_opening).
     retried = {"open_note", "refresh_note_pool"}
     assert all(
         outcome == "done" or (outcome == "failed" and action in retried)

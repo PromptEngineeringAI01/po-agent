@@ -16,7 +16,7 @@ import pytest
 from playwright.sync_api import Browser, Page
 
 from po_agent.core.errors import LoginFailed, UnexpectedScreen
-from po_agent.mysys import driver
+from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 
 POOL = "Agent Pool"
@@ -183,7 +183,7 @@ render();
 
 @pytest.fixture
 def page(browser: Browser, monkeypatch) -> Iterator[Page]:
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 3000)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 3000)
     page = browser.new_page()
     page.set_default_timeout(3000)
     yield page
@@ -614,3 +614,30 @@ def test_open_my_notes_goes_project_then_my_notes_through_the_guard(page, guard)
     assert panel.get_attribute("id") == "my_notes__456"
     assert page.locator("#pool").is_hidden()
     assert driver.read_my_notes(panel).rows == ()
+
+
+# Refactor safety net (task 8.4; decisions, 18 Nov 2026): the first Project
+# click can only load the module (row 27); the menu's item shows after the
+# second, and Project is clicked again until it does.
+
+SECOND_CLICK_MENU_PAGE = MY_NOTES_MENU_PAGE.replace(
+    "li:hover .drop", "li.open:hover .drop"
+).replace(
+    "<span>Project</span>",
+    "<span onclick=\"if (++this.dataset.n >= 2) this.parentNode.className = 'open'\""
+    ' data-n="0">Project</span>',
+)
+
+
+@pytest.mark.parametrize("opens", ["open_note_pool", "open_my_notes"])
+def test_project_is_clicked_again_until_the_menu_item_shows(page, guard, opens):
+    assert SECOND_CLICK_MENU_PAGE != MY_NOTES_MENU_PAGE
+    page.set_content(
+        SECOND_CLICK_MENU_PAGE
+        % {"pool": POOL_PANEL_HTML, "mine": my_notes_panel_html()}
+    )
+
+    getattr(driver, opens)(guard, page)
+
+    assert actions(guard).count("open_project_tab") == 2
+    assert opens in actions(guard)

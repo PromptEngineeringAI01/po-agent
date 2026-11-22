@@ -20,7 +20,7 @@ from playwright.sync_api import Page, sync_playwright
 
 from po_agent.core import runlog
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import driver
+from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 
 NOTE_ID = "300001"
@@ -39,7 +39,7 @@ def downloads(tmp_path) -> Path:
 
 @pytest.fixture
 def page(downloads, monkeypatch) -> Iterator[Page]:
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 2000)
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(downloads_path=downloads)
         page = browser.new_context(accept_downloads=True).new_page()

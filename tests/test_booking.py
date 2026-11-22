@@ -21,7 +21,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
-from po_agent.mysys import booking, driver
+from po_agent.mysys import booking, driver, wait
 from po_agent.mysys.guard import ActionGuard
 
 AGENT = "Agent 1 (MySys Only)"
@@ -192,7 +192,7 @@ def email_iframe(html: str, *, srcdoc: str = "srcdoc") -> str:
 @pytest.fixture
 def quick(monkeypatch):
     # A body that never shows: wait 2 s, not 15 s.
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 2000)
 
 
 def test_note_body_from_the_email_iframe(page):
@@ -469,6 +469,18 @@ def test_take_note_reads_back_after_assign_re_renders_the_window(page, guard):
     assert booking.read_assignee(window) == AGENT
 
 
+def test_take_note_waits_for_an_assignee_that_changes_a_moment_later(page, guard):
+    # Refactor safety net (task 8.4; decisions, 18 Nov 2026): the label stays
+    # shown with the old value, then reads the agent 700 ms after Assign.
+    now = "document.getElementById('assignee').textContent = who;"
+    later = f"setTimeout(() => {{ {now} }}, 700);"
+    assert now in note_page()
+    page.set_content(note_page().replace(now, later))
+    window = booking.note_window(page, NOTE_ID)
+    booking.take_note(guard, window, AGENT)
+    assert booking.read_assignee(window) == AGENT
+
+
 # Live S5, 28 Oct 2026 (laptop snapshot): one visible "Client Internal No.:"
 # between the window heading and Create New Task, still "not found once".
 # The label's spaces may be non-breaking: the snapshot shows plain spaces.
@@ -577,7 +589,7 @@ def slow_link_page(delay_ms: int) -> str:
 def test_link_project_waits_longer_than_a_page_load_for_the_picker(
     page, guard, monkeypatch
 ):
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 500)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 500)
     page.set_content(slow_link_page(1500))
     window = booking.note_window(page, NOTE_ID)
     booking.link_project(guard, page, window, "pln_10001")
@@ -666,7 +678,7 @@ def test_probe_link_fails_when_the_pln_is_not_listed(
     page, guard, tmp_path, monkeypatch
 ):
     monkeypatch.setattr(booking, "SNAPSHOT_DIR", tmp_path)
-    monkeypatch.setattr(booking, "LINK_TIMEOUT_MS", 1500)
+    monkeypatch.setattr(wait, "LINK_TIMEOUT_MS", 1500)
     page.set_content(heading_first_link_page())
     with pytest.raises(UnexpectedScreen):
         booking.probe_link(guard, page, booking.note_window(page, NOTE_ID), "pln_99999")
@@ -701,7 +713,10 @@ def projects_page(
     delay: int = 400,
     status: str = "All Projects",
     duplicate: bool = False,
+    partial_ms: int | None = None,
 ) -> str:
+    # `partial_ms`: the first result row alone shows this long after Enter,
+    # before every row shows at `delay`.
     rows = "".join(
         f"<tr><td><a href='#'>{pln}</a></td><td>{ref}</td><td>{state}</td>"
         "<td>B1 Homes</td></tr>"
@@ -718,6 +733,15 @@ def projects_page(
         for s in ("All Projects", "On-hold")
     )
     old = "" if stale_none else OTHER_ROW
+    first = rows[: rows.index("</tr>") + len("</tr>")]
+    partial = (
+        f"""setTimeout(() => {{
+    document.getElementById('rows').innerHTML = `{first}`;
+    document.getElementById('footer').textContent = 'Page 1 of 1(1 Items)';
+  }}, {partial_ms});"""
+        if partial_ms is not None
+        else ""
+    )
     return f"""
 <div>
   <button>Reset Filter</button>
@@ -745,6 +769,7 @@ function go(text) {{
     document.getElementById('rows').innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
     document.getElementById('footer').textContent = '';
   }}, 100);
+  {partial}
   setTimeout(() => {{
     document.getElementById('rows').innerHTML = `{rows}`;
     document.getElementById('footer').textContent = 'Page 1 of 1({count} Items)';
@@ -763,6 +788,15 @@ def test_search_projects_presses_enter_and_reads_past_a_loading_row(page, guard)
     rows = booking.search_projects(guard, page, panel, "2600001B")
     assert plns(rows) == ["pln_10001", "pln_10009"]
     assert actions(guard) == ["search_project", "submit_project_search"]
+
+
+def test_search_projects_waits_for_the_list_to_settle_past_its_first_row(page, guard):
+    # Refactor safety net (task 8.4; decisions, 18 Nov 2026): one result row
+    # shows first, then both; a list read once is not yet settled.
+    page.set_content(projects_page(partial_ms=300, delay=800))
+    panel = booking.projects_panel(page)
+    rows = booking.search_projects(guard, page, panel, "2600001B")
+    assert plns(rows) == ["pln_10001", "pln_10009"]
 
 
 def test_search_projects_waits_out_a_stale_no_record(page, guard):
@@ -825,7 +859,7 @@ function go(text) {{
 
 @pytest.fixture
 def short_search(monkeypatch):
-    monkeypatch.setattr(booking, "SEARCH_TIMEOUT_MS", 5000)
+    monkeypatch.setattr(wait, "SEARCH_TIMEOUT_MS", 5000)
 
 
 def test_a_second_not_found_in_a_row_is_no_rows(page, guard, short_search):
@@ -859,7 +893,7 @@ def test_a_kept_not_found_is_never_this_notes_result(page, guard, short_search):
 
 
 def test_search_projects_waits_longer_than_a_page_load(page, guard, monkeypatch):
-    monkeypatch.setattr(booking, "LOAD_TIMEOUT_MS", 300)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 300)
     page.set_content(projects_page(delay=1500))
     rows = booking.search_projects(
         guard, page, booking.projects_panel(page), "2600001B"
@@ -1052,6 +1086,72 @@ def test_wait_new_task_reads_past_a_half_added_row(
     assert booking.wait_new_task(form, project, before) == "tsk_200009"
 
 
+# Refactor safety net (task 8.4; decisions, 18 Nov 2026): W2's new-task
+# read-back on a project window with its "-- Select Task --" select, as
+# driver.settled_tasks reads it (row 10).
+
+
+def w2_page(*, new: tuple[str, ...], status: str) -> str:
+    def task(number: str, state: str) -> str:
+        return (
+            f"<tr><td><div><span>({number}) | Compaction Test</span></div></td></tr>"
+            f"<tr><td>{AGENT}</td><td>Perth Scheduling</td><td>{state}</td></tr>"
+        )
+
+    def option(number: str) -> str:
+        return f"<option>({number}) [Compaction Test]</option>"
+
+    rows = "".join(task(number, status) for number in new)
+    options = "".join(option(number) for number in new)
+    return f"""
+<div><div>
+  <h3>pln_10001 B1 Homes Sample Lane, Sampleville WA 6000</h3>
+  <select><option selected>-- Select Task --</option>{option("tsk_200001")}</select>
+  <button>Create New Task</button>
+  <table><tbody id="tasks">{task("tsk_200001", "Cancelled")}</tbody></table>
+</div>{CLOSE}</div>
+<div id="form"><div>
+  <h3>Create New Task</h3>
+  <button onclick="submitTask()">Submit</button>
+</div>{CLOSE}</div>
+<script>
+function submitTask() {{
+  document.getElementById('form').remove();
+  document.getElementById('tasks').insertAdjacentHTML('beforeend', `{rows}`);
+  document.querySelector('select').insertAdjacentHTML('beforeend', `{options}`);
+}}
+</script>"""
+
+
+def submitted(page: Page, guard: ActionGuard, html: str) -> str:
+    page.set_content(html)
+    project = booking.project_window(page, "pln_10001")
+    form = booking.task_form(page)
+    booking.submit_task(guard, form)
+    return booking.new_task_after_submit(form, project, {"tsk_200001"})
+
+
+def test_w2_finds_the_one_new_task(page, guard):
+    html = w2_page(new=("tsk_200009",), status="New Project")
+    assert submitted(page, guard, html) == "tsk_200009"
+
+
+@pytest.mark.usefixtures("short_waits")
+def test_w2_stops_on_two_new_tasks(page, guard):
+    html = w2_page(new=("tsk_200008", "tsk_200009"), status="New Project")
+    with pytest.raises(PartialWrite, match="more than one new task") as error:
+        submitted(page, guard, html)
+    assert error.value.reason == "NO_NEW_TASK"
+
+
+@pytest.mark.usefixtures("short_waits")
+def test_w2_stops_on_a_new_task_whose_status_never_fits(page, guard):
+    html = w2_page(new=("tsk_200009",), status="Draft")
+    with pytest.raises(PartialWrite, match="new task not found") as error:
+        submitted(page, guard, html)
+    assert error.value.reason == "TASK_STATUS"
+
+
 def test_task_form_without_a_po_documents_block_does_not_submit(page, guard):
     # Fail closed: a PO Documents area not found once is not "empty".
     po_documents = (
@@ -1096,6 +1196,6 @@ BLOCKED_BRIEFLY_PAGE = """
 def test_an_opening_click_retried_after_a_block_prints_nothing(page, guard, capsys):
     page.set_content(BLOCKED_BRIEFLY_PAGE)
     refresh = page.get_by_role("button", name="Refresh", exact=True)
-    booking._open(guard, "refresh_note_pool", page.locator("body"), refresh)
+    wait.retry_opening(guard, "refresh_note_pool", page.locator("body"), refresh)
     assert refresh.get_attribute("data-clicked") == "yes"  # retried, then clicked
     assert capsys.readouterr().out == ""
