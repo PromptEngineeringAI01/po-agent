@@ -42,7 +42,7 @@ from po_agent.core.errors import (
     WriteNotStarted,
 )
 from po_agent.core.secrets import SecretName
-from po_agent.mysys import booking, driver
+from po_agent.mysys import booking, driver, wait
 from po_agent.mysys.guard import ActionGuard
 
 # The one trial PO (Must never #6 allows its identifiers in committed files).
@@ -73,7 +73,7 @@ def _browser(*, headed: bool, slow_mo: int, downloads: Path) -> Iterator[Page]:
         )
         try:
             page = browser.new_context(accept_downloads=True).new_page()
-            page.set_default_timeout(driver.LOAD_TIMEOUT_MS)
+            page.set_default_timeout(wait.LOAD_TIMEOUT_MS)
             yield page
         finally:
             browser.close()

@@ -71,6 +71,7 @@ module = [
     "po_agent.mysys.booking",
     "po_agent.mysys.driver",
     "po_agent.mysys.guard",
+    "po_agent.mysys.wait",
 ]
 disallow_any_generics = true
 disallow_subclassing_any = true

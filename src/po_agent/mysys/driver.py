@@ -18,7 +18,6 @@ Found on the test site in 1.8 (25-27 Oct 2026, observed only):
 """
 
 import re
-import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -54,19 +53,15 @@ from po_agent.core.errors import (
 )
 from po_agent.core.runlog import RunLog
 from po_agent.core.trace import Booking
+from po_agent.mysys import wait
 from po_agent.mysys.guard import ActionGuard
 
 if TYPE_CHECKING:  # booking imports this module
     from po_agent.mysys.booking import HoldState
 
-LOAD_TIMEOUT_MS = 15_000
-MENU_TRIES = 3
 FOOTER = re.compile(r"^Page (\d+) of (\d+)\s*\((\d+) Items?\)$")
 NO_RECORD = "No record could be found."
 PROJECTS_NO_RECORD = "No record found."
-POLL_MS = 500
-EMPTY_SETTLE_MS = 3000  # My Notes: how long an empty list must stay empty
-OPEN_TRIES = 4  # x 15 s
 SELECT_USER = "--Select User--"
 SELECT_POOL = "--Select Pool--"
 ALL_POOLS = "All Pools"
@@ -120,7 +115,7 @@ def open_browser(
         try:
             context = browser.new_context(accept_downloads=downloads is not None)
             page = context.new_page()
-            page.set_default_timeout(LOAD_TIMEOUT_MS)
+            page.set_default_timeout(wait.LOAD_TIMEOUT_MS)
             yield page
         finally:
             browser.close()
@@ -153,7 +148,7 @@ def login(guard: ActionGuard, page: Page, username: str, password: str) -> None:
         "login_submit", body, page.get_by_role("button", name="Log in", exact=True)
     )
     try:
-        _project_title(page).wait_for(state="visible", timeout=LOAD_TIMEOUT_MS)
+        _project_title(page).wait_for(state="visible", timeout=wait.LOAD_TIMEOUT_MS)
     except PlaywrightError:
         raise LoginFailed("login did not reach the app") from None
     _network_idle(page)
@@ -162,17 +157,8 @@ def login(guard: ActionGuard, page: Page, username: str, password: str) -> None:
 def open_note_pool(guard: ActionGuard, page: Page) -> Locator:
     """Project menu -> Note Pool; returns the panel once its list is shown."""
     menu = _project_menu(page)
-    title = _project_title(page)
-    item = menu.get_by_text("Note Pool", exact=True)
-    for _ in range(MENU_TRIES):
-        guard.act("open_project_tab", menu, title)
-        _network_idle(page)
-        try:
-            item.wait_for(state="visible", timeout=2000)
-            break
-        except PlaywrightError:
-            continue
-    else:
+    item = _open_menu_item(guard, page, "Note Pool")
+    if item is None:
         raise UnexpectedScreen("Note Pool menu item did not show")
     guard.act("open_note_pool", menu, item)
     panel = note_pool_panel(page)
@@ -201,9 +187,9 @@ def wait_for_list(panel: Locator, before: ElementHandle | None = None) -> None:
     away, then the footer or "No record could be found." shows."""
     try:
         if before is not None:
-            before.wait_for_element_state("hidden", timeout=LOAD_TIMEOUT_MS)
+            before.wait_for_element_state("hidden", timeout=wait.LOAD_TIMEOUT_MS)
         _footer(panel).or_(_no_record(panel)).wait_for(
-            state="visible", timeout=LOAD_TIMEOUT_MS
+            state="visible", timeout=wait.LOAD_TIMEOUT_MS
         )
     except PlaywrightError:
         raise UnexpectedScreen("Note Pool list did not load") from None
@@ -242,14 +228,8 @@ def open_my_notes(guard: ActionGuard, page: Page) -> Locator:
     pointer off the menu and the list loaded. Read only: nothing in MySys
     changes. Returns the My Notes panel."""
     menu = _project_menu(page)
-    title = _project_title(page)
-    item = menu.get_by_text(MY_NOTES, exact=True)
-    for _ in range(MENU_TRIES):
-        guard.act("open_project_tab", menu, title)
-        _network_idle(page)
-        if _shows(item, 2000):
-            break
-    else:
+    item = _open_menu_item(guard, page, MY_NOTES)
+    if item is None:
         raise UnexpectedScreen("My Notes menu item did not show")
     guard.act("open_my_notes", menu, item)
     leave_menu(guard, page)
@@ -287,7 +267,7 @@ def read_my_notes(panel: Locator) -> NotePoolList:
     where shown. My Notes lists the Notes assigned to the logged-in agent
     (Joey, live, 10 Nov 2026), so every row is listed, whatever its
     Assignee cell. The one empty list is "No record could be found." with
-    no rows, read twice EMPTY_SETTLE_MS apart; rows that don't match the
+    no rows, read twice wait.EMPTY_SETTLE_MS apart; rows that don't match the
     footer are an UnexpectedScreen (no Refresh: nothing on My Notes is
     clicked). Reads only."""
     try:
@@ -299,7 +279,7 @@ def read_my_notes(panel: Locator) -> NotePoolList:
             # An empty list counts only if it is still empty a moment later:
             # "No record could be found." can show while the rows load, and
             # networkidle doesn't wait for a list loaded after the page.
-            panel.page.wait_for_timeout(EMPTY_SETTLE_MS)
+            panel.page.wait_for_timeout(wait.EMPTY_SETTLE_MS)
             listing = _read_my_notes_list(panel)
         return listing
     except PlaywrightError:
@@ -413,9 +393,27 @@ def _project_title(page: Page) -> Locator:
 def _network_idle(page: Page) -> None:
     # https://playwright.dev/python/docs/api/class-page#page-wait-for-load-state
     try:
-        page.wait_for_load_state("networkidle", timeout=LOAD_TIMEOUT_MS)
+        page.wait_for_load_state("networkidle", timeout=wait.LOAD_TIMEOUT_MS)
     except PlaywrightError:
         raise UnexpectedScreen("page did not settle") from None
+
+
+def _open_menu_item(guard: ActionGuard, page: Page, name: str) -> Locator | None:
+    """Clicks Project until the Project menu's item `name` shows, up to
+    wait.MENU_TRIES times (the first click can only load the module, row 27);
+    returns the item, else None. Nothing is chosen here."""
+    item = _project_menu(page).get_by_text(name, exact=True)
+
+    def shown() -> bool:
+        _network_idle(page)
+        return _shows(item, wait.MENU_ITEM_MS)
+
+    menu, title = _project_menu(page), _project_title(page)
+    if not wait.retry_opening(
+        guard, "open_project_tab", menu, title, tries=wait.MENU_TRIES, shown=shown
+    ):
+        return None
+    return item
 
 
 def _footer(panel: Locator) -> Locator:
@@ -520,7 +518,7 @@ def _labelled(window: Locator, label: str) -> str:
     re-renders the Note window. Two visible labels fail at once (strict)."""
     strong = window.locator("strong").filter(has_text=_label_pattern(label)).visible
     try:
-        strong.wait_for(state="visible", timeout=LOAD_TIMEOUT_MS)
+        strong.wait_for(state="visible", timeout=wait.LOAD_TIMEOUT_MS)
     except PlaywrightError:
         raise UnexpectedScreen("label not found once") from None
     try:
@@ -560,21 +558,6 @@ def _shows(locator: Locator, timeout: int | None = None) -> bool:
         return False
 
 
-def _polls(window: Locator, read: Callable[[], bool]) -> bool:
-    """Polls `read` until it is true, for up to 15 s; a read that fails for a
-    moment (the window re-rendering) is tried again."""
-    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
-    while True:
-        try:
-            if read():
-                return True
-        except (UnexpectedScreen, PlaywrightError):
-            pass
-        if time.monotonic() >= deadline:
-            return False
-        window.page.wait_for_timeout(POLL_MS)
-
-
 # Moving between windows (rows 25, 27)
 
 
@@ -593,12 +576,12 @@ def leave_menu(guard: ActionGuard, page: Page) -> None:
         .or_(page.get_by_text(PROJECTS_NO_RECORD, exact=True))
         .visible
     )
-    if not _shows(status, LOAD_TIMEOUT_MS):
+    if not _shows(status, wait.LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("list status line not shown")
     guard.act("move_pointer_off_menu", page.locator("body"), status)
     item = _project_menu(page).get_by_text("Note Pool", exact=True)
     try:
-        item.wait_for(state="hidden", timeout=LOAD_TIMEOUT_MS)
+        item.wait_for(state="hidden", timeout=wait.LOAD_TIMEOUT_MS)
     except PlaywrightError:
         raise UnexpectedScreen("Project menu did not close") from None
 
@@ -612,7 +595,7 @@ def reload_home(
     (row 27). Never Minimize or a taskbar entry."""
     go_home(page, base_url)
     login_box = page.get_by_role("textbox", name="Username", exact=True)
-    if not _shows(_project_title(page).or_(login_box).first, LOAD_TIMEOUT_MS):
+    if not _shows(_project_title(page).or_(login_box).first, wait.LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("base_url showed neither the app nor the login")
     try:
         logged_out = login_box.count() > 0
@@ -622,22 +605,6 @@ def reload_home(
         login(guard, page, username, password)
     else:
         _network_idle(page)
-
-
-def _open_retried(
-    guard: ActionGuard, action: str, scope: Locator, target: Locator
-) -> None:
-    """An opening or refreshing click (it changes nothing in MySys), tried
-    OPEN_TRIES times in case the page is still covered (see leave_menu).
-    Playwright never clicks while the target is covered, so a retry cannot
-    act twice. A guard refusal is never retried."""
-    for attempt in range(OPEN_TRIES):
-        try:
-            guard.act(action, scope, target)
-            return
-        except UnexpectedScreen:
-            if attempt == OPEN_TRIES - 1:
-                raise
 
 
 def search_note(
@@ -664,7 +631,7 @@ def search_note(
     except PlaywrightError:
         raise UnexpectedScreen("Note Pool list not readable") from None
     refresh = panel.get_by_role("button", name="Refresh", exact=True)
-    _open_retried(guard, "refresh_note_pool", panel, refresh)
+    wait.retry_opening(guard, "refresh_note_pool", panel, refresh)
     wait_for_list(panel, before)
     return panel, read_note_pool(guard, panel)
 
@@ -733,9 +700,9 @@ def note_window(page: Page, note_id: str) -> Locator:
 def open_note(guard: ActionGuard, page: Page, panel: Locator, note_id: str) -> Locator:
     """Opens the Note from its Note Pool row by the row's ID cell."""
     cell = panel.get_by_role("cell", name=note_id, exact=True)
-    _open_retried(guard, "open_note", panel, cell)
+    wait.retry_opening(guard, "open_note", panel, cell)
     window = note_window(page, note_id)
-    if not _shows(window, LOAD_TIMEOUT_MS):
+    if not _shows(window, wait.LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("Note window did not open", note_id=note_id)
     return window
 
@@ -884,7 +851,7 @@ def _read_back(
     field: str,
     read: Callable[[], bool],
 ) -> None:
-    ok = _polls(window, read)
+    ok = wait.until(wait.within(window.page), read)
     log.event("read_back", note_id=note_id, step=step, ok=ok, field=field)
     if not ok:
         raise UnexpectedScreen(
@@ -998,7 +965,7 @@ def note_body(window: Locator, file_name: str) -> str:
 
     try:
         if frames.count():
-            _polls(window, settled)
+            wait.until(wait.within(window.page), settled)
         found, _ = read()
     except PlaywrightError:
         raise UnexpectedScreen("Note body not readable") from None
@@ -1043,7 +1010,7 @@ def download_pdf(guard: ActionGuard, page: Page, window: Locator) -> Pdf | None:
     if len(names) != 1 or not names[0].lower().endswith(".pdf"):
         return None
     try:
-        with page.expect_download(timeout=LOAD_TIMEOUT_MS) as info:
+        with page.expect_download(timeout=wait.LOAD_TIMEOUT_MS) as info:
             guard.act("download_attachment", window, _download_links(window))
         download = info.value
         try:
@@ -1126,28 +1093,26 @@ def settled_tasks(window: Locator) -> dict[str, str]:
     empty project shows nothing else (probe, 4 Nov 2026), so "no tasks"
     counts only when every read for the full 15 s is empty. Otherwise after
     15 s UnexpectedScreen."""
-    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
-    last = None
     empty_throughout = True
-    while True:
+
+    def read() -> dict[str, str] | None:
+        """The tasks once the table is whole, else None."""
+        nonlocal empty_throughout
         try:
             tasks = rules.compaction_tasks(task_rows(window))
             whole = set(tasks) == _task_options(window)
         except (PartialWrite, UnexpectedScreen, PlaywrightError):
             tasks, whole = None, False  # a half-rendered row
-        if whole and tasks:
-            if tasks == last:
-                return tasks
-            last = tasks
-        else:
-            last = None
         if not (whole and not tasks):
             empty_throughout = False
-        if time.monotonic() >= deadline:
-            if empty_throughout:
-                return {}
-            raise UnexpectedScreen("task table did not settle")
-        window.page.wait_for_timeout(POLL_MS)
+        return tasks if whole else None
+
+    tasks = wait.settled(wait.within(window.page), read, bool)
+    if tasks is not None:
+        return tasks
+    if empty_throughout:
+        return {}
+    raise UnexpectedScreen("task table did not settle")
 
 
 def project_lookup(
