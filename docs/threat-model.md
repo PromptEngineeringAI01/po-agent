@@ -32,7 +32,7 @@
 
 | STRIDE | Existing control | Gap | Owner | Follow-up (candidate) |
 |---|---|---|---|---|
-| S/T: wrong or swapped credentials | Each site has its own named pair (`core/secrets.py`); only `PO_AGENT_<NAME>` is read, `ANTHROPIC_API_KEY` is ignored | **Live-profile secrets are checked only in production (verified):** every test reads test names or env vars; the live names are first read by the real run on the Mac Mini, so a missing or stale live item shows up as `CONFIG` or `LOGIN_FAILED` at run time. Claude may not read or set them (CLAUDE.md #3) | Joey | Task: a read-only `po-agent check-secrets --site live` the wrapper runs, printing only present or absent, never values |
+| S/T: wrong or swapped credentials | Each site has its own named pair (`core/secrets.py`); only `PO_AGENT_<NAME>` is read, `ANTHROPIC_API_KEY` is ignored | **Live-profile secrets are checked only in production (verified):** every test reads test names or env vars; the live names are first read by the real run on the Mac Mini, so a missing or stale live item shows up as `CONFIG` or `LOGIN_FAILED` at run time. Claude may not read or set them (CLAUDE.md #3) | Joey | Task: a read-only `po-agent check-secrets --site live` the wrapper runs, printing only present or absent, never values. **Done 20 Nov 2026 as `po-agent preflight --site live`, run by Joey before a live run, not by the wrapper (decisions, 20 Nov 2026, secrets pre-flight); presence and format only, not that the password is right** |
 | R: access to a secret | None beyond the Keychain's own prompt | Not tracked; acceptable for one operator | Joey | - |
 | I: a secret reaches a log, repo or chat | Values never logged or put in errors; gitleaks in pre-commit and CI (`.github/workflows/check.yml`); Healthchecks URL goes to curl on stdin (`scripts/macmini-run.sh`) | None found | - | - |
 | D: Keychain locked or `poagent` logged out | Runbook entries, heartbeat and Healthchecks alerts (19 Nov outage, decisions 19 Nov 2026) | Detection takes about an hour (Healthchecks) to a weekday afternoon (GitHub check); a night or weekend gap is not alerted | Joey | Accepted in the 18-19 Nov decisions; revisit if a gap costs a PO |
@@ -76,7 +76,7 @@
 
 1. Stale-Note stop halts all runs until a person acts, with hourly repeat alerts (D).
 2. No run lock on the Mac Mini wrapper; "one agent at a time" is a rule, not a control (T).
-3. Live secrets are exercised only in production; no safe pre-flight (S/T).
+3. ~~Live secrets are exercised only in production; no safe pre-flight (S/T).~~ Closed 20 Nov 2026: `po-agent preflight --site live` (Joey runs it; presence and format only).
 4. Sender of a Note is not verified (C6 deferred) and the agent account may still hold forbidden MySys rights (C9) (S, E).
 5. Alert and heartbeat have known weak spots: token expiry, GitHub schedule limits, no night or weekend alert (D).
 6. `core/` and `mysys/` form an import cycle that leaks B1 rules into reusable code (E, design).

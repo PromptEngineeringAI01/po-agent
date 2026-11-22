@@ -38,8 +38,9 @@ def mysys_names(site: str) -> tuple[SecretName, SecretName]:
     return _MYSYS_NAMES[site]
 
 
-def get(name: SecretName) -> str:
-    """The secret's value; ConfigError (naming the secret) if it isn't set."""
+def _find(name: SecretName) -> str | None:
+    """The value, or None when it isn't set; ConfigError if the store can't
+    be read."""
     if name not in SECRET_NAMES:
         raise ValueError("unknown secret name")
     value = os.environ.get(ENV_PREFIX + name.upper())
@@ -49,10 +50,34 @@ def get(name: SecretName) -> str:
         # Returns None when the entry doesn't exist; backend failures raise
         # KeyringError or a subclass such as NoKeyringError
         # (https://keyring.readthedocs.io/en/latest/, "API" and "Exceptions").
-        value = keyring.get_password(KEYRING_SERVICE, name)
+        return keyring.get_password(KEYRING_SERVICE, name) or None
     except KeyringError:
         # from None: the backend's message stays out of the error chain.
         raise ConfigError("secret store unavailable", secret=name) from None
+
+
+def get(name: SecretName) -> str:
+    """The secret's value; ConfigError (naming the secret) if it isn't set."""
+    value = _find(name)
     if not value:
         raise ConfigError("secret not set (env var or keyring)", secret=name)
     return value
+
+
+SecretStatus = Literal["ok", "not set", "malformed", "store unavailable"]
+
+
+def inspect(name: SecretName) -> SecretStatus:
+    """Whether the secret is set and well-formed, without returning it:
+    non-empty, no leading or trailing whitespace, no control character (a
+    pasted newline or tab). Nothing else about the value is judged or kept
+    (decisions, 20 Nov 2026, secrets pre-flight)."""
+    try:
+        value = _find(name)
+    except ConfigError:
+        return "store unavailable"
+    if value is None:
+        return "not set"
+    if value != value.strip() or not value.isprintable():
+        return "malformed"
+    return "ok"

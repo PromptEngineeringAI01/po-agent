@@ -142,7 +142,7 @@ When the agent account's password has changed (or was reset). The live account's
    uv run keyring set po-agent mysys_live_password
    ```
    It asks for the password: type it (nothing shows) and press Return.
-3. Run one spike: `~/po-agent/scripts/macmini-run.sh spike live` (not within a few minutes of :07).
+3. Check the items: `cd ~/po-agent && uv run po-agent preflight --site live` (both `ok`; it prints no values and doesn't log in). Then run one spike: `~/po-agent/scripts/macmini-run.sh spike live` (not within a few minutes of :07).
 4. If macOS asks whether Python may use the "po-agent" item in your keychain, type the `poagent` macOS password and choose **Always Allow**. If it asks again (once per item), choose **Always Allow** again. A run left waiting on this dialog is killed after 20 minutes and alerts.
 5. Check `runs.log`: `INFO  logged in` and `"exit_code": 0` in the last `RUN_SUMMARY`.
 6. Lock the screen (Control-Command-Q).
@@ -220,6 +220,7 @@ The username works the same way with `mysys_live_username`. For the test site, u
 
 - **Means:** a setting or secret is missing or wrong, so the run stopped before opening a browser. Nothing in MySys changed. Check the `detail`:
   - **"secret not set (env var or keyring)"** (with `secret=<name>`): that item is missing from `poagent`'s Keychain. Add it (3.7, with that name).
+  - To see which items are not `ok` before fixing: `uv run po-agent preflight --site live` as `poagent` (3.7 step 3).
   - **"secret store unavailable"**: the Keychain couldn't be read, usually because it is locked. Log in at the Mac as `poagent`, run one spike (3.7 steps 3 to 6), and lock the screen.
   - **"leftover download folder not removed"**: a temp folder from an earlier run couldn't be deleted. As `poagent`: `ls -d "$TMPDIR"po-agent-dl-* /tmp/po-agent-dl-*` shows them; `rm -rf "$TMPDIR"po-agent-dl-* /tmp/po-agent-dl-*` deletes them. It may hold a PO PDF, so delete it, don't copy it. If that fails too, restart the Mac (`docs/macmini-setup.md` section 10).
   - **"config file not readable"**, **"config file is not valid TOML"**, **"invalid config value"**, **"unknown site"**, **"config file is for another site"**, **"unknown time zone"** or **"invalid command line"**: the code or the site's config (`config/live.toml` or `config/test.toml`) at the `production` tag is wrong. Joey fixes it on `main` and moves the tag.

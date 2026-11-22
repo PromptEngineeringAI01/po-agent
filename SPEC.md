@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.56 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.57 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -106,6 +106,7 @@ Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses the main ch
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
 Supervised demo:     uv run po-agent demo --site test --headed [--until-check]   one PO, Enter before every write (decisions, 27 Oct 2026)
+Secrets pre-flight:  uv run po-agent preflight --site test|live   secret names and ok / not set / malformed / store unavailable, never values; no login, no network; exit 2 if any is not ok (decisions, 20 Nov 2026, secrets pre-flight)
 Link probe:          uv run po-agent demo --site test --probe-link   opens Choose Project, searches, snapshots, selects nothing (decisions, 28 Oct 2026)
 Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
 Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only test|live   site required; fetch, enabled from config/<site>.toml on main, production tag, sync, run, log, alert
@@ -130,7 +131,7 @@ src/po_agent/
   cli.py                        argument parsing; maps errors to exit codes
   core/                         reusable for the next MySys automations
     config.py                   load + validate config/<site>.toml (test, live); each refuses any host but its own (TEST_HOST, LIVE_HOST)
-    secrets.py                  PO_AGENT_* env var, else keyring; one MySys pair per site
+    secrets.py                  PO_AGENT_* env var, else keyring; one MySys pair per site; `inspect` = status only, for the pre-flight
     output.py                   the ONLY module that prints (stdout contract below)
     runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log), its one traceback writer; feeds the trace
     trace.py                    the safe trace (7.3): allowlisted fields only, one file per day, 90 days
@@ -212,7 +213,8 @@ NOTE  {"note_id": "...", "outcome": "booked|skipped|untouched|partial", "reason"
        "field": "street", "po_number": "2609034B/048", "pln": "pln_66938", "task_id": "...",
        "tokens_in": 0, "tokens_out": 0, "cost_aud": 0.0}
 ALERT <PARTIAL_WRITE|ACCURACY_BREACH|GUARD_REFUSAL|UNEXPECTED_SCREEN|MORE_PAGES|HOLD_LOST|LOGIN_FAILED|CONFIG> {"note_id": "...", "step": "W3", "detail": "<no PO data>"}
-RUN_SUMMARY {"run_id": "...", "site": "test|live", "mode": "run|decide-only|spike", "seen": 0, "eligible": 0,
+SECRET {"name": "mysys_test_password", "status": "ok|not set|malformed|store unavailable"}   (preflight only)
+RUN_SUMMARY {"run_id": "...", "site": "test|live", "mode": "run|decide-only|spike|demo|preflight", "seen": 0, "eligible": 0,
        "booked": 0, "skipped": 0, "partial": 0, "duration_s": 0, "tokens_in": 0, "tokens_out": 0,
        "cost_aud": 0.0, "exit_code": 0}
 ```
@@ -220,6 +222,7 @@ RUN_SUMMARY {"run_id": "...", "site": "test|live", "mode": "run|decide-only|spik
 - `outcome` values beyond a skip reason: a decide-only Note that would have been booked is `"outcome": "skipped", "reason": "DECIDE_ONLY"`; a Note a person took mid-run is `"outcome": "untouched", "reason": "NOTE_TAKEN"`. These are run-output values only, not skip reasons in the decision engine.
 - **Run mode (4.5; decisions, 5 Nov 2026, run mode):** a booked Note is `"outcome": "booked"` with `po_number`, `pln` and `task_id`. A Note stopped from the Submit click on (`PARTIAL_WRITE`, `ACCURACY_BREACH` or `GUARD_REFUSAL` with step W2-W5; a Ctrl+C there is `PARTIAL_WRITE`) has no NOTE line: its ALERT names it, RUN_SUMMARY's `partial` counts it, it stays with the agent and the run stops. `"outcome": "partial"` is not printed in the MVP. A Note a person took before the W1 check is `untouched` / `NOTE_TAKEN`; its browser context is closed and the next Note runs in a fresh browser.
 - Run-control `INFO` lines (3.5), each ending the run with exit 0 unless noted: `kill switch on: run not started` (any mode, before secrets or a browser), `outside the run window: run not started` (`run` and `run --decide-only` only), `kill switch on: run stopped` (switched off before W1 or W2: the Note is returned first), and `run cap reached: <n> notes left for the next run` (the run goes on to its summary).
+- **Secrets pre-flight (decisions, 20 Nov 2026, secrets pre-flight):** `po-agent preflight --site test|live` prints one `SECRET` line per MySys secret of that site (name and status word only: `ok`, `not set`, `malformed` = leading or trailing whitespace or a control character such as a pasted newline, or `store unavailable` = the Keychain can't be read), then `INFO  preflight: secrets ok` and exit 0, or `ALERT CONFIG` with the fixed detail `secrets not ready` and exit 2. It reads no config and opens no browser or network connection, so it never logs in; no value, length or other property of a value is printed. The wrapper and launchd don't run it. On the live site only Joey runs it, on the Mac Mini (it reads the live secrets; Must never #3 is unchanged).
 - **Silent skips and more pages (7.2; decisions, 5 Nov 2026):** the run stops on its first `UNEXPECTED_SCREEN` (exit 1), so a MySys screen change can't skip every Note quietly; there is no separate all-skipped alert, and business skips (`NOT_B1`, `DUPLICATE_TASK`, ...) never alert. A Note Pool with a second page, which is never read, prints `ALERT MORE_PAGES` (fixed detail, no `note_id`) and exits 1 before any Note is taken: in `run` and `run --decide-only` from the stale-Note read (D6), which lists every Pending Note and so has a second page whenever the eligible read does; in `spike` from the eligible read, after its counts line. A typed error raised later has its own exit code (none can follow, since the run stops).
 - **Hold re-check (decisions, 11 Nov 2026, hold re-check):** `ALERT HOLD_LOST {"note_id": "<the booked Note>", "step": "hold_check", "detail": "booked task not on hold"}` (or `"booked task not found"`), one per task, then `INFO  hold re-check: <n> checked, <m> not on hold` and, past 10, `INFO  hold re-check cap reached: <n> tasks not checked`. No pln or task number in the line. The run goes on: exit 0 unless something else stops it. Nothing is printed when the trace lists no booking.
 - **Alert issues (audit N4; decisions, 10 Nov 2026, live profile):** the repo is public, so the wrapper's alert issue body carries the ALERT lines without `note_id`: the JSON key and the detail's `note_id=<id>` are cut, and a line that still names one keeps only `ALERT <KIND>`. `runs.log` on the Mac Mini keeps every line whole; the Note is found there (`docs/ops-runbook.md`).
