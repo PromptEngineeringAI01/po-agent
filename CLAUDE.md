@@ -60,7 +60,7 @@ Do only what the task asks: no mutation probes (except refactor tasks: `/start-t
 - You may read `private/` to understand pages; test-site captures count as real data. Committed files use fake or redacted values; seam-1 fixture PDFs are generated fakes.
 - Use a plain dash "-", not the em dash. Never hand-edit `uv.lock` or other generated files.
 - An unrelated failure you notice: report it, don't fix it in this task.
-- Same mistake twice: propose a hook, test or skill change that prevents it; add a line here only if none fits.
+- Friction (stale doc, broken script, missing env var, a blocked permission) or the same mistake twice: log it in `tasks/friction-log.md` instead of working around it, then walk the correction ladder (`docs/factory-handbook.md` §4): propose a hook, test or skill change that prevents it; add a line here only if none fits.
 
 <!-- Index (progressive disclosure, HumanLayer's agent_docs pattern): each line says when to read the doc, so Claude loads details only when a task needs them. The docs already exist; no separate agent_docs/ folder, so nothing is copied and goes stale. -->
 ## Read before you start
