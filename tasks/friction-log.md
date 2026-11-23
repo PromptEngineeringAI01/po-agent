@@ -16,3 +16,4 @@ Rules: newest first, one row per friction, no secrets or real client data (Must 
 
 | Date | Task | Friction / blocker | Promoted to hook / test? |
 |---|---|---|---|
+| 2026-11-20 | 8.3 (PR 150) | A new test file was auto-formatted before the module it imports existed, so ruff's isort sorted that import as third-party; a stale local ruff cache then kept `ruff check` green, and only CI caught the I001 (one extra test: commit, one more /verify-pr round). | Proposed: `scripts/check.py` runs `ruff check` with `--no-cache`, so the local check can't pass on a cached result CI won't reproduce |
