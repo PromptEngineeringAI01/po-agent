@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **23 Nov 2026: Summit Home is client 2** (ADR-003 Accepted, option C; Joey said yes under the CEO's delegation; six entries below): a read-only peek with every check before the take; the Client Internal No. check in place of the address check (loosens a control); Summit's decision rules; return to the original assignee (taking a person's Note is allowed for Summit); a separate Agent 2 run; testing and go-live without the test site (loosens a control). Spec only: nothing built yet.
 - **21 Nov 2026: one wait module** (task 8.4; Joey's settled design of 9 Nov; entry below): every MySys wait in `mysys/wait.py`; its retry refuses any action but the four opening clicks (tightens a safety control). No change in MySys or run output; the tests' timeout patches move to the one module in their own `test:` commit.
 - **20 Nov 2026: secrets pre-flight** (threat-model gap 3; entry below): `po-agent preflight --site test|live` reports whether the site's MySys secrets are set and well-formed, names and status only, no login. Joey runs it on the Mac Mini before a live run.
 - **21 Nov 2026: run lock** (threat-model gap 2; entry below): an OS lock on `state/run-<site>.lock`; a held lock skips the run (INFO, exit 0), over an hour is ALERT `RUN_LOCK_STUCK`.
@@ -10,6 +11,54 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
+
+- **Decided:** Summit Home (code `summit`) is the second client. Its rules go in `src/po_agent/summit/` beside `b1/`, behind one interface that `core/` and `mysys/` call instead of importing `b1`; `mysys/` stays shared and client-free, and client values come in through the client profile and the `Proceed` (`docs/specs/ADR-003-more-clients.md`, now Accepted). Same repo, same guard, same W1-W5.
+- **Data approval:** the CEO left the approval for Summit's client data to Joey (as decision 2 for B1); Joey said yes (23 Nov 2026). Terms as B1's: real Summit PDFs, Note titles and bodies, addresses and homeowner names stay in `private/summit/` on the laptop and in MySys; the agent reads them on the Mac Mini in memory only (D2). May be committed: "Summit Home", the company names, aliases and creators of the Task Creator table, the agent and staff user names in the config, the Source and sender addresses. Summit has no trial POs, so CLAUDE.md Must never #6's trial-PO exception covers no Summit identifier.
+- **Inputs:** Joey's 24 manual steps and his answers in two rounds (`private/summit/process-2026-11-23/process.md`), the step-by-step gap map (`gap-map.md` there: no step needs a new screen), and his answers in the spec session (23 Nov 2026).
+- **Carried in:** `SPEC.md` v1.59, section Client 2: Summit Home, and Assumption 9; ADR-003 status. Not changed here (Joey's by hand): CLAUDE.md's first line and Must never #6, `docs/workflow.md`.
+
+## 23 Nov 2026 - Summit: a read-only peek, every check before the take (ADR-003 decision 4, widened; replaces "never opened" for Summit)
+
+- **Problem:** a Summit Note is ours only if its PDF says COMPACTION TEST; the title and the list can't tell (Joey: the PDF decides, READY or ISSUED doesn't matter). B1's rule "a Note is never opened before it is taken" can't hold.
+- **Decided (Joey: "全部檢查完才 Assign"):** for each eligible row, the agent opens the Note, downloads its PDF, searches and opens the project and reads its Tasks, all read-only, and decides; only a PROCEED is assigned to Agent 2. A Note that fails any check is untouched: no Assign, no status change, a NOTE line `"outcome": "untouched"` with the reason. Summit's `run --decide-only` therefore assigns and writes nothing. This differs from Joey's manual order (he assigns after reading the PDF, before the project search) on purpose: a skip never needs a return.
+- **Why it is safe enough:** the peek uses only actions B1 already uses read-only (find, open, the Note ID search, download, project search and open). Open question 8 found on the test site that opening a Note and downloading its PDF add no log line and change no assignee or status; on live it is checked at the first decide-only run (SPEC go-live step S.3) before any booking.
+- **Loosens:** B1's "never opened before taken" invariant, for Summit only (B1 keeps it). It replaces it with "opened read-only, never changed".
+
+## 23 Nov 2026 - Summit: Client Internal No. check instead of the address check (Joey; loosens a safety control)
+
+- **Before (B1):** the PDF's Job Address block must hold the project's lot and street-and-suburb (decisions, 2 Nov 2026), checked on both readers' text.
+- **Now, for Summit only:** no address check (Joey: "NO address check - check the project's Client Internal No. instead"). Summit's PDFs and Note titles lay the site address out differently, and the admins' own check is the project's Client Internal No.
+- **Why it is acceptable:** the PO identifies the job: both readers must agree on the PDF's `Purchase Order No:`; it must equal the Note title's `PO:` exactly (Joey: PDF and title, not the file name); exactly one project matches its Client Ref No. with a Summit Company; the opened project's Client Internal No. must equal it again; and the title company, the PDF's top-left company and the project's Company must map to the same row of the creator table (Joey). A wrong match needs a wrong PO number on Summit's own PDF and title together.
+- **Risk kept:** nothing ties the PDF to the site beyond the PO's first segment. The real-PO seam (`false PROCEED: 0`) and decide-only on live, read against the Notes by Joey, come before any booking.
+
+## 23 Nov 2026 - Summit's decision rules (Joey's answers)
+
+- **Creator:** the Task Creator table (company -> creator), keyed by the row the three company names agree on, aliases included ("New Gen and EasyStart" = Summit Easystart; "Summit Developments" = Summit Project; more Summit Project names to come from Joey). Unknown name -> `COMPANY_UNKNOWN`; rows differ -> `COMPANY_MISMATCH`.
+- **Previous Task Creator** (Summit Project, Home Improvement, Homes Display): Joey: "there will always be previous tasks which is not compaction task". The rule: the task with the highest task number that is not Compaction Test and not Cancelled; its Task Creator. None, empty or `---` -> `CREATOR_UNKNOWN`; not an option in the Creator select at W1 -> `WRITE_NOT_STARTED` before Submit, Note returned.
+- **Duplicate:** any non-Cancelled Compaction Test task on the project -> `DUPLICATE_TASK`, whatever its PO suffix (Joey: as recommended; B1's live rule).
+- **Send Email Notification:** Joey said Summit doesn't need it handled; the shared control still unticks and reads it back before every Note-window write (CLAUDE.md Must never #4 unchanged).
+- **New skip reasons:** `COMPANY_UNKNOWN`, `COMPANY_MISMATCH`, `CREATOR_UNKNOWN`. Not used for Summit: `NOT_B1`, `ADDRESS_MISMATCH`, `ADDRESS_UNVERIFIABLE`.
+
+## 23 Nov 2026 - Summit: any assignee may be taken; return to the original assignee (Joey; loosens a safety control)
+
+- **Before (B1):** only a Note whose Assignee is the pool is ever taken; a skip returns it to the pool.
+- **Now, for Summit:** a Note held by anyone except an agent account may be taken (Joey: "任何 Assignee 都可以"; the admins take Summit Notes from each other by hand). The original assignee is read at the peek; right before the take it must still read the same, else `NOTE_TAKEN`, untouched. A Note taken and then stopped before Submit goes back with one Assign to its original assignee: a user to that user, a pool to that pool, `---` to Gita Valani (Joey). A name in neither or both lists: the Note stays with Agent 2 and the run alerts. Never Unassign or Unlink.
+- **Why acceptable:** with every check before the take, a return happens only on a run-control stop or a change between the peek and W1, so a person's Note leaves them only to be booked, and comes back to them otherwise.
+
+## 23 Nov 2026 - Summit: a separate run with the Agent 2 account (Joey)
+
+- **Decided:** Summit runs as its own run (`--client summit`, live only) logged in as "Agent 2 (Summit Homes)", a separate MySys account (Joey). Own secrets `mysys_live_summit_username` / `_password` (only Joey sets them, on the Mac Mini; Must never #3 and #5 unchanged), own run lock (`state/run-<site>-<client>.lock`), kill switch (the client file's `enabled` with the site's), caps (bookings and Notes peeked), stale-Note stop (Agent 2's My Notes), hold re-check (its own client's bookings), launchd job and Healthchecks check (Joey's). `RUN_SUMMARY` gains `"client"`.
+- **Config:** client values in `config/clients/summit.toml`; the host stays in `config/live.toml`, so the live host still appears only where Must never #3 allows.
+- **Consequence:** from go-live step S.1 no person assigns Notes to Agent 2 by hand, or the stale-Note stop holds every Summit run.
+
+## 23 Nov 2026 - Summit: tested and taken live without the test site (Joey; loosens a safety control)
+
+- **Joey:** "forget about the test website, just do it in the production website". Agent 2 and Summit Notes don't exist there, and its Source filter has no Summit value.
+- **Instead:** offline fakes and seam 1 on fake Summit POs in CI; the real-PO seam on Joey's real Summit POs in `private/summit/` on the laptop (`false PROCEED: 0`); screens not yet seen are Joey's by-hand live screenshots into `private/summit/`, or caught before Submit in the first watched run; then Joey's live steps on the Mac Mini in the G.5-G.7 order: pre-flight, spike, decide-only (which writes nothing for Summit), watched one-PO runs with the 5.2 trace check, then hourly.
+- **Unchanged:** CLAUDE.md Must never #3: Claude never logs in to, runs on or maps live; the 10 Nov live-lookup exception is not widened. Changes to shared `mysys/` code still run B1's seam 2 on the test site.
+- **Loosens:** the "trial on the test site first" path B1 took (ADR-003 Consequences). Accepted because the first live runs write nothing (decide-only) or one watched PO at a time.
 
 ## 21 Nov 2026 - One MySys wait module; its retry refuses committing clicks (task 8.4; Joey's settled design, 9 Nov 2026, `docs/architecture-review.md` Round 2 C; behaviour unchanged; tightens a safety control)
 
