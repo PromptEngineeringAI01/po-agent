@@ -1,6 +1,6 @@
 # ADR-003: Booking for more clients than B1 Homes
 
-**Status:** **Proposed** (4 Nov 2026). The direction for when a second client is real; nothing is built for it now. B1 Homes goes live first (`SPEC.md` -> Production).
+**Status:** **Accepted** (23 Nov 2026), option C, for client 2 Summit Home (`summit`); Joey decided under the CEO's delegated data approval (`docs/decisions.md`, 23 Nov 2026, Summit entries; `SPEC.md` -> Client 2: Summit Home). Decision 4's peek is widened for Summit: every check, the project lookup included, runs read-only before the take. Proposed 4 Nov 2026, when nothing was built for a second client and B1 Homes went live first.
 
 **Date:** 4 Nov 2026
 **Deciders:** Joey Wu (author, maintainer); the CEO for each new client's data (as decision 2 was for B1)

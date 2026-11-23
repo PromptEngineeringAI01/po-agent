@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.58 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.59 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -14,6 +14,8 @@
 6. **Production runs on the same Mac Mini** (CEO decision 3), after the CEO's go-live sign-off. The code stays host-agnostic: secrets from env vars or keyring, and nothing Mac-specific in `src/` (launchd and the wrapper live in `scripts/` and `docs/macmini-setup.md`).
 7. **CEO decisions 1 and 3 are made.** Decision 2 is Joey's call pending the CEO's confirmation. Because the trial POs are real, it now gates the **first Mac Mini run that downloads a trial PO** (M3 on the Mac Mini); work on the laptop isn't blocked.
 8. **Built on Joey's Windows laptop** in VS Code with Claude Code; Python 3.12 via uv; GitHub repo, public so the CEO can read it (the Mac Mini fetches it and runs the `production` tag; decisions, 25 Oct 2026; 9 Nov 2026, release pinning); Addy Osmani's agent-skills.
+
+9. **Client 2, Summit Home (`summit`), phase 1** (decisions, 23 Nov 2026): live only, its own login and run, no test-site phase; everything above stays B1's unless [Client 2: Summit Home](#client-2-summit-home-summit-phase-1) says otherwise.
 
 → Correct any of these before `/agent-skills:plan`.
 
@@ -475,6 +477,217 @@ Since 10 Nov 2026 the code has the live profile (G.3; decisions, 10 Nov 2026, li
 - **Then:** a reload, and the run goes on as usual. A read that fails is `UNEXPECTED_SCREEN`, exit 1, before any Note.
 
 **Live order** (each step its own dated `docs/decisions.md` entry): read-only `spike` on live, then `run --decide-only` on live, then `run` booking **one PO per run, watched** (gate 5's trace check on the first), then full hourly runs (gate 4's backup admin and the heartbeat on first).
+
+## Client 2: Summit Home (`summit`), phase 1
+
+**Status:** spec slice, 23 Nov 2026 (decisions, 23 Nov 2026, Summit entries). Nothing built yet; the plan comes next. Everything above stays B1's rule unless this section says otherwise; where they disagree for a Summit run, this section wins.
+
+### Objective
+
+Book Summit Home's compaction POs on **live** MySys the way Joey does by hand (his 24 steps, `private/summit/process-2026-11-23/process.md`), with the same shared guard and booker as B1 (ADR-003, Accepted 23 Nov 2026, option C), as a **separate hourly run** with its own MySys login, "Agent 2 (Summit Homes)". Same promise as B1: every check passes before the first write, every write is read back, and anything uncertain leaves the Note where it was.
+
+There is **no test-site phase** for Summit (Joey, 23 Nov 2026: "forget about the test website, just do it in the production website"). CLAUDE.md Must never #3 is unchanged: Claude never logs in to, runs on or maps live. Claude builds and proves Summit offline; Joey runs every live step on the Mac Mini ([Testing and go-live](#summit-testing-and-go-live)).
+
+**Done when:** offline tests and seam 1 (fake Summit POs) green in CI; the real-PO seam on Joey's real Summit POs `false PROCEED: 0`; then Joey's live spike, decide-only and watched one-PO runs pass in that order; then hourly runs.
+
+### What is shared with B1, and what is Summit's
+
+| Layer | Summit uses | Change needed (built in the plan's refactor, B1 behaviour unchanged) |
+|---|---|---|
+| `mysys/guard.py` | The same guard, denylist and allowlist | **One new action** `set_source_filter` (the Note Pool's Source select, `filter_source`, row 01/26): a guard PR, Joey's to merge (CLAUDE.md Must never #9). Nothing else in the guard changes: `set_locked_filter` already takes "Unlocked", `select_note_user` any user, `set_creator` any option that exists |
+| `mysys/driver.py`, `booking.py`, `wait.py` | Login, Note Pool, Note window, download, Projects search, W1-W5, every read-back, the Send Email control | No `b1` import and no client constant in `mysys/` (ADR-003 decision 3): the filters to set, the Source column read, the body rule, the Creator, the expected Documents file name and the return target come from the client profile or the `Proceed`. The Tasks read returns every task's name, status and Task Creator (today it keeps Compaction Test numbers only) |
+| `core/` | Run loop, run controls, output, trace, run lock, secrets, config | A client choice (`--client b1|summit`, default `b1`) next to the site; per-client secrets, lock, kill switch and caps (below) |
+| `src/po_agent/summit/` (new, beside `b1/`) | Title rule, PDF rules (two readers), company table, creator rule, decision engine | All new; no browser code, as `b1/` |
+
+### Which Notes (list level, no click)
+
+In `run`, `run --decide-only` and `spike`, logged in as Agent 2:
+- **Note Pool filters:** Source = `source_filter` (the receiving mailbox; new guard action), Locked/Unlocked = **Unlocked**, Assigned Pool and Assigned User at their defaults (Summit has no pool), Status Pending (never set), Search/filter empty. Each read back, as B1's.
+- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee is anything except an agent account (`Agent 1 (MySys Only)` or `Agent 2 (Summit Homes)`), and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026).
+- Anything else is untouched, with no NOTE line (as B1's step 0). Order newest first by Note ID; page 1 only, and a second page is `ALERT MORE_PAGES` as for B1 (the spike shows whether the filtered list fits one page; open question S3).
+- **Taking a person's Note is allowed for Summit** (Joey, 23 Nov 2026: "any assignee"): the admins' manual process takes Notes from whoever holds them. B1's "the Assignee must be the pool" stays B1's.
+
+### The peek: every check before the take
+
+ADR-003 decision 4, widened (Joey, 23 Nov 2026: "全部檢查完才 Assign"): for each eligible row, up to the peek cap, the agent decides **everything read-only first** and assigns the Note to Agent 2 **only on PROCEED**:
+1. Find the Note again (Assigned Pool = All Pools, Search/filter = the Note ID, the row whose ID equals it), open it, and read: "Assignee:" (kept as the **original assignee**), the window shows **Link to Project** (else `NOTE_ALREADY_LINKED`), the attachment count (B1's rule: exactly one `.pdf` link, else `NO_PDF` / `MULTIPLE_PDFS`), the email body.
+2. Download the PDF (B1's download rule: run-scoped folder, read into memory, deleted at once). Read it with both code readers; the PDF checks below.
+3. Reload, Projects search, open the project, read the settled Tasks table: the project checks below.
+4. Decide. No write, no Assign, no Send Email click happens in steps 1-4: only the read-only actions B1 already uses to find, open and download (`open_note`, `refresh_note_pool`, the Note ID search, `download_attachment`, the project search and opening clicks).
+
+A Note that fails any check is **untouched**: no Assign, no status change, nothing written. It prints a NOTE line `"outcome": "untouched", "reason": "<skip reason>"` so Joey can read the run against the Notes; business skips never alert. Because nothing is stored between runs, the same Notes are peeked again every run.
+
+`run --decide-only` for Summit therefore **never assigns or writes anything**: it peeks, decides and prints `"outcome": "untouched", "reason": "DECIDE_ONLY"` for a Note that would be booked.
+
+**Why opening is allowed:** open question 8 showed on the test site that opening a Note and downloading its PDF adds no log line and changes no assignee or status. It was never checked on live: the first live decide-only run checks it (go-live step S.3).
+
+### Decision checks and skip reasons
+
+In this order (cheap first, so a non-compaction PDF costs no project search):
+
+| Check | Rule | Skip reason |
+|---|---|---|
+| Already linked | Note window shows Link to Project | `NOTE_ALREADY_LINKED` |
+| Attachment | exactly one `.pdf` (B1's rule) | `NO_PDF`, `MULTIPLE_PDFS` |
+| PDF readable | pdfplumber and pypdf both give text | `PDF_UNREADABLE` |
+| Compaction | the PDF's Description holds `COMPACTION TEST`, on both readers' text | `NOT_COMPACTION` |
+| Readers agree | the company line, the `Purchase Order No:` value and the compaction finding are equal on both readers' text | `READERS_DISAGREE` |
+| PO number | the PDF's `Purchase Order No:` value equals the title's `PO:` value exactly (Joey, 23 Nov 2026). The attachment's file name is **not** compared | `PO_MISMATCH` |
+| Company known | the title company, the PDF's top-left company and (after the search) the project's Company each name a row of the creator table, directly or by an alias | `COMPANY_UNKNOWN` (new) |
+| Project | Projects search by the Client Ref No. = the PO before its first `/`; a row matches when Client Ref No. (trimmed, case-insensitive) equals it **and** its Company is one of the table's companies. Exactly one → its pln; none → `PROJECT_NOT_FOUND`; more, or a second page → `PROJECT_AMBIGUOUS`. The project window's **Client Internal No.** must equal it too, else `UNEXPECTED_SCREEN` (as B1) | as listed |
+| Company agrees | title, PDF and project Company map to the **same** table row (Joey, 23 Nov 2026) | `COMPANY_MISMATCH` (new) |
+| Duplicate | any Compaction Test task on the project not Cancelled → skip, whatever its PO (B1's live rule; `duplicate_ignores_cancelled = false`; Joey, 23 Nov 2026) | `DUPLICATE_TASK` |
+| Creator | the row's creator; for a "previous task" row, the previous task's Task Creator (below) | `CREATOR_UNKNOWN` (new) |
+
+**No address check for Summit** (Joey, 23 Nov 2026; decisions, 23 Nov 2026, Client Internal No. check): `b1/address.py` and the Job Address agreement are not used. The identity link is instead: two readers agree on the PO, the PDF's PO equals the title's, exactly one project with that Client Ref No. and a Summit Company, its Client Internal No. equal again, and the company agreeing three ways.
+
+**PDF patterns** (the company line, the `Purchase Order No:` value, `COMPACTION TEST` under Description) are pinned in the readers task from Joey's real Summit PDFs (open question S1); no Summit PDF is in `private/` yet. The readers task is a review-stop task, as B1's 2.2-2.5.
+
+### Creator table
+
+Company names, creators and aliases may be committed; they are in `config/clients/summit.toml` (shape below). Keyed by the table row the three company names agree on:
+
+| Company (row) | Aliases | Creator |
+|---|---|---|
+| Summit Easystart | New Gen and EasyStart | NH Sub Floor |
+| Summit Homes Group | - | Compactions |
+| Summit New Homes | - | NH Sub Floor |
+| Summit SouthWest | - | Compactions |
+| Summit Granny Flats | - | Allison Wells |
+| Summit Project | Summit Developments; more names to come from Joey (open question S2) | previous task |
+| Summit Home Improvement | - | previous task |
+| Summit Homes Display | - | previous task |
+
+Names are compared trimmed and case-insensitive, whole name only. A name not in the table (including a company the paper list strikes out) is `COMPANY_UNKNOWN`: a missing alias costs coverage, never a wrong write.
+
+**Previous task** (Joey, 23 Nov 2026: such a project always has an earlier task that isn't a compaction task): from the settled Tasks table, the task with the **highest task number** whose name is not `Compaction Test` and whose Status is not Cancelled; its details row's **Task Creator** is the creator. No such task, or a Task Creator empty or `---` → `CREATOR_UNKNOWN`.
+
+The creator travels in the `Proceed` (ADR-003 decision 3) and replaces B1's `Perth Scheduling` in every Creator write and read-back (W1 form, W2 new-task row and task detail).
+
+### The take and the booking
+
+On PROCEED in `run`:
+- **Take:** `before_write` (kill switch), find the Note again; its "Assignee:" must still read the original assignee, else `"outcome": "untouched", "reason": "NOTE_TAKEN"`. Untick Send Email and read it back (the shared control; unchanged by Joey's "doesn't matter": CLAUDE.md Must never #4), user list = `Agent 2 (Summit Homes)`, pool list `--Select Pool--`, **Assign**, read back as B1 (Assignee reads the agent, a new "User Assigned" log line). The window must still show Link to Project.
+- **W1-W5 as B1** ([MySys screen rules](#mysys-screen-rules)), with these values: Creator = the decided creator (if the option is not in the Creator select: close the browser context, `WRITE_NOT_STARTED`, reason `CREATOR_UNKNOWN`, Note returned); PO Number = the full PO; Documents = the PDF; Note = the email body; Hold note `ON HOLD UNTIL CALL UP`; Link to the pln; Solved. W1's recheck of the project also requires, for a previous-task row, the same previous task and Task Creator as decided, else `WRITE_NOT_STARTED`. Read-backs as B1, with Lodged By and "Solved by" = Agent 2, and Task Creator = the decided creator.
+- **Email body:** the Note window's email body is one `iframe` (an HTML table, a line of text and a Disclaimer; Joey copies all of it). Rule: exactly one `iframe` in the Note window whose body text is not empty, still empty after 15 s or more than one → `UNEXPECTED_SCREEN`. Its text, line breaks kept, is the task Note; read back whitespace-collapsed as B1. B1 keeps its "ends with the file name" rule.
+- **Documents file name:** the Documents row's name is compared to the PDF's file name after MySys's own renaming, if it has one (open question S4: one screenshot showed `-` uploaded as `_`). Until that is pinned, a mismatch stops before Submit as `WRITE_NOT_STARTED`, which is safe.
+
+### Return to the original assignee
+
+A Note is returned only when it was taken and then stopped **before Submit** (kill switch before W1/W2, `WRITE_NOT_STARTED`, a W1 recheck change). With the peek, every business skip happens before the take, so a return is rare. One **Assign**, never Unassign or Unlink (Joey, 23 Nov 2026):
+- Original assignee a **user** (an option of the Note window's user list): user list = that user, pool list `--Select Pool--`.
+- Original assignee a **pool** (an option of the pool list): B1's return (user list `--Select User--`, pool list = that pool).
+- Original assignee **`---`**: user list = `return_unassigned_to` (**Gita Valani**, Joey, 23 Nov 2026), pool list `--Select Pool--`.
+- The name in both lists or neither: the Note stays with Agent 2, `ALERT UNEXPECTED_SCREEN` (fixed detail "Note not returned"), exit 1; the stale-Note stop holds later Summit runs until Joey moves it by hand.
+- Read back: "Assignee:" reads the target and a new "User Assigned" (or pool) log line. Every return unticks Send Email first, through the shared control.
+
+From Submit on, B1's partial-write rule holds unchanged: the Note stays with Agent 2, the run stops.
+
+### The separate run
+
+| What | B1 | Summit |
+|---|---|---|
+| MySys login | Agent 1 | **Agent 2 (Summit Homes)**, its own account |
+| Secrets | `mysys_live_username`, `mysys_live_password` | `mysys_live_summit_username`, `mysys_live_summit_password` (env `PO_AGENT_MYSYS_LIVE_SUMMIT_USERNAME` / `_PASSWORD`). Live secrets: only Joey sets or reads them, on the Mac Mini (Must never #3; the `mysys_live_*` prefix keeps them under it) |
+| Sites | test and live | **live only**: `--site test --client summit` is `ALERT CONFIG`, exit 2 |
+| Config | `config/<site>.toml` | `config/<site>.toml` (host, run window, trace, `stale_read`) plus `config/clients/summit.toml` (client values). The live host stays only in `config/live.toml` (Must never #3 unchanged) |
+| Kill switch | `enabled` in the site file | site `enabled` **and** the client file's `enabled`; the wrapper reads both from `origin/main` |
+| Run lock | `state/run-<site>.lock` | `state/run-<site>-<client>.lock` (the two clients' runs don't block each other: different accounts) |
+| Stale-Note stop | Agent 1's My Notes | **Agent 2's My Notes** (`stale_read = "my_notes"`): any Pending row is stale. So from go-live step S.1 on, no person assigns Notes to Agent 2 by hand |
+| Hold re-check | its own site's `booked` events | its own site's **and client's** `booked` events (the event gains `client`; an event without one is B1's) |
+| Caps | `max_notes_per_run = 10` | `max_notes_per_run` (bookings; 1 for the watched runs) and `max_peeks_per_run` (Notes opened; open question S3) in the client file; `max_run_minutes` as the site's |
+| Mac Mini | `au.com.prompteng.po-agent`, wrapper `run live` | its own launchd job and wrapper argument (`macmini-run.sh <mode> live summit`), its own Healthchecks check (keychain `healthchecks_ping_url_summit`), at another minute past the hour (Joey's choice). All Joey's (`scripts/macmini-run.sh`, the plist and `docs/macmini-setup.md` are ask-first) |
+| Run output | as today | `RUN_SUMMARY` gains `"client": "b1|summit"` (B1's too); NOTE lines unchanged in shape, `po_number` is the full Summit PO |
+
+Commands (once built; on live only Joey runs them, on the Mac Mini):
+
+```text
+Pre-flight:   uv run po-agent preflight --site live --client summit
+Spike:        scripts/macmini-run.sh spike live summit         login as Agent 2, filters, eligible count, page-1 check
+Decide only:  scripts/macmini-run.sh decide-only live summit   peek and decide, no Assign, no write
+Run:          scripts/macmini-run.sh run live summit
+```
+
+`config/clients/summit.toml` (shape; values from Joey, 23 Nov 2026):
+
+```toml
+client = "summit"
+sites = ["live"]                    # no test-site profile
+enabled = false                     # kill switch, with the site's; flipped by its own PR before the spike
+agent_user_name = "Agent 2 (Summit Homes)"
+source_filter = "support@prompteng.com.au"         # Note Pool Source filter (receiving mailbox)
+sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
+locked_filter = "Unlocked"
+return_unassigned_to = "Gita Valani"
+max_notes_per_run = 1               # bookings per run; raised by its own PR for hourly runs
+max_peeks_per_run = 10              # Notes opened per run; set from the spike and decide-only (S3)
+project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
+
+[[company]]
+name = "Summit Easystart"
+aliases = ["New Gen and EasyStart"]
+creator = "NH Sub Floor"
+
+[[company]]
+name = "Summit Project"
+aliases = ["Summit Developments"]
+creator_rule = "previous_task"
+# ... one [[company]] per table row; exactly one of creator / creator_rule
+```
+
+### Summit real data
+
+- May be committed: the company names, aliases and creators above, the agent and staff user names in the config, the Source and sender addresses, fake PO numbers.
+- Never committed (Must never #6): Summit PDFs, homeowner names, site addresses, Note titles (they carry the address), Note bodies, real PO numbers or plns. They stay in `private/summit/` (laptop) and MySys. There are no Summit trial POs, so CLAUDE.md's trial-PO exception does not cover any Summit identifier.
+- Run output on the Mac Mini carries the PO number and pln, as B1's (stdout contract); alert issues drop `note_id` as today.
+
+### Summit testing and go-live
+
+**Offline (Claude, CI):**
+- Fakes: `tests/fakes/` gains Summit-shaped Notes (fake sender domain, fake companies' rows, a fake long iframe body with a table and disclaimer). Tests prove: no Assign or other write before PROCEED (the guard history holds only read-only actions for an untouched Note); decide-only writes nothing; the take refuses a changed assignee; each return target (user, pool, `---` to the fallback, unknown name stays with an ALERT); the Creator from the table and from the previous task reaches the W1 form and every read-back; W1's recheck of the previous task; B1's runs and seam-2 expectations unchanged.
+- Seam 1 for Summit (`tests/seam1/summit/`): fake fixture POs as B1's (fake text for both readers in a cases file, corrupt and image-only bytes built in the test; a fake-PDF generator only if a reader case needs real bytes, decided in the readers task) and their mutations, one case per row of the decision table, each alias, each company pair that disagrees, a previous-task project with only Compaction Test or Cancelled tasks, a Note title whose PO differs from the PDF's. **Zero false PROCEED.**
+- Any change under `mysys/` still runs B1's seam 2 on the test site (CLAUDE.md Done means 3). Summit itself has no seam 2.
+
+**Real-PO seam (Claude, laptop only, `-m real_data`):** Joey saves Summit POs in `private/summit/pdfs/` (original file names; READY and ISSUED titles, at least one non-compaction PDF, one per creator kind where he can), with `private/summit/fixtures/cases.toml`: the Note title and body, the original assignee, the MySys lookup he copies by hand (search rows, Client Internal No., the Tasks table with each task's name, status and Task Creator) and the expected result. `false PROCEED: 0`, agreement per field and coverage reported. The 10 Nov live-lookup exception is not widened: Joey copies Summit lookups himself, or logs in himself with the agent account as that exception says.
+
+**Screens not seen yet** (gap-map section 7): Joey screenshots them **by hand on live during his own Summit work** into `private/summit/`, or the first live run below checks them safely:
+
+| Screen | By hand (Joey, on live) | Otherwise caught by |
+|---|---|---|
+| Creator select options on Summit projects (NH Sub Floor, Compactions, Allison Wells, a previous-task name) | open Create New Task on a few Summit projects, screenshot the open list, abandon | W1 before Submit (`WRITE_NOT_STARTED`) in a watched run |
+| Documents file name with a `-`; Type of the row; Sale Office default | a past Summit task's Documents row and form | W1 read-back before Submit |
+| Locked/Unlocked after an Assign to Agent 2; Agent 2's My Notes lists it | after he assigns one by hand (before S.1) | the first watched run's stale read |
+| Note Pool count at Source + Unlocked + Pending | the footer | the spike (`MORE_PAGES`) |
+| Opening a Note and downloading its PDF changes nothing | the Note's log after decide-only | S.3 |
+
+**Live steps (Joey, Mac Mini, in the G.5-G.7 order; each with its own dated `docs/decisions.md` entry first):**
+
+| Step | What | Passes when |
+|---|---|---|
+| S.0 | By-hand screenshots above; 3-5+ real Summit POs and `cases.toml` in `private/summit/` | Screens written into `docs/screen-map.md` (redacted); real-PO seam `false PROCEED: 0` |
+| S.1 | Agent 2's secrets in `poagent`'s Keychain; `po-agent preflight --site live --client summit`; Agent 2's My Notes holds no Pending Note and the team stops assigning to Agent 2 by hand | pre-flight exit 0 |
+| S.2 | Kill-switch PR flips the client's `enabled`; Joey moves the `production` tag; `spike live summit` (G.5) | exit 0, eligible count read, no `MORE_PAGES` |
+| S.3 | `decide-only live summit` (G.6) | Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee |
+| S.4 | `run live summit`, `max_notes_per_run = 1`, watched (G.7); 5.2's trace check on the first | each booked task correct in MySys (Creator, PO, Documents, Note, On Hold, linked, Solved) |
+| S.5 | Cap raised by its own PR; the Summit launchd job and Healthchecks check loaded (G.8) | first hourly run watched, exit 0 |
+
+A miss at any step stops the order until it is understood, as for B1.
+
+### Out of scope (phase 1)
+
+- Any Summit run on the test site; Summit Notes or Creator users seeded there.
+- Paging past page 1; a state file of peeked Notes.
+- The duplicate check by PO number (Summit uses B1's strict rule).
+- A third client; generalising past what B1 and Summit share (ADR-003 rule of three).
+- `po-agent demo` for Summit.
+
+### Open questions (Summit)
+
+- **S1** No Summit PDF in `private/` yet: the readers task needs 3-5+ (S.0).
+- **S2** Joey: the other names under Summit Project (aliases) - "稍後給清單". Until then only Summit Developments; others skip `COMPANY_UNKNOWN`.
+- **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings.
+- **S4** Documents: does MySys rename `-` to `_` in an uploaded name; is the Type Client Documents; is Sale Office "Prompt Engineering Pty Ltd" on Summit projects.
+- **S5** Locked/Unlocked after the take (open question 12 for Summit): does a taken Note move to Locked, and does Agent 2's My Notes list it.
 
 ## Open Questions
 
