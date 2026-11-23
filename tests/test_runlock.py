@@ -1,4 +1,4 @@
-"""The run lock (docs/decisions.md, 20 Nov 2026, run lock; threat model gap 2).
+"""The run lock (docs/decisions.md, 21 Nov 2026, run lock; threat model gap 2).
 
 Two agent runs on one site must never overlap: a launchd run and a manual run,
 or a slow run and the next hour's. `core/runlock.py` is an OS file lock on

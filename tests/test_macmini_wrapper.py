@@ -501,7 +501,7 @@ def test_hung_agent_also_kills_detached_playwright_browsers(box):
     assert "-u" in args
 
 
-# Run lock (decisions, 20 Nov 2026): a run that finds the lock held prints the
+# Run lock (decisions, 21 Nov 2026): a run that finds the lock held prints the
 # fixed INFO line and exits 0. The wrapper must not then kill "leftover"
 # Playwright browsers: they belong to the run that holds the lock.
 LOCK_HELD = "INFO  run lock held: run not started"
