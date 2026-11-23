@@ -69,7 +69,7 @@ The MVP proves that:
 | `STOP` file written by the agent after an accuracy breach | `ALERT ACCURACY_BREACH`, Note **left assigned to the agent**, so the stale-Note stop (D6) holds every later run until Joey clears it; exit 3. Joey unloads the Mac Mini's launchd job and sets `enabled = false`; restart needs the CEO (approved safeguard) | Joey is told by the GitHub alert issue |
 | Email/Teams alerts | `ALERT` lines; the Mac Mini's run script opens a GitHub issue labelled `po-agent-alert` (GitHub emails Joey) | — |
 | Circuit breaker (3 failures) | Stricter: the first unexpected screen or failed write stops the run | — |
-| Single-run lock, start-of-run sweep | No lock: by rule, **one agent at a time** (laptop test-site runs one at a time; the Mac Mini's live job uses another site and account, so it keeps running). Instead of the sweep, the stale-Note stop (D6): a Pending Note still assigned to the agent stops the run before any Note is taken | Runs take minutes and are hourly; launchd never starts the job while it's still running; don't start a manual run near :07 |
+| Single-run lock, start-of-run sweep | **Run lock** (decisions, 21 Nov 2026): an OS file lock on `state/run-<site>.lock` (`core/runlock.py`), taken before anything else touches disk or MySys and held until the process ends; a run that finds it held does not start (INFO `run lock held: run not started`, exit 0, no ALERT), unless the holder began over an hour ago (ALERT `RUN_LOCK_STUCK`, exit 1). The OS frees it if the process dies. It is per site and per checkout (the Mac Mini has one); the laptop test-site and the live job use different sites, so both keep running. Instead of the sweep, the stale-Note stop (D6): a Pending Note still assigned to the agent stops the run before any Note is taken | Runs take minutes and are hourly; launchd never starts the job while it's still running; don't start a manual run near :07 |
 | Daily log files and 90-day retention | Full detail only in local runs with `--detailed-log` (`logs/`, git-ignored; the Mac Mini never passes it). The Mac Mini appends the short run output to `~/Library/Logs/po-agent/runs.log`, and writes the safe trace (allowlisted fields only, one file per day, 90 days; [Production](#production) → Safe trace, 7.3) | MVP runs only touch the test site |
 | Sender check (C6) | Not built. The live profile was built in G.3 (decisions, 10 Nov 2026) | — |
 | Duplicate check by PO number | Any non-Cancelled Compaction Test task on the project → `DUPLICATE_TASK` | Only costs coverage on projects with an older compaction task; v1 reads PO numbers from the task detail screen |
@@ -118,7 +118,7 @@ Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
 
 **Screen mapping with Playwright CLI** (`@playwright/cli`, M0 and whenever a screen changes; laptop, test site only). Joey opens a headed browser and does every click and every typed value himself, including the login. Claude Code only **observes**: `playwright-cli snapshot` (the accessibility tree, with the role and name of every element, which is what the guard's lookups use), `screenshot`, `find` and `generate-locator`. Claude never runs a command that acts on the page (click, fill, type, press, hover, check, select, upload, drag, drop, eval, run-code, dialog, goto, reload), saves state or cookies, or lists network requests; `.claude/settings.json` denies them and, from M1, the `guard_bash.py` hook allows only the observe commands. `.playwright/cli.config.json` keeps the browser profile in memory, blocks the live origin and writes output to `private/captures/test/`; `.playwright-cli/` (snapshot files) is git-ignored. Fallback if Node.js can't be installed: the classic recorder that ships with Playwright for Python (`playwright codegen`), plus screenshots.
 
-**Exit codes:** 0 run finished (bookings and skips are normal; so is a `HOLD_LOST` alert) · 1 run stopped (unexpected screen, Note Pool more pages, failed write, partial write, guard refusal) · 2 config, secrets or login problem · 3 accuracy breach.
+**Exit codes:** 0 run finished (bookings and skips are normal; so is a `HOLD_LOST` alert) · 1 run stopped (unexpected screen, Note Pool more pages, failed write, partial write, guard refusal, run lock held over an hour) · 2 config, secrets or login problem · 3 accuracy breach.
 
 ## Project Structure
 
@@ -212,7 +212,7 @@ INFO  <progress message, no PO data>
 NOTE  {"note_id": "...", "outcome": "booked|skipped|untouched|partial", "reason": "ADDRESS_MISMATCH",
        "field": "street", "po_number": "2609034B/048", "pln": "pln_66938", "task_id": "...",
        "tokens_in": 0, "tokens_out": 0, "cost_aud": 0.0}
-ALERT <PARTIAL_WRITE|ACCURACY_BREACH|GUARD_REFUSAL|UNEXPECTED_SCREEN|MORE_PAGES|HOLD_LOST|LOGIN_FAILED|CONFIG> {"note_id": "...", "step": "W3", "detail": "<no PO data>"}
+ALERT <PARTIAL_WRITE|ACCURACY_BREACH|GUARD_REFUSAL|UNEXPECTED_SCREEN|MORE_PAGES|HOLD_LOST|LOGIN_FAILED|CONFIG|RUN_LOCK_STUCK> {"note_id": "...", "step": "W3", "detail": "<no PO data>"}
 SECRET {"name": "mysys_test_password", "status": "ok|not set|malformed|store unavailable"}   (preflight only)
 RUN_SUMMARY {"run_id": "...", "site": "test|live", "mode": "run|decide-only|spike|demo|preflight", "seen": 0, "eligible": 0,
        "booked": 0, "skipped": 0, "partial": 0, "duration_s": 0, "tokens_in": 0, "tokens_out": 0,

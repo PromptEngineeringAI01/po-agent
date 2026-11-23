@@ -23,7 +23,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 HOOKS = ROOT / ".claude" / "hooks"
-HOOK_NAMES = ("protect_paths", "guard_bash", "format_python")
+HOOK_NAMES = ("protect_paths", "guard_bash", "format_python", "stop_quick_check")
 
 LIVE_HOST = "prompt.mysys.com.au"
 TEST_URL = "https://test-prompt.mysys.com.au/index.php?option=com_cweb"
@@ -659,3 +659,54 @@ def test_format_python_ignores_other_files(tmp_path):
     result = run_hook("format_python", post_edit(notes))
     assert_allowed(result)
     assert notes.read_text() == "x=[1,2 ,3]\n"
+
+
+# --- stop_quick_check ------------------------------------------------------
+# Only the paths that pass without running check.py, and failing closed; the
+# path that runs `check.py --quick` needs this repo's tests, so it was
+# dry-run by hand (a failing test gave exit 2, a passing one exit 0).
+
+
+def stop(cwd: Path, active: bool = False) -> dict:
+    return {"hook_event_name": "Stop", "stop_hook_active": active, "cwd": str(cwd)}
+
+
+def committed_repo(root: Path) -> Path:
+    repo = git_repo_on("main", root)
+    (repo / "a.py").write_text("x = 1\n")
+    subprocess.run(["git", "-C", str(repo), "add", "a.py"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+        + ["commit", "-q", "-m", "init"],
+        check=True,
+    )
+    return repo
+
+
+def test_stop_malformed_input_blocks():
+    result = run_hook("stop_quick_check", "not json")
+    assert result.returncode == 2
+    assert "stop_quick_check: hook error" in result.stderr
+
+
+def test_stop_hook_active_passes_without_looking(tmp_path):
+    # Claude is already continuing because of this hook: never loop, even
+    # where git would fail.
+    assert_allowed(run_hook("stop_quick_check", stop(tmp_path / "nowhere", True)))
+
+
+def test_stop_clean_tree_passes(tmp_path):
+    repo = committed_repo(tmp_path / "repo")
+    assert_allowed(run_hook("stop_quick_check", stop(repo)))
+
+
+def test_stop_docs_only_change_passes(tmp_path):
+    repo = committed_repo(tmp_path / "repo")
+    (repo / "notes.md").write_text("draft\n")
+    assert_allowed(run_hook("stop_quick_check", stop(repo)))
+
+
+def test_stop_py_change_with_no_test_passes(tmp_path):
+    repo = committed_repo(tmp_path / "repo")
+    (repo / "a.py").write_text("x = 2\n")
+    assert_allowed(run_hook("stop_quick_check", stop(repo)))

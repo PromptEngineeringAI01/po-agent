@@ -31,8 +31,9 @@ The safe trace (7.3) starts right after config is loaded, when config sets
 `trace_dir` (core/trace.py): the run log's events, then one run_end event
 (pass, or the reported error's type). It is a file, never stdout.
 
-Order: run_id (before anything can fail), command line, leftover download
-folders swept (D2), config, the kill switch and the Perth window (3.5:
+Order: run_id (before anything can fail), command line, the run lock
+(decisions, 21 Nov 2026: held by another run -> INFO, exit 0), leftover
+download folders swept (D2), config, the kill switch and the Perth window (3.5:
 exit 0, nothing launched), secrets, then the mode. Config and secret
 problems exit 2 before any browser is launched. `run` books since 4.5 (its
 refusal until then, D1, is gone); `run --decide-only` books nothing.
@@ -48,13 +49,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from po_agent.core import controls, demo, output, run, runlog, secrets
+from po_agent.core import controls, demo, output, run, runlock, runlog, secrets
 from po_agent.core.config import CONFIG_DIR, Config, load_config
-from po_agent.core.errors import ConfigError, PoAgentError, identifier
+from po_agent.core.errors import ConfigError, PoAgentError, RunLockStuck, identifier
 from po_agent.core.secrets import SecretName
 from po_agent.core.trace import Trace
 
 LOGS_DIR = Path(__file__).resolve().parents[2] / "logs"
+STATE_DIR = Path(__file__).resolve().parents[2] / "state"  # git-ignored
 DOWNLOAD_PREFIX = "po-agent-dl-"
 # The run's safe trace by run_id, set by main() for the length of the run, so
 # start() keeps its signature.
@@ -201,12 +203,38 @@ def _run(
     trace: Trace,
 ) -> int:
     if mode == "preflight":
+        # Before the run lock: it reads nothing but the secrets, so it neither
+        # takes nor needs the lock.
         return _preflight(options.site)
-    sweep_download_dirs()
     if mode == "demo" and not _demo_read_only(options) and not options.headed:
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")
     names = secret_names(mode, options.site)  # before any file is read
+    # The run lock (core/runlock.py), per site, before anything else touches
+    # disk or MySys: the sweep below deletes another run's download folder.
+    try:
+        lock = runlock.acquire(STATE_DIR / f"run-{options.site}.lock")
+    except runlock.RunLockHeld as held:
+        if held.held_s is not None and held.held_s > runlock.STUCK_AFTER_S:
+            raise RunLockStuck("run lock held for over an hour") from None
+        output.info("run lock held: run not started")
+        return 0
+    except OSError:
+        raise ConfigError("run lock not available") from None
+    try:
+        return _run_locked(mode, options, summary, trace, names)
+    finally:
+        lock.release()
+
+
+def _run_locked(
+    mode: output.Mode,
+    options: argparse.Namespace,
+    summary: output.RunSummary,
+    trace: Trace,
+    names: tuple[SecretName, ...],
+) -> int:
+    sweep_download_dirs()
     config = load_config(options.site, CONFIG_DIR)
     _start_trace(trace, config)
     if not config.enabled:

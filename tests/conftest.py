@@ -35,6 +35,14 @@ from po_agent.core.config import CONFIG_DIR
 pytest_plugins = ("xdist_guard", "testsite_lock")
 
 
+@pytest.fixture(autouse=True)
+def run_lock_in_tmp(monkeypatch, tmp_path) -> None:
+    """The run lock (core/runlock.py) under tmp_path for every test: a test
+    that calls cli.main never takes the repo's real state/ lock, so parallel
+    tests and a real run on this machine can't block each other."""
+    monkeypatch.setattr(cli, "STATE_DIR", tmp_path / "state")
+
+
 @pytest.fixture(scope="module")
 def browser() -> Iterator[Browser]:
     with sync_playwright() as playwright:

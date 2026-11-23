@@ -27,6 +27,7 @@ from po_agent.core.errors import (
     LoginFailed,
     PartialWrite,
     PoAgentError,
+    RunLockStuck,
     UnexpectedScreen,
     WriteNotStarted,
 )
@@ -444,6 +445,7 @@ def test_exit_code_table():
         GuardRefusal: 1,
         LoginFailed: 2,
         ConfigError: 2,
+        RunLockStuck: 1,
         AccuracyBreach: 3,
     }
     for error_type, code in EXIT_CODES.items():

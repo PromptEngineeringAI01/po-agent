@@ -43,7 +43,7 @@
 | STRIDE | Existing control | Gap | Owner | Follow-up (candidate) |
 |---|---|---|---|---|
 | S: code that is not Joey's runs | The Mac Mini runs the `production` tag only Joey moves, `uv sync --locked`, never falls back to code on disk (`scripts/macmini-run.sh`) | None found | - | - |
-| T: a hand edit or a second process changes state | `git checkout` fails on edited files; runs keep no state | **No run lock (verified):** the wrapper has no lock file (the "single-run lock" was deferred to v1, decisions, 16 Oct 2026). launchd does not start a second instance of the same job, but a manual `launchctl kickstart`, the laptop (SPEC: "one agent at a time") or a second job can overlap, all as the same agent account. The only lock is the laptop's seam-2 test-site lock (decisions, 20 Nov 2026), which does not cover the Mac Mini or `run` | Joey | Task: a `flock`-style lock on the Mac Mini wrapper (macOS has no `flock`: use `mkdir` lock with stale-PID check) |
+| T: a hand edit or a second process changes state | `git checkout` fails on edited files; runs keep no state | **Closed 21 Nov 2026:** `core/runlock.py` now holds an OS lock on `state/run-<site>.lock` for every run (decisions, 21 Nov 2026); the text that follows describes the gap as found. Was: the wrapper has no lock file (the "single-run lock" was deferred to v1, decisions, 16 Oct 2026). launchd does not start a second instance of the same job, but a manual `launchctl kickstart`, the laptop (SPEC: "one agent at a time") or a second job can overlap, all as the same agent account. The only lock is the laptop's seam-2 test-site lock (decisions, 20 Nov 2026), which does not cover the Mac Mini or `run` | Joey | Task: a `flock`-style lock on the Mac Mini wrapper (macOS has no `flock`: use `mkdir` lock with stale-PID check) |
 | R: what a run did | `runs.log`, `RUN_SUMMARY`, trace | Logs are local to the Mac Mini | Joey | - |
 | I: PDF left on disk | D2 cleanup at run start, `CONFIG` alert if it cannot be removed; FileVault | None found | - | - |
 | D: a hung run or an unattended stop | 1200 s kill, process-group kill, Healthchecks plus GitHub heartbeat, kill switch read from `origin/main` | Single machine, single operator plus one backup admin | Joey | - |
@@ -75,7 +75,7 @@
 ## Summary of real gaps (for triage)
 
 1. Stale-Note stop halts all runs until a person acts, with hourly repeat alerts (D).
-2. No run lock on the Mac Mini wrapper; "one agent at a time" is a rule, not a control (T).
+2. ~~No run lock on the Mac Mini wrapper~~ - closed 21 Nov 2026 (decisions, 21 Nov 2026, run lock).
 3. ~~Live secrets are exercised only in production; no safe pre-flight (S/T).~~ Closed 20 Nov 2026: `po-agent preflight --site live` (Joey runs it; presence and format only).
 4. Sender of a Note is not verified (C6 deferred) and the agent account may still hold forbidden MySys rights (C9) (S, E).
 5. Alert and heartbeat have known weak spots: token expiry, GitHub schedule limits, no night or weekend alert (D).
