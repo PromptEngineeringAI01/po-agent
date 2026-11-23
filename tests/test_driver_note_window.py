@@ -11,6 +11,7 @@ The reload test loads a fake login or app page as a data: URL. Values are
 fake. Tests never act on the page themselves (guard_check.py): what a click did shows up through inline JS.
 """
 
+import html
 import json
 from collections.abc import Iterator
 from urllib.parse import quote
@@ -21,7 +22,7 @@ from playwright.sync_api import Browser, Page
 from po_agent.b1.models import NotePoolRow
 from po_agent.core import runlog
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import driver
+from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ALLOWLIST, ActionGuard, Kind
 
 AGENT = "Agent 1 (MySys Only)"
@@ -38,7 +39,7 @@ PASSWORD = "fake-Password-42"
 
 @pytest.fixture
 def page(browser: Browser, monkeypatch) -> Iterator[Page]:
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 2000)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 2000)
     page = browser.new_page()
     page.set_default_timeout(2000)
     yield page
@@ -316,3 +317,21 @@ def listing(*note_ids: str) -> driver.NotePoolList:
 )
 def test_only_a_row_whose_id_equals_the_note_id_counts(note_ids, found):
     assert driver.found_once(listing(*note_ids), NOTE_ID) is found
+
+
+# Refactor safety net (task 8.4; decisions, 18 Nov 2026): the driver's
+# opening click is made again while the page is still covered (see
+# driver.leave_menu); the fixture's page waits 2 s per try.
+
+
+def test_open_note_clicks_its_row_again_once_the_page_is_uncovered(page, guard):
+    window = json.dumps(note_page())
+    page.set_content(f"""
+<div id="cover" style="position: fixed; inset: 0; z-index: 10"></div>
+<table><tbody><tr><td onclick="document.body.insertAdjacentHTML('beforeend', {html.escape(window)})">{NOTE_ID}</td></tr></tbody></table>
+<script>setTimeout(() => document.getElementById("cover").remove(), 2500)</script>
+""")
+    opened = driver.open_note(guard, page, page.locator("table"), NOTE_ID)
+    assert opened.count() == 1
+    assert [action for action, _ in guard.history] == ["open_note", "open_note"]
+    assert guard.history[0][1] == "failed"

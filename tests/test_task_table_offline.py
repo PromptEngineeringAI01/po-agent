@@ -17,7 +17,7 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page
 
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import booking, driver
+from po_agent.mysys import booking, driver, wait
 
 AGENT = "Agent 1 (MySys Only)"
 CLOSE = '<div><span title="Close">close</span></div>'
@@ -75,7 +75,7 @@ def test_rows_that_render_after_the_window_are_waited_for(page):
 def test_an_empty_table_while_the_select_lists_a_task_is_an_unexpected_screen(
     page, monkeypatch
 ):
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 1500)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 1500)
     page.set_content(project_page(options=("tsk_200001",), rows="", late_ms=None))
     window = booking.project_window(page, "pln_10001")
 
@@ -126,7 +126,7 @@ def test_an_empty_table_counts_as_no_tasks_only_after_the_full_wait(page, monkey
     # Probe, 4 Nov 2026: the table, its rows and the select's options render
     # together, so two equal empty reads early on prove nothing. Here both
     # arrive 1.5 s after the window shows: they must still be read.
-    monkeypatch.setattr(driver, "LOAD_TIMEOUT_MS", 3000)
+    monkeypatch.setattr(wait, "LOAD_TIMEOUT_MS", 3000)
     late = f"""<script>setTimeout(() => {{
       document.getElementById('tasks').innerHTML = `{ROWS}`;
       const select = document.querySelector('select');
@@ -137,6 +137,43 @@ def test_an_empty_table_counts_as_no_tasks_only_after_the_full_wait(page, monkey
       }}
     }}, 1500)</script>"""
     page.set_content(project_page(options=(), rows="", late_ms=None) + late)
+    window = booking.project_window(page, "pln_10001")
+
+    tasks = driver.settled_tasks(window)
+
+    assert tasks == {"tsk_200001": "Cancelled", "tsk_200002": "New Project"}
+
+
+# Refactor safety net (task 8.4; decisions, 18 Nov 2026): rows that survived
+# hand-written mutants of the settled read.
+
+FIRST_TASK = "\n".join(ROWS.strip().splitlines()[:2])
+
+
+def test_rows_that_do_not_yet_match_the_select_are_not_settled(page):
+    # Only tsk_200001's rows at first, while the select already lists both:
+    # two equal reads of half the table must not count.
+    late = f"""<script>
+      document.getElementById('tasks').innerHTML = `{FIRST_TASK}`;
+      setTimeout(() => {{ document.getElementById('tasks').innerHTML = `{ROWS}`; }}, 1200);
+    </script>"""
+    page.set_content(project_page(options=BOTH, rows="", late_ms=None) + late)
+    window = booking.project_window(page, "pln_10001")
+
+    tasks = driver.settled_tasks(window)
+
+    assert tasks == {"tsk_200001": "Cancelled", "tsk_200002": "New Project"}
+
+
+def test_a_status_that_fills_in_after_the_first_read_is_read_settled(page):
+    # Live S6: the Status cell can fill in after the rows show; one whole
+    # read is not yet the answer.
+    early = ROWS.replace("<td>New Project</td>", "<td>Loading</td>")
+    late = """<script>setTimeout(() => {
+      const cells = [...document.querySelectorAll('#tasks td')];
+      cells.find(cell => cell.textContent === 'Loading').textContent = 'New Project';
+    }, 400)</script>"""
+    page.set_content(project_page(options=BOTH, rows=early, late_ms=0) + late)
     window = booking.project_window(page, "pln_10001")
 
     tasks = driver.settled_tasks(window)

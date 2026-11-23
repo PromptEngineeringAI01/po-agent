@@ -17,7 +17,6 @@ Reads that fail become a fixed `UnexpectedScreen` (or `WriteNotStarted` /
 """
 
 import re
-import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -33,17 +32,9 @@ from po_agent.core.errors import (
     WriteNotStarted,
 )
 from po_agent.core.runlog import RunLog
-from po_agent.mysys import driver
+from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 
-LOAD_TIMEOUT_MS = driver.LOAD_TIMEOUT_MS
-POLL_MS = driver.POLL_MS
-# Live 28 Oct 2026: the Choose Project window's content showed only
-# after a 15 s wait had given up.
-LINK_TIMEOUT_MS = 60_000
-# The Projects search: Joey saw pauses of about 10 s (28 Oct 2026).
-SEARCH_TIMEOUT_MS = 60_000
-OPEN_TRIES = driver.OPEN_TRIES
 CREATOR = "Perth Scheduling"
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
 REMINDER = "Send me a reminder email every days"
@@ -83,7 +74,7 @@ def _chosen(select: Locator) -> str:
 
 def _gone(locator: Locator) -> bool:
     try:
-        locator.wait_for(state="detached", timeout=LOAD_TIMEOUT_MS)
+        locator.wait_for(state="detached", timeout=wait.LOAD_TIMEOUT_MS)
         return True
     except PlaywrightError:
         return False
@@ -109,28 +100,12 @@ def save_snapshot(page: Page, step: str) -> Path | None:
 # Note window (rows 02-04, 13-15b)
 
 
-def _open(guard: ActionGuard, action: str, scope: Locator, target: Locator) -> None:
-    """An opening, searching or refreshing click (it changes nothing in
-    MySys), tried OPEN_TRIES times in case the page is still covered (see
-    leave_menu). Playwright never clicks while the target is covered, so a
-    retry can't act twice. A guard refusal is never retried. Silent: it runs
-    inside `run` too (open_project), where no demo line belongs."""
-    for attempt in range(OPEN_TRIES):
-        try:
-            guard.act(action, scope, target)
-            return
-        except UnexpectedScreen:
-            if attempt == OPEN_TRIES - 1:
-                raise
-
-
 def open_note(guard: ActionGuard, page: Page, panel: Locator, note_id: str) -> Locator:
     """Opens the Note from its Note Pool row by the row's ID cell."""
-    _open(
-        guard, "open_note", panel, panel.get_by_role("cell", name=note_id, exact=True)
-    )
+    cell = panel.get_by_role("cell", name=note_id, exact=True)
+    wait.retry_opening(guard, "open_note", panel, cell)
     window = note_window(page, note_id)
-    if not _shows(window, LOAD_TIMEOUT_MS):
+    if not _shows(window, wait.LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("Note window did not open")
     return window
 
@@ -160,16 +135,9 @@ def _list(window: Locator, placeholder: str) -> Locator:
 def _reads(window: Locator, label: str, wanted: str) -> bool:
     """Polls a label until it reads `wanted`, for up to 15 s; a label that
     is gone for a moment (the window re-rendering) is read again."""
-    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
-    while True:
-        try:
-            if _labelled(window, label) == wanted:
-                return True
-        except UnexpectedScreen:
-            pass
-        if time.monotonic() >= deadline:
-            return False
-        window.page.wait_for_timeout(POLL_MS)
+    return wait.until(
+        wait.within(window.page), lambda: _labelled(window, label) == wanted
+    )
 
 
 def _assign(guard: ActionGuard, window: Locator, assignee: str) -> None:
@@ -224,7 +192,7 @@ def download_pdf(guard: ActionGuard, page: Page, window: Locator) -> tuple[str, 
     run's download folder, which the demo removes when it ends."""
     link = window.get_by_role("link", name="Download document", exact=True)
     try:
-        with page.expect_download(timeout=LOAD_TIMEOUT_MS) as info:
+        with page.expect_download(timeout=wait.LOAD_TIMEOUT_MS) as info:
             guard.act("download_attachment", window, link)
         download = info.value
         try:
@@ -279,7 +247,7 @@ def find_note_again(
     except PlaywrightError:
         raise UnexpectedScreen("Note Pool list not readable") from None
     refresh = panel.get_by_role("button", name="Refresh", exact=True)
-    _open(guard, "refresh_note_pool", panel, refresh)
+    wait.retry_opening(guard, "refresh_note_pool", panel, refresh)
     driver.wait_for_list(panel, before)
     listing = driver.read_note_pool(guard, panel)
     if [row.note_id for row in listing.rows].count(note_id) != 1:
@@ -324,7 +292,7 @@ def _pln_cell(picker: Locator, pln: str) -> Locator:
     results). Never the row: its name holds the Site Address, which could
     contain "Close" (M4 gate: no link, button or text fallback)."""
     cell = picker.get_by_role("cell", name=pln, exact=True)
-    if not _shows(cell.first, LINK_TIMEOUT_MS):
+    if not _shows(cell.first, wait.LINK_TIMEOUT_MS):
         raise UnexpectedScreen("project not listed in Choose Project")
     try:
         listed = cell.visible.count()
@@ -353,7 +321,7 @@ def _search_choose_project(
     link = window.get_by_role("button", name="Link to Project", exact=True)
     guard.act("link_to_project", window, link)
     picker = choose_project_window(page)
-    if not _shows(picker, LINK_TIMEOUT_MS):
+    if not _shows(picker, wait.LINK_TIMEOUT_MS):
         if snapshots:  # --probe-link only: the booker never writes page text
             save_snapshot(page, "S8-link-opened")
         raise UnexpectedScreen("Link to Project search did not show")
@@ -372,7 +340,7 @@ def probe_link(guard: ActionGuard, page: Page, window: Locator, pln: str) -> Non
     with UnexpectedScreen if the window closes or the pln isn't listed. The
     demo then abandons the window by closing the browser."""
     picker = _search_choose_project(guard, page, window, pln, snapshots=True)
-    listed = _shows(picker.get_by_text(pln, exact=True).first, LINK_TIMEOUT_MS)
+    listed = _shows(picker.get_by_text(pln, exact=True).first, wait.LINK_TIMEOUT_MS)
     save_snapshot(page, "probe-link-results")
     if not listed:
         raise UnexpectedScreen("project not listed in Choose Project")
@@ -402,7 +370,7 @@ def link_project(
     check_send_email(window, log, note_id, "W4", log_may_fail=True)
     guard.act("link_select_project", picker, cell)
     project = window.get_by_role("button", name=driver.PROJECT_BUTTON)
-    if not _shows(project.first, LOAD_TIMEOUT_MS):
+    if not _shows(project.first, wait.LOAD_TIMEOUT_MS):
         raise PartialWrite("project link did not read back")
     try:
         shown = [name.strip() for name in project.all_inner_texts()]
@@ -429,7 +397,9 @@ def _solved_log_line(window: Locator, before: int) -> bool:
 def check_solved_log(window: Locator, before: int) -> None:
     """W5's log read-back, polled for up to 15 s; `before` is the line count
     read before Solved."""
-    if not driver._polls(window, lambda: _solved_log_line(window, before)):
+    if not wait.until(
+        wait.within(window.page), lambda: _solved_log_line(window, before)
+    ):
         raise PartialWrite("Solved log line did not read back")
 
 
@@ -453,19 +423,13 @@ def projects_panel(page: Page) -> Locator:
 def open_projects(guard: ActionGuard, page: Page) -> Locator:
     """Project menu -> Projects, as driver.open_note_pool does Note Pool."""
     menu = driver._project_menu(page)
-    title = driver._project_title(page)
-    item = menu.get_by_text("Projects", exact=True)
-    for _ in range(driver.MENU_TRIES):
-        guard.act("open_project_tab", menu, title)
-        driver._network_idle(page)
-        if _shows(item, 2000):
-            break
-    else:
+    item = driver._open_menu_item(guard, page, "Projects")
+    if item is None:
         raise UnexpectedScreen("Projects menu item did not show")
     guard.act("open_projects_subtab", menu, item)
     leave_menu(guard, page)
     panel = projects_panel(page)
-    if not _shows(panel, LOAD_TIMEOUT_MS):
+    if not _shows(panel, wait.LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("Projects panel did not show")
     return panel
 
@@ -580,12 +544,12 @@ def search_project_rows(
     project, before this Note's search: a not-found is then always new."""
     _check_project_filters(panel)
     search = panel.get_by_role("textbox", name="Search...", exact=True)
-    before = _settled_list(page, panel, lambda state: True, _search_deadline())
+    before = _settled_list(panel, lambda state: True, _search_deadline(page))
     if before == ("none",):
         guard.act("search_project", panel, search, "")
         guard.act("submit_project_search", panel, search, "Enter")
         before = _settled_list(
-            page, panel, lambda state: state[0] == "rows", _search_deadline()
+            panel, lambda state: state[0] == "rows", _search_deadline(page)
         )
     guard.act("search_project", panel, search, internal_no)
     guard.act("submit_project_search", panel, search, "Enter")
@@ -595,9 +559,9 @@ def search_project_rows(
         holds_it = state[0] == "rows" and all(wanted in row.lower() for row in state[1])
         return state != before or holds_it
 
-    deadline = _search_deadline()
+    deadline = _search_deadline(page)
     while True:
-        state = _settled_list(page, panel, result, deadline)
+        state = _settled_list(panel, result, deadline)
         if state[0] == "none":
             return [], 1
         # The settled rows, parsed and read again unchanged (a re-render
@@ -611,30 +575,21 @@ def search_project_rows(
                 return rows, state[2]
 
 
-def _search_deadline() -> float:
-    return time.monotonic() + SEARCH_TIMEOUT_MS / 1000
+def _search_deadline(page: Page) -> wait.Deadline:
+    return wait.within(page, wait.SEARCH_TIMEOUT_MS)
 
 
 def _settled_list(
-    page: Page,
     panel: Locator,
     counts: Callable[[ListState], bool],
-    deadline: float,
+    deadline: wait.Deadline,
 ) -> ListState:
     """The list once two reads in a row are equal and `counts` takes it,
     before `deadline`; else UnexpectedScreen."""
-    last = None
-    while True:
-        state = _project_list(panel)
-        if state is not None and counts(state):
-            if state == last:
-                return state
-            last = state
-        else:
-            last = None
-        if time.monotonic() >= deadline:
-            raise UnexpectedScreen("project search did not finish")
-        page.wait_for_timeout(POLL_MS)
+    state = wait.settled(deadline, lambda: _project_list(panel), counts)
+    if state is None:
+        raise UnexpectedScreen("project search did not finish")
+    return state
 
 
 def project_window(page: Page, pln: str) -> Locator:
@@ -644,9 +599,10 @@ def project_window(page: Page, pln: str) -> Locator:
 
 
 def open_project(guard: ActionGuard, page: Page, panel: Locator, pln: str) -> Locator:
-    _open(guard, "open_project", panel, panel.get_by_role("link", name=pln, exact=True))
+    link = panel.get_by_role("link", name=pln, exact=True)
+    wait.retry_opening(guard, "open_project", panel, link)
     window = project_window(page, pln)
-    if not _shows(window, LOAD_TIMEOUT_MS):
+    if not _shows(window, wait.LOAD_TIMEOUT_MS):
         raise UnexpectedScreen("project window did not open")
     return window
 
@@ -673,7 +629,7 @@ def open_task_form(guard: ActionGuard, page: Page, project: Locator) -> Locator:
     create = project.get_by_role("button", name="Create New Task", exact=True)
     guard.act("open_create_new_task", project, create)
     form = task_form(page)
-    if not _shows(form, LOAD_TIMEOUT_MS):
+    if not _shows(form, wait.LOAD_TIMEOUT_MS):
         raise WriteNotStarted("Create New Task did not open")
     return form
 
@@ -694,7 +650,7 @@ def fill_task_form(
     compaction = form.get_by_role("checkbox", name="- Compaction Test", exact=True)
     guard.act("tick_compaction_test", form, compaction)
     po_box = _field(form, "PO Number", "input")
-    if not _shows(po_box, LOAD_TIMEOUT_MS):
+    if not _shows(po_box, wait.LOAD_TIMEOUT_MS):
         raise WriteNotStarted("Compaction Test form did not open")
     guard.act("set_po_number", form, po_box, po_number)
     upload = _field(form, "Documents", 'input[type="file"]')
@@ -711,7 +667,7 @@ def fill_task_form(
 def check_task_form(form: Locator, po_number: str, body: str, file_name: str) -> None:
     """Row 09 read-back before Submit; any mismatch -> WriteNotStarted."""
     documents = _container(form, "Documents", 'input[type="file"]')
-    if not _shows(documents.get_by_text(file_name, exact=True), LOAD_TIMEOUT_MS):
+    if not _shows(documents.get_by_text(file_name, exact=True), wait.LOAD_TIMEOUT_MS):
         raise WriteNotStarted("task form not as expected", field="documents")
     # No file row (a header row is not one); not found once is not empty.
     po_docs = _container(form, "PO Documents", 'input[type="file"]')
@@ -760,8 +716,10 @@ def wait_new_task(form: Locator, project: Locator, before: set[str]) -> str:
     whole or 15 s have passed; only then does the last problem stop the run."""
     if not _gone(form):
         raise PartialWrite("Create New Task did not close")
-    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
-    while True:
+    found: list[str] = []
+    problem: list[PartialWrite | UnexpectedScreen] = []
+
+    def read() -> bool:
         try:
             tasks = rules.compaction_tasks(task_rows(project))
             task_id = rules.new_task(before, tasks)
@@ -769,11 +727,15 @@ def wait_new_task(form: Locator, project: Locator, before: set[str]) -> str:
                 raise PartialWrite(
                     "new task status not as expected", reason="TASK_STATUS"
                 )
-            return task_id
-        except (PartialWrite, UnexpectedScreen):
-            if time.monotonic() >= deadline:
-                raise
-        project.page.wait_for_timeout(POLL_MS)
+        except (PartialWrite, UnexpectedScreen) as error:
+            problem[:] = [error]
+            return False
+        found.append(task_id)
+        return True
+
+    if not wait.until(wait.within(project.page), read):
+        raise problem[0]
+    return found[0]
 
 
 # W2: the new task and its read-back (rows 10, 19)
@@ -787,24 +749,28 @@ def new_task_after_submit(form: Locator, project: Locator, before: set[str]) -> 
     wait, decisions 4 Nov 2026) or the form still open -> PartialWrite."""
     if not _gone(form):
         raise PartialWrite("Create New Task did not close")
-    deadline = time.monotonic() + LOAD_TIMEOUT_MS / 1000
+    found: list[str] = []
     problem = "NO_NEW_TASK"
-    while True:
+
+    def read() -> bool:
+        nonlocal problem
         try:
             tasks = driver.settled_tasks(project)
         except UnexpectedScreen:
-            tasks = None
-        if tasks is not None:
-            new = [task for task in tasks if task not in before]
-            if len(new) > 1:
-                raise PartialWrite("more than one new task", reason="NO_NEW_TASK")
-            if len(new) == 1:
-                if tasks[new[0]] in NEW_TASK_STATUSES:
-                    return new[0]
-                problem = "TASK_STATUS"  # the Status cell can fill in later
-        if time.monotonic() >= deadline:
-            raise PartialWrite("new task not found", reason=problem)
-        project.page.wait_for_timeout(POLL_MS)
+            return False
+        new = [task for task in tasks if task not in before]
+        if len(new) > 1:
+            raise PartialWrite("more than one new task", reason="NO_NEW_TASK")
+        if len(new) == 1:
+            if tasks[new[0]] in NEW_TASK_STATUSES:
+                found.append(new[0])
+                return True
+            problem = "TASK_STATUS"  # the Status cell can fill in later
+        return False
+
+    if not wait.until(wait.within(project.page), read):
+        raise PartialWrite("new task not found", reason=problem)
+    return found[0]
 
 
 def _details_row(project: Locator, task_no: str) -> Locator:
@@ -870,7 +836,7 @@ def check_task_detail(
     section and Task Creator in the Client section. Nothing here is
     clicked. Returns the window."""
     window = task_detail_window(page, task_no)
-    if not _shows(window, LOAD_TIMEOUT_MS):
+    if not _shows(window, wait.LOAD_TIMEOUT_MS):
         raise PartialWrite("task detail not as mapped")
     task = _section(
         window,
@@ -902,7 +868,7 @@ def back_to_project(
     select = window.locator("select").filter(has=placeholder)
     guard.act("back_to_project", window, select, driver.SELECT_TASK)
     project = project_window(page, pln)
-    if not _shows(project, LOAD_TIMEOUT_MS):
+    if not _shows(project, wait.LOAD_TIMEOUT_MS):
         raise PartialWrite("project window did not come back")
     return project
 
@@ -941,7 +907,7 @@ def check_project_document(
         page.get_by_role("heading", name=task_no, exact=True),
         page.locator("table").or_(none),
     )
-    if not _shows(section, LOAD_TIMEOUT_MS):
+    if not _shows(section, wait.LOAD_TIMEOUT_MS):
         raise PartialWrite("project documents not as mapped")
     try:
         rows = [
@@ -960,7 +926,7 @@ def check_project_document(
     tasks = window.get_by_role("button", name="Tasks", exact=True)
     guard.act("open_project_tasks", window, tasks)
     project = project_window(page, pln)
-    if not _shows(_task_header(project, task_no), LOAD_TIMEOUT_MS):
+    if not _shows(_task_header(project, task_no), wait.LOAD_TIMEOUT_MS):
         raise PartialWrite("task table did not come back")
     return project
 
@@ -988,7 +954,7 @@ def open_hold(
     hold = _task_header(project, task_id).get_by_role("button", name="Hold", exact=True)
     guard.act("open_hold", project, hold)
     dialog = hold_dialog(page, task_id)
-    if not _shows(dialog, LOAD_TIMEOUT_MS):
+    if not _shows(dialog, wait.LOAD_TIMEOUT_MS):
         raise PartialWrite("Hold Task did not open")
     return dialog
 

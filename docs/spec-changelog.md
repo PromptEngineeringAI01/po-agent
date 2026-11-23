@@ -2,6 +2,7 @@
 
 Version history of `SPEC.md`, moved verbatim from its status line on 19 Nov 2026 (v1.47). Newest first, one line per version; each line cites the `docs/decisions.md` entry behind it, where there is one. Add the next version here, at the top, in the same commit as the `SPEC.md` change, and bump the version on `SPEC.md` line 3.
 
+- 1.58: Project Structure: `mysys/wait.py` holds every MySys wait and timeout; W2 after Submit: the one retry takes only the four opening actions and refuses any other before the guard is asked (decisions, 21 Nov 2026, one wait module)
 - 1.57: Commands and the run output contract: `po-agent preflight --site test|live` checks that the site's MySys secrets are set and well-formed and prints `SECRET` lines (name and status only), no login (decisions, 20 Nov 2026, secrets pre-flight)
 - 1.56: Project Structure: `b1/readers.py` holds both readers' texts as one value and the two-readers rule; `decision.py` calls the project lookup it is given, only once the Note and PDF checks pass (decisions, 20 Nov 2026, the readers as one value)
 - 1.55: Production -> Safe trace, Events: every Send Email read-back (take, return, W4, W5) comes from one control and records `ok` true or false; a box still ticked at W4 or W5 now records `ok=false` before the stop, as take and return already did; One agent at a time (Approach table and Trial conditions): a laptop test-site run no longer unloads the Mac Mini's live job (another site, account and secrets), laptop test-site runs still go one at a time (decisions, 20 Nov 2026, one Send Email control)

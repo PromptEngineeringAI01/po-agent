@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.57 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.58 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -143,6 +143,7 @@ src/po_agent/
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
     booking.py                  the demo's screens, Note to Solved, proven on the test site 28 Oct 2026; the base for the booker (4.1-4.5)
+    wait.py                     every MySys wait and timeout: poll until true, read until settled, the one retry of an opening click (refuses any other action)
   b1/                           rules for this automation
     models.py                   Reading, Decision, SkipReason (pydantic)
     reader_rules.py             the code readers (pdfplumber and pypdf + patterns)
@@ -306,7 +307,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 
 **W2 after Submit (row 10)**
 - Before Submit, `before_write(note_id, "W2")` re-reads `enabled` (no assignee check); a stop there closes the browser context, which abandons the filled form.
-- **The Submit click is the partial-write line:** from the click on, every error (Ctrl+C included) is `PARTIAL_WRITE` and the Note is never returned to the pool, except `ACCURACY_BREACH` and `GUARD_REFUSAL`, which keep their own ALERT and also leave the Note with the agent. Each carries step W2. Committing clicks (Submit, the Hold confirm, the Choose Project cell, Solved, each Assign) are made once, never retried (decisions, 3 Nov 2026, M4 gate).
+- **The Submit click is the partial-write line:** from the click on, every error (Ctrl+C included) is `PARTIAL_WRITE` and the Note is never returned to the pool, except `ACCURACY_BREACH` and `GUARD_REFUSAL`, which keep their own ALERT and also leave the Note with the agent. Each carries step W2. Committing clicks (Submit, the Hold confirm, the Choose Project cell, Solved, each Assign) are made once, never retried (decisions, 3 Nov 2026, M4 gate). The one retry (`mysys/wait.py`) takes only the opening actions `open_note`, `refresh_note_pool`, `open_project` and `open_project_tab`, and raises before the guard is asked for any other (decisions, 21 Nov 2026, one wait module).
 - Wait up to 15 s for the Create New Task window to close. The new task is the **one** Compaction Test task number not in the set recorded at step 10 (after a reset, older Cancelled tasks are still there). Its details row: Lodged By `agent_user_name`, Task Creator Perth Scheduling, Status New Project or Inspection Analysis (row 07: it can move on by itself). No new task, more than one, or the form still open after 15 s → `PARTIAL_WRITE`.
 - PO number, document and Note aren't in the project table (row 19):
   - **Task detail:** click the Task Creator cell of the new task's **details row**, the row right after the header row whose cell is exactly `(tsk_<n>) | Compaction Test` (never its header row, which holds Cancel and Hold). The task opens **in the same window**: its heading becomes `TSK_<n> PLN_<n> …` (upper case), and it must name the **new** task number, else `PARTIAL_WRITE`. In the section headed `tsk_<n> [Compaction Test]`, read **PO Number:** = the PO number, **Lodged By:** = `agent_user_name` and the **Notes** text = the email body; in the Client section, **Task Creator:** = Perth Scheduling. Nothing on this screen is clicked (Save, Complete and the uploads are danger).
