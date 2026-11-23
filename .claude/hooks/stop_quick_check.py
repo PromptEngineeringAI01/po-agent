@@ -24,7 +24,8 @@ import sys
 from pathlib import Path
 
 HOOK = "stop_quick_check"
-TIMEOUT = 900  # seconds; mypy plus a few test files take well under this
+TIMEOUT = 840  # seconds; under the 900 s Stop timeout in settings.json, so
+# this exit-2 path fires before Claude Code kills the hook
 TAIL = 60  # lines of check output shown to Claude on failure
 
 
@@ -139,7 +140,11 @@ def main() -> None:
         tail = (result.stderr + result.stdout).splitlines()[-TAIL:]
         sys.stderr.write(
             f"{HOOK}: `uv run scripts/check.py --quick {' '.join(tests)}` failed. "
-            "Fix the cause before ending the turn:\n" + "\n".join(tail) + "\n"
+            "Fix it if this turn caused it. A deliberate red test (TDD) or a "
+            "failure unrelated to this task: say so in your reply instead, and "
+            "never edit a test to make it pass (CLAUDE.md Must never 8):\n"
+            + "\n".join(tail)
+            + "\n"
         )
         sys.exit(2)
 
