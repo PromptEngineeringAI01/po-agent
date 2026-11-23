@@ -4,6 +4,8 @@ that prints; scripts/guard_check.py fails on `print` anywhere else in src/.
     INFO  <fixed message>
     NOTE  {"note_id": ..., "outcome": ..., ...}
     ALERT <KIND> {"note_id": ..., "step": ..., "detail": ...}
+    SECRET {"name": ..., "status": ...}   (preflight only: a secret's name and
+                                           a status word, never its value)
     RUN_SUMMARY {"run_id": ..., ...}
     NEXT  <fixed step> [Enter / n]      (demo only: waits for Joey's Enter)
 
@@ -22,6 +24,7 @@ from typing import Annotated, Literal, get_args
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from po_agent.core.errors import identifier
+from po_agent.core.secrets import SecretName, SecretStatus
 
 InfoMessage = Literal[
     "config loaded",
@@ -50,6 +53,7 @@ InfoMessage = Literal[
     "demo: note not returned to the pool",
     "demo: page snapshot saved",
     "demo: link probe done",
+    "preflight: secrets ok",
 ]
 # The supervised demo's prompts (decisions, 27 Oct 2026): one per write.
 AskStep = Literal[
@@ -72,7 +76,7 @@ AlertKind = Literal[
     "CONFIG",
     "RUN_LOCK_STUCK",
 ]
-Mode = Literal["run", "decide-only", "spike", "demo"]
+Mode = Literal["run", "decide-only", "spike", "demo", "preflight"]
 
 # Runs after the str check, so `identifier` only ever sees a str or None
 # (https://docs.pydantic.dev/latest/concepts/validators/#field-after-validator).
@@ -104,6 +108,11 @@ class Alert(_Line):
     note_id: Identifier | None = None
     step: Identifier | None = None
     detail: str
+
+
+class SecretCheck(_Line):
+    name: SecretName
+    status: SecretStatus
 
 
 class RunSummary(_Line):
@@ -149,6 +158,10 @@ def alert(kind: AlertKind, line: Alert) -> None:
     if kind not in get_args(AlertKind):
         raise ValueError("unknown ALERT kind")
     _emit(f"ALERT {kind} {_json(line)}")
+
+
+def secret_check(line: SecretCheck) -> None:
+    _emit(f"SECRET {_json(line)}")
 
 
 def run_summary(line: RunSummary) -> None:
