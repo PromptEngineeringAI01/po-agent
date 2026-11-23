@@ -1,4 +1,5 @@
 # PO Agent - decision log (updated 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **21 Nov 2026: run lock** (threat-model gap 2; entry below): an OS lock on `state/run-<site>.lock`; a held lock skips the run (INFO, exit 0), over an hour is ALERT `RUN_LOCK_STUCK`.
 - **20 Nov 2026: the readers as one value; `decide()` calls the project lookup** (task 8.3; Joey's settled design of 9 Nov; entry below): no change in MySys or run output; the seam-1 calls of `decide()` change in their own `test:` commit.
 - **20 Nov 2026: process from three skill collections** (Joey: "Start both"; entry below): a `diagnosing-bugs` skill, test rules in the task brief, agent-skills called by skill name, pr-reviewer Spec pass and verify-pr Risk evidence (applied on Joey's word). Loosens nothing.
 - **20 Nov 2026: one Send Email control** (task 8.1; Joey's settled design of 9 Nov; entry below): take, return, W4 and W5 untick and check Send Email Notification through one control in `driver.py`; a box still ticked at W4 or W5 now records `ok=false` in the trace before the stop. A laptop test-site run no longer needs the live Mac Mini job unloaded.
@@ -7,6 +8,16 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 21 Nov 2026 - Run lock: one run per site at a time (threat-model gap 2; Joey chose to fix gaps 2 and 3 now; adds a control, loosens nothing)
+
+- **Found:** `docs/threat-model.md` Boundary 4: no lock stopped a manual run, a second job or a slow run from overlapping launchd's run as the same agent account. "One agent at a time" (D7) was only a rule.
+- **Now:** `core/runlock.py`, an OS file lock (msvcrt on Windows, flock elsewhere) on `state/run-<site>.lock`, taken in `cli._run` right after the site is validated and before the download-folder sweep (which deletes another run's folder) and held until the process ends, for every mode. Per site, so the laptop's test-site run and the Mac Mini's live job stay independent. The OS frees it when the process dies, so a crash leaves no stale lock; the file is never deleted.
+- **Held:** the run does not start: INFO `run lock held: run not started`, RUN_SUMMARY, exit 0, no ALERT (a manual run overlapping is normal and must not open an issue). If the holder began over an hour ago (`STUCK_AFTER_S`): ALERT `RUN_LOCK_STUCK`, exit 1 (wrapper opens an issue, as for any ALERT). Reason: a launchd run is killed at 20 minutes, so over an hour means a hung manual run, which would otherwise skip every hourly run silently with exit 0 and a good heartbeat. Holder info is a pid and a start time, nothing else. If the lock file can't be opened, the run stops: ALERT CONFIG, exit 2 (fails closed).
+- **Wrapper:** when the agent skipped for the lock, `scripts/macmini-run.sh` no longer kills "leftover" Playwright browsers, which belong to the run holding the lock. The 20-minute kill of its own agent's process group is unchanged.
+- **Limit:** the lock is in the checkout's `state/`, so it covers runs from one checkout (the Mac Mini's). Laptop worktrees each have their own; seam 2 keeps its temp-dir lock (decisions, 20 Nov 2026).
+- **Tests:** `tests/test_runlock.py`, two cases in `tests/test_macmini_wrapper.py`; `tests/conftest.py` points every test's lock at tmp_path.
+- **Carried in:** `SPEC.md` (Boundaries table, stdout contract, exit codes), `docs/ops-runbook.md` (RUN_LOCK_STUCK), `docs/macmini-setup.md`, `docs/threat-model.md` (gap 2 closed).
 
 ## 20 Nov 2026 - The two readers as one value; `decide()` calls the project lookup itself (task 8.3; Joey's settled design, 9 Nov 2026, `docs/architecture-review.md` Round 2 A with Round 1 proposal 6; behaviour unchanged)
 
