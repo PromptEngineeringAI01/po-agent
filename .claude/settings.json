@@ -186,6 +186,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_quick_check.py\"",
+            "timeout": 900
+          }
+        ]
+      }
     ]
   }
 }
