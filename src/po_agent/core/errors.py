@@ -105,6 +105,14 @@ class ConfigError(PoAgentError):
     alert_kind = "CONFIG"
 
 
+class RunLockStuck(PoAgentError):
+    """Another run has held the run lock for over an hour (core/runlock.py):
+    a hung run. A lock held for less is normal and not an error."""
+
+    exit_code = 1
+    alert_kind = "RUN_LOCK_STUCK"
+
+
 class AccuracyBreach(PoAgentError):
     exit_code = 3
     alert_kind = "ACCURACY_BREACH"
@@ -120,6 +128,7 @@ EXIT_CODES: dict[type[PoAgentError], int] = {
         GuardRefusal,
         LoginFailed,
         ConfigError,
+        RunLockStuck,
         AccuracyBreach,
     )
 }
