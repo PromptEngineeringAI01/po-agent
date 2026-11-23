@@ -2,13 +2,17 @@
 
     po-agent spike|run --site test|live [--decide-only] [--headed]
              [--slow-mo N] [--detailed-log]
+    po-agent preflight --site test|live
     po-agent demo --site test [--headed] [--slow-mo N] [--until-check]
              [--probe-link]
              [--detailed-log]
 
 `--site` picks config/<site>.toml and that site's MySys secrets (decisions,
 10 Nov 2026, live profile); only Joey runs a live site, on the Mac Mini.
-The demo is test site only.
+The demo is test site only. `preflight` (decisions, 20 Nov 2026, secrets
+pre-flight) checks that the site's MySys secrets are set and well-formed and
+prints their names and a status; it reads no config, opens no browser and
+makes no network call.
 
 `demo` books the one trial PO 2609017B, supervised: it waits for Joey's
 Enter before every write; --until-check stops after the read-only checks
@@ -88,6 +92,8 @@ def _parser() -> _Parser:
     # allow_abbrev=False: only the exact option names.
     parser = _Parser(prog="po-agent", add_help=False, allow_abbrev=False)
     commands = parser.add_subparsers(dest="command", required=True)
+    preflight = commands.add_parser("preflight", add_help=False, allow_abbrev=False)
+    preflight.add_argument("--site", required=True)
     for name in ("spike", "run", "demo"):
         command = commands.add_parser(name, add_help=False, allow_abbrev=False)
         command.add_argument("--site", required=True)
@@ -175,12 +181,31 @@ def _start_trace(trace: Trace, config: Config) -> None:
     trace.start(directory, today)
 
 
+def _preflight(site: str) -> int:
+    """Each secret's status, then exit 2 if any is not ok. Reads only the
+    secrets' presence and shape; their values are never kept."""
+    checks = [
+        output.SecretCheck(name=name, status=secrets.inspect(name))
+        for name in secret_names("preflight", site)
+    ]
+    for check in checks:
+        output.secret_check(check)
+    if any(check.status != "ok" for check in checks):
+        raise ConfigError("secrets not ready")
+    output.info("preflight: secrets ok")
+    return 0
+
+
 def _run(
     mode: output.Mode,
     options: argparse.Namespace,
     summary: output.RunSummary,
     trace: Trace,
 ) -> int:
+    if mode == "preflight":
+        # Before the run lock: it reads nothing but the secrets, so it neither
+        # takes nor needs the lock.
+        return _preflight(options.site)
     if mode == "demo" and not _demo_read_only(options) and not options.headed:
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")
@@ -246,7 +271,7 @@ def main(argv: list[str] | None = None) -> int:
     failure: BaseException | None = None
     try:
         options = _parser().parse_args(argv)
-        detailed_log = options.detailed_log
+        detailed_log = getattr(options, "detailed_log", False)
         mode: output.Mode = (
             "decide-only" if getattr(options, "decide_only", False) else options.command
         )

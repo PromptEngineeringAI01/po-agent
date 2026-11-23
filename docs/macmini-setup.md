@@ -144,6 +144,14 @@ uv run keyring set po-agent mysys_live_password
 
 Claude never reads, sets or names these values (CLAUDE.md Must never #3 and #5). The live password has no expiry (Joey's look at live, 10 Nov 2026); if the admin changes it, set the new one the same way, then run one live spike at the Mac.
 
+**Check them before the first live run, and after any change to them (decisions, 20 Nov 2026, secrets pre-flight).** At the Mac as `poagent`:
+
+```bash
+cd ~/po-agent && uv run po-agent preflight --site live
+```
+
+It prints each secret's name and `ok`, `not set`, `malformed` (a stray space, tab or newline) or `store unavailable` (Keychain locked), never a value, and does not log in. Exit 0 and `INFO  preflight: secrets ok` mean both are there and well-formed; anything else exits 2: fix the named item (`uv run keyring set po-agent <name>`) and run it again. If macOS asks for Keychain access, choose **Always Allow**. A pass does not prove the password is right: only the live spike after it does. For the test site: `--site test`.
+
 **Keychain trap:** a Keychain item trusts the program that created it. If uv installs a new Python (a new path), macOS shows an "allow access to the keychain" dialog and an unattended run waits for a click. So: keep Python pinned in `.python-version`; after any Python change, run one spike at the Mac as `poagent` (section 8) and click **Always Allow** for each item. The wrapper's 20-minute limit ends a run stuck on that dialog and raises an alert.
 
 ## 8. The scheduled job (launchd)
