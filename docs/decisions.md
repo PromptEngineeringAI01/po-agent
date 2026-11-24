@@ -1,5 +1,6 @@
-# PO Agent - decision log (updated 24 Nov 2026, ruff tightened; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
 - **24 Nov 2026: ruff tightened** (factory audit fix #4; Joey; entry below): BLE and RUF100 selected, `po_agent` pinned first-party, both ruff steps run `--no-cache`. Tightens dev tooling; nothing changes in MySys or run output.
+- **24 Nov 2026: `refactor:` is a commit type** (Joey, audit fix #2; entry below): CLAUDE.md's Conventional Commits list adds `refactor:`, which tasks 8.3 and 8.4 already used; `scripts/verify_pr.py` accepts it. Loosens nothing.
 - **23 Nov 2026: Summit Home is client 2** (ADR-003 Accepted, option C; Joey said yes under the CEO's delegation; six entries below): a read-only peek with every check before the take; the Client Internal No. check in place of the address check (loosens a control); Summit's decision rules; return to the original assignee (taking a person's Note is allowed for Summit); a separate Agent 2 run; testing and go-live without the test site (loosens a control). Spec only: nothing built yet.
 - **21 Nov 2026: one wait module** (task 8.4; Joey's settled design of 9 Nov; entry below): every MySys wait in `mysys/wait.py`; its retry refuses any action but the four opening clicks (tightens a safety control). No change in MySys or run output; the tests' timeout patches move to the one module in their own `test:` commit.
 - **20 Nov 2026: secrets pre-flight** (threat-model gap 3; entry below): `po-agent preflight --site test|live` reports whether the site's MySys secrets are set and well-formed, names and status only, no login. Joey runs it on the Mac Mini before a live run.
@@ -20,6 +21,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Tests changed (Must never #8):** `tests/test_check.py` expects `--no-cache` in both ruff steps (names and commands, full and `--quick`), the ruff config, and three probes that run ruff on small snippets with the repo's config.
 - **Loosens?** No: tightens dev tooling. Seven more catch-alls in `src/` keep their behaviour and now carry a `noqa` with its reason, beside the four that already had one (11 in all).
 - Carried in: `pyproject.toml`, `scripts/check.py`, `SPEC.md` v1.60 (Commands, Code Style), `docs/workflow.md` Appendix A.
+
+## 24 Nov 2026 - `refactor:` is an allowed commit type (Joey, audit fix #2)
+
+- **Decided:** the Conventional Commit types are `feat:`, `fix:`, `test:`, `docs:`, `chore:` and `refactor:`. CLAUDE.md (How we work) lists all six; `scripts/verify_pr.py` fails any other subject (merge commits skipped).
+- **Why:** behaviour-unchanged tasks (8.3, 8.4) already committed as `refactor:`, which the old five-type list didn't name, so /verify-pr's rule and the practice disagreed.
+- **Also decided:** the em dash rule is checked on added lines only (existing lines stay); the CI step that runs `verify_pr.py` and the verify-pr skill change are Joey's to apply after the PR merges (`.github/workflows/` and `skills/verify-pr/` are his).
+- **Loosens:** nothing. A dev-tooling rule; no change in MySys or run output.
 
 ## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
 
