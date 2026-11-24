@@ -51,6 +51,7 @@ module = [
     "guard_check",
     "heartbeat_check",
     "risk",
+    "verify_pr",
     "po_agent",
     "po_agent.b1",
     "po_agent.b1.address",

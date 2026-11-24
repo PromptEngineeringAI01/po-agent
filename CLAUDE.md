@@ -53,7 +53,7 @@ Do only what the task asks: no mutation probes (except refactor tasks: `/start-t
 ## How we work
 
 - TDD: failing test first, show it fails for the expected reason, commit it as `test:` and carry on. Ask Joey only for a behaviour choice that is his, in plain words, with your recommendation.
-- Branch per task from up-to-date `main`; Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
+- Branch per task from up-to-date `main`; Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`).
 - A change to what the agent does in MySys or prints, or one that loosens a safety control, needs a dated `docs/decisions.md` entry plus the `SPEC.md` lines it changes, in the same commit.
 - `.claude/` is Joey's to change by hand, except `.claude/skills/` (not `skills/verify-pr/`).
 - Python 3.12, uv, ruff, pytest, pydantic, type hints. Only `src/po_agent/core/output.py` prints (`SPEC.md` → Code style).
