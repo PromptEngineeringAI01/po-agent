@@ -71,6 +71,7 @@ module = [
     "po_agent.core.controls",
     "po_agent.core.demo",
     "po_agent.core.errors",
+    "po_agent.core.models",
     "po_agent.core.output",
     "po_agent.core.run",
     "po_agent.core.runlog",

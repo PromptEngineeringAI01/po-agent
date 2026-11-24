@@ -23,7 +23,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from playwright.sync_api import Locator, Page
 
-from po_agent.b1.models import NotePoolRow
 from po_agent.core.config import Config, RunWindow, load_config
 from po_agent.core.errors import (
     ConfigError,
@@ -31,6 +30,7 @@ from po_agent.core.errors import (
     PartialWrite,
     UnexpectedScreen,
 )
+from po_agent.core.models import NotePoolRow
 from po_agent.core.runlog import RunLog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard

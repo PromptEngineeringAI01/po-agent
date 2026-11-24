@@ -52,7 +52,6 @@ from playwright.sync_api import Locator, Page
 from po_agent.b1 import booker, readers
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import TitleRule, decide, eligible_internal_no
-from po_agent.b1.models import NotePoolRow, NoteSnapshot, Proceed, Skip, SkipReason
 from po_agent.core import controls, output
 from po_agent.core.config import Config
 from po_agent.core.errors import (
@@ -64,6 +63,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     identifier,
 )
+from po_agent.core.models import NotePoolRow, NoteSnapshot, Proceed, Skip, SkipReason
 from po_agent.core.runlog import RunLog
 from po_agent.core.secrets import SecretName, mysys_names
 from po_agent.core.trace import Booking, Trace

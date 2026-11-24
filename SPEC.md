@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.61 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.62 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -141,13 +141,14 @@ src/po_agent/
     demo.py                     supervised demo: one trial PO, Enter before every write (decisions, 27 Oct 2026)
     controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
     errors.py                   typed errors, their exit codes and ALERT kinds
+    models.py                   shared models (pydantic): Note Pool row, Note window, project lookup, SkipReason, Skip, Proceed (ADR-003 decision 2)
   mysys/                        reusable
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
     booking.py                  the demo's screens, Note to Solved, proven on the test site 28 Oct 2026; the base for the booker (4.1-4.5)
     wait.py                     every MySys wait and timeout: poll until true, read until settled, the one retry of an opening click (refuses any other action)
   b1/                           rules for this automation
-    models.py                   Reading, Decision, SkipReason (pydantic)
+    models.py                   B1's models (pydantic): Reading, B1Proceed (the /048 PO and file name)
     reader_rules.py             the code readers (pdfplumber and pypdf + patterns)
     readers.py                  both readers' texts as one value; the two-readers rule (agreement, address check on both)
     address.py                  normaliser + address check against the project's address
