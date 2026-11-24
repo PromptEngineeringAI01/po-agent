@@ -8,7 +8,7 @@ Creator to the Proceed, its `test:` commit compares the shared fields and
 
 import b1_worlds
 from b1_worlds import MUTATIONS, any_internal_nos, fresh_values, proceed_worlds
-from hypothesis import given
+from hypothesis import assume, given
 from hypothesis import strategies as st
 from oracle import decision as old_decision
 from oracle import models as old_models
@@ -46,6 +46,11 @@ def test_decide_matches_the_frozen_b1_code(world, names, data):
     st.sampled_from(["test-body-filename", "live-b1-title"]),
 )
 def test_step_0_eligibility_matches_the_frozen_b1_code(cell, project, assignee, rule):
+    # The live rule now refuses a cell naming a second internal number (Joey,
+    # 24 Nov 2026), unlike the frozen code: compare only cells without one.
+    # test_prop_decision.py and seam 1 pin the new behaviour.
+    if rule == "live-b1-title":
+        assume("_048" not in cell and cell.count("/048") <= 1)
     new = decision.eligible_internal_no(
         models.NotePoolRow(
             note_id="1", subject_note=cell, project=project, assignee=assignee

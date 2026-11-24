@@ -144,12 +144,6 @@ def test_a_live_note_whose_attachment_is_another_number_skips(title_no, file_no)
         assert result.reason is SkipReason.PO_MISMATCH
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Found 24 Nov 2026: a live cell naming a second, different PO in its"
-    " body is still eligible (decision.py:64-66), unlike its docstring and the"
-    " test rule. Joey pinned it as a skip; the fix is its own task.",
-)
 @example(title_no="9000001A", other_no="9000002A")  # the minimized counterexample
 @given(internal_nos, internal_nos)
 def test_a_live_cell_naming_a_second_po_is_not_eligible(title_no, other_no):
