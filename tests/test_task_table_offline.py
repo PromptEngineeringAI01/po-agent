@@ -17,7 +17,7 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page
 
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import booking, driver, wait
+from po_agent.mysys import booking, driver, tasks, wait
 
 AGENT = "Agent 1 (MySys Only)"
 CLOSE = '<div><span title="Close">close</span></div>'
@@ -116,7 +116,7 @@ def test_the_table_is_read_in_one_call_with_the_same_cells(page, monkeypatch):
     assert rows[3] == [AGENT, "Perth Scheduling", "New Project"]
     assert rows[4] == [""]
     assert rows[0][0].startswith("(tsk_200001) | Compaction Test")
-    assert driver.rules.compaction_tasks(rows) == {
+    assert tasks.compaction_tasks(rows) == {
         "tsk_200001": "Cancelled",
         "tsk_200002": "New Project",
     }

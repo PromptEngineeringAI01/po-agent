@@ -68,7 +68,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, ConsoleMessage, Page
 
-from po_agent.b1 import booker, readers
+from po_agent.b1 import readers
 from po_agent.b1.decision import decide
 from po_agent.b1.models import B1Proceed
 from po_agent.core import controls
@@ -81,7 +81,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.models import CompactionTask, NotePoolRow, Proceed
 from po_agent.core.runlog import RunLog
-from po_agent.mysys import booking, driver
+from po_agent.mysys import booker, booking, driver
 from po_agent.mysys.guard import ActionGuard, Refusal
 
 # Local fakes: every MySys wait short (tests/fakes/browser.py).

@@ -14,14 +14,13 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page
 
-from po_agent.b1 import reader_rules as rules
 from po_agent.core.errors import (
     GuardRefusal,
     PartialWrite,
     UnexpectedScreen,
     WriteNotStarted,
 )
-from po_agent.mysys import booking, driver, wait
+from po_agent.mysys import booking, driver, tasks, wait
 from po_agent.mysys.guard import ActionGuard
 
 AGENT = "Agent 1 (MySys Only)"
@@ -1088,7 +1087,7 @@ def test_wait_new_task_reads_past_a_half_added_row(
         submit_page(details_after_ms=details_after_ms, status_after_ms=status_after_ms)
     )
     project = booking.project_window(page, "pln_10001")
-    before = set(rules.compaction_tasks(booking.task_rows(project)))
+    before = set(tasks.compaction_tasks(booking.task_rows(project)))
     assert len(before) == 7
     form = booking.task_form(page)
     booking.submit_task(guard, form)
