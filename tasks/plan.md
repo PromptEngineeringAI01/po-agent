@@ -991,6 +991,8 @@ As SPEC -> Summit testing and go-live, each with its own dated `docs/decisions.m
 
 ### Open questions for the advisor's decision batch (one at a time, with the recommendation)
 
+**Answered by Joey, 24 Nov 2026 (decisions, 24 Nov 2026, Phase S approved):** Phase S approved as this phase's freeze point (A.1). 1: as recommended (Joey the Note side, Claude the project side under the live-lookup exception after Joey logs in). 2: the tag moves **once, after Checkpoint S-A** (not after each refactor merge), with one watched B1 hourly run; next at S.1. 4: Healthchecks only. 3 stays for 9.7's review stop.
+
 1. **Who fills `private/summit/fixtures/cases.toml`?** Recommended: Joey copies the Note side (title, body, original assignee) and states the expected result for each PO; Claude reads the project side (Projects search rows, Client Internal No., the Tasks table with Task Creator) under the 10 Nov 2026 live-lookup exception, after Joey logs in to live himself with the agent account, writing only into `private/`. The exception covers no Note Pool or Note window, so the Note side stays Joey's. Alternative: Joey copies everything by hand.
 2. **When does the `production` tag move during the build?** Recommended: after each refactor merge (9.1, 9.2, 9.4) and after Checkpoints S-A and S-C, each with one watched B1 hourly run, so a B1 break shows on one small PR; alternatives: after every shared-code merge (the other session's suggestion: safest, about ten tag moves), or once at S.1 (one big diff under B1's live run).
 3. **A PDF whose `Purchase Order No:` values differ between pages** (none of the 11 does): recommended `PO_MISMATCH`; asked at 9.7's review stop.
