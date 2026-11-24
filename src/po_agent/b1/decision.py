@@ -43,9 +43,14 @@ _TEST_FILENAME = re.compile(
 # The title [B1 Homes] Order <internal no>/048 at the start of the cell, then
 # the body or nothing.
 _LIVE_TITLE = re.compile(rf"\[B1 Homes\] Order ({_INTERNAL_NO})/048(?=\s|$)")
-# <internal no>/048 anywhere in the cell, with _TEST_FILENAME's leading
-# boundary; a following "." still counts, so "Order <n>/048." is seen.
-_LIVE_PO = re.compile(rf"(?<![0-9A-Za-z_])({_INTERNAL_NO})/048(?![0-9A-Za-z_])")
+# Live's second-number check: <internal no>_048[_n].pdf or <internal no>/048
+# anywhere in the cell, with _TEST_FILENAME's leading boundary. Wider than
+# the test rule, so it refuses more, never less: any case (compare upper
+# case), and a following "." still counts ("... file <n>_048_1.pdf.").
+_LIVE_PO = re.compile(
+    r"(?<![0-9A-Za-z_])([0-9A-Z]+)(?:_048(?:_[0-9]+)?\.pdf|/048)(?![0-9A-Za-z_])",
+    re.IGNORECASE,
+)
 
 
 def eligible_internal_no(
@@ -70,8 +75,7 @@ def eligible_internal_no(
         match = _LIVE_TITLE.match(cell)
         if not match:
             return None
-        found = {m.group(1) for m in _TEST_FILENAME.finditer(cell)}
-        found |= {m.group(1) for m in _LIVE_PO.finditer(cell)}
+        found = {m.group(1).upper() for m in _LIVE_PO.finditer(cell)}
         return match.group(1) if found == {match.group(1)} else None
     raise ValueError("unknown title rule")
 
