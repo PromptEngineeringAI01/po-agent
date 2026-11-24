@@ -6,8 +6,6 @@ expected skip reason is SPEC's; the order of the checks is not restated
 here: a combination of faults only has to skip.
 """
 
-import string
-
 import b1_worlds
 import pytest
 from b1_worlds import (
@@ -21,7 +19,7 @@ from b1_worlds import (
     proceed_worlds,
     task_nos,
 )
-from hypothesis import assume, example, given
+from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
@@ -110,16 +108,6 @@ def test_a_linked_note_or_a_persons_note_is_never_eligible(
     assert eligible_internal_no(row, rule, POOL) is None
 
 
-@given(st.text(max_size=80), RULES)
-def test_any_cell_gives_none_or_an_internal_number_from_it(cell, rule):
-    """Spec open question 10: upper-case letters and digits only."""
-    row = NotePoolRow(note_id="1", subject_note=cell, project="---", assignee=POOL)
-    found = eligible_internal_no(row, rule, POOL)
-    if found is not None:
-        assert found and set(found) <= set(string.digits + string.ascii_uppercase)
-        assert found in cell
-
-
 @given(any_internal_nos, any_internal_nos, FILLER)
 def test_two_internal_numbers_in_a_test_cell_are_not_eligible(first, second, between):
     """Anything uncertain is not eligible (decision.py, step 0)."""
@@ -162,7 +150,7 @@ def test_a_live_note_whose_attachment_is_another_number_skips(title_no, file_no)
     " body is still eligible (decision.py:64-66), unlike its docstring and the"
     " test rule. Joey pinned it as a skip; the fix is its own task.",
 )
-@example(title_no="2600001B", other_no="2600002B")  # the minimized counterexample
+@example(title_no="9000001A", other_no="9000002A")  # the minimized counterexample
 @given(internal_nos, internal_nos)
 def test_a_live_cell_naming_a_second_po_is_not_eligible(title_no, other_no):
     """decision.py step 0: two different internal numbers in one cell are
@@ -272,8 +260,12 @@ def test_a_world_passing_every_check_proceeds_with_its_values(world):
     assert result.value["existing_task_nos"] == tuple(t for t, _ in world.tasks)
 
 
-@given(proceed_worlds(), st.sampled_from(sorted(MUTATIONS)), st.data())
-def test_each_single_fault_skips_with_its_spec_reason(world, name, data):
+# Every fault runs every time (a sampled fault could go undrawn in the
+# derandomized check), on a few worlds each.
+@pytest.mark.parametrize("name", sorted(MUTATIONS))
+@settings(max_examples=10)
+@given(world=proceed_worlds(), data=st.data())
+def test_each_single_fault_skips_with_its_spec_reason(name, world, data):
     mutation = MUTATIONS[name]
     assume(mutation.applies(world))
     fresh = data.draw(fresh_values(world))

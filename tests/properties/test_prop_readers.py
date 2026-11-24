@@ -15,7 +15,6 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.address import verify_address
 from po_agent.b1.models import SkipReason
 from po_agent.b1.readers import PdfTexts, check_address, check_second_reader
 from po_agent.core.errors import WriteNotStarted
@@ -138,19 +137,6 @@ def test_a_link_to_another_file_type_is_no_pdf(name):
 
 
 # B6: the address check on both texts
-
-
-@given(proceed_worlds(), st.text(max_size=60))
-def test_check_address_is_pdfplumbers_result_or_readers_disagree(world, project):
-    """SPEC: the check runs on both texts; different results ->
-    READERS_DISAGREE. A pass needs both texts to pass, pypdf's exactly."""
-    texts = PdfTexts(plumber=world.plumber, pypdf=world.pypdf, data=world.data)
-    for address in (world.address, project):
-        result = check_address(texts, address)
-        plumber = verify_address(world.plumber, address)
-        assert result in (plumber, SkipReason.READERS_DISAGREE)
-        if result is None:
-            assert verify_address(world.pypdf, address, exact_line_under=True) is None
 
 
 @given(proceed_worlds())

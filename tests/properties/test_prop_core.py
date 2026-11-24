@@ -89,24 +89,26 @@ CONFIG = load_config("test")
 STARTED = datetime(2026, 11, 24, 1, 0, tzinfo=UTC)
 
 
-def cap_reached(done: int, minutes: float) -> bool:
-    with mock.patch.object(
-        controls, "now", return_value=STARTED + timedelta(minutes=minutes)
-    ):
+def cap_reached(done: int, seconds: int) -> bool:
+    later = STARTED + timedelta(seconds=seconds)
+    with mock.patch.object(controls, "now", return_value=later):
         return controls.cap_reached(CONFIG, STARTED, done)
 
 
-@given(st.integers(0, 30), st.floats(0, 120), st.integers(0, 5), st.floats(0, 30))
-def test_more_notes_or_more_time_never_lifts_the_cap(done, minutes, more, later):
-    if cap_reached(done, minutes):
-        assert cap_reached(done + more, minutes + later)
+SECONDS = st.integers(0, 2 * 60 * 60)
 
 
-@given(st.integers(0, 30), st.floats(0, 120))
-def test_the_cap_holds_from_max_notes_or_max_minutes_on(done, minutes):
+@given(st.integers(0, 30), SECONDS, st.integers(0, 5), st.integers(0, 1800))
+def test_more_notes_or_more_time_never_lifts_the_cap(done, seconds, more, later):
+    if cap_reached(done, seconds):
+        assert cap_reached(done + more, seconds + later)
+
+
+@given(st.integers(0, 30), SECONDS)
+def test_the_cap_holds_from_max_notes_or_max_minutes_on(done, seconds):
     """SPEC -> run cap: at most max_notes_per_run Notes, max_run_minutes."""
-    under = done < CONFIG.max_notes_per_run and minutes < CONFIG.max_run_minutes
-    assert cap_reached(done, minutes) is not under
+    under = done < CONFIG.max_notes_per_run and seconds < CONFIG.max_run_minutes * 60
+    assert cap_reached(done, seconds) is not under
 
 
 # E3: identifiers in errors (SPEC -> Code style: identifiers only, never

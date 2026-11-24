@@ -43,7 +43,9 @@ A failing property prints its minimized counterexample (the
 
 - Paste that decorator above the test's `@given` to replay exactly that
   example; remove it before committing (it is tied to the Hypothesis version).
-- A `thorough` run prints the seed it used; rerun with that seed:
+- A `thorough` run saves the failure in `.hypothesis/` and replays it first
+  on the next `thorough` run. To pin the random examples of a run, give it a
+  seed:
 
 ```powershell
 uv run pytest tests/properties --hypothesis-profile=thorough --hypothesis-seed=12345

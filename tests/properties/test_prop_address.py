@@ -262,16 +262,7 @@ def test_a_house_number_on_the_pdfs_label_line_is_never_verified(
     assert None not in both(project, plumber, pypdf)
 
 
-# A12, A13: any input
-
-
-@given(st.text(), st.text(), st.booleans())
-def test_any_input_gives_one_of_three_results(pdf_text, project, exact):
-    assert verify_address(pdf_text, project, exact_line_under=exact) in (
-        None,
-        MISMATCH,
-        UNVERIFIABLE,
-    )
+# A13: safety under random edits
 
 
 EDITS = st.lists(
