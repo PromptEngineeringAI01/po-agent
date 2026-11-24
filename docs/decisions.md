@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 24 Nov 2026, grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, Summit creator table; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: Summit creator table** (Joey; entry below): Summit Home Improvement is now Summit Renovations; Summit Project covers only Summit Developments (SPEC open question S2 closed). Loosens nothing.
 - **24 Nov 2026: the grading scripts are high risk** (PR 162 second-model review, finding 4): `scripts/risk.py` rates a change to `scripts/risk.py` or `scripts/verify_pr.py` high (was medium), and `verify_pr.py` prints `REVIEW:` for both, so a PR can't loosen the scripts that grade it unseen; `tests/test_risk.py` moves `scripts/risk.py` from its medium rows to high (Must never #8). Tightens dev tooling; loosens nothing.
 - **24 Nov 2026: ruff tightened** (factory audit fix #4; Joey; entry below): BLE and RUF100 selected, `po_agent` pinned first-party, both ruff steps run `--no-cache`. Tightens dev tooling; nothing changes in MySys or run output.
 - **24 Nov 2026: `refactor:` is a commit type** (Joey, audit fix #2; entry below): CLAUDE.md's Conventional Commits list adds `refactor:`, which tasks 8.3 and 8.4 already used; `scripts/verify_pr.py` accepts it. Loosens nothing.
@@ -14,6 +15,13 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - Summit creator table: Summit Renovations; Summit Project is Summit Developments only (Joey; loosens nothing)
+
+- **Joey (24 Nov 2026):** "Summit Home Improvement has changed their name to Summit Renovations." "For Summit Project, it only includes Summit Developments."
+- **Now:** the creator table row Summit Home Improvement is Summit Renovations (creator rule unchanged: the previous task's Task Creator); Summit Project's aliases are exactly `["Summit Developments"]`, so SPEC open question S2 is closed. The 23 Nov 2026 entries below keep their wording as a dated record.
+- **Loosens?** No: a company outside the table is still `COMPANY_UNKNOWN` (skip, never a wrong write).
+- **Carried in:** `SPEC.md` v1.61 (Creator table, open question S2).
 
 ## 24 Nov 2026 - ruff tightened (Joey; factory audit fix #4; loosens nothing)
 
