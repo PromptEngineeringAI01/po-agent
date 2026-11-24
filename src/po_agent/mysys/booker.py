@@ -57,7 +57,6 @@ from typing import NoReturn
 
 from playwright.sync_api import Locator, Page
 
-from po_agent.b1.decision import Site
 from po_agent.core.controls import Controls
 from po_agent.core.errors import (
     AccuracyBreach,
@@ -66,7 +65,7 @@ from po_agent.core.errors import (
     PoAgentError,
     WriteNotStarted,
 )
-from po_agent.core.models import Proceed
+from po_agent.core.models import Proceed, ProjectRule
 from po_agent.core.runlog import RunLog
 from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard
@@ -84,7 +83,7 @@ def book(
     login: tuple[str, str, str],
     controls: Controls,
     agent: str,
-    site: Site,
+    project_rule: ProjectRule,
     document_type: str,
     stop_after: str,
     log: RunLog | None = None,
@@ -92,16 +91,17 @@ def book(
     """Books the Note `note_id` (the one the run loop holds) as `proceed`
     decided, up to and including `stop_after`. Returns the new task number
     once W2 has run. With `log`, W4's and W5's Send Email read-backs are
-    `email_notification_unticked` events (5.2). `site` picks the project
-    match rule for W1's reopen; `document_type` is W2's expected Type in
-    the project's Documents tab (both from the profile)."""
+    `email_notification_unticked` events (5.2). `project_rule` is the
+    client's project match rule for W1's reopen; `document_type` is W2's
+    expected Type in the project's Documents tab (from the profile). The
+    Creator and the expected Documents file name come from the Proceed."""
     if not isinstance(proceed, Proceed):
         raise TypeError("book() takes only a Proceed from decide()")
     if stop_after not in BUILT:
         raise ValueError("stop_after must be W1-W5")
     if proceed.note_id != note_id:
         raise WriteNotStarted("decision is for another Note", step="W1")
-    project, form = _w1(proceed, guard, page, login, controls, site)
+    project, form = _w1(proceed, guard, page, login, controls, project_rule)
     _flush(log, note_id, "W1")
     if stop_after == "W1":
         return None
@@ -136,11 +136,11 @@ def _w1(
     page: Page,
     login: tuple[str, str, str],
     controls: Controls,
-    site: Site,
+    project_rule: ProjectRule,
 ) -> tuple[Locator, Locator]:
     note_id = proceed.note_id
     controls.before_write(note_id, "W1")
-    project = driver.reopen_project(guard, page, *login, proceed, site)
+    project = driver.reopen_project(guard, page, *login, proceed, project_rule)
     try:
         form = booking.open_task_form(guard, page, project)
         booking.fill_task_form(

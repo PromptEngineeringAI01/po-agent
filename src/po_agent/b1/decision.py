@@ -7,7 +7,8 @@ callable: the run passes the driver's read of MySys, seam 1 a fixture, and
 
 import re
 from collections.abc import Callable, Sequence
-from typing import Literal
+from dataclasses import dataclass
+from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +18,7 @@ from po_agent.b1.models import B1Proceed, DeterministicReading
 from po_agent.core.models import (
     CompactionTask,
     MySysLookup,
+    NotePoolFilters,
     NotePoolRow,
     NoteSnapshot,
     SearchRow,
@@ -36,6 +38,9 @@ UNLINKED_PROJECT = "---"
 # B1's Creator on every task it books (ADR-003 decision 3: a client rule,
 # carried in the Proceed; SPEC.md -> Client 2: Creator table).
 CREATOR = "Perth Scheduling"
+# B1's Notes are Locked in its pool (screen-map row 01); a client value the
+# run passes to the driver (ADR-003 decision 3).
+LOCKED: Final = "Locked"
 # Spec open question 10: live numbers look like 2609034B; until confirmed,
 # accept upper-case letters and digits only.
 _INTERNAL_NO = r"[0-9A-Z]+"
@@ -54,6 +59,17 @@ _LIVE_PO = re.compile(
     r"(?<![0-9A-Za-z_])([0-9A-Z]+)(?:_048(?:_[0-9]+)?\.pdf|/048)(?![0-9A-Za-z_])",
     re.IGNORECASE,
 )
+
+
+def note_pool_filters(pool_name: str) -> NotePoolFilters:
+    """B1's Note Pool filters: the profile's pool, Locked."""
+    return NotePoolFilters(pool=pool_name, locked=LOCKED)
+
+
+def body_rule(file_name: str) -> re.Pattern[str]:
+    """B1's body rule (SPEC.md -> Email body): the one source in the Note
+    window whose text ends with the PDF's file name."""
+    return re.compile(rf"{re.escape(file_name)}\s*$")
 
 
 def eligible_internal_no(
@@ -177,6 +193,23 @@ def check_project(lookup: MySysLookup, internal_no: str, site: Site) -> Skip | s
     if not _is_ref(lookup.project_internal_no, _client_ref(internal_no, site)):
         return Skip(reason=SkipReason.UNEXPECTED_SCREEN)
     return pln
+
+
+@dataclass(frozen=True)
+class B1ProjectRule:
+    """B1's project match rule for the driver's project reads and W1's
+    reopen (core.models.ProjectRule): match_project and check_project on the
+    profile's site."""
+
+    site: Site
+
+    def match(
+        self, rows: Sequence[SearchRow], more_pages: bool, internal_no: str
+    ) -> Skip | str:
+        return match_project(rows, more_pages, internal_no, self.site)
+
+    def check(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
+        return check_project(lookup, internal_no, self.site)
 
 
 def check_duplicate(

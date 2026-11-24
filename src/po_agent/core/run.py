@@ -51,7 +51,14 @@ from playwright.sync_api import Locator, Page
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1 import readers
-from po_agent.b1.decision import TitleRule, decide, eligible_internal_no
+from po_agent.b1.decision import (
+    B1ProjectRule,
+    TitleRule,
+    body_rule,
+    decide,
+    eligible_internal_no,
+    note_pool_filters,
+)
 from po_agent.core import controls, output
 from po_agent.core.config import Config
 from po_agent.core.errors import (
@@ -155,7 +162,7 @@ def spike(
         driver.login(guard, page, credentials[username], credentials[password])
         output.info("logged in")
         panel = driver.open_note_pool(guard, page)
-        driver.set_note_pool_filters(guard, panel, config.pool_name)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
         output.info("note pool filters set")
         _read_eligible(guard, panel, config, summary)
     return 0
@@ -292,7 +299,9 @@ def _note_loop(
             driver.leave_menu(guard, page)
             if config.stale_read == "note_pool":
                 controls.stale_note_stop(guard, panel, config.agent_user_name)
-            driver.set_note_pool_filters(guard, panel, config.pool_name)
+            driver.set_note_pool_filters(
+                guard, panel, note_pool_filters(config.pool_name)
+            )
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, config, summary)
             try:
@@ -405,7 +414,9 @@ def _hold_recheck(
     checked = bookings[:HOLD_RECHECK_CAP]
     lost = 0
     for booked in checked:
-        state = driver.recheck_hold(guard, page, *login, booked, config.site)
+        state = driver.recheck_hold(
+            guard, page, *login, booked, B1ProjectRule(config.site)
+        )
         held = state not in HOLD_LOST_DETAIL
         try:
             log.flush(note_id=None, step="0")
@@ -557,7 +568,7 @@ def _book(
         login=login,
         controls=gate,
         agent=config.agent_user_name,
-        site=config.site,
+        project_rule=B1ProjectRule(config.site),
         document_type=config.project_document_type,
         stop_after="W5",
         log=log,
@@ -589,7 +600,7 @@ def _decide(
     snapshot = NoteSnapshot(
         note_id=note_id,
         title="",  # step 0 read the title rule on the Note Pool cell
-        body=driver.note_body(window, pdf.file_name) if pdf else "",
+        body=driver.note_body(window, body_rule(pdf.file_name)) if pdf else "",
         attachment_names=names,
         project_linked=linked,
     )
@@ -603,7 +614,7 @@ def _decide(
         note.internal_no,
         texts,
         lambda: driver.project_lookup(
-            guard, page, *login, note.internal_no, config.site
+            guard, page, *login, note.internal_no, B1ProjectRule(config.site)
         ),
         site=config.site,
         duplicate_ignores_cancelled=config.duplicate_ignores_cancelled,

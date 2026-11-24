@@ -35,7 +35,6 @@ from playwright.sync_api import (
 from playwright.sync_api import Error as PlaywrightError
 from pydantic import ValidationError
 
-from po_agent.b1.decision import Site, check_project, match_project
 from po_agent.core.errors import (
     LoginFailed,
     PartialWrite,
@@ -45,8 +44,10 @@ from po_agent.core.errors import (
 from po_agent.core.models import (
     CompactionTask,
     MySysLookup,
+    NotePoolFilters,
     NotePoolRow,
     Proceed,
+    ProjectRule,
     SearchRow,
     Skip,
 )
@@ -68,7 +69,6 @@ ALL_POOLS = "All Pools"
 ALL_LOCKED = "All"
 # Row 13: a linked Note shows a button named for its project.
 PROJECT_BUTTON = re.compile(r"^pln_\d+$")
-LOCKED = "Locked"
 POOL_FILTER = "filter_allocation_pool_id"
 LOCK_FILTER = "filter_lock_status"
 USER_FILTER = "filter_user_id"
@@ -195,14 +195,15 @@ def wait_for_list(panel: Locator, before: ElementHandle | None = None) -> None:
         raise UnexpectedScreen("Note Pool list did not load") from None
 
 
-def set_note_pool_filters(guard: ActionGuard, panel: Locator, pool_name: str) -> None:
-    """Assigned Pool = pool_name, Locked/Unlocked = Locked, each read back;
-    every other filter at its default and every textbox empty."""
-    _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, pool_name)
-    _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, LOCKED)
-    _check_filters(
-        panel, {**FILTER_DEFAULTS, POOL_FILTER: pool_name, LOCK_FILTER: LOCKED}
-    )
+def set_note_pool_filters(
+    guard: ActionGuard, panel: Locator, filters: NotePoolFilters
+) -> None:
+    """Assigned Pool and Locked/Unlocked as the client's `filters` say, each
+    read back; every other filter at its default and every textbox empty."""
+    _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, filters.pool)
+    _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, filters.locked)
+    wanted = {POOL_FILTER: filters.pool, LOCK_FILTER: filters.locked}
+    _check_filters(panel, {**FILTER_DEFAULTS, **wanted})
 
 
 def read_agent_notes(guard: ActionGuard, panel: Locator, agent: str) -> NotePoolList:
@@ -933,18 +934,18 @@ def return_note(
 # Attachment and download (rows 02, 05)
 
 
-def note_body(window: Locator, file_name: str) -> str:
-    """The Note's body (row 02): the one source in the window whose text ends
-    with the file name, either a <pre> (test site, 27 Oct 2026; the title
-    heading and the file-name <span> end with it too) or the document body
-    of an iframe (live email Notes: MySys's get_email_body; decisions, 10
-    Nov 2026, Note body iframe). None or more than one -> UnexpectedScreen.
+def note_body(window: Locator, body: re.Pattern[str]) -> str:
+    """The Note's body (row 02): the one source in the window whose text
+    `body` finds (the caller's body rule; B1's: ends with the file name),
+    either a <pre> (test site, 27 Oct 2026; the title heading and the
+    file-name <span> end with it too) or the document body of an iframe
+    (live email Notes: MySys's get_email_body; decisions, 10 Nov 2026, Note
+    body iframe). None or more than one -> UnexpectedScreen.
 
     An iframe's document loads after the window shows, so while any iframe
     in the window is still empty the read waits, up to 15 s. Read only:
     nothing in a frame is clicked. Untrusted data: never printed."""
-    ends = re.compile(rf"{re.escape(file_name)}\s*$")
-    pres = window.locator("pre").filter(has_text=ends)
+    pres = window.locator("pre").filter(has_text=body)
     frames = window.locator("iframe")
 
     def read() -> tuple[list[str], bool]:
@@ -955,7 +956,7 @@ def note_body(window: Locator, file_name: str) -> str:
             text = frame.content_frame.locator("body").inner_text().strip()
             if not text:
                 loaded = False
-            elif ends.search(text):
+            elif body.search(text):
                 found.append(text)
         return found, loaded
 
@@ -1122,11 +1123,11 @@ def project_lookup(
     username: str,
     password: str,
     internal_no: str,
-    site: Site,
+    rule: ProjectRule,
 ) -> MySysLookup:
     """Steps 8-10's reads (see _lookup_and_window)."""
     lookup, _ = _lookup_and_window(
-        guard, page, base_url, username, password, internal_no, site
+        guard, page, base_url, username, password, internal_no, rule
     )
     return lookup
 
@@ -1138,13 +1139,14 @@ def reopen_project(
     username: str,
     password: str,
     proceed: Proceed,
-    site: Site,
+    rule: ProjectRule,
 ) -> Locator:
     """W1's reopen (the assignee check reloaded, so step 10's window is
     gone): the same reads as step 10, and the project must still be the
-    one decided: the match is the Proceed's pln, Client Internal No. passes
-    the match rule and the settled Compaction Test tasks are the Proceed's
-    (none created meanwhile). Any mismatch -> WriteNotStarted."""
+    one decided: the client's `rule` matches the Proceed's pln, its check of
+    the opened project (Client Internal No. for B1) passes and the settled
+    Compaction Test tasks are the Proceed's (none created meanwhile). Any
+    mismatch -> WriteNotStarted."""
     lookup, window = _lookup_and_window(
         guard,
         page,
@@ -1152,12 +1154,10 @@ def reopen_project(
         username,
         password,
         proceed.internal_no,
-        site,
+        rule,
         decided_pln=proceed.pln,
     )
-    if window is None or check_project(lookup, proceed.internal_no, site) != (
-        proceed.pln
-    ):
+    if window is None or rule.check(lookup, proceed.internal_no) != proceed.pln:
         raise WriteNotStarted("project not as decided", step="W1")
     if {task.task_no for task in lookup.tasks} != set(proceed.existing_task_nos):
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
@@ -1175,22 +1175,20 @@ def recheck_hold(
     username: str,
     password: str,
     booked: Booking,
-    site: Site,
+    rule: ProjectRule,
 ) -> "HoldState":
     """The hold re-check of one earlier booking (decisions, 11 Nov 2026,
     hold re-check), read only: step 8's reads (reload, Projects search by
-    the internal number, the match rule, the project opened by its pln
+    the internal number, the client's match `rule`, the project opened by its pln
     link), then the task's row (booking.read_hold). A project that no longer
     matches, or matches another pln, is "not_found". A screen not as mapped
     is UnexpectedScreen, as in every read."""
     from po_agent.mysys import booking  # booking imports this module
 
     lookup, window = _lookup_and_window(
-        guard, page, base_url, username, password, booked.internal_no, site
+        guard, page, base_url, username, password, booked.internal_no, rule
     )
-    if window is None or check_project(lookup, booked.internal_no, site) != (
-        booked.pln
-    ):
+    if window is None or rule.check(lookup, booked.internal_no) != booked.pln:
         return "not_found"
     return booking.read_hold(window, booked.task_id)
 
@@ -1202,17 +1200,17 @@ def _lookup_and_window(
     username: str,
     password: str,
     internal_no: str,
-    site: Site,
+    rule: ProjectRule,
     *,
     decided_pln: str | None = None,
 ) -> tuple[MySysLookup, Locator | None]:
     """Steps 8-10's reads: reload (the Note window would cover the results,
     row 25), Project -> Projects, the demo's search (Enter), every row on
-    page 1; match_project() chooses the row, opened by its pln link; then its
-    Client Internal No., Address and settled Compaction Test tasks. With no
-    single match nothing is opened, the project fields stay empty and the
-    window is None. With `decided_pln` (W1's reopen), a match that isn't it
-    is WriteNotStarted before anything is opened."""
+    page 1; the client's `rule.match` chooses the row, opened by its pln
+    link; then its Client Internal No., Address and settled Compaction Test
+    tasks. With no single match nothing is opened, the project fields stay
+    empty and the window is None. With `decided_pln` (W1's reopen), a match
+    that isn't it is WriteNotStarted before anything is opened."""
     from po_agent.mysys import booking  # booking imports this module
 
     reload_home(guard, page, base_url, username, password)
@@ -1230,7 +1228,7 @@ def _lookup_and_window(
     except KeyError:
         raise UnexpectedScreen("Projects columns not recognised") from None
     more_pages = pages > 1
-    pln = match_project(search_rows, more_pages, internal_no, site)
+    pln = rule.match(search_rows, more_pages, internal_no)
     if isinstance(pln, Skip):
         return MySysLookup(search_rows=search_rows, more_pages=more_pages), None
     if decided_pln is not None and pln != decided_pln:
