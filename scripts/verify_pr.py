@@ -22,7 +22,8 @@ finding:
 
 The last line is `verify_pr: <n> fail, <n> warn`; exit 1 on any FAIL, 2 when
 git or gh fails. The PR body comes from `gh pr view <n> --json body` with
-`--pr`, or from a file with `--body-file`. Standard library, git and gh only.
+`--pr`, or from a file with `--body-file`. Standard library, git and gh,
+plus LIVE_HOST from po_agent.core.config.
 
 The live host is never written here: it comes from LIVE_HOST in
 po_agent.core.config (CLAUDE.md Must never #3). The Anthropic key's variable
@@ -63,6 +64,7 @@ KEY_FILE = "tests/test_config_secrets.py"
 
 DEPENDENCY_FILES = ("uv.lock", "pyproject.toml")
 SECTIONS = ("Intent", "What changed", "Risk", "Testing")
+HUNK = re.compile(r"@@ -\S+ \+(\d+)")
 
 # verify-pr step 3: the files whose diff the LLM must read and judge.
 SAFETY_FILES = (
@@ -85,7 +87,12 @@ class ToolError(Exception):
 def _run(args: list[str]) -> str:
     try:
         return subprocess.run(
-            args, check=True, capture_output=True, text=True, encoding="utf-8"
+            args,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",  # a non-UTF-8 file in the diff must not crash it
         ).stdout
     except (OSError, subprocess.CalledProcessError) as exc:
         raise ToolError(f"{' '.join(args[:3])} failed: {exc}") from exc
@@ -129,6 +136,11 @@ def commit_findings(ref: str) -> list[str]:
 # --- added lines --------------------------------------------------------------
 
 
+def _hunk_start(line: str) -> int:
+    match = HUNK.match(line)
+    return int(match.group(1)) if match else 0
+
+
 def added_lines(diff: str) -> Iterator[tuple[str, int, str]]:
     """(path, line number, text) for each added line of a `git diff -U0`."""
     path = ""
@@ -143,11 +155,9 @@ def added_lines(diff: str) -> Iterator[tuple[str, int, str]]:
                 path = target[2:] if target.startswith("b/") else ""
             elif line.startswith("@@"):
                 in_header = False
-                match = re.match(r"@@ -\S+ \+(\d+)", line)
-                number = int(match.group(1)) if match else 0
+                number = _hunk_start(line)
         elif line.startswith("@@"):
-            match = re.match(r"@@ -\S+ \+(\d+)", line)
-            number = int(match.group(1)) if match else 0
+            number = _hunk_start(line)
         elif line.startswith("+"):
             if path:
                 yield path, number, line[1:]
