@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, browser tools hook; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: a hook for the browser tools** (Joey: "保留例外，擋其餘"; entry below): `guard_browser.py` blocks Claude in Chrome, the pane's page scripts, field setting and network reads, and any MySys address in a browser tool or WebFetch; the 10 Nov live lookups keep working (tightens a safety control).
 - **23 Nov 2026: Summit Home is client 2** (ADR-003 Accepted, option C; Joey said yes under the CEO's delegation; six entries below): a read-only peek with every check before the take; the Client Internal No. check in place of the address check (loosens a control); Summit's decision rules; return to the original assignee (taking a person's Note is allowed for Summit); a separate Agent 2 run; testing and go-live without the test site (loosens a control). Spec only: nothing built yet.
 - **21 Nov 2026: one wait module** (task 8.4; Joey's settled design of 9 Nov; entry below): every MySys wait in `mysys/wait.py`; its retry refuses any action but the four opening clicks (tightens a safety control). No change in MySys or run output; the tests' timeout patches move to the one module in their own `test:` commit.
 - **20 Nov 2026: secrets pre-flight** (threat-model gap 3; entry below): `po-agent preflight --site test|live` reports whether the site's MySys secrets are set and well-formed, names and status only, no login. Joey runs it on the Mac Mini before a live run.
@@ -11,6 +12,16 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - Browser tools hook (Joey; tightens a safety control)
+
+- **Problem:** the hooks and deny rules saw only Bash and file edits (decisions, 10 Nov 2026, live lookups: "Hooks unchanged"). The browser tools (the desktop app's built-in pane and Claude in Chrome) and WebFetch had no rule at all, so Claude could run page scripts, set fields, upload a file or open MySys, live or test, with nothing in the way. Claude in Chrome is Joey's own Chrome, signed in to live MySys and Outlook (Must never #2, #3, #4).
+- **Decided (Joey, choosing "keep the exception, block the rest"):** a PreToolUse hook `.claude/hooks/guard_browser.py` on `mcp__Claude_Browser__.*|mcp__claude-in-chrome__.*|WebFetch`, plus deny rules for Claude in Chrome and the three pane tools below:
+  - Claude in Chrome: every tool blocked in this project (file upload and image upload included).
+  - Built-in pane: only a listed set of tools passes (look, read, click, type, navigate, tabs, preview, batch); `javascript_tool`, `form_input`, `read_network_requests` and any tool added later are blocked. `browser_batch` is checked item by item; a nested batch is blocked.
+  - No browser tool or WebFetch input may name a MySys host, live or test (percent-decoded, any case): Claude never opens MySys itself.
+- **Unchanged:** the 10 Nov live-lookup exception. Clicks and typing in the pane still pass, because the hook sees only a ref or a point and can't tell a search click from a write; Joey logs in himself, and the narrow list plus Joey watching the pane stay the control. Seam 2 reaches the test site through Playwright, as before.
+- **Carried in:** `docs/workflow.md` hook table; `docs/threat-model.md` Boundary 5 row E. No `SPEC.md` change: nothing the agent does in MySys or prints changes.
 
 ## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
 
