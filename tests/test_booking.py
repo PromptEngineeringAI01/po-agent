@@ -14,6 +14,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page
 
+from po_agent.b1.decision import body_rule
 from po_agent.core.errors import (
     GuardRefusal,
     PartialWrite,
@@ -167,7 +168,9 @@ def test_download_links_are_read_from_the_note_window(page):
 
 def test_note_body_is_the_body_line_not_a_title_with_the_same_text(page):
     page.set_content(note_page(title=BODY))
-    assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
+    assert (
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE)) == BODY
+    )
 
 
 # Live G.6 (10 Nov 2026, Joey's DevTools look): an email Note's body is
@@ -198,12 +201,14 @@ def quick(monkeypatch):
 def test_note_body_from_the_email_iframe(page):
     page.set_content(note_page(body=email_iframe(LIVE_BODY)))
     window = booking.note_window(page, NOTE_ID)
-    assert booking.note_body(window, FILE) == f"{LIVE_LINE}\n{FILE}"
+    assert booking.note_body(window, body_rule(FILE)) == f"{LIVE_LINE}\n{FILE}"
 
 
 def test_note_body_from_an_email_iframe_without_font(page):
     page.set_content(note_page(body=email_iframe(f"<p>{BODY}</p>")))
-    assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
+    assert (
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE)) == BODY
+    )
 
 
 def test_note_body_waits_for_an_email_iframe_that_loads_late(page):
@@ -214,34 +219,34 @@ def test_note_body_waits_for_an_email_iframe_that_loads_late(page):
         + f" {LIVE_BODY!r}; }}, 500);</script>"
     )
     window = booking.note_window(page, NOTE_ID)
-    assert booking.note_body(window, FILE) == f"{LIVE_LINE}\n{FILE}"
+    assert booking.note_body(window, body_rule(FILE)) == f"{LIVE_LINE}\n{FILE}"
 
 
 def test_no_pre_and_no_iframe_is_no_body(page, quick):
     page.set_content(note_page(body="<p>nothing here</p>"))
     with pytest.raises(UnexpectedScreen) as caught:
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
     assert FILE not in str(caught.value)
 
 
 def test_a_pre_and_an_iframe_both_matching_is_no_body(page, quick):
     page.set_content(note_page(body=f"<pre>{BODY}</pre>" + email_iframe(LIVE_BODY)))
     with pytest.raises(UnexpectedScreen):
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
 
 
 def test_an_iframe_not_ending_with_the_file_name_is_no_body(page, quick):
     html = f"<p>{LIVE_LINE}</p><p>{FILE}</p><p>Regards, fake sender</p>"
     page.set_content(note_page(body=email_iframe(html)))
     with pytest.raises(UnexpectedScreen) as caught:
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
     assert "fake sender" not in str(caught.value)
 
 
 def test_two_iframes_both_matching_is_no_body(page, quick):
     page.set_content(note_page(body=email_iframe(LIVE_BODY) * 2))
     with pytest.raises(UnexpectedScreen):
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
 
 
 def test_mark_solved_unticks_email_and_reads_back(page, guard):

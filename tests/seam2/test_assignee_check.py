@@ -15,6 +15,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from po_agent.b1.decision import note_pool_filters
 from po_agent.core import controls, run, runlog
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import UnexpectedScreen
@@ -83,7 +84,7 @@ def test_the_assignee_check_reads_the_agent_for_a_taken_trial_note(
     driver.reload_home(guard, page, *login)
     panel = driver.open_note_pool(guard, page)
     driver.leave_menu(guard, page)
-    driver.set_note_pool_filters(guard, panel, pool)
+    driver.set_note_pool_filters(guard, panel, note_pool_filters(pool))
     listing = driver.read_note_pool(guard, panel)
     found = [
         n

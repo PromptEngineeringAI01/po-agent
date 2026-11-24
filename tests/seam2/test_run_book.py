@@ -26,6 +26,7 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1.decision import B1ProjectRule, note_pool_filters
 from po_agent.core import run
 from po_agent.mysys import driver
 from po_agent.mysys import tasks as task_table
@@ -61,14 +62,14 @@ def read_site(config, login) -> tuple[driver.NotePoolList, dict[str, tuple]]:
         driver.reload_home(guard, page, *login)
         panel = driver.open_note_pool(guard, page)
         driver.leave_menu(guard, page)
-        driver.set_note_pool_filters(guard, panel, config.pool_name)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
         listing = driver.read_note_pool(guard, panel)
         assert listing.pages == 1, "Agent Pool has more than one page"
         tasks = {
             number: tuple(
                 t.task_no
                 for t in driver.project_lookup(
-                    guard, page, *login, number, "test"
+                    guard, page, *login, number, B1ProjectRule("test")
                 ).tasks
                 if t.status.strip() != task_table.CANCELLED
             )

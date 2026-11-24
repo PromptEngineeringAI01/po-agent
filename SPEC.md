@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.64 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.65 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -141,12 +141,12 @@ src/po_agent/
     demo.py                     supervised demo: one trial PO, Enter before every write (decisions, 27 Oct 2026)
     controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
     errors.py                   typed errors, their exit codes and ALERT kinds
-    models.py                   shared models (pydantic): Note Pool row, Note window, project lookup, SkipReason, Skip, Proceed (ADR-003 decision 2)
-  mysys/                        reusable
+    models.py                   shared models (pydantic): Note Pool row, Note window, project lookup, SkipReason, Skip, Proceed (ADR-003 decision 2); NotePoolFilters and ProjectRule, the client values `mysys/` takes (decision 3)
+  mysys/                        reusable and client-free: no client import or constant (ADR-003 decision 3; tests/test_mysys_client_free.py)
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
     booking.py                  the demo's screens, Note to Solved, proven on the test site 28 Oct 2026; the base for the booker (4.1-4.5)
-    booker.py                   W1-W5 with read-back, shared by every client (moved from b1/, task 9.2)
+    booker.py                   W1-W5 with read-back, shared by every client: the project rule from the caller, the Creator and the Documents file name from the Proceed (moved from b1/, task 9.2)
     tasks.py                    the project's Tasks table: Compaction Test rows, live tasks, the new task (moved from b1/reader_rules.py, task 9.2)
     wait.py                     every MySys wait and timeout: poll until true, read until settled, the one retry of an opening click (refuses any other action)
   b1/                           rules for this automation
@@ -154,7 +154,7 @@ src/po_agent/
     reader_rules.py             the code readers (pdfplumber and pypdf + patterns)
     readers.py                  both readers' texts as one value; the two-readers rule (agreement, address check on both)
     address.py                  normaliser + address check against the project's address
-    decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given)
+    decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given); B1's values for `mysys/`: Note Pool filters (the pool, Locked), the body rule (ends with the file name), B1ProjectRule
 config/test.toml                test-site profile; no secrets
 config/live.toml                live profile; no secrets; ask-first for Claude (protect_paths)
 scripts/check.py                the one check command

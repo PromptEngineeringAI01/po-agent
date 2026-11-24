@@ -15,6 +15,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page
 
+from po_agent.b1.decision import note_pool_filters
 from po_agent.core.errors import LoginFailed, UnexpectedScreen
 from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
@@ -252,7 +253,7 @@ def test_the_panel_is_the_one_element_holding_new_note_search_and_the_list(page)
 def test_filters_are_set_by_name_and_read_back(page, guard):
     panel = panel_of(page, note_pool_page())
 
-    driver.set_note_pool_filters(guard, panel, POOL)
+    driver.set_note_pool_filters(guard, panel, note_pool_filters(POOL))
 
     assert actions(guard) == ["set_pool_filter", "set_locked_filter"]
     listing = driver.read_note_pool(guard, panel)
@@ -262,7 +263,7 @@ def test_filters_are_set_by_name_and_read_back(page, guard):
 def test_a_filter_already_set_is_not_set_again(page, guard):
     panel = panel_of(page, note_pool_page(filters={"filter_lock_status": "Locked"}))
 
-    driver.set_note_pool_filters(guard, panel, POOL)
+    driver.set_note_pool_filters(guard, panel, note_pool_filters(POOL))
 
     assert actions(guard) == ["set_pool_filter"]
 
@@ -282,14 +283,14 @@ def test_another_filter_off_its_default_is_an_unexpected_screen(
     panel = panel_of(page, note_pool_page(filters={name: value}))
 
     with pytest.raises(UnexpectedScreen):
-        driver.set_note_pool_filters(guard, panel, POOL)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(POOL))
 
 
 def test_text_left_in_search_filter_is_an_unexpected_screen(page, guard):
     panel = panel_of(page, note_pool_page(search="300001"))
 
     with pytest.raises(UnexpectedScreen) as caught:
-        driver.set_note_pool_filters(guard, panel, POOL)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(POOL))
 
     assert "300001" not in str(caught.value)
 

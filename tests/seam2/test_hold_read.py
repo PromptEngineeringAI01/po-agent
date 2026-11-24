@@ -14,6 +14,7 @@ states only, never an address or page text.
 
 import pytest
 
+from po_agent.b1.decision import B1ProjectRule
 from po_agent.core.trace import Booking
 from po_agent.mysys import driver, tasks
 
@@ -58,14 +59,16 @@ def test_hold_read_agrees_with_each_trial_tasks_status(
 ):
     pln = TRIAL_PLNS[internal_no]
     with driver.open_browser(headed=False, slow_mo=0) as page:
-        lookup = driver.project_lookup(guard, page, *login, internal_no, config.site)
+        lookup = driver.project_lookup(
+            guard, page, *login, internal_no, B1ProjectRule(config.site)
+        )
         states = {}
         for task_no in [task.task_no for task in lookup.tasks] + [NO_SUCH_TASK]:
             booked = Booking(
                 note_id="1", pln=pln, task_id=task_no, internal_no=internal_no
             )
             states[task_no] = driver.recheck_hold(
-                guard, page, *login, booked, config.site
+                guard, page, *login, booked, B1ProjectRule(config.site)
             )
 
     assert states.pop(NO_SUCH_TASK) == "not_found"

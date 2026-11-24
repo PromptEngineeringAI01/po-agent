@@ -170,7 +170,7 @@ def _steps(
     output.info("logged in")
     panel = driver.open_note_pool(guard, page)
     booking.leave_menu(guard, page)
-    driver.set_note_pool_filters(guard, panel, pool)
+    driver.set_note_pool_filters(guard, panel, decision.note_pool_filters(pool))
     output.info("note pool filters set")
     listing = driver.read_note_pool(guard, panel)
     eligible = runs.eligible_notes(listing.rows, config.title_rule, pool)
@@ -201,7 +201,7 @@ def _steps(
         raise WriteNotStarted("Note already linked", reason="NOTE_ALREADY_LINKED")
     file_name = rules.pdf_file_name(booking.download_hrefs(window))
     file_po = rules.po_from_file_name(file_name)
-    body = booking.note_body(window, file_name)
+    body = booking.note_body(window, decision.body_rule(file_name))
     downloaded, data = booking.download_pdf(guard, page, window)
     if downloaded != file_name:
         raise WriteNotStarted("download not the linked file", reason="NO_PDF")
