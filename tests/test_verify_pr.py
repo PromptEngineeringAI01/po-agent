@@ -235,7 +235,7 @@ def test_playwright_action_names_in_non_python_files_pass(tmp_path):
         {
             "docs/x.md": prose,
             ".claude/skills/x/SKILL.md": prose,
-            "notes/x.txt": "page.click(target)\n",
+            "notes/x.txt": f"page.{ACTIONS[0]}(target)\n",
         },
     )
     code, lines = run(repo, body("High"))
@@ -248,7 +248,10 @@ def test_playwright_action_in_any_py_file_outside_guard_fails(tmp_path):
     commit(
         repo,
         "docs: x",
-        {"docs/example.py": "page.fill(target)\n", "docs/example.md": "fill(\n"},
+        {
+            "docs/example.py": f"page.{ACTIONS[1]}(target)\n",
+            "docs/example.md": f"{ACTIONS[1]}(\n",
+        },
     )
     code, lines = run(repo, body("Medium"))
     assert code == 1
@@ -264,7 +267,8 @@ def test_live_host_and_key_name_still_fail_in_markdown(tmp_path):
         "docs: x",
         {
             "docs/x.md": (
-                f"Open https://{LIVE_HOST}/ and click( it.\nSet {KEY_NAME} first.\n"
+                f"Open https://{LIVE_HOST}/ and {ACTIONS[0]}( it.\n"
+                f"Set {KEY_NAME} first.\n"
             )
         },
     )
