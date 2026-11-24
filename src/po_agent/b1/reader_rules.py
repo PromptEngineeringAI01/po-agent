@@ -17,8 +17,9 @@ from urllib.parse import parse_qs, urlsplit
 import pdfplumber
 import pypdf
 
-from po_agent.b1.models import DeterministicReading, SkipReason
+from po_agent.b1.models import DeterministicReading
 from po_agent.core.errors import PartialWrite, WriteNotStarted
+from po_agent.core.models import SkipReason
 
 COMPANY = "B1 Homes"
 # The issuer, as the first line of every B1 Homes PO reads.

@@ -13,13 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1 import readers
-from po_agent.b1.models import (
+from po_agent.b1.models import B1Proceed, DeterministicReading
+from po_agent.core.models import (
     CompactionTask,
-    DeterministicReading,
     MySysLookup,
     NotePoolRow,
     NoteSnapshot,
-    Proceed,
     SearchRow,
     Skip,
     SkipReason,
@@ -196,7 +195,7 @@ def decide(
     *,
     site: Site,
     duplicate_ignores_cancelled: bool,
-) -> Skip | Proceed:
+) -> Skip | B1Proceed:
     """Steps 2a-11 in section 2 order on the inputs given; the first failing
     step decides: steps 2a-4, the second reader, the project lookup (8), the
     address check against the project's address (9), the duplicate check
@@ -223,7 +222,7 @@ def decide(
     task_nos = check_duplicate(found.tasks, duplicate_ignores_cancelled)
     if isinstance(task_nos, Skip):
         return task_nos
-    return Proceed(
+    return B1Proceed(
         note_id=note.note_id,
         internal_no=checked.internal_no,
         pln=pln,

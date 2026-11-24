@@ -23,12 +23,13 @@ from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
-from po_agent.b1 import decision, models, readers
+from po_agent.b1 import decision, readers
 from po_agent.b1.decision import check_duplicate, eligible_internal_no, match_project
-from po_agent.b1.models import (
+from po_agent.b1.models import B1Proceed
+from po_agent.core import models
+from po_agent.core.models import (
     CompactionTask,
     NotePoolRow,
-    Proceed,
     SearchRow,
     Skip,
     SkipReason,
@@ -305,7 +306,7 @@ def proceeds(draw):
 
 @given(proceeds())
 def test_a_well_formed_proceed_is_accepted(fields):
-    assert Proceed(**fields).po_number == fields["po_number"]
+    assert B1Proceed(**fields).po_number == fields["po_number"]
 
 
 @given(
@@ -333,7 +334,7 @@ def test_a_near_miss_proceed_is_refused(fields, change):
     write (models.py, Proceed)."""
     name, mutate = change
     with pytest.raises(ValidationError):
-        Proceed(**{**fields, name: mutate(fields[name])})
+        B1Proceed(**{**fields, name: mutate(fields[name])})
 
 
 def test_the_fault_catalog_covers_every_decide_skip_reason():

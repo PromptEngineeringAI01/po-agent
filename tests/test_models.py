@@ -1,18 +1,22 @@
-"""Tests for the seam-1 models (task 2.1; docs/specs/spec.md section 3).
+"""Tests for the seam-1 models (task 2.1; docs/specs/spec.md section 3) and
+the shared models (task 9.1; ADR-003 decision 2).
 
 Values are fake (`2600001B`, `pln_10001`, `Sample Lane`), never a trial PO's.
 """
 
+import ast
+import re
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
-from po_agent.b1.models import (
+from po_agent.b1.models import B1Proceed, DeterministicReading, Reading
+from po_agent.core.models import (
     CompactionTask,
-    DeterministicReading,
     MySysLookup,
     NoteSnapshot,
     Proceed,
-    Reading,
     SearchRow,
     Skip,
     SkipReason,
@@ -21,7 +25,7 @@ from po_agent.b1.models import (
 BODY = "Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf"
 
 
-def proceed(**overrides: object) -> Proceed:
+def proceed(**overrides: object) -> B1Proceed:
     values: dict[str, object] = {
         "note_id": "1001",
         "internal_no": "2600001B",
@@ -33,7 +37,7 @@ def proceed(**overrides: object) -> Proceed:
         "existing_task_nos": ("tsk_200001",),
     }
     values.update(overrides)
-    return Proceed(**values)  # type: ignore[arg-type]
+    return B1Proceed(**values)  # type: ignore[arg-type]
 
 
 # --- SkipReason: exactly docs/specs/spec.md section 3 ---
@@ -180,6 +184,7 @@ def test_proceed_is_frozen() -> None:
         {"internal_no": "2600001b"},
         {"email_body": ""},
         {"pdf_file_name": "2600001B_048_1.docx"},
+        {"pdf_file_name": "2600001B_023_1.pdf"},  # not the /048 file
         {"pdf_bytes": b""},
         {"existing_task_nos": ("200001",)},
         {"extra": "value"},
@@ -194,3 +199,105 @@ def test_proceed_repr_hides_the_pdf_and_the_note_body() -> None:
     text = repr(proceed())
     assert "%PDF" not in text
     assert "Please find attached" not in text
+
+
+def test_note_snapshot_needs_a_note_id() -> None:
+    with pytest.raises(ValidationError):
+        NoteSnapshot(
+            note_id="",
+            title=BODY,
+            body=BODY,
+            attachment_names=(),
+            project_linked=False,
+        )
+
+
+# --- Task 9.1: the shared Proceed and B1's (ADR-003 decision 2) ---
+
+
+def test_a_b1_proceed_is_a_shared_proceed() -> None:
+    # The booker takes the shared model; B1's adds its /048 rules.
+    assert isinstance(proceed(), Proceed)
+
+
+SRC = Path(__file__).resolve().parents[1] / "src" / "po_agent"
+# A client's decision engine: src/po_agent/<client>/decision.py, never a
+# shared package's (ADR-003 decision 2).
+DECISION_ENGINE = re.compile(r"(?!core/|mysys/)[a-z0-9_]+/decision\.py")
+
+
+def builds_a_proceed(tree: ast.AST) -> bool:
+    """A call of a class named ...Proceed, or of a pydantic model_* method on
+    one or on a value named ...proceed (model_validate, model_construct,
+    model_copy); and, on any value, model_construct or model_copy(update=...),
+    which skip validation (no src code uses them)."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id.endswith("Proceed"):
+            return True
+        if isinstance(func, ast.Attribute):
+            if func.attr.endswith("Proceed"):
+                return True
+            if func.attr == "model_construct" or (
+                func.attr == "model_copy"
+                and any(keyword.arg == "update" for keyword in node.keywords)
+            ):
+                return True
+            owner = func.value
+            if (
+                func.attr.startswith("model_")
+                and isinstance(owner, ast.Name)
+                and owner.id.lower().endswith("proceed")
+            ):
+                return True
+    return False
+
+
+def test_only_a_client_decision_engine_constructs_a_proceed() -> None:
+    builders = sorted(
+        path.relative_to(SRC).as_posix()
+        for path in SRC.rglob("*.py")
+        if builds_a_proceed(ast.parse(path.read_text(encoding="utf-8")))
+    )
+    assert "b1/decision.py" in builders
+    assert [p for p in builders if not DECISION_ENGINE.fullmatch(p)] == []
+
+
+@pytest.mark.parametrize(
+    ("source", "builds"),
+    [
+        ("Proceed(note_id='1')", True),
+        ("models.B1Proceed(note_id='1')", True),
+        ("B1Proceed.model_validate({})", True),
+        ("proceed.model_copy(update={'pln': 'pln_1'})", True),
+        # A Proceed under another name (run.py's `decision`): no validation.
+        ("decision.model_copy(update={'po_number': '1/023'})", True),
+        ("decision.model_construct(note_id='1')", True),
+        ("lookup.model_copy()", False),
+        ("isinstance(decision, Proceed)", False),
+        ("Skip(reason=reason)", False),
+    ],
+)
+def test_the_proceed_scan_sees_every_way_to_build_one(
+    source: str, builds: bool
+) -> None:
+    assert builds_a_proceed(ast.parse(source)) is builds
+
+
+@pytest.mark.parametrize(
+    ("path", "allowed"),
+    [
+        ("b1/decision.py", True),
+        ("summit/decision.py", True),
+        ("b1/booker.py", False),
+        ("core/decision.py", False),
+        ("mysys/decision.py", False),
+        ("decision.py", False),
+    ],
+)
+def test_only_a_client_package_s_decision_py_may_build_one(
+    path: str, allowed: bool
+) -> None:
+    assert bool(DECISION_ENGINE.fullmatch(path)) is allowed

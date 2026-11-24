@@ -18,8 +18,8 @@ from seam1_cases import pdf_bytes, text_pdf
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1 import readers
-from po_agent.b1.models import Skip, SkipReason
 from po_agent.b1.readers import PdfTexts
+from po_agent.core.models import Skip, SkipReason
 
 # pdfplumber's layout: the Job Address block shares its lines with Supplier.
 PLUMBER = """B1 Homes Pty Ltd

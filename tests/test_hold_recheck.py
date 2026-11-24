@@ -34,10 +34,10 @@ from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, Page
 
 from po_agent import cli
-from po_agent.b1.models import MySysLookup, SearchRow
 from po_agent.core import controls, run, trace
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import UnexpectedScreen
+from po_agent.core.models import MySysLookup, SearchRow
 from po_agent.mysys import booking, driver
 
 KEYS = {"run_id", "ts", "note_id", "step", "name", "outcome", "duration_ms"}

@@ -42,7 +42,7 @@ from pydantic import (
     field_serializer,
 )
 
-from po_agent.b1.models import SkipReason
+from po_agent.core.models import SkipReason
 from po_agent.mysys.guard import ALLOWLIST
 
 RETENTION_DAYS = 90

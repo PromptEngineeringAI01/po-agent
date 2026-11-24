@@ -12,9 +12,9 @@ import pytest
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
-from po_agent.b1.models import NotePoolRow
 from po_agent.core import run
 from po_agent.core.errors import LoginFailed
+from po_agent.core.models import NotePoolRow
 from po_agent.mysys import driver
 
 POOL = "Agent Pool"

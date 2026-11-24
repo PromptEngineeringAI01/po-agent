@@ -21,9 +21,9 @@ from collections.abc import Iterator
 import pytest
 
 from po_agent.b1 import booker
-from po_agent.b1.models import Proceed
 from po_agent.core import controls, run, runlog
 from po_agent.core.config import CONFIG_DIR
+from po_agent.core.models import Proceed
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 

@@ -69,7 +69,6 @@ from playwright.sync_api import Browser, ConsoleMessage, Page
 
 from po_agent.b1 import booker, readers
 from po_agent.b1.decision import decide
-from po_agent.b1.models import CompactionTask, NotePoolRow, Proceed
 from po_agent.core import controls
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import (
@@ -78,6 +77,7 @@ from po_agent.core.errors import (
     PartialWrite,
     WriteNotStarted,
 )
+from po_agent.core.models import CompactionTask, NotePoolRow, Proceed
 from po_agent.core.runlog import RunLog
 from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard, Refusal

@@ -37,19 +37,19 @@ from pydantic import ValidationError
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import Site, check_project, match_project
-from po_agent.b1.models import (
+from po_agent.core.errors import (
+    LoginFailed,
+    PartialWrite,
+    UnexpectedScreen,
+    WriteNotStarted,
+)
+from po_agent.core.models import (
     CompactionTask,
     MySysLookup,
     NotePoolRow,
     Proceed,
     SearchRow,
     Skip,
-)
-from po_agent.core.errors import (
-    LoginFailed,
-    PartialWrite,
-    UnexpectedScreen,
-    WriteNotStarted,
 )
 from po_agent.core.runlog import RunLog
 from po_agent.core.trace import Booking

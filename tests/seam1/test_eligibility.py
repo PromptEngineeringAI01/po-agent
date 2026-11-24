@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from po_agent.b1.decision import eligible_internal_no
-from po_agent.b1.models import NotePoolRow
+from po_agent.core.models import NotePoolRow
 
 POOL = "Agent Pool"
 BODY = "Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf"

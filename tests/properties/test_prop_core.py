@@ -12,9 +12,9 @@ from b1_worlds import note_ids
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from po_agent.b1.models import NotePoolRow
 from po_agent.core import controls, errors
 from po_agent.core.config import RunWindow, load_config
+from po_agent.core.models import NotePoolRow
 from po_agent.core.run import EligibleNote, newest_first
 from po_agent.mysys.driver import NotePoolList, exact_row
 
