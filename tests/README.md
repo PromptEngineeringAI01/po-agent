@@ -16,7 +16,7 @@ Generators use fake values only (CLAUDE.md Must never #6).
   skip reason SPEC gives it.
 - `tests/oracle/`: B1's pure modules frozen at main `be84448` for the
   differential tests of the multi-client refactor (tasks/plan.md Phase S).
-  Never edit it (a test pins its hashes); it is deleted in its own `test:`
+  Never edit it (CLAUDE.md Must never #8); it is deleted in its own `test:`
   commit after checkpoint S-A, B1 seam 2 and the first watched B1 hourly run
   after the tag move.
 
