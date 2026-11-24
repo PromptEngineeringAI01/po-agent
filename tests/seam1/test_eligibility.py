@@ -79,6 +79,7 @@ def test_test_rule_same_file_twice_is_eligible() -> None:
         # the title's own number again in the body stays eligible
         f"{LIVE_TITLE} {BODY} {BODY}",
         f"{LIVE_TITLE} Re 2600001B/048: {BODY}",
+        f"{LIVE_TITLE} {BODY}.",
     ],
 )
 def test_live_rule_eligible_returns_internal_no(subject_note: str) -> None:
@@ -105,6 +106,11 @@ def test_live_rule_eligible_returns_internal_no(subject_note: str) -> None:
         f"{LIVE_TITLE} Please see Order 2600002B/048",
         f"{LIVE_TITLE} Please see Order 2600002B/048.",
         f"{LIVE_TITLE} {BODY} (2600002B/048)",
+        # the same, with punctuation or case B1 doesn't generate
+        f"{LIVE_TITLE} {BODY.replace('2600001B', '2600002B')}.",
+        f"{LIVE_TITLE} {BODY} and 2600002B_048_1.PDF",
+        f"{LIVE_TITLE} {BODY} and 2600002b_048_1.pdf",
+        f"{LIVE_TITLE} {BODY} and 2600002B_048_1.pdf.exe",
     ],
 )
 def test_live_rule_other_text_not_eligible(subject_note: str) -> None:
