@@ -18,7 +18,7 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Why:** two rules lived only in prose or luck. `src/` carried `# noqa: BLE001` comments while BLE wasn't selected, so they were dead and a blind `except` went unchecked. And a stale local ruff cache kept `ruff check` green on an I001 that CI caught (friction log, 20 Nov 2026; commit 5f86d7b).
 - **Decided (Joey, 24 Nov 2026):** pyproject `[tool.ruff.lint]` selects `BLE` (blind except) and `RUF100` (unused `noqa`); `[tool.ruff.lint.isort] known-first-party = ["po_agent"]`; `.claude/hooks/*` is exempt from BLE (Joey's hooks fail closed on any error by design); `scripts/check.py` runs `ruff format --check` and `ruff check` with `--no-cache`, in the full check and in `--quick`. A justified catch-all keeps `# noqa: BLE001 - <reason>`. Not now: PT, SIM, C901, mypy on tests.
 - **Tests changed (Must never #8):** `tests/test_check.py` expects `--no-cache` in both ruff steps (names and commands, full and `--quick`), the ruff config, and three probes that run ruff on small snippets with the repo's config.
-- **Loosens?** No: tightens dev tooling. The seven catch-alls in `src/` keep their behaviour; each now carries a `noqa` with its reason.
+- **Loosens?** No: tightens dev tooling. Seven more catch-alls in `src/` keep their behaviour and now carry a `noqa` with its reason, beside the four that already had one (11 in all).
 - Carried in: `pyproject.toml`, `scripts/check.py`, `SPEC.md` v1.60 (Commands, Code Style), `docs/workflow.md` Appendix A.
 
 ## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
