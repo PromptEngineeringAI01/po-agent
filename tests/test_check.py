@@ -308,6 +308,9 @@ def ruff_codes(code: str, path: str) -> set[str]:
         text=True,
         encoding="utf-8",
     )
+    # 0 = clean, 1 = findings; 2 = ruff itself failed (e.g. a broken config),
+    # which would otherwise read as "no findings".
+    assert result.returncode in (0, 1), result.stderr
     return {line.split()[1] for line in result.stdout.splitlines() if ": " in line}
 
 
