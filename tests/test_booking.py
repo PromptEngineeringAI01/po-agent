@@ -31,6 +31,7 @@ FILE = "2600001B_048_1.pdf"
 BODY = f"Please find attached Purchase Order / Quotation file {FILE}"
 CLOSE = '<div><span title="Close">close</span></div>'
 PDF = b"%PDF-1.4 fake"
+CREATOR = "Perth Scheduling"  # B1's Creator, from its Proceed
 
 
 # `browser` is tests/conftest.py's: one headless Chromium per module.
@@ -288,7 +289,9 @@ function addDoc(input, rows) {{
 def test_task_form_is_filled_and_read_back(page, guard):
     page.set_content(task_form_page())
     form = booking.task_form(page)
-    booking.fill_task_form(guard, form, "2600001B/048", BODY, FILE, PDF)
+    booking.fill_task_form(
+        guard, form, "2600001B/048", BODY, FILE, PDF, creator=CREATOR
+    )
     assert page.locator("body").get_attribute("data-submitted") is None
     assert "upload_document" in actions(guard)
     # The PDF goes to Documents (the task's Client Documents), not PO
@@ -305,7 +308,7 @@ def test_a_two_line_iframe_body_fills_and_reads_back_the_same(page, guard):
     page.set_content(task_form_page())
     form = booking.task_form(page)
     booking.fill_task_form(
-        guard, form, "2600001B/048", f"{LIVE_LINE}\n{FILE}", FILE, PDF
+        guard, form, "2600001B/048", f"{LIVE_LINE}\n{FILE}", FILE, PDF, creator=CREATOR
     )
     assert "set_task_note" in actions(guard)
 
@@ -314,7 +317,13 @@ def test_task_form_with_another_box_ticked_does_not_submit(page, guard):
     page.set_content(task_form_page(multiple="checked"))
     with pytest.raises(WriteNotStarted):
         booking.fill_task_form(
-            guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+            guard,
+            booking.task_form(page),
+            "2600001B/048",
+            BODY,
+            FILE,
+            PDF,
+            creator=CREATOR,
         )
     assert "submit_task" not in actions(guard)
 
@@ -1164,7 +1173,13 @@ def test_task_form_without_a_po_documents_block_does_not_submit(page, guard):
     page.set_content(html.replace(po_documents, ""))
     with pytest.raises(WriteNotStarted):
         booking.fill_task_form(
-            guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+            guard,
+            booking.task_form(page),
+            "2600001B/048",
+            BODY,
+            FILE,
+            PDF,
+            creator=CREATOR,
         )
     assert "submit_task" not in actions(guard)
 
@@ -1177,7 +1192,7 @@ def test_task_form_po_documents_with_only_a_header_row_reads_as_empty(page, guar
     assert empty in html
     page.set_content(html.replace(empty, header))
     booking.fill_task_form(
-        guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+        guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF, creator=CREATOR
     )
     assert "upload_document" in actions(guard)
 

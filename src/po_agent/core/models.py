@@ -90,7 +90,11 @@ class Proceed(Frozen):
     """Step 11: the only input the booker takes. Every value is checked here
     again, so a malformed decision can't reach a write. MySys's own formats
     are checked here; a client's PO and file-name rules in its subclass
-    (`b1.models.B1Proceed`), and only a client's decision engine builds one."""
+    (`b1.models.B1Proceed`), and only a client's decision engine builds one.
+
+    `creator` is the Create New Task form's Creator, set at W1 and read back
+    at W1 and W2 (ADR-003 decision 3; a client rule, never a constant in
+    `mysys/`)."""
 
     note_id: str = Field(min_length=1)
     internal_no: str = Field(min_length=1)
@@ -101,6 +105,7 @@ class Proceed(Frozen):
     pdf_bytes: bytes = Field(min_length=1, repr=False)
     # The project's Compaction Test task numbers at step 10, for W2.
     existing_task_nos: tuple[Annotated[str, Field(pattern=r"^tsk_[0-9]+$")], ...]
+    creator: str = Field(min_length=1)
 
 
 class Skip(Frozen):

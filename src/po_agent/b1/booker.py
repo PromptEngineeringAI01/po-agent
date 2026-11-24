@@ -8,9 +8,9 @@ click. Every page action goes through the guard.
 
 W1: `before_write(note_id, "W1")` (the assignee check reloads, so step 10's
 project window is gone) -> the project reopened by its pln and checked again
--> Create New Task: Creator, - Compaction Test, PO Number, the PDF to
-Documents from memory (D2; the task's own Client Documents, decisions,
-12 Nov 2026), Note = the email body -> the full read-back.
+-> Create New Task: the Proceed's Creator, - Compaction Test, PO Number,
+the PDF to Documents from memory (D2; the task's own Client Documents,
+decisions, 12 Nov 2026), Note = the email body -> the full read-back.
 Nothing is submitted in W1: any problem once the form is open closes the
 browser context, which abandons the form (the upload is saved only by
 Submit, M0b.2), and is WriteNotStarted.
@@ -150,6 +150,7 @@ def _w1(
             proceed.email_body,
             proceed.pdf_file_name,
             proceed.pdf_bytes,
+            creator=proceed.creator,
         )
     except Exception as error:
         _close_context(page)  # abandons the form: nothing is saved
@@ -183,10 +184,17 @@ def _w2(
         task_no = booking.new_task_after_submit(
             form, project, set(proceed.existing_task_nos)
         )
-        details = booking.check_new_task_row(project, task_no, agent)
-        booking.open_task_detail(guard, project, details)
+        details = booking.check_new_task_row(
+            project, task_no, agent, creator=proceed.creator
+        )
+        booking.open_task_detail(guard, project, details, creator=proceed.creator)
         window = booking.check_task_detail(
-            page, task_no, proceed.po_number, proceed.email_body, agent
+            page,
+            task_no,
+            proceed.po_number,
+            proceed.email_body,
+            agent,
+            creator=proceed.creator,
         )
         booking.back_to_project(guard, page, window, proceed.pln)
         booking.check_project_document(

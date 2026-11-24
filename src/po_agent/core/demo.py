@@ -31,6 +31,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
+from po_agent.b1 import decision
 from po_agent.b1 import reader_rules as rules
 from po_agent.core import output
 from po_agent.core import run as runs
@@ -233,7 +234,9 @@ def _steps(
     progress.step = "S6"
     _ask("create the Compaction Test task", progress)
     form = booking.open_task_form(guard, page, project)
-    booking.fill_task_form(guard, form, po_number, body, file_name, data)
+    booking.fill_task_form(
+        guard, form, po_number, body, file_name, data, creator=decision.CREATOR
+    )
     output.info("demo: task form filled")
     _ask("submit the task", progress)
     progress.written = True
