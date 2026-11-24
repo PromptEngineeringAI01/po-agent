@@ -12,6 +12,7 @@ import pytest
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.core.errors import PartialWrite, WriteNotStarted
+from po_agent.mysys import tasks
 
 LINK = (
     "index.php?option=com_cweb&controller=user_note&task=get_note_file_content"
@@ -209,7 +210,7 @@ TASK_ROWS = [
 
 
 def test_compaction_tasks_are_read_with_their_status():
-    assert rules.compaction_tasks(TASK_ROWS) == {
+    assert tasks.compaction_tasks(TASK_ROWS) == {
         "tsk_200001": "Cancelled",
         "tsk_200003": "On-hold\nNotes:",
     }
@@ -217,16 +218,16 @@ def test_compaction_tasks_are_read_with_their_status():
 
 def test_a_header_row_without_a_details_row_is_unexpected():
     with pytest.raises(PartialWrite):
-        rules.compaction_tasks([["(tsk_200001) | Compaction Test\nCancel\nHold"]])
+        tasks.compaction_tasks([["(tsk_200001) | Compaction Test\nCancel\nHold"]])
 
 
 def test_live_tasks_leave_out_cancelled_ones():
-    assert rules.live_tasks(rules.compaction_tasks(TASK_ROWS)) == ["tsk_200003"]
+    assert tasks.live_tasks(tasks.compaction_tasks(TASK_ROWS)) == ["tsk_200003"]
 
 
 def test_new_task_is_the_one_id_not_seen_before():
     after = {"tsk_200001": "Cancelled", "tsk_200004": "New Project"}
-    assert rules.new_task({"tsk_200001"}, after) == "tsk_200004"
+    assert tasks.new_task({"tsk_200001"}, after) == "tsk_200004"
 
 
 @pytest.mark.parametrize(
@@ -238,7 +239,7 @@ def test_new_task_is_the_one_id_not_seen_before():
 )
 def test_no_new_task_or_two_is_a_partial_write(after):
     with pytest.raises(PartialWrite):
-        rules.new_task({"tsk_200001"}, after)
+        tasks.new_task({"tsk_200001"}, after)
 
 
 def test_a_duplicated_row_counts_as_one_project():

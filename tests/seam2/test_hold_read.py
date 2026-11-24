@@ -14,9 +14,8 @@ states only, never an address or page text.
 
 import pytest
 
-from po_agent.b1 import reader_rules as rules
 from po_agent.core.trace import Booking
-from po_agent.mysys import driver
+from po_agent.mysys import driver, tasks
 
 pytestmark = pytest.mark.testsite
 
@@ -71,7 +70,7 @@ def test_hold_read_agrees_with_each_trial_tasks_status(
 
     assert states.pop(NO_SUCH_TASK) == "not_found"
     for task in lookup.tasks:
-        if task.status == rules.CANCELLED:
+        if task.status == tasks.CANCELLED:
             wanted = "cancelled"
         elif task.status.startswith("On-hold"):
             wanted = "on_hold"

@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.63 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.64 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -146,6 +146,8 @@ src/po_agent/
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
     booking.py                  the demo's screens, Note to Solved, proven on the test site 28 Oct 2026; the base for the booker (4.1-4.5)
+    booker.py                   W1-W5 with read-back, shared by every client (moved from b1/, task 9.2)
+    tasks.py                    the project's Tasks table: Compaction Test rows, live tasks, the new task (moved from b1/reader_rules.py, task 9.2)
     wait.py                     every MySys wait and timeout: poll until true, read until settled, the one retry of an opening click (refuses any other action)
   b1/                           rules for this automation
     models.py                   B1's models (pydantic): Reading, B1Proceed (the /048 PO and file name)
@@ -153,7 +155,6 @@ src/po_agent/
     readers.py                  both readers' texts as one value; the two-readers rule (agreement, address check on both)
     address.py                  normaliser + address check against the project's address
     decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given)
-    booker.py                   W1–W5 with read-back
 config/test.toml                test-site profile; no secrets
 config/live.toml                live profile; no secrets; ask-first for Claude (protect_paths)
 scripts/check.py                the one check command
@@ -198,7 +199,7 @@ trace_dir = "~/Library/Logs/po-agent/trace"   # the safe trace (7.3): written on
 Python 3.12, ruff format and ruff check (pyproject `[tool.ruff.lint]`: a catch-all `except` keeps `# noqa: BLE001 - <reason>`, an unused `noqa` fails, `po_agent` is always first-party; decisions, 24 Nov 2026), type hints throughout, checked by mypy with the pydantic plugin on `src` and `scripts` (strict flags for every module listed in the pyproject override; add each new module there; no `# type: ignore` without an error code and a reason), pydantic models at every boundary, small pure functions in `b1/`. Every MySys write is a **named guarded action** on one element inside its window (see [MySys screen rules](#mysys-screen-rules) → Windows and locators), found by accessible role and name, or by its visible label where the screen map marks the field weak, then read back:
 
 ```python
-# src/po_agent/b1/booker.py
+# src/po_agent/mysys/booker.py
 def set_po_number(guard: ActionGuard, task_form: Locator, po_number: str) -> None:
     field = field_by_label(task_form, "PO Number", role="textbox")   # weak: no accessible name (screen map row 09)
     guard.act("set_po_number", task_form, field, po_number)   # vet() first: refuses if not allowlisted, denylisted, or not exactly one match

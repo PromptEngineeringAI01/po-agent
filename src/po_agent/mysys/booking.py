@@ -24,7 +24,6 @@ from typing import Any, Literal
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import FilePayload, Locator, Page
 
-from po_agent.b1 import reader_rules as rules
 from po_agent.core.errors import (
     AccuracyBreach,
     PartialWrite,
@@ -33,6 +32,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.runlog import RunLog
 from po_agent.mysys import driver, wait
+from po_agent.mysys import tasks as task_table
 from po_agent.mysys.guard import ActionGuard
 
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
@@ -724,8 +724,8 @@ def wait_new_task(form: Locator, project: Locator, before: set[str]) -> str:
 
     def read() -> bool:
         try:
-            tasks = rules.compaction_tasks(task_rows(project))
-            task_id = rules.new_task(before, tasks)
+            tasks = task_table.compaction_tasks(task_rows(project))
+            task_id = task_table.new_task(before, tasks)
             if tasks[task_id] not in NEW_TASK_STATUSES:
                 raise PartialWrite(
                     "new task status not as expected", reason="TASK_STATUS"
@@ -1031,7 +1031,7 @@ def check_on_hold(project: Locator, task_id: str) -> None:
     )
     if not _shows(un_hold):
         raise PartialWrite("task not on hold")
-    status = rules.compaction_tasks(task_rows(project)).get(task_id, "")
+    status = task_table.compaction_tasks(task_rows(project)).get(task_id, "")
     if not status.startswith("On-hold") or HOLD_NOTE not in status:
         raise PartialWrite("task not on hold")
 
@@ -1051,7 +1051,7 @@ def read_hold(project: Locator, task_id: str) -> HoldState:
     status = driver.settled_tasks(project).get(task_id)
     if status is None:
         return "not_found"
-    if status == rules.CANCELLED:
+    if status == task_table.CANCELLED:
         return "cancelled"
     un_hold = _task_header(project, task_id).get_by_role(
         "button", name="Un-Hold", exact=True

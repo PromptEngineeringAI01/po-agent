@@ -2,6 +2,7 @@
 
 Version history of `SPEC.md`, moved verbatim from its status line on 19 Nov 2026 (v1.47). Newest first, one line per version; each line cites the `docs/decisions.md` entry behind it, where there is one. Add the next version here, at the top, in the same commit as the `SPEC.md` change, and bump the version on `SPEC.md` line 3.
 
+- 1.64: Project Structure: the W1-W5 booker moves from `b1/` to `mysys/booker.py` and the Tasks table parsing from `b1/reader_rules.py` to `mysys/tasks.py`, both shared by every client (task 9.2; ADR-003 decision 3)
 - 1.63: Project Structure: `core/models.py` holds the shared models and the shared `Proceed`; `b1/models.py` keeps B1's readings and `B1Proceed` (task 9.1; ADR-003 decision 2)
 - 1.62: Client 2: the assignee rule (the first run of the day, before 08:00 Perth, takes any non-agent assignee; later runs only `---`); a `---` Note returns to `---` (was Gita Valani), open question S6; S1 closed (11 POs saved) (decisions, 24 Nov 2026, Summit assignee rule)
 - 1.61: Client 2 creator table: Summit Home Improvement renamed Summit Renovations; Summit Project's only alias is Summit Developments; open question S2 closed (decisions, 24 Nov 2026, Summit creator table)

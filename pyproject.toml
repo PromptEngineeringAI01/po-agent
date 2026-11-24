@@ -62,7 +62,6 @@ module = [
     "po_agent",
     "po_agent.b1",
     "po_agent.b1.address",
-    "po_agent.b1.booker",
     "po_agent.b1.decision",
     "po_agent.b1.models",
     "po_agent.b1.reader_rules",
@@ -77,9 +76,11 @@ module = [
     "po_agent.core.runlog",
     "po_agent.core.secrets",
     "po_agent.mysys",
+    "po_agent.mysys.booker",
     "po_agent.mysys.booking",
     "po_agent.mysys.driver",
     "po_agent.mysys.guard",
+    "po_agent.mysys.tasks",
     "po_agent.mysys.wait",
 ]
 disallow_any_generics = true

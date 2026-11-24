@@ -44,6 +44,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.secrets import SecretName
 from po_agent.mysys import booking, driver, wait
+from po_agent.mysys import tasks as task_table
 from po_agent.mysys.guard import ActionGuard
 
 # The one trial PO (Must never #6 allows its identifiers in committed files).
@@ -222,8 +223,8 @@ def _steps(
     project = booking.open_project(guard, page, projects, pln)
     if not rules.same_internal_no(booking.client_internal_no(project), INTERNAL_NO):
         raise WriteNotStarted("project internal number", reason="PROJECT_MISMATCH")
-    tasks = rules.compaction_tasks(booking.task_rows(project))
-    if rules.live_tasks(tasks):
+    tasks = task_table.compaction_tasks(booking.task_rows(project))
+    if task_table.live_tasks(tasks):
         raise WriteNotStarted("Compaction Test task exists", reason="DUPLICATE_TASK")
     output.info("demo: project checked")
     if options.until_check:
