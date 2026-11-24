@@ -71,6 +71,9 @@ SAFETY_FILES = (
     GUARD,
     "scripts/guard_check.py",
     "scripts/check.py",
+    # The scripts that grade a PR, so a PR can't loosen them unseen.
+    "scripts/risk.py",
+    "scripts/verify_pr.py",
     "config/test.toml",
     "docs/macmini-setup.md",
     "scripts/macmini-run.sh",
