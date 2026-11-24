@@ -12,6 +12,12 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 
 Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SPEC names them. B1 behaviour stays unchanged; any `mysys/` change runs B1's seam 2 on the test site (the advisor may batch resets). High risk = one second-model review. Open questions for the decision batch: plan -> Phase S.
 
+**Before 9.1 (admin)**
+- [ ] **A.1** Joey approves Phase S (freeze point for this phase) · by hand
+- [ ] **A.2** PR 165's hand edits merged (CLAUDE.md first line and Must never #6, `docs/workflow.md` phases) · Joey
+- [ ] **A.3** `/start-task` brief no longer says "B1 Homes only" or "in the order of Phase P" (`.claude/skills/start-task/SKILL.md`, Claude-editable: the advisor or a small task, or Joey by hand)
+- [ ] **A.4** `production` tag moves during the build as Joey picks (plan -> Phase S, open question 2), each followed by one watched B1 hourly run · by hand
+
 **S-A Seam, B1 unchanged**
 - [ ] **9.1** Shared models (`core/models.py`); the Creator travels in the `Proceed`, no `CREATOR` constant in `mysys/` · step · refactor · high
 - [ ] **9.2** `mysys/` imports no client package and holds no client constant; the booker moves to `mysys/booker.py`; B1 seam 2 green · step · refactor · high
@@ -35,17 +41,17 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.12** The peek (read-only open, iframe body rule, download, readers, lookup, decide) and `run --decide-only --client summit`; guard history read-only for untouched Notes · step · high
 - [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> Gita Valani, else ALERT) · step · high
 - [ ] **9.14** Summit booking W1-W5: decided Creator (missing option -> `WRITE_NOT_STARTED`), full PO, body, previous-task recheck at W1, Documents name per S.0; `run --client summit` books (needs S.0 screens) · step · high
-- [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist, Healthchecks `healthchecks_ping_url_summit`, `docs/macmini-setup.md` and `docs/ops-runbook.md` · step · medium · ask-first files
+- [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist at :30 (07:30-17:30 Mon-Fri Perth; Joey, 24 Nov 2026), Healthchecks `healthchecks_ping_url_summit`, alert issues `po-agent alert summit <run_id>`, `docs/macmini-setup.md` and `docs/ops-runbook.md` · step · medium · ask-first files
 
 **Checkpoint S-C:** SPEC's offline Summit tests green; B1 seam 2 booking cases green; the client file still `enabled = false`.
 
 **S-D Live (Joey, Mac Mini; each step its own dated decisions entry first; Claude never runs anything on live)**
-- [ ] **S.0** (from now, beside the build) By-hand live screenshots into `private/summit/` (Creator options, a Summit Documents row, Locked/Unlocked and My Notes after one by-hand Assign, Note Pool count); `cases.toml` and expected compaction per PDF; Claude writes the screens into `docs/screen-map.md` redacted · by hand
-- [ ] **S.1** (after 9.15) Agent 2's secrets in `poagent`'s Keychain; `preflight --site live --client summit` exit 0; Agent 2's My Notes empty, no more by-hand assigns to Agent 2 · by hand
-- [ ] **S.2** Kill-switch PR (client `enabled`), `production` tag moved, `spike live summit`: exit 0, no `MORE_PAGES` · by hand
-- [ ] **S.3** `decide-only live summit`: NOTE lines read against the Notes; a peeked Note's log unchanged · by hand
-- [ ] **S.4** `run live summit`, cap 1, watched; 5.2's trace check on the first · by hand
-- [ ] **S.5** Cap raised by its own PR; Summit launchd job and Healthchecks check loaded; first hourly run watched · by hand
+- [ ] **S.0** (from now, beside the build) By-hand live screenshots into `private/summit/` (Creator options, a Summit Documents row, Locked/Unlocked and My Notes after one by-hand Assign, assigned back before S.1, Note Pool count); `cases.toml` and expected compaction per PDF; the MySys admin's answer on Agent 2's password expiry and MFA; Claude writes the screens into `docs/screen-map.md` redacted · by hand
+- [ ] **S.1** (after 9.15; `production` tag on a commit with 9.1-9.15) Agent 2's secrets in `poagent`'s Keychain; `preflight --site live --client summit` exit 0; Agent 2's My Notes empty; Joey tells the team: no by-hand assigns to Agent 2 · by hand
+- [ ] **S.2** Kill-switch PR (client `enabled`), `production` tag moved, `spike live summit`: exit 0, `"client": "summit"`, no `MORE_PAGES` · by hand
+- [ ] **S.3** `decide-only live summit`: NOTE lines read against the Notes; a peeked Note's log unchanged; its duration sets `max_peeks_per_run` · by hand
+- [ ] **S.4** Admins told the agent may take and return their Summit Notes; `run live summit`, cap 1, watched; 5.2's trace check on the first · by hand
+- [ ] **S.5** Healthchecks check `po-agent summit` (cron `30 7-17 * * 1-5`, Perth, 40 min grace); cap raised by its own PR; Summit launchd job loaded (:30); first hourly run watched · by hand
 
 ## Production order (from 29 Oct 2026; plan -> Phase P, `SPEC.md` -> Production)
 

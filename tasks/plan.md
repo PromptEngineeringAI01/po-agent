@@ -757,6 +757,7 @@ Unattended runs need what a watched demo didn't: someone told when the job stops
 
 | Step | Tasks | Done when |
 |---|---|---|
+| Admin before 9.1 | A.1-A.4 in `tasks/todo.md` (plan approved, PR 165's hand edits, the `/start-task` brief, tag moves) | 9.1 can start |
 | S-A Seam, B1 unchanged | 9.1 shared models and the Creator in the `Proceed` -> 9.2 `mysys/` client-free -> 9.3 client profile and `--client` -> 9.4 client interface in the run loop -> 9.5 per-client run controls and output; 9.6 guard `set_source_filter` (any time; Joey merges) | Checkpoint S-A |
 | S-B Decide, offline | 9.7 Summit readers (review stop; needs only 9.1) -> 9.8 Tasks read with Task Creator -> 9.9 Summit decision engine -> 9.10 Summit real-PO seam (needs S.0's `cases.toml`) | Checkpoint S-B |
 | S-C Run, offline | 9.11 Note Pool list and spike -> 9.12 the peek and decide-only -> 9.13 take and return -> 9.14 booking W1-W5 (needs S.0's screenshots) -> 9.15 Mac Mini wiring and runbook | Checkpoint S-C |
@@ -837,7 +838,7 @@ One task per session, in this order (workflow build loop). 9.6 and 9.7 touch onl
 - Kill switch: a Summit run needs the site's `enabled` and the client file's `enabled`, at start and in every `before_write`.
 - Caps: `max_notes_per_run` (bookings) and `max_peeks_per_run` (Notes opened) from the client file; `max_run_minutes` from the site.
 - Stale-Note stop reads Agent 2's My Notes (the client's `agent_user_name`, `stale_read = "my_notes"`).
-- `RUN_SUMMARY` gains `"client"` (B1's too); the `booked` trace event gains `client` (closed type `b1|summit`); the hold re-check reads only its own site's and client's `booked` events, an event without `client` being B1's.
+- `RUN_SUMMARY` gains `"client"` (B1's too; the test that pins its keys changes in its own `test:` commit citing decisions, 23 Nov 2026, separate run); the `booked` trace event gains `client` (closed type `b1|summit`); the hold re-check reads only its own site's and client's `booked` events, an event without `client` being B1's.
 **Verify:** `uv run scripts/check.py`.
 **Files:** `src/po_agent/core/runlock.py`, `controls.py`, `trace.py`, `output.py`, `run.py`, tests. **Scope:** M.
 
@@ -927,21 +928,29 @@ One task per session, in this order (workflow build loop). 9.6 and 9.7 touch onl
 
 ### 9.15 Mac Mini wiring and runbook · step · medium · ask-first files
 
-**Description:** `scripts/macmini-run.sh <mode> live summit` passes `--client summit` and reads both `enabled` flags from `origin/main`; a second launchd plist at another minute past the hour (Joey picks the minute); its own Healthchecks ping (keychain `healthchecks_ping_url_summit`); `docs/macmini-setup.md` (Agent 2's secrets, the second job); `docs/ops-runbook.md` Summit entries (Note not returned, `NOTE_TAKEN`, a stale Note on Agent 2, `CREATOR_UNKNOWN` at W1). The wrapper, the plist and `docs/macmini-setup.md` are **ask-first**: the session names each change to Joey before making it.
+**Description:** `scripts/macmini-run.sh <mode> live summit` passes `--client summit` and reads both `enabled` flags from `origin/main`; a second launchd plist at **:30 past the hour, 07:30-17:30 Monday-Friday Perth** (Joey, 24 Nov 2026; B1 stays at :07); its own Healthchecks ping (keychain `healthchecks_ping_url_summit`; the check's cron `30 7-17 * * 1-5`); Summit's alert issues titled `po-agent alert summit <run_id>`, B1's titles unchanged; Summit runs don't touch B1's GitHub backup heartbeat (open question 4); `docs/macmini-setup.md` (Agent 2's secrets, the second job, its Healthchecks check); `docs/ops-runbook.md` Summit entries (Note not returned, `NOTE_TAKEN`, a stale Note on Agent 2, `CREATOR_UNKNOWN` at W1, Agent 2's password changed, stopping Summit alone: unload its job or the client `enabled = false` PR). If the run minute's dated decisions entry and SPEC's Mac Mini row aren't on `main` yet, this task adds them. The wrapper, the plist and `docs/macmini-setup.md` are **ask-first**: the session names each change to Joey before making it.
 **Needs:** 9.14.
-**Acceptance:** stub-command wrapper tests: the client argument reaches `--client`; an unknown client refuses and alerts; the client's `enabled = false` on `main` runs nothing; B1's `run live` unchanged; one ping per run per client.
+**Acceptance:** stub-command wrapper tests: the client argument reaches `--client`; an unknown client refuses and alerts; the client's `enabled = false` on `main` runs nothing; B1's `run live` unchanged; one ping per run per client; the Summit plist's calendar is minute 30, hours 7-17, Monday-Friday.
 **Verify:** `uv run scripts/check.py`; `plutil -lint` on the Mac by Joey at S.5.
 **Files:** `scripts/macmini-run.sh`, a new plist in `scripts/`, `docs/macmini-setup.md`, `docs/ops-runbook.md`, `tests/test_macmini_wrapper.py`. **Scope:** M.
 
 ### Joey's live steps S.0-S.5 · by hand
 
-As SPEC -> Summit testing and go-live, each with its own dated `docs/decisions.md` entry first; Claude never runs anything on live.
-- **S.0** (from now, beside the build): Joey's by-hand live screenshots into `private/summit/` (Creator options on Summit projects, a Summit Documents row and its Type and Sale Office, Locked/Unlocked and Agent 2's My Notes after one by-hand Assign, the Note Pool count at Source + Unlocked + Pending); `private/summit/fixtures/cases.toml` for the 11 POs (open question 1: who fills which part) and the expected compaction finding per PDF for 9.7. Claude writes the screens into `docs/screen-map.md` redacted. Needed by 9.7 (expected values), 9.10 (`cases.toml`) and 9.14 (screens).
-- **S.1** (after 9.15): Agent 2's secrets in `poagent`'s Keychain; `po-agent preflight --site live --client summit` exit 0; Agent 2's My Notes empty and the team stops assigning to Agent 2 by hand.
-- **S.2:** the kill-switch PR flips the client's `enabled`; Joey moves the `production` tag; `spike live summit`: exit 0, eligible count, no `MORE_PAGES`; sets `max_peeks_per_run` with S.3 (open question S3).
-- **S.3:** `decide-only live summit`; Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee.
-- **S.4:** `run live summit`, cap 1, watched; 5.2's trace check on the first; each booked task correct in MySys.
-- **S.5:** the cap raised by its own PR; the Summit launchd job and Healthchecks check loaded; the first hourly run watched.
+As SPEC -> Summit testing and go-live, each with its own dated `docs/decisions.md` entry first; Claude never runs anything on live. Steps marked "before" are Joey's admin steps that gate a build task (merged in from the 24 Nov 2026 handover of a second planning session, which also had paste-ready commands for each: its `docs/summit-admin-steps.md` draft, not committed; 9.15's `docs/macmini-setup.md` section carries the Mac Mini commands).
+
+**Before 9.1 (admin):**
+- Joey approves Phase S (the freeze point for this phase).
+- PR 165's hand edits merged: CLAUDE.md's first line and Must never #6, `docs/workflow.md` phases (Joey's).
+- The `/start-task` brief (`.claude/skills/start-task/SKILL.md`) still says "The agent is for B1 Homes only." and picks tasks "in the order of Phase P": fixed before the first Summit task session starts, by the advisor or a small task (skills are Claude-editable except `skills/verify-pr/`), or by Joey by hand.
+- From 9.1 on, the `production` tag moves under open question 2; each move: Joey watches the next B1 hourly run (exit 0, the tagged commit in its `wrapper: running production` line); rollback is the same move to the previous commit (`docs/macmini-setup.md` section 8).
+
+**Live steps:**
+- **S.0** (from now, beside the build): Joey's by-hand live screenshots into `private/summit/` (Creator options on Summit projects, one per fixed-creator company and one previous-task company; a past Summit task's Documents row with a `-` in the file name, its Type and Sale Office; Locked/Unlocked and Agent 2's My Notes after one by-hand Assign, **assigned back to its original assignee before S.1**; the Note Pool footer at Source + Unlocked + Pending at a busy time); `private/summit/fixtures/cases.toml` for the 11 POs (open question 1: who fills which part) and the expected compaction finding per PDF for 9.7. Claude writes the screens into `docs/screen-map.md` redacted. Needed by 9.7 (expected values), 9.10 (`cases.toml`) and 9.14 (screens). Also before S.1: the MySys admin answers whether Agent 2's password expires and whether its login has MFA (an expiring password stops unattended runs; goes into `docs/ops-runbook.md`).
+- **S.1** (after 9.15, with the `production` tag on a commit holding 9.1-9.15): the Mac Mini checkout is on that commit; Agent 2's secrets in `poagent`'s Keychain (Joey types them); `po-agent preflight --site live --client summit` exit 0; Agent 2's My Notes empty; Joey tells the team nobody assigns a Note to Agent 2 by hand from now on.
+- **S.2:** the kill-switch PR flips the client's `enabled`; Joey moves the `production` tag to its merge; `spike live summit`: exit 0, `RUN_SUMMARY` with `"client": "summit"`, eligible count, no `MORE_PAGES`; sets `max_peeks_per_run` with S.3 (open question S3). No manual run within a few minutes of :07 (B1) or :30 (Summit).
+- **S.3:** `decide-only live summit`; Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee; the run's duration sets `max_peeks_per_run` (its own PR if it changes).
+- **S.4:** before it, Joey tells the admins that the agent may take a Summit Note from them and returns it if it stops before Submit. `run live summit`, cap 1, watched; 5.2's trace check on the first; each booked task correct in MySys (Creator, PO Number, Documents, Note, On Hold, linked, Solved).
+- **S.5:** the Healthchecks check `po-agent summit` (cron `30 7-17 * * 1-5`, Australia/Perth, grace 40 minutes) and its ping URL in `poagent`'s Keychain as `healthchecks_ping_url_summit`; the cap raised by its own PR and the tag moved; the Summit launchd job loaded (07:30-17:30 Monday-Friday Perth); the first hourly run watched. Stopping Summit alone later: unload its job, or the client `enabled = false` PR (9.15's runbook).
 
 ### Checkpoints
 
@@ -978,14 +987,16 @@ As SPEC -> Summit testing and go-live, each with its own dated `docs/decisions.m
 | Creator option or Documents name differs on Summit projects | Med | S.0 screenshots; W1 stops before Submit (`WRITE_NOT_STARTED`) |
 | Page 1 overflows or the peek runs long | Med | `MORE_PAGES`; `max_peeks_per_run` and `max_run_minutes` set from S.2-S.3 |
 | A second compaction PO for one job never books (strict duplicate rule) | Low | Known and out of scope (SPEC); decide-only shows how often; booked by hand |
-| B1 and Summit runs overlap on the Mac Mini | Low | Different accounts and locks; another minute past the hour; `max_run_minutes` each |
+| B1 and Summit runs overlap on the Mac Mini | Low | Different accounts and locks; B1 at :07, Summit at :30; `max_run_minutes` each |
 
 ### Open questions for the advisor's decision batch (one at a time, with the recommendation)
 
 1. **Who fills `private/summit/fixtures/cases.toml`?** Recommended: Joey copies the Note side (title, body, original assignee) and states the expected result for each PO; Claude reads the project side (Projects search rows, Client Internal No., the Tasks table with Task Creator) under the 10 Nov 2026 live-lookup exception, after Joey logs in to live himself with the agent account, writing only into `private/`. The exception covers no Note Pool or Note window, so the Note side stays Joey's. Alternative: Joey copies everything by hand.
-2. **When does the `production` tag first move past the refactor?** Recommended: right after Checkpoint S-A, so a B1 regression shows on a small diff and Joey watches one B1 hourly run then; alternative: once, at S.2.
+2. **When does the `production` tag move during the build?** Recommended: after each refactor merge (9.1, 9.2, 9.4) and after Checkpoints S-A and S-C, each with one watched B1 hourly run, so a B1 break shows on one small PR; alternatives: after every shared-code merge (the other session's suggestion: safest, about ten tag moves), or once at S.1 (one big diff under B1's live run).
 3. **A PDF whose `Purchase Order No:` values differ between pages** (none of the 11 does): recommended `PO_MISMATCH`; asked at 9.7's review stop.
-4. **The GitHub backup heartbeat** (18 Nov 2026) for the Summit job: recommended Healthchecks only, as SPEC says, the backup staying B1's; asked at 9.15.
+4. **The GitHub backup heartbeat** (18 Nov 2026) for the Summit job: recommended Healthchecks only, as SPEC says; Summit runs don't rewrite B1's heartbeat issue, so the backup keeps meaning "B1 ran"; asked at 9.15.
+
+Settled since the first draft: the Summit run minute is **:30** (Joey, 24 Nov 2026, in the other planning session; its decisions entry lands with SPEC or in 9.15).
 
 ---
 
