@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 24 Nov 2026, `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, verify_pr.py advisory in CI; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: verify_pr.py runs in CI as an advisory job** (Joey; entry below): its own `verify-pr` job, not a required status, so a false positive never blocks a merge or skips gitleaks; `/verify-pr` runs it first from `main`'s copy. Loosens nothing.
 - **24 Nov 2026: `refactor:` is a commit type** (Joey, audit fix #2; entry below): CLAUDE.md's Conventional Commits list adds `refactor:`, which tasks 8.3 and 8.4 already used; `scripts/verify_pr.py` accepts it. Loosens nothing.
 - **23 Nov 2026: Summit Home is client 2** (ADR-003 Accepted, option C; Joey said yes under the CEO's delegation; six entries below): a read-only peek with every check before the take; the Client Internal No. check in place of the address check (loosens a control); Summit's decision rules; return to the original assignee (taking a person's Note is allowed for Summit); a separate Agent 2 run; testing and go-live without the test site (loosens a control). Spec only: nothing built yet.
 - **21 Nov 2026: one wait module** (task 8.4; Joey's settled design of 9 Nov; entry below): every MySys wait in `mysys/wait.py`; its retry refuses any action but the four opening clicks (tightens a safety control). No change in MySys or run output; the tests' timeout patches move to the one module in their own `test:` commit.
@@ -12,6 +13,13 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - verify_pr.py in CI as an advisory job, and in /verify-pr (Joey; PR 161 follow-up)
+
+- **Decided:** CI runs `scripts/verify_pr.py` on every pull_request push in its own job, `verify-pr`, which is **not** a required status; the required `check` status stays `scripts/check.py` plus gitleaks. `/verify-pr` runs the script first (step 2) from `main`'s copy in the advisor's checkout, and that run is the one that counts; the skill's mechanical rules are marked *(script)* and not redone by hand.
+- **Why advisory (second-model review of the first patch):** inside the required `check` job, any FAIL, a false positive included (the guarded-action rule matches a helper of ours named `check`), would block a merge with no override short of lifting branch protection, which is enforced on admins too; it would also skip gitleaks on that run; a PR body fixed after the push would leave the red check on the head commit; and CI runs the PR's own copy of the script, so a PR could loosen the rules it is checked by.
+- **False positives:** a FAIL from the guarded-action rule that plainly isn't a Playwright page call is reported as a likely false positive for Joey to decide, not merged past silently.
+- **Loosens:** nothing. The required status is unchanged; the script adds an advisory signal and replaces hand greps in the skill.
 
 ## 24 Nov 2026 - `refactor:` is an allowed commit type (Joey, audit fix #2)
 

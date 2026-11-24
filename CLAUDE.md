@@ -18,7 +18,7 @@ Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note 
 
 All commands, flags and Mac Mini runs: `SPEC.md` → Commands.
 
-- Check (= CI): `uv run scripts/check.py` - healthy: last line "check: all passed", exit 0
+- Check (= CI): `uv run scripts/check.py` - healthy: last line "check: all passed", exit 0. CI also runs gitleaks, and on PRs an advisory `verify-pr` job (`scripts/verify_pr.py`, not a required status)
 - Install: `uv sync --locked`
 - Seam 2 on the test site: `uv run pytest tests/seam2 -m testsite`
 - Real-PO seam (laptop only): `uv run pytest tests/seam1 -m real_data`
