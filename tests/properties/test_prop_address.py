@@ -13,7 +13,7 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from po_agent.b1.address import normalise, parse_project_address, verify_address
-from po_agent.b1.models import SkipReason
+from po_agent.core.models import SkipReason
 
 MISMATCH = SkipReason.ADDRESS_MISMATCH
 UNVERIFIABLE = SkipReason.ADDRESS_UNVERIFIABLE

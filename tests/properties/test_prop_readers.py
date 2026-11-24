@@ -15,9 +15,9 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from po_agent.b1 import reader_rules as rules
-from po_agent.b1.models import SkipReason
 from po_agent.b1.readers import PdfTexts, check_address, check_second_reader
 from po_agent.core.errors import WriteNotStarted
+from po_agent.core.models import SkipReason
 
 PO_SHAPE = st.from_regex(r"[0-9A-Z]{1,10}/[0-9]{3}", fullmatch=True)
 # File names as URLs carry them: anything printable, no surrogates.

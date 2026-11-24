@@ -14,7 +14,8 @@ from oracle import decision as old_decision
 from oracle import models as old_models
 from oracle import readers as old_readers
 
-from po_agent.b1 import decision, models, readers
+from po_agent.b1 import decision, readers
+from po_agent.core import models
 
 POOL = "Fake Agent Pool"
 
