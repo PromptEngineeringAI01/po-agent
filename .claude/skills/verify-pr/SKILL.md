@@ -26,9 +26,17 @@ git log --format='%h %s' origin/main..origin/<headRefName>
 
 For each commit, list its files (`git show --name-only --format= <sha>`).
 
+First run the mechanical rules of steps 2-4 (commit types, tests only in `test:` commits, em dashes, guarded actions, the live host and the key name in added lines, dependency files, the four PR sections and the stated risk):
+
+```bash
+uv run scripts/verify_pr.py origin/<headRefName> --pr $ARGUMENTS
+```
+
+Every `FAIL:` line is Important. `WARN:` and `REVIEW:` lines are for the steps below to judge; don't re-check by hand what a FAIL rule already covers. CI runs the same script on every PR push, but not after a PR body edit, so this run is the one that counts for the body rules.
+
 - **Fail** if a commit whose subject doesn't start with `test:` touches `tests/` (CLAUDE.md, TDD: test changes go in their own commit).
 - **Fail** if a `test:` commit touches `src/`.
-- Every subject is a Conventional Commit (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
+- Every subject is a Conventional Commit (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`).
 - Flag a `test:` commit that changes an existing expected result. It passes without asking Joey only if the PR explains it as an intended behaviour change **and** the PR carries the `docs/decisions.md` entry that made that change: quote both. Otherwise it's Important (CLAUDE.md Must never #8; decisions, 6 Nov 2026).
 
 ## 3. Safety-sensitive files

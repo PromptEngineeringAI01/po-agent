@@ -24,6 +24,14 @@ jobs:
       - run: uv sync --locked
       - run: uv run playwright install --with-deps chromium # the guard's tests use a real browser on local HTML
       - run: uv run scripts/check.py
+      # The mechanical half of /verify-pr (audit fix #2, PR 161); PRs only. A body
+      # edit doesn't re-run pull_request, so /verify-pr's own run still counts.
+      - if: github.event_name == 'pull_request'
+        run: uv run scripts/verify_pr.py "$HEAD_SHA" --pr "$PR_NUMBER"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
       # v3: v2 ran on Node 20, which GitHub removed from its runners on 16 Sep 2026.
       # The owner is a user account, so no GITLEAKS_LICENSE is needed.
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
