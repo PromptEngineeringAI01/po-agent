@@ -119,14 +119,15 @@ def test_two_internal_numbers_in_a_test_cell_are_not_eligible(first, second, bet
 
 @given(internal_nos, internal_nos)
 def test_a_live_note_whose_attachment_is_another_number_skips(title_no, file_no):
-    """The live title's number, a body and attachment for another number:
-    never PROCEED (Joey, 24 Nov 2026: pinned as a skip). Here the attachment
-    is the other PO's, so step 4 skips it (PO_MISMATCH)."""
+    """The live title's number, a body naming no number and an attachment
+    for another number: never PROCEED (Joey, 24 Nov 2026: pinned as a skip).
+    The cell is eligible, and step 4 skips it (PO_MISMATCH). A body naming
+    the other number is not eligible (the test below)."""
     assume(title_no != file_no)
-    cell = f"[B1 Homes] Order {title_no}/048 Please find attached {file_no}_048_1.pdf"
+    cell = f"[B1 Homes] Order {title_no}/048 Please find attached Purchase Order"
     row = NotePoolRow(note_id="1", subject_note=cell, project="---", assignee=POOL)
     internal_no = eligible_internal_no(row, "live-b1-title", POOL)
-    assert internal_no in (None, title_no)
+    assert internal_no == title_no
     if internal_no is not None:
         note = models.NoteSnapshot(
             note_id="1",
@@ -144,17 +145,11 @@ def test_a_live_note_whose_attachment_is_another_number_skips(title_no, file_no)
         assert result.reason is SkipReason.PO_MISMATCH
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Found 24 Nov 2026: a live cell naming a second, different PO in its"
-    " body is still eligible (decision.py:64-66), unlike its docstring and the"
-    " test rule. Joey pinned it as a skip; the fix is its own task.",
-)
 @example(title_no="9000001A", other_no="9000002A")  # the minimized counterexample
 @given(internal_nos, internal_nos)
 def test_a_live_cell_naming_a_second_po_is_not_eligible(title_no, other_no):
     """decision.py step 0: two different internal numbers in one cell are
-    uncertain, so not eligible. The live rule reads only the title."""
+    uncertain, so not eligible, on live as on the test rule."""
     assume(title_no != other_no)
     cell = (
         f"[B1 Homes] Order {title_no}/048 Please find attached Purchase Order"

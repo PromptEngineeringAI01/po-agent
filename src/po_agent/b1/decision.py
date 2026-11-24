@@ -43,6 +43,14 @@ _TEST_FILENAME = re.compile(
 # The title [B1 Homes] Order <internal no>/048 at the start of the cell, then
 # the body or nothing.
 _LIVE_TITLE = re.compile(rf"\[B1 Homes\] Order ({_INTERNAL_NO})/048(?=\s|$)")
+# Live's second-number check: <internal no>_048[_n].pdf or <internal no>/048
+# anywhere in the cell, with _TEST_FILENAME's leading boundary. Wider than
+# the test rule, so it refuses more, never less: any case (compare upper
+# case), and a following "." still counts ("... file <n>_048_1.pdf.").
+_LIVE_PO = re.compile(
+    r"(?<![0-9A-Za-z_])([0-9A-Z]+)(?:_048(?:_[0-9]+)?\.pdf|/048)(?![0-9A-Za-z_])",
+    re.IGNORECASE,
+)
 
 
 def eligible_internal_no(
@@ -53,7 +61,9 @@ def eligible_internal_no(
     Eligible: the Subject/Note cell matches the title rule, the Project cell
     reads "---" and the Assignee cell reads pool_name (so a person's Note is
     never taken, even if the pool filter didn't apply). Anything uncertain,
-    such as two different internal numbers in one cell, is not eligible.
+    such as two different internal numbers in one cell, is not eligible: on
+    live, a body naming another number as <n>_048[_m].pdf or <n>/048
+    (Joey, 24 Nov 2026).
     """
     if row.project.strip() != UNLINKED_PROJECT or row.assignee.strip() != pool_name:
         return None
@@ -63,7 +73,10 @@ def eligible_internal_no(
         return found.pop() if len(found) == 1 else None
     if rule == "live-b1-title":
         match = _LIVE_TITLE.match(cell)
-        return match.group(1) if match else None
+        if not match:
+            return None
+        found = {m.group(1).upper() for m in _LIVE_PO.finditer(cell)}
+        return match.group(1) if found == {match.group(1)} else None
     raise ValueError("unknown title rule")
 
 
