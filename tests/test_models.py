@@ -1,5 +1,6 @@
 """Tests for the seam-1 models (task 2.1; docs/specs/spec.md section 3) and
-the shared models (task 9.1; ADR-003 decision 2).
+the shared models with the Creator in the `Proceed` (task 9.1; ADR-003
+decisions 2-3).
 
 Values are fake (`2600001B`, `pln_10001`, `Sample Lane`), never a trial PO's.
 """
@@ -35,6 +36,7 @@ def proceed(**overrides: object) -> B1Proceed:
         "pdf_file_name": "2600001B_048_1.pdf",
         "pdf_bytes": b"%PDF-fake",
         "existing_task_nos": ("tsk_200001",),
+        "creator": "Perth Scheduling",
     }
     values.update(overrides)
     return B1Proceed(**values)  # type: ignore[arg-type]
@@ -185,6 +187,7 @@ def test_proceed_is_frozen() -> None:
         {"email_body": ""},
         {"pdf_file_name": "2600001B_048_1.docx"},
         {"pdf_file_name": "2600001B_023_1.pdf"},  # not the /048 file
+        {"creator": ""},
         {"pdf_bytes": b""},
         {"existing_task_nos": ("200001",)},
         {"extra": "value"},
@@ -212,7 +215,15 @@ def test_note_snapshot_needs_a_note_id() -> None:
         )
 
 
-# --- Task 9.1: the shared Proceed and B1's (ADR-003 decision 2) ---
+# --- Task 9.1: the Creator travels in the Proceed (ADR-003 decision 3) ---
+
+
+@pytest.mark.parametrize("model", [Proceed, B1Proceed])
+def test_a_proceed_has_no_default_creator(model: type[Proceed]) -> None:
+    values = proceed().model_dump()
+    del values["creator"]
+    with pytest.raises(ValidationError):
+        model(**values)
 
 
 def test_a_b1_proceed_is_a_shared_proceed() -> None:
@@ -265,7 +276,7 @@ def test_only_a_client_decision_engine_constructs_a_proceed() -> None:
         ("Proceed(note_id='1')", True),
         ("models.B1Proceed(note_id='1')", True),
         ("B1Proceed.model_validate({})", True),
-        ("proceed.model_copy(update={'pln': 'pln_1'})", True),
+        ("proceed.model_copy(update={'creator': 'x'})", True),
         ("isinstance(decision, Proceed)", False),
         ("Skip(reason=reason)", False),
     ],

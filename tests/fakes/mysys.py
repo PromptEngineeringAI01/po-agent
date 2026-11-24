@@ -276,7 +276,7 @@ class FakeMySys:
         self._step("form")  # Create New Task (screen-map row 08)
         return "form"
 
-    def fill_task_form(self, guard, form, po_number, body, file_name, data):
+    def fill_task_form(self, guard, form, po_number, body, file_name, data, *, creator):
         self._step("fill")  # Compaction Test ticked and filled (screen-map row 09)
 
     def submit_task(self, guard, form):
@@ -288,14 +288,14 @@ class FakeMySys:
         self._step("new_task")
         return self.task_no
 
-    def check_new_task_row(self, project, task_no, agent):
+    def check_new_task_row(self, project, task_no, agent, *, creator):
         self._step("task_row")  # the new task's details row (screen-map row 10)
         return "details"
 
-    def open_task_detail(self, guard, project, details):
+    def open_task_detail(self, guard, project, details, *, creator):
         self._step("open_detail")  # opened from the details row (screen-map row 19)
 
-    def check_task_detail(self, page, task_no, po_number, body, agent):
+    def check_task_detail(self, page, task_no, po_number, body, agent, *, creator):
         self._step("detail")  # the task detail screen (screen-map row 19)
         return "detail-window"
 
