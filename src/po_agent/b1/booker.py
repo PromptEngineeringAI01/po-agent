@@ -58,7 +58,6 @@ from typing import NoReturn
 from playwright.sync_api import Locator, Page
 
 from po_agent.b1.decision import Site
-from po_agent.b1.models import Proceed
 from po_agent.core.controls import Controls
 from po_agent.core.errors import (
     AccuracyBreach,
@@ -67,6 +66,7 @@ from po_agent.core.errors import (
     PoAgentError,
     WriteNotStarted,
 )
+from po_agent.core.models import Proceed
 from po_agent.core.runlog import RunLog
 from po_agent.mysys import booking, driver
 from po_agent.mysys.guard import ActionGuard

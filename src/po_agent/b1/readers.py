@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.address import job_address_line, normalise, verify_address
-from po_agent.b1.models import Skip, SkipReason
+from po_agent.core.models import Skip, SkipReason
 
 
 class PdfTexts(BaseModel):

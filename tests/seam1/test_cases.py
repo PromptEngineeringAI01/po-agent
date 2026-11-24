@@ -22,7 +22,7 @@ from seam1_cases import (
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import eligible_internal_no
-from po_agent.b1.models import Proceed
+from po_agent.b1.models import B1Proceed
 from po_agent.core.errors import WriteNotStarted
 
 FAKE_INTERNAL_NO = re.compile(r"26000[0-9]{2}[A-Z]")
@@ -95,7 +95,7 @@ def test_expected_proceed_is_a_valid_proceed(seam1_case: Seam1Case) -> None:
         return
     assert expect.pln in [row.pln for row in seam1_case.lookup.search_rows]
     assert [n for n in seam1_case.note.attachment_names if n.lower().endswith(".pdf")]
-    Proceed(
+    B1Proceed(
         note_id=seam1_case.note.note_id,
         internal_no=expect.po_number.split("/")[0],
         pln=expect.pln,

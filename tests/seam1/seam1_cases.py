@@ -15,12 +15,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from po_agent.b1.decision import TitleRule
-from po_agent.b1.models import (
-    MySysLookup,
-    NotePoolRow,
-    NoteSnapshot,
-    SkipReason,
-)
+from po_agent.core.models import MySysLookup, NotePoolRow, NoteSnapshot, SkipReason
 
 CASES_FILE = Path(__file__).parent / "fixtures" / "cases.toml"
 POOL = "Agent Pool"
@@ -34,6 +29,7 @@ COVERAGE = {
     "live-title-config": "same 3, live-style titles -> PROCEED",
     "live-title-missing-tag": "live title missing [B1 Homes]",
     "live-title-po-differs": "live title PO differs from the PDF PO",
+    "live-cell-second-po": "live cell names a second internal number -> not eligible",
     "issuer-not-b1": "issuer not B1 Homes Pty Ltd -> NOT_B1",
     "compaction-removed": "COMPACTION removed -> NOT_COMPACTION",
     "file-name-023": "file name _023 -> not eligible",

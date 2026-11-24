@@ -149,7 +149,11 @@
       "Bash(gh api * -F *)",
       "Bash(gh api * --field *)",
       "Bash(gh api * --raw-field *)",
-      "Bash(gh api * --input *)"
+      "Bash(gh api * --input *)",
+      "mcp__claude-in-chrome",
+      "mcp__Claude_Browser__javascript_tool",
+      "mcp__Claude_Browser__form_input",
+      "mcp__Claude_Browser__read_network_requests"
     ]
   },
   "hooks": {
@@ -170,6 +174,16 @@
           {
             "type": "command",
             "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*([Cc]hrome|[Bb]rowser|[Pp]review).*__.*|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"$CLAUDE_PROJECT_DIR\" python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_browser.py\"",
             "onFailure": "block"
           }
         ]

@@ -10,7 +10,7 @@ into a return value other than these comparisons, or into run output.
 import re
 from typing import NamedTuple
 
-from po_agent.b1.models import SkipReason
+from po_agent.core.models import SkipReason
 
 # Section 4's street-type abbreviations, mapped to one form. Only these, until
 # the real-PO seam shows a need for more (approved 2.4).

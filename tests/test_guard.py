@@ -88,6 +88,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "open_pool": "click",
         "set_pool_filter": "select",
         "set_locked_filter": "select",
+        "set_source_filter": "select",  # Summit's Source filter (task 9.6)
         "search_note_pool": "fill",
         "refresh_note_pool": "click",
         "open_note": "click",
@@ -1058,3 +1059,73 @@ def test_set_user_filter_is_no_longer_allowed(page, guard):
     assert refusal(
         guard, "set_user_filter", scope, scope.locator("select"), "Unassigned"
     ) == (Refusal.UNKNOWN_ACTION)
+
+
+# --- Summit's Note Pool Source filter (task 9.6) ------------------------------
+# SPEC -> Client 2 -> What is shared: one new action, the Note Pool panel's
+# Source select (`filter_source`, screen-map rows 01 and 26), vetted as
+# set_locked_filter is. The Note Pool panel has no heading: it is the panel
+# holding button "New Note" and textbox "Search/filter" (screen-map).
+
+NOTE_POOL_PANEL = (
+    '<div id="user_note__1001">'
+    + button("New Note")
+    + '<input type="text" aria-label="Search/filter">'
+    '<label for="src">Source</label><select id="src" name="filter_source">'
+    "<option>All Sources</option><option>orders@example.test</option>"
+    "<option>remove@example.test</option></select></div>"
+)
+NOTE_WINDOW_SOURCE = window(
+    "Note 300001",
+    '<select name="filter_source"><option>All Sources</option>'
+    "<option>orders@example.test</option></select>",
+)
+
+
+def note_pool_panel(page: Page) -> Locator:
+    return (
+        page.locator("div")
+        .filter(has=page.get_by_role("button", name="New Note", exact=True))
+        .filter(has=page.get_by_role("textbox", name="Search/filter", exact=True))
+    )
+
+
+def test_source_filter_is_set_to_an_existing_option(page, guard):
+    page.set_content(NOTE_POOL_PANEL)
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    guard.act("set_source_filter", scope, source, "orders@example.test")
+
+    assert source.input_value() == "orders@example.test"
+
+
+@pytest.mark.parametrize(
+    "label, reason",
+    [
+        ("other@example.test", Refusal.OPTION_NOT_FOUND),
+        ("orders@example", Refusal.OPTION_NOT_FOUND),  # part of a label
+        ("remove@example.test", Refusal.DENYLISTED),  # the chosen label
+    ],
+)
+def test_source_filter_refuses_a_missing_or_denylisted_option(
+    page, guard, label, reason
+):
+    page.set_content(NOTE_POOL_PANEL)
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    assert refusal(guard, "set_source_filter", scope, source, label) == reason
+    assert source.input_value() == "All Sources"
+
+
+def test_source_filter_outside_the_note_pool_panel_is_refused(page, guard):
+    page.set_content(NOTE_POOL_PANEL + NOTE_WINDOW_SOURCE)
+    scope = note_pool_panel(page)
+    outside = win(page, "Note 300001").locator('select[name="filter_source"]')
+
+    refused = refusal(guard, "set_source_filter", scope, outside, "orders@example.test")
+
+    assert refused == Refusal.TARGET_OUTSIDE_SCOPE
+    assert outside.input_value() == "All Sources"
+    assert scope.locator("select").input_value() == "All Sources"

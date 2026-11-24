@@ -25,7 +25,7 @@ from fakes.mysys import AGENT, POOL, FakeNote, FakePage
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
-from po_agent.b1.models import Proceed
+from po_agent.b1.models import B1Proceed
 from po_agent.core import run
 from po_agent.core.config import CONFIG_DIR, load_config
 from po_agent.core.errors import (
@@ -311,7 +311,7 @@ def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path
     # Note ID, so a decision for another Note never reaches W1.
     fake = mysys(two_notes())
     config_dir = tmp_path / "config"
-    other = Proceed(
+    other = B1Proceed(
         note_id="300001",
         internal_no="2600002B",
         pln="pln_10002",

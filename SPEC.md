@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.61 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.63 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -48,7 +48,7 @@ The MVP proves that:
 
 | `docs/specs/spec.md` section | MVP |
 |---|---|
-| §2 processing order | Steps 0, 2 (with 2a), 3–4 and 6–12. The decision engine knows **both title rules** (test: the Note Pool's Subject/Note cell, which joins title and body, contains `<internal no>_048[_n].pdf`; live: title `[B1 Homes] Order <internal no>/048`) each profile uses its own (`title_rule` in its config; live: `live-b1-title`, decisions, 10 Nov 2026). On both, step 0 also needs the row's Project cell to read `---` (not linked). A test Note whose title has the live form must also agree on the PO number (`PO_MISMATCH`). Step 1 (skip list) is v1; step 5 (live sender check) is v1 |
+| §2 processing order | Steps 0, 2 (with 2a), 3–4 and 6–12. The decision engine knows **both title rules** (test: the Note Pool's Subject/Note cell, which joins title and body, contains `<internal no>_048[_n].pdf`; live: title `[B1 Homes] Order <internal no>/048` at the start of the cell, and no different internal number elsewhere in it as `<internal no>_048[_n].pdf` or `<internal no>/048`, decisions, 24 Nov 2026) each profile uses its own (`title_rule` in its config; live: `live-b1-title`, decisions, 10 Nov 2026). On both, step 0 also needs the row's Project cell to read `---` (not linked). A test Note whose title has the live form must also agree on the PO number (`PO_MISMATCH`). Step 1 (skip list) is v1; step 5 (live sender check) is v1 |
 | §2 step 2a (new) | After Assign, a Note window that shows a project button instead of **Link to Project** → skip `NOTE_ALREADY_LINKED` (final), before any download or write |
 | §3 reading schema and skip reasons | All, except live-only checks; plus `NOTE_ALREADY_LINKED` |
 | §2 step 8 project lookup | Exactly one **matching** row, by the match rule in [MySys screen rules](#mysys-screen-rules) → Project search: Company B1 Homes and Client Ref No. exactly `<internal no>` on both sites (live: one row per internal number, Client Ref No. the bare number, Joey's look, 10 Nov 2026; `/048` is in the Note's title, not the project); rows with any other value are ignored |
@@ -141,13 +141,14 @@ src/po_agent/
     demo.py                     supervised demo: one trial PO, Enter before every write (decisions, 27 Oct 2026)
     controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
     errors.py                   typed errors, their exit codes and ALERT kinds
+    models.py                   shared models (pydantic): Note Pool row, Note window, project lookup, SkipReason, Skip, Proceed (ADR-003 decision 2)
   mysys/                        reusable
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
     booking.py                  the demo's screens, Note to Solved, proven on the test site 28 Oct 2026; the base for the booker (4.1-4.5)
     wait.py                     every MySys wait and timeout: poll until true, read until settled, the one retry of an opening click (refuses any other action)
   b1/                           rules for this automation
-    models.py                   Reading, Decision, SkipReason (pydantic)
+    models.py                   B1's models (pydantic): Reading, B1Proceed (the /048 PO and file name)
     reader_rules.py             the code readers (pdfplumber and pypdf + patterns)
     readers.py                  both readers' texts as one value; the two-readers rule (agreement, address check on both)
     address.py                  normaliser + address check against the project's address
@@ -256,7 +257,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 - Filters: Assigned Pool = `pool_name`, Locked/Unlocked = **Locked** (the captures show the trial Notes listed under Locked). Every other filter stays at its default; Status stays **Pending** and is never set. Each filter is read back, and Search/filter must read empty (a Note ID left there would hide every Note).
 - **How the list reloads** (row 27): changing a filter select reloads the list by itself. Search/filter does **not** search on `fill` alone: the search runs when focus leaves the box. So a search is: `fill` → click the panel's **Refresh** → wait up to 15 s for the footer "Page 1 of 1(N Items)" (or "No record could be found.") → read. If the number of table rows differs from N (Refresh plus the focus change can add the same rows twice), click Refresh once more and read again; still different → `UNEXPECTED_SCREEN`. After any filter change the driver waits for the footer the same way before reading.
 - **What persists** (row 27): a page reload keeps every filter and the Search/filter text; a fresh login resets them all to their defaults with Search/filter empty. Every run logs in fresh, so the list read at run start sees the defaults; within a run, the driver always sets and reads back the filters it needs instead of trusting what a reload kept.
-- Eligible (step 0, list only): the Subject/Note cell matches the title rule, the Project cell reads `---` **and** the Assignee cell reads `pool_name` (so a person's Note is never taken, even if the pool filter didn't apply). Everything else is left untouched (outcome `untouched`).
+- Eligible (step 0, list only): the Subject/Note cell matches the title rule, the Project cell reads `---` **and** the Assignee cell reads `pool_name` (so a person's Note is never taken, even if the pool filter didn't apply). A cell naming two different internal numbers is not eligible on either site: on test, two different `<internal no>_048[_n].pdf`; on live, a number in the body as `<internal no>_048[_n].pdf` or `<internal no>/048` that isn't the title's (decisions, 24 Nov 2026). Everything else is left untouched (outcome `untouched`).
 - The list is read **once per run**; the run works through that fixed list, so a Note it skips and returns isn't taken again in the same run.
 - **Stale-Note stop** (D6): in `run` and `run --decide-only`, after login and before the list is read. Test (`stale_read = "note_pool"`): the Note Pool is read with Assigned User = All Users (its Assigned User list has no agent; decisions, 3 Nov 2026), Assigned Pool = All Pools, Locked/Unlocked = All, Status Pending; any row whose Assignee is `agent_user_name` is stale. Live (`stale_read = "my_notes"`; live's Assigned User list has no agent either and lists 28 pages at All Users; decisions, 10 Nov 2026, My Notes): reload `base_url`, Project -> My Notes (the Notes assigned to the logged-in agent), Status read back Pending, every textbox empty, Filter No Company Note unticked where shown; **any** row is stale, whatever its Assignee cell; "No record could be found." with no rows, still so 3 s later, is none; rows not matching the footer are `UNEXPECTED_SCREEN`; then a reload before the Note Pool. The My Notes panel holds New Note, Search/filter and the list but no Assigned User or Assigned Pool filter, so it is never the Note Pool panel. A stale Note was left by an earlier run's partial write or failed return: `ALERT UNEXPECTED_SCREEN` (fixed detail, with its `note_id`), no Note taken, exit 1. Only page 1 is read, so a second page stops the run too, as `ALERT MORE_PAGES`, exit 1 (after page 1's rows, so a stale Note there is named; 7.2). Status stays Pending: a Note left with the agent in another status is reported by its own `PARTIAL_WRITE` alert instead.
 - **Finding a Note again** (after a reload or closing a browser context, to return a Note to the pool, for the assignee check, for W5's read-back): Assigned Pool = All Pools and Search/filter = the Note ID, searched as above (fill → Refresh), and the row whose ID cell **equals** the Note ID (the search is treated as a substring filter: 123 also matches 1234). Under Assigned Pool = Agent Pool, a Note assigned to the agent is hidden (row 04).
@@ -374,7 +375,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 **Live site** (the full text of CLAUDE.md Must never #3, which keeps the core rule and points here; moved verbatim on 19 Nov 2026: decisions, 19 Nov 2026, SPEC history and Must never #3 details move out)
 - Never touch the live site (`prompt.mysys.com.au`) in code, config, tests or commands. Only exceptions: the `LIVE_HOST` constant in `src/po_agent/core/config.py`, `config/live.toml`, and the deny rules in `.claude/hooks/guard_bash.py` and `.playwright/cli.config.json` and their tests (decisions, 10 Nov 2026, hooks for the live profile).
 - Never run the agent or the wrapper on live (`--site live`, `macmini-run.sh <mode> live`), log in to live from any test, command or seam, or read or set a live secret (`mysys_live_*`): only Joey does, on the Mac Mini.
-- One exception (decisions, 10 Nov 2026, live lookups for the real-PO seam): in the built-in browser pane, after Joey logs in to live himself with the agent account, Claude may read the Projects search, a project's page and its Tasks list, typing only an internal number into the Projects search and clicking only the search, a result row and tabs. Nothing else on live: no Note Pool or Note window, no button that saves or writes, nothing in #2 (CLAUDE.md Must never #2). Claude never types a live password, and every value read goes only into `private/`.
+- One exception (decisions, 10 Nov 2026, live lookups for the real-PO seam): in the built-in browser pane, after Joey logs in to live himself with the agent account, Claude may read the Projects search, a project's page and its Tasks list, typing only an internal number into the Projects search and clicking only the search, a result row and tabs. Nothing else on live: no Note Pool or Note window, no button that saves or writes, nothing in #2 (CLAUDE.md Must never #2). Claude never types a live password, and every value read goes only into `private/`. Joey also opens the live page in the pane himself: `guard_browser.py` blocks Claude from navigating to any MySys address (decisions, 24 Nov 2026, browser tools hook).
 
 ## Trial conditions
 
@@ -503,9 +504,9 @@ There is **no test-site phase** for Summit (Joey, 23 Nov 2026: "forget about the
 
 In `run`, `run --decide-only` and `spike`, logged in as Agent 2:
 - **Note Pool filters:** Source = `source_filter` (the receiving mailbox; new guard action), Locked/Unlocked = **Unlocked**, Assigned Pool and Assigned User at their defaults (Summit has no pool), Status Pending (never set), Search/filter empty. Each read back, as B1's.
-- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee is anything except an agent account (`Agent 1 (MySys Only)` or `Agent 2 (Summit Homes)`), and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026).
+- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee passes the **assignee rule** below, and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026).
 - Anything else is untouched, with no NOTE line (as B1's step 0). Order newest first by Note ID; page 1 only, and a second page is `ALERT MORE_PAGES` as for B1 (the spike shows whether the filtered list fits one page; open question S3).
-- **Taking a person's Note is allowed for Summit** (Joey, 23 Nov 2026: "any assignee"): the admins' manual process takes Notes from whoever holds them. B1's "the Assignee must be the pool" stays B1's.
+- **Assignee rule** (Joey, 24 Nov 2026; replaces 23 Nov's "any assignee"): Summit Notes arrive in the Note Pool unassigned (`---`). The **first run of the day** (a run that starts before `any_assignee_before`, 08:00 Perth, so the 07:30 run) takes a Note whatever its assignee, except an agent account (`Agent 1 (MySys Only)`, `Agent 2 (Summit Homes)`), to catch Notes an admin picked up overnight. **Every later run** takes only Assignee `---`. The run decides from its own start time (no state between runs). B1's "the Assignee must be the pool" stays B1's.
 
 ### The peek: every check before the take
 
@@ -577,7 +578,7 @@ On PROCEED in `run`:
 A Note is returned only when it was taken and then stopped **before Submit** (kill switch before W1/W2, `WRITE_NOT_STARTED`, a W1 recheck change). With the peek, every business skip happens before the take, so a return is rare. One **Assign**, never Unassign or Unlink (Joey, 23 Nov 2026):
 - Original assignee a **user** (an option of the Note window's user list): user list = that user, pool list `--Select Pool--`.
 - Original assignee a **pool** (an option of the pool list): B1's return (user list `--Select User--`, pool list = that pool).
-- Original assignee **`---`**: user list = `return_unassigned_to` (**Gita Valani**, Joey, 23 Nov 2026), pool list `--Select Pool--`.
+- Original assignee **`---`**: back to `---` (Joey, 24 Nov 2026: "assign to the original assignee so it can be anyone or ---"; replaces 23 Nov's Gita Valani): user list `--Select User--`, pool list `--Select Pool--`, Assign, and "Assignee:" must read `---`. Whether MySys accepts that Assign is open question S6, checked by hand in S.0; until it is confirmed, this case stays with Agent 2 with the ALERT below.
 - The name in both lists or neither: the Note stays with Agent 2, `ALERT UNEXPECTED_SCREEN` (fixed detail "Note not returned"), exit 1; the stale-Note stop holds later Summit runs until Joey moves it by hand.
 - Read back: "Assignee:" reads the target and a new "User Assigned" (or pool) log line. Every return unticks Send Email first, through the shared control.
 
@@ -618,7 +619,7 @@ agent_user_name = "Agent 2 (Summit Homes)"
 source_filter = "support@prompteng.com.au"         # Note Pool Source filter (receiving mailbox)
 sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
 locked_filter = "Unlocked"
-return_unassigned_to = "Gita Valani"
+any_assignee_before = "08:00"     # Perth; a run starting earlier takes any non-agent assignee, later runs only `---`
 max_notes_per_run = 1               # bookings per run; raised by its own PR for hourly runs
 max_peeks_per_run = 10              # Notes opened per run; set from the spike and decide-only (S3)
 project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
@@ -683,11 +684,12 @@ A miss at any step stops the order until it is understood, as for B1.
 
 ### Open questions (Summit)
 
-- **S1** No Summit PDF in `private/` yet: the readers task needs 3-5+ (S.0).
+- **S1** Closed (24 Nov 2026): Joey saved 11 real Summit POs at the top of `private/summit/`; the readers task moves them into `private/summit/pdfs/`.
 - **S2** Closed (Joey, 24 Nov 2026): Summit Project covers only Summit Developments.
 - **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings.
 - **S4** Documents: does MySys rename `-` to `_` in an uploaded name; is the Type Client Documents; is Sale Office "Prompt Engineering Pty Ltd" on Summit projects.
 - **S5** Locked/Unlocked after the take (open question 12 for Summit): does a taken Note move to Locked, and does Agent 2's My Notes list it.
+- **S6** Returning a Note to `---`: does Assign with `--Select User--` and `--Select Pool--` leave "Assignee:" reading `---` (no Unassign, Must never #2)? Joey tries it by hand in S.0 on a Note he is handling anyway. If MySys refuses, Joey picks the fallback target then.
 
 ## Open Questions
 

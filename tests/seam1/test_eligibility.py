@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from po_agent.b1.decision import eligible_internal_no
-from po_agent.b1.models import NotePoolRow
+from po_agent.core.models import NotePoolRow
 
 POOL = "Agent Pool"
 BODY = "Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf"
@@ -72,7 +72,15 @@ def test_test_rule_same_file_twice_is_eligible() -> None:
 
 @pytest.mark.parametrize(
     "subject_note",
-    [LIVE_TITLE, f"{LIVE_TITLE} {BODY}", f" {LIVE_TITLE} "],
+    [
+        LIVE_TITLE,
+        f"{LIVE_TITLE} {BODY}",
+        f" {LIVE_TITLE} ",
+        # the title's own number again in the body stays eligible
+        f"{LIVE_TITLE} {BODY} {BODY}",
+        f"{LIVE_TITLE} Re 2600001B/048: {BODY}",
+        f"{LIVE_TITLE} {BODY}.",
+    ],
 )
 def test_live_rule_eligible_returns_internal_no(subject_note: str) -> None:
     assert eligible_internal_no(row(subject_note), "live-b1-title", POOL) == "2600001B"
@@ -91,6 +99,18 @@ def test_live_rule_eligible_returns_internal_no(subject_note: str) -> None:
         "FW: [B1 Homes] Order 2600001B/048",
         "[B1 Homes] Order /048",
         "",
+        # a second, different internal number in the body: ambiguous
+        # (Joey, 24 Nov 2026)
+        f"{LIVE_TITLE} {BODY.replace('2600001B', '2600002B')}",
+        f"{LIVE_TITLE} {BODY} and 2600002B_048.pdf",
+        f"{LIVE_TITLE} Please see Order 2600002B/048",
+        f"{LIVE_TITLE} Please see Order 2600002B/048.",
+        f"{LIVE_TITLE} {BODY} (2600002B/048)",
+        # the same, with punctuation or case B1 doesn't generate
+        f"{LIVE_TITLE} {BODY.replace('2600001B', '2600002B')}.",
+        f"{LIVE_TITLE} {BODY} and 2600002B_048_1.PDF",
+        f"{LIVE_TITLE} {BODY} and 2600002b_048_1.pdf",
+        f"{LIVE_TITLE} {BODY} and 2600002B_048_1.pdf.exe",
     ],
 )
 def test_live_rule_other_text_not_eligible(subject_note: str) -> None:

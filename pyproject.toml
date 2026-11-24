@@ -71,6 +71,7 @@ module = [
     "po_agent.core.controls",
     "po_agent.core.demo",
     "po_agent.core.errors",
+    "po_agent.core.models",
     "po_agent.core.output",
     "po_agent.core.run",
     "po_agent.core.runlog",
@@ -105,6 +106,7 @@ markers = [
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.170.17",
     "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",

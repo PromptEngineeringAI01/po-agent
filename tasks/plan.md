@@ -5,6 +5,7 @@
 **Git state:** those versions are on `main` (PRs #1–#5 merged; `origin/main` at `73d468d`, the same commit as `plan-mvp`). The local `main` is stale at `58cde2b`: fast-forward it (`git switch main && git merge --ff-only origin/main`) before branching. A stale local branch `m1-walking-skeleton` already exists at `58cde2b`; Joey deletes it or resets it to `origin/main` before M1 starts, or Stage 5's `git switch -c m1-walking-skeleton` fails.
 **Production (29 Oct 2026, decisions):** the MVP demo was shown on 28 Oct 2026. The tasks below are now built in the order of [Phase P: Production](#phase-p-production), which also has the go-live gates. Task numbers and acceptance criteria are unchanged.
 **Freeze point:** when Joey approves this file (`docs/workflow.md` Stage 4.4). After that, a behaviour change needs a dated `docs/decisions.md` entry plus `SPEC.md` and this file, in the same commit.
+**Summit (24 Nov 2026):** client 2 is planned in [Phase S: Summit Home](#phase-s-summit-home-client-2) (build tasks 9.1-9.14, Joey's live steps S.0-S.5), from `SPEC.md` v1.59 -> Client 2: Summit Home and the 23 Nov 2026 decisions.
 
 ## Overview
 
@@ -736,6 +737,268 @@ Unattended runs need what a watched demo didn't: someone told when the job stops
 
 - A read-only second-model reviewer as `.claude/agents/pr-reviewer.md` (model `opus`; prompt from `docs/workflow.md` Appendix C), with no Edit or Write tool; its prompt limits Bash to `git diff` and `git log`, with `guard_bash` as the backstop; Appendix C then points to it.
 - `/verify-pr` treats a task PR that doesn't tick its task in `tasks/todo.md` as Important, so the task list can't fall behind `main` (it can't tick after the merge: that would be a commit to `main`).
+
+---
+
+## Phase S: Summit Home (client 2)
+
+**Planned 24 Nov 2026** from `SPEC.md` v1.59 -> Client 2: Summit Home (`summit`), phase 1; `docs/decisions.md` 23 Nov 2026 (Summit entries); `docs/specs/ADR-003-more-clients.md` (Accepted, option C); the gap map and Joey's process in `private/summit/process-2026-11-23/` (laptop only). With Joey's two corrections of 24 Nov 2026 (going into SPEC in parallel): "Summit Home Improvement" is now **"Summit Renovations"**, and "Summit Project" has one alias only, **"Summit Developments"** (SPEC open question S2 closed).
+
+**Goal:** Summit's compaction POs booked on live by a separate hourly run as "Agent 2 (Summit Homes)", through the same guard and W1-W5 as B1, with B1's behaviour unchanged. No test-site phase: Claude builds and proves Summit offline (fakes, seam 1, the real-PO seam on the laptop); Joey runs every live step (S.0-S.5) on the Mac Mini. CLAUDE.md Must never #3 is unchanged.
+
+**Numbering:** build tasks are **9.1-9.15**; Joey's live steps keep SPEC's names **S.0-S.5**. SPEC's success criteria S1-S8 and Summit open questions S1-S5 are other things; this phase writes "open question S4" in full.
+
+### What the inputs say (sizing, 24 Nov 2026)
+
+- **Real PDFs:** 11 real Summit PO PDFs are in `private/summit/` (SPEC open question S1 is answered; they move to `private/summit/pdfs/` in 9.7). Looked at for structure only, nothing copied out: every one is a text PDF of 1-2 pages; pdfplumber and pypdf both give text for all 11; 9 hold "COMPACTION TEST", 2 don't (the non-compaction cases SPEC asks for); each holds one `Purchase Order No` with a three-part PO equal to its file name's, except the 2-page one, which repeats the header on page 2 (same value). Two of the 11 share a Client Ref No. (two suffixes of one job): under the strict duplicate rule the second always skips `DUPLICATE_TASK` once the first is booked (SPEC -> Out of scope keeps it so). No OCR and, likely, no fake-PDF generator.
+- **Seam list** (gap map section 3): `mysys/driver.py` and `mysys/booking.py` import `b1`; `booking.py` fixes the Creator; the driver fixes Locked, the pool filter, the B1 body rule and the B1 project match; the W1-W5 booker lives in `b1/booker.py` although both clients run it; `core/run.py`, `controls.py`, `trace.py`, `demo.py` import `b1`; config, secrets and the run lock know one agent per site. No step of Joey's 24 needs a new screen; one guard action is new (`set_source_filter`).
+
+### Order
+
+| Step | Tasks | Done when |
+|---|---|---|
+| Admin before 9.1 | A.1-A.4 in `tasks/todo.md` (plan approved, PR 165's hand edits, the `/start-task` brief, tag moves) | 9.1 can start |
+| S-A Seam, B1 unchanged | 9.1 shared models and the Creator in the `Proceed` -> 9.2 `mysys/` client-free -> 9.3 client profile and `--client` -> 9.4 client interface in the run loop -> 9.5 per-client run controls and output; 9.6 guard `set_source_filter` (any time; Joey merges) | Checkpoint S-A |
+| S-B Decide, offline | 9.7 Summit readers (review stop; needs only 9.1) -> 9.8 Tasks read with Task Creator -> 9.9 Summit decision engine -> 9.10 Summit real-PO seam (needs S.0's `cases.toml`) | Checkpoint S-B |
+| S-C Run, offline | 9.11 Note Pool list and spike -> 9.12 the peek and decide-only -> 9.13 take and return -> 9.14 booking W1-W5 (needs S.0's screenshots) -> 9.15 Mac Mini wiring and runbook | Checkpoint S-C |
+| S-D Live, Joey | S.0 (from now, beside the build) -> S.1 -> S.2 -> S.3 -> S.4 -> S.5 | First hourly Summit run watched, exit 0 |
+
+```
+9.1 models+Creator ─► 9.2 mysys client-free ─► 9.3 profile+--client ─► 9.4 interface in run loop ─► 9.5 per-client controls
+9.6 guard set_source_filter (Joey merges) ─────────────────────────────────────────────────────────┐
+9.1 ─► 9.7 readers (review stop) ─┐                                                                │
+9.2 ─► 9.8 Tasks read ────────────┼─► 9.9 decision engine ─► 9.10 real-PO seam (needs S.0 cases)   │
+9.3 ──────────────────────────────┘          │                                                     │
+9.5 + 9.6 ─► 9.11 list+spike ─► 9.12 peek+decide-only (needs 9.9) ─► 9.13 take/return ─► 9.14 booking (needs S.0 screens) ─► 9.15 Mac Mini
+S.0 (Joey, any time) ─────────────────────────────────────────────────────────────────────────────► S.1 ─► S.2 ─► S.3 ─► S.4 ─► S.5
+```
+
+One task per session, in this order (workflow build loop). 9.6 and 9.7 touch only the guard and `summit/` plus their tests, so the advisor may start them beside S-A if it wants them earlier; nothing else overlaps.
+
+### Cross-cutting rules for Phase S
+
+- **B1 unchanged** until the client choice says otherwise: `--client` defaults to `b1`; every B1 command line, NOTE line and exit code stays as it is, except `RUN_SUMMARY` gaining `"client"` (SPEC -> The separate run). `config/test.toml` and `config/live.toml` don't change (test is ask-first; live is the running job's).
+- **Refactor tasks (9.1, 9.2, 9.4)** first prove the tests guard the code they move: hand-written mutants in a scratch copy, a test row for each survivor (`/start-task` -> Refactor tasks). Test import paths that change with a move go in the `test:` commit first (red on import until the move).
+- **Any change under `mysys/`** (9.1, 9.2, 9.8, 9.11-9.14) runs B1's seam 2 on the test site (CLAUDE.md Done means 3); the advisor may batch them into one reset (test-site queue). Summit has no seam 2: the test site has no Summit Note, no Summit Source option and none of Summit's Creator users.
+- **The live job runs the `production` tag.** Merges don't deploy; but the first tag move past 9.1 puts the refactored shared code under B1's live hourly run. So: B1 seam 2 green on the test site before any tag move past S-A, and Joey watches the first B1 hourly run after it (open question 2 below on when).
+- **Risk:** every task here except 9.10 (tests only) and 9.15 (wrapper and docs, medium) is **high** (`mysys/`, the guard, the readers, the decision engine, run controls or secrets): one second-model review each (`docs/workflow.md` build loop step 6). Compute it with `uv run scripts/risk.py`; state at least that.
+- **Real data:** fakes use a fake sender domain, fake company rows only where the committed table doesn't serve, fake POs (`123456/020/01` shape) and a fake long body; no Summit PO number, pln, address, title or body anywhere committed (SPEC -> Summit real data). Real-PO tests assert on counts and enums only.
+- **Each task that changes what the agent does in MySys or prints** checks that SPEC v1.59 already says it; if not, it adds the dated decisions entry and the SPEC lines in the same commit (CLAUDE.md How we work).
+
+### 9.1 Shared models; the Creator travels in the `Proceed` · step · refactor · high
+
+**Description:** ADR-003 decisions 2-3 start here. The client-neutral models leave `b1/models.py` for a shared module (proposed `src/po_agent/core/models.py`): `NotePoolRow`, `NoteSnapshot`, `SearchRow`, `CompactionTask`, `MySysLookup`, `Skip`, `SkipReason`, `Proceed`. `Proceed` gains `creator`; B1's decision engine sets "Perth Scheduling" (a B1 rule); `mysys/booking.py:38`'s `CREATOR` constant goes, and every Creator write and read-back (W1 form, new-task row, detail-screen target and read-back) uses `proceed.creator`.
+**Needs:** nothing.
+**Acceptance:**
+- No `CREATOR` constant in `mysys/`; a fake-page test gives a `Proceed` with another creator and sees it in the W1 Creator set and in every read-back.
+- `Proceed`'s B1 validation is no weaker for a B1 `Proceed` (the `/048` PO and file-name patterns still refuse a wrong one, by a per-client validator or equivalent: the task picks); the "only a decision engine constructs `Proceed`" test now allows `<client>/decision.py` and nothing else.
+- B1 behaviour unchanged: the offline suite and seam 1 green with only import paths changed in tests (in the `test:` commit).
+**Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam1 -s` -> `false PROCEED: 0`; B1 seam 2 (may share 9.2's reset).
+**Files:** `src/po_agent/core/models.py` (new), `src/po_agent/b1/models.py`, `src/po_agent/b1/decision.py`, `src/po_agent/b1/booker.py`, `src/po_agent/mysys/booking.py`, import lines elsewhere, tests' imports. **Scope:** M (mostly mechanical; over 400 lines, the Creator change goes in its own PR).
+
+### 9.2 `mysys/` client-free; the booker is shared · step · refactor · high
+
+**Description:** `mysys/driver.py` imports `b1.reader_rules`, `b1.decision` (`Site`, `check_project`, `match_project`) and `b1.models`; `booking.py` imports `b1.reader_rules`; W1-W5 live in `b1/booker.py`. After this task `mysys/` imports no client package and holds no client constant (ADR-003 decision 3): the Note Pool filter values (pool, Locked/Unlocked) come in as one filters value; the project lookup reads (search rows, Client Internal No., Tasks) and the client judges the match (consistent with 8.3, where `decide()` calls the lookup); the body rule is the caller's choice (B1 keeps "ends with the file name"); the expected Documents name comes from the `Proceed`; `b1/booker.py` moves to `mysys/booker.py`.
+**Needs:** 9.1.
+**Acceptance:**
+- A test fails if any module under `src/po_agent/mysys/` imports `po_agent.b1` or `po_agent.summit`, or holds a listed B1 literal ("Perth Scheduling", "/048", "B1 Homes").
+- B1's run, decide-only and booking offline tests pass unchanged (import paths aside, `test:` commit).
+- B1 seam 2 on the test site green: spike, decide-only and the booking cases (`tests/seam2/README.md` sequence).
+**Verify:** `uv run scripts/check.py`; B1 seam 2.
+**Files:** `src/po_agent/mysys/driver.py`, `src/po_agent/mysys/booking.py`, `src/po_agent/mysys/booker.py` (moved from `b1/`), `src/po_agent/core/run.py` (call sites), a new import test. **Scope:** M-L; over 400 lines it splits into the booker move and the driver arguments.
+
+### 9.3 Client profile and `--client` · step · high (config, secrets)
+
+**Description:** `--client b1|summit` (default `b1`) beside `--site` on `run`, `spike` and `preflight` (`demo` stays B1's). `config/clients/summit.toml` committed in SPEC's shape with the 24 Nov corrections, `enabled = false`, `sites = ["live"]`, `max_notes_per_run = 1`. B1's values stay in `config/<site>.toml`. Summit's secrets `mysys_live_summit_username` / `_password` (env `PO_AGENT_MYSYS_LIVE_SUMMIT_USERNAME` / `_PASSWORD`); `mysys_names` becomes client-aware; `preflight --client summit` checks the Summit pair.
+**Needs:** 9.2.
+**Acceptance:**
+- The client file is validated: exactly one of `creator` / `creator_rule` per company, `creator_rule` only `previous_task`, names and aliases unique after trim and case-fold, `sites` only `live`; each breach is `ALERT CONFIG`, exit 2 (one test each). The committed table matches SPEC's rows with "Summit Renovations" and Summit Project's single alias.
+- `--site test --client summit` is `ALERT CONFIG`, exit 2. Until its task lands, `spike` (9.11), `run --decide-only` (9.12) and `run` (9.14) refuse `--client summit` with exit 2, as plain `run` refused until 4.5.
+- Secrets tests use fake values in env or a fake keyring, as `tests/test_config_secrets.py` and `tests/test_preflight.py` do for the B1 live pair; nothing reads or sets a real `mysys_live_*` secret. B1's preflight output unchanged.
+**Verify:** `uv run scripts/check.py`.
+**Files:** `config/clients/summit.toml` (new), `src/po_agent/core/config.py`, `src/po_agent/core/secrets.py`, `src/po_agent/cli.py`, tests. **Scope:** M.
+
+### 9.4 Client interface in the run loop · step · refactor · high
+
+**Description:** ADR-003 decision 2: one small interface (proposed `src/po_agent/core/client.py`) that `core/run.py` calls instead of importing `b1`: list eligibility, the peek's reads (none for B1), `decide`, the return target, the booker's client values and the output name. B1 implements it in `b1/`; Summit's implementation starts as a stub that refuses, and 9.9-9.14 fill it. `core/run.py`, `controls.py` and `trace.py` import no client package (`core/demo.py` may keep B1's: SPEC keeps `demo` as is).
+**Needs:** 9.3.
+**Acceptance:**
+- The 9.2 import test widens to `core/` (except `demo.py`).
+- B1's run-loop, run-control, hold re-check and booking offline tests pass unchanged (import paths aside).
+- The interface carries every SPEC -> Client 2 difference listed in "What is shared" (filters, Source read, body rule, Creator, Documents name, return target) and nothing a third client would need (ADR-003 rule of three).
+**Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam1 -s` -> `false PROCEED: 0`.
+**Files:** `src/po_agent/core/client.py` (new), `src/po_agent/core/run.py`, `src/po_agent/b1/` (its implementation), `src/po_agent/summit/__init__.py` (stub), tests. **Scope:** M.
+
+### 9.5 Per-client run controls, trace and output · step · high
+
+**Description:** SPEC -> The separate run, as controls.
+**Needs:** 9.4.
+**Acceptance:**
+- Run lock: Summit `state/run-<site>-summit.lock`, B1 keeps `state/run-<site>.lock`; a B1 and a Summit run on one site don't block each other; two Summit runs do.
+- Kill switch: a Summit run needs the site's `enabled` and the client file's `enabled`, at start and in every `before_write`.
+- Caps: `max_notes_per_run` (bookings) and `max_peeks_per_run` (Notes opened) from the client file; `max_run_minutes` from the site.
+- Stale-Note stop reads Agent 2's My Notes (the client's `agent_user_name`, `stale_read = "my_notes"`).
+- `RUN_SUMMARY` gains `"client"` (B1's too; the test that pins its keys changes in its own `test:` commit citing decisions, 23 Nov 2026, separate run); the `booked` trace event gains `client` (closed type `b1|summit`); the hold re-check reads only its own site's and client's `booked` events, an event without `client` being B1's.
+**Verify:** `uv run scripts/check.py`.
+**Files:** `src/po_agent/core/runlock.py`, `controls.py`, `trace.py`, `output.py`, `run.py`, tests. **Scope:** M.
+
+### 9.6 Guard: `set_source_filter` · step · high · Joey merges (Must never #9)
+
+**Description:** The one new guard action (SPEC -> What is shared): the Note Pool panel's Source select (`filter_source`, screen-map rows 01 and 26), vetted as `set_locked_filter` is (the option exists; the denylist on the select's name and the chosen label). Nothing else in the guard changes; Locked/Unlocked already takes "Unlocked".
+**Needs:** nothing (early, since Joey merges it).
+**Acceptance:** guard tests on local HTML: allowed for an existing option, refused for a missing one and outside the Note Pool panel; `scripts/guard_check.py` passes; the diff touches only the allowlist entry and its tests. No seam 2 use: the test site's Source list has only "All Sources".
+**Verify:** `uv run scripts/check.py`.
+**Files:** `src/po_agent/mysys/guard.py`, `tests/test_guard.py` (and its local HTML). **Scope:** XS.
+
+### 9.7 Summit readers · step · **review stop** · high
+
+**Description:** `src/po_agent/summit/reader_rules.py`: from each reader's text (pdfplumber and pypdf, through 8.3's two-reader value), the company line at the top left, the `Purchase Order No:` value (three digit groups joined by `/`), and whether `COMPACTION TEST` stands under Description. Review stop (CLAUDE.md: readers are ask-first): the session shows Joey the patterns and the failing tests before code, as B1's 2.2-2.5 did.
+**Needs:** 9.1.
+**Acceptance:**
+- Seam 1 (`tests/seam1/summit/`, fake text for both readers in a cases file, as B1's): each field; COMPACTION outside Description; no Description; the PO missing, malformed or appearing twice with different values (Joey picks the skip at the review stop; open question 3); readers disagreeing on each field (`READERS_DISAGREE`); corrupt and image-only bytes built in the test (`PDF_UNREADABLE`). A fake-PDF generator only if a rule needs layout (a new dependency: Joey's OK).
+- Real PDFs (laptop, `-m real_data`): the 11 move to `private/summit/pdfs/`; on each, both readers agree on all three fields, the PO equals the file name's (a reader cross-check only; `decide` compares title and PDF, SPEC), and the compaction finding equals Joey's expected value (S.0). Counts only in the output.
+- B1 seam 1 unchanged: `false PROCEED: 0`.
+**Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam1 -s`; on the laptop `uv run pytest tests/seam1 -m real_data`.
+**Files:** `src/po_agent/summit/reader_rules.py`, `tests/seam1/summit/` (cases file, tests, real-PDF test). **Scope:** M.
+
+### 9.8 Tasks read: every task's name, status and Task Creator · step · high
+
+**Description:** `driver.task_rows` already returns every row of the settled Tasks table; `b1/reader_rules.compaction_tasks` keeps Compaction Test rows only. A shared parse gives each task's number, name, status and Task Creator (details row, screen-map row 07) in `MySysLookup`; B1's duplicate check reads the same rows filtered to Compaction Test.
+**Needs:** 9.2.
+**Acceptance:** parser tests on fake tables: several tasks, a Cancelled one, Task Creator empty and `---`, header without details row (`UNEXPECTED_SCREEN`); B1's duplicate tests and seam 1 unchanged; B1 seam 2 reads green on the test site.
+**Verify:** `uv run scripts/check.py`; B1 seam 2 reads.
+**Files:** `src/po_agent/mysys/driver.py` (or a shared table parser), `src/po_agent/core/models.py`, `src/po_agent/b1/reader_rules.py`, tests. **Scope:** S.
+
+### 9.9 Summit decision engine · step · high
+
+**Description:** `src/po_agent/summit/decision.py` (and a company module): SPEC -> Decision checks in its order (cheap first), the creator table from 9.3's file, the previous-task rule from 9.8's rows. New skip reasons `COMPANY_UNKNOWN`, `COMPANY_MISMATCH`, `CREATOR_UNKNOWN` (also in the trace's closed type).
+**Needs:** 9.3, 9.7, 9.8.
+**Acceptance (seam 1, fake data only):**
+- One case per row of the decision table with its skip reason, including the Client Internal No. mismatch (`UNEXPECTED_SCREEN`); a non-compaction PDF makes no project lookup (the fake lookup records no call).
+- Company: each alias; each pair of the three names that disagrees (`COMPANY_MISMATCH`); a name not in the table (`COMPANY_UNKNOWN`); trimmed, case-insensitive, whole name only; the project match needs Client Ref No. = the PO before its first `/` and a table Company (none, several, second page).
+- Creator: each fixed row; previous task = highest task number not Compaction Test and not Cancelled, its Task Creator; none, empty or `---` -> `CREATOR_UNKNOWN`; a project with only Compaction Test or Cancelled tasks.
+- Duplicate: any non-Cancelled Compaction Test task -> `DUPLICATE_TASK`, whatever its PO.
+- PROCEED carries the full PO, the creator, the pln, the email body, the original assignee and, for a previous-task row, that task's number and creator (for W1's recheck). `NOT_B1` and `ADDRESS_*` are never produced. **Zero false PROCEED** over every case.
+**Verify:** `uv run scripts/check.py`; `uv run pytest tests/seam1 -s` -> `false PROCEED: 0`.
+**Files:** `src/po_agent/summit/decision.py`, `src/po_agent/summit/company.py`, `src/po_agent/core/models.py` (skip reasons), `src/po_agent/core/trace.py`, `tests/seam1/summit/`. **Scope:** M.
+
+### 9.10 Summit real-PO seam · step (pauses: laptop runs) · risk as computed (tests only)
+
+**Description:** SPEC -> Real-PO seam: `-m real_data` over `private/summit/pdfs/` with `private/summit/fixtures/cases.toml` (S.0): per PO the Note title and body, the original assignee, the MySys lookup (search rows, Client Internal No., the Tasks table with each task's name, status and Task Creator) and the expected result. Skipped when `private/` is absent (CI, Mac Mini).
+**Needs:** 9.9; S.0's `cases.toml`.
+**Acceptance:** `false PROCEED: 0` on all 11; agreement per field and coverage reported, not judged; output holds counts and enums only.
+**Verify:** on the laptop `uv run pytest tests/seam1 -m real_data -s`.
+**Files:** `tests/seam1/summit/test_real_data.py` (and its helper). **Scope:** S.
+
+### 9.11 Summit Note Pool list and spike · step · high
+
+**Description:** SPEC -> Which Notes. The driver sets the client's filters (Source = `source_filter` through 9.6's action, Locked/Unlocked = `locked_filter`, Assigned Pool and User at their defaults, Status untouched, Search empty) and reads each back; it reads the Source column into `NotePoolRow`. Summit's list eligibility (pure, `summit/`): Source equals `sender` exactly, Project `---`, the assignee rule (a run starting before `any_assignee_before`, 08:00 Perth: any assignee but an agent account; later runs: only `---`; the run's start time from the injectable clock), the title shape `<company> - <any> - PO: <d>/<d>/<d> - <word>` with the PO exactly once. Newest first, page 1 only, a second page `ALERT MORE_PAGES`. `spike --client summit` lists the eligible count without opening a Note.
+**Needs:** 9.5, 9.6 (built after S-B in the order above).
+**Acceptance:** fake Note Pool (`tests/fakes/`, Summit-shaped rows, fake sender domain): eligible only when all four hold; an agent-held row, a linked row, a display-name Source, a title with the PO twice or malformed are untouched with no NOTE line; READY and ISSUED both eligible; every filter read back; `MORE_PAGES`; B1's filters and step 0 unchanged (B1 seam 2 spike green).
+**Verify:** `uv run scripts/check.py`; B1 seam 2 spike.
+**Files:** `src/po_agent/mysys/driver.py`, `src/po_agent/summit/eligibility.py`, `src/po_agent/core/models.py`, `tests/fakes/mysys.py`, tests. **Scope:** M.
+
+### 9.12 The peek and Summit decide-only · step · high
+
+**Description:** SPEC -> The peek. For each eligible row up to `max_peeks_per_run`: find the Note again (All Pools, the Note ID, exact ID), open it, read the original assignee, Link to Project, the attachments and the email body (Summit's rule: exactly one `iframe` with non-empty body text, waited for up to 15 s; empty or more than one -> `UNEXPECTED_SCREEN`; line breaks kept), download (B1's rule), both readers, reload, the project lookup, decide. Untouched Notes print `"outcome": "untouched"` with the reason; `run --decide-only --client summit` prints `DECIDE_ONLY` for a Note that would be booked.
+**Needs:** 9.9, 9.11.
+**Acceptance:**
+- For every untouched Note, and every Note in decide-only, the guard history holds only the read-only actions SPEC lists (find, open, the Note ID search, `download_attachment`, project search and opening clicks): no Assign, no Send Email click, no write. A test asserts the set.
+- The body rule's cases, including a long fake body with a table and a disclaimer; B1 keeps "ends with the file name".
+- The peek cap stops opening Notes; the run cap counts bookings only; 7.2's silent-skip alert still fires when every eligible Note is `UNEXPECTED_SCREEN` and never on business skips.
+- B1's decide-only offline tests and seam 2 decide-only unchanged.
+**Verify:** `uv run scripts/check.py`; B1 seam 2 decide-only.
+**Files:** `src/po_agent/core/run.py`, `src/po_agent/mysys/driver.py`, `src/po_agent/summit/` (its interface part), `tests/fakes/`, tests. **Scope:** M (the body rule splits out if large).
+
+### 9.13 Take and return to the original assignee · step · high
+
+**Description:** SPEC -> The take, and Return to the original assignee. On PROCEED in `run`: `before_write`; find the Note again; its Assignee must still read the original, else `untouched` / `NOTE_TAKEN`; Send Email unticked and read back (the shared control); user = Agent 2, pool `--Select Pool--`, Assign, read back. A Note taken and stopped before Submit goes back with one Assign: a user to that user; a pool to that pool (B1's return); `---` back to `---` (`--Select User--` and `--Select Pool--`, Assignee read back `---`; until S.0 confirms MySys accepts it (SPEC S6), it stays with Agent 2 with the ALERT below); a name in both lists or neither stays with Agent 2 with `ALERT UNEXPECTED_SCREEN` ("Note not returned"), exit 1. Never Unassign or Unlink.
+**Needs:** 9.12.
+**Acceptance:** fake-page tests: the take refuses a changed assignee; each return target; the both-or-neither stop; Send Email unticked and read back before every Assign; Link to Project still shown after the take. B1's take and return unchanged (B1 seam 2 assignee cases green).
+**Verify:** `uv run scripts/check.py`; B1 seam 2 assignee cases.
+**Files:** `src/po_agent/mysys/driver.py`, `src/po_agent/mysys/booking.py`, `src/po_agent/core/run.py`, `src/po_agent/summit/`, tests. **Scope:** M.
+
+### 9.14 Summit booking, W1-W5 · step · high
+
+**Description:** SPEC -> The take and the booking: the shared booker with Summit's `Proceed`. Creator = the decided creator (not an option of the select: close the context, `WRITE_NOT_STARTED` with reason `CREATOR_UNKNOWN`, Note returned); PO Number = the full PO; Documents = the PDF (W2 Type from `project_document_type`); Note = the email body; Hold note unchanged; Link the pln; Solved. W1's project recheck also requires, for a previous-task row, the same previous task and Task Creator, else `WRITE_NOT_STARTED`. Read-backs as B1's with Lodged By and "Solved by" = Agent 2 and Task Creator = the decided creator. Documents name compared after MySys's renaming once S.0 pins it (open question S4); until then a mismatch stops before Submit (`WRITE_NOT_STARTED`). From here `run --client summit` books (cap 1 in the client file).
+**Needs:** 9.13; S.0's screenshots of the Creator options and a Summit Documents row.
+**Acceptance:** fake-page tests: a table creator and a previous-task creator each reach the W1 form and every read-back; a creator missing from the select -> `WRITE_NOT_STARTED` and the return; the previous task changed between peek and W1 -> `WRITE_NOT_STARTED`; the long body read back whitespace-collapsed; the Documents name rule as S.0 found it. B1 seam 2 booking cases green on the test site.
+**Verify:** `uv run scripts/check.py`; B1 seam 2 booking cases.
+**Files:** `src/po_agent/mysys/booker.py`, `src/po_agent/mysys/booking.py`, `src/po_agent/core/run.py`, `src/po_agent/summit/`, tests. **Scope:** M.
+
+### 9.15 Mac Mini wiring and runbook · step · medium · ask-first files
+
+**Description:** `scripts/macmini-run.sh <mode> live summit` passes `--client summit` and reads both `enabled` flags from `origin/main`; a second launchd plist at **:30 past the hour, 07:30-17:30 Monday-Friday Perth** (Joey, 24 Nov 2026; B1 stays at :07); its own Healthchecks ping (keychain `healthchecks_ping_url_summit`; the check's cron `30 7-17 * * 1-5`); Summit's alert issues titled `po-agent alert summit <run_id>`, B1's titles unchanged; Summit runs don't touch B1's GitHub backup heartbeat (open question 4); `docs/macmini-setup.md` (Agent 2's secrets, the second job, its Healthchecks check); `docs/ops-runbook.md` Summit entries (Note not returned, `NOTE_TAKEN`, a stale Note on Agent 2, `CREATOR_UNKNOWN` at W1, Agent 2's password changed, stopping Summit alone: unload its job or the client `enabled = false` PR). If the run minute's dated decisions entry and SPEC's Mac Mini row aren't on `main` yet, this task adds them. The wrapper, the plist and `docs/macmini-setup.md` are **ask-first**: the session names each change to Joey before making it.
+**Needs:** 9.14.
+**Acceptance:** stub-command wrapper tests: the client argument reaches `--client`; an unknown client refuses and alerts; the client's `enabled = false` on `main` runs nothing; B1's `run live` unchanged; one ping per run per client; the Summit plist's calendar is minute 30, hours 7-17, Monday-Friday.
+**Verify:** `uv run scripts/check.py`; `plutil -lint` on the Mac by Joey at S.5.
+**Files:** `scripts/macmini-run.sh`, a new plist in `scripts/`, `docs/macmini-setup.md`, `docs/ops-runbook.md`, `tests/test_macmini_wrapper.py`. **Scope:** M.
+
+### Joey's live steps S.0-S.5 · by hand
+
+As SPEC -> Summit testing and go-live, each with its own dated `docs/decisions.md` entry first; Claude never runs anything on live. Steps marked "before" are Joey's admin steps that gate a build task (merged in from the 24 Nov 2026 handover of a second planning session, which also had paste-ready commands for each: its `docs/summit-admin-steps.md` draft, not committed; 9.15's `docs/macmini-setup.md` section carries the Mac Mini commands).
+
+**Before 9.1 (admin):**
+- Joey approves Phase S (the freeze point for this phase).
+- PR 165's hand edits merged: CLAUDE.md's first line and Must never #6, `docs/workflow.md` phases (Joey's).
+- The `/start-task` brief (`.claude/skills/start-task/SKILL.md`) still says "The agent is for B1 Homes only." and picks tasks "in the order of Phase P": fixed before the first Summit task session starts, by the advisor or a small task (skills are Claude-editable except `skills/verify-pr/`), or by Joey by hand.
+- From 9.1 on, the `production` tag moves under open question 2; each move: Joey watches the next B1 hourly run (exit 0, the tagged commit in its `wrapper: running production` line); rollback is the same move to the previous commit (`docs/macmini-setup.md` section 8).
+
+**Live steps:**
+- **S.0** (from now, beside the build): Joey's by-hand live screenshots into `private/summit/` (Creator options on Summit projects, one per fixed-creator company and one previous-task company; a past Summit task's Documents row with a `-` in the file name, its Type and Sale Office; Locked/Unlocked and Agent 2's My Notes after one by-hand Assign, **assigned back to its original assignee before S.1**; the Note Pool footer at Source + Unlocked + Pending at a busy time); `private/summit/fixtures/cases.toml` for the 11 POs (open question 1: who fills which part) and the expected compaction finding per PDF for 9.7. Claude writes the screens into `docs/screen-map.md` redacted. Needed by 9.7 (expected values), 9.10 (`cases.toml`) and 9.14 (screens). Also before S.1: the MySys admin answers whether Agent 2's password expires and whether its login has MFA (an expiring password stops unattended runs; goes into `docs/ops-runbook.md`).
+- **S.1** (after 9.15, with the `production` tag on a commit holding 9.1-9.15): the Mac Mini checkout is on that commit; Agent 2's secrets in `poagent`'s Keychain (Joey types them); `po-agent preflight --site live --client summit` exit 0; Agent 2's My Notes empty; Joey tells the team nobody assigns a Note to Agent 2 by hand from now on.
+- **S.2:** the kill-switch PR flips the client's `enabled`; Joey moves the `production` tag to its merge; `spike live summit`: exit 0, `RUN_SUMMARY` with `"client": "summit"`, eligible count, no `MORE_PAGES`; sets `max_peeks_per_run` with S.3 (open question S3). No manual run within a few minutes of :07 (B1) or :30 (Summit).
+- **S.3:** `decide-only live summit`; Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee; the run's duration sets `max_peeks_per_run` (its own PR if it changes).
+- **S.4:** before it, Joey tells the admins that the agent may take a Summit Note from them and returns it if it stops before Submit. `run live summit`, cap 1, watched; 5.2's trace check on the first; each booked task correct in MySys (Creator, PO Number, Documents, Note, On Hold, linked, Solved).
+- **S.5:** the Healthchecks check `po-agent summit` (cron `30 7-17 * * 1-5`, Australia/Perth, grace 40 minutes) and its ping URL in `poagent`'s Keychain as `healthchecks_ping_url_summit`; the cap raised by its own PR and the tag moved; the Summit launchd job loaded (07:30-17:30 Monday-Friday Perth); the first hourly run watched. Stopping Summit alone later: unload its job, or the client `enabled = false` PR (9.15's runbook).
+
+### Checkpoints
+
+- **S-A (after 9.1-9.6):** check green; the import test green; B1 seam 2 full sequence green on the test site; Joey merged 9.6. Before any `production` tag move past here, Joey watches the first B1 hourly run on it.
+- **S-B (after 9.7-9.10):** Summit seam 1 `false PROCEED: 0` in CI; the real-PO seam `false PROCEED: 0` on the laptop, its skips of clean POs reviewed with Joey.
+- **S-C (after 9.11-9.15):** every offline test SPEC lists under Summit testing green; B1 seam 2 booking cases green; `config/clients/summit.toml` still `enabled = false`; then S.1.
+
+### SPEC coverage (Client 2 subsections -> tasks)
+
+| SPEC subsection | Tasks |
+|---|---|
+| Objective | the whole phase; Done when = Checkpoints S-B and S-C, then S.2-S.5 |
+| What is shared with B1, and what is Summit's | 9.1, 9.2, 9.4 (seams), 9.6 (guard), 9.8 (Tasks read) |
+| Which Notes | 9.11 |
+| The peek | 9.12; checked on live at S.3 |
+| Decision checks and skip reasons | 9.7 (PDF rows), 9.9 (all rows), 9.10 |
+| Creator table | 9.3 (the file), 9.9 (the rule), 9.14 (W1 and read-backs) |
+| The take and the booking | 9.13 (take), 9.14 (W1-W5, body, Documents name) |
+| Return to the original assignee | 9.13 |
+| The separate run | 9.3 (client, secrets, sites), 9.5 (lock, kill switch, caps, stale read, hold re-check, output), 9.15 (Mac Mini) |
+| Summit real data | cross-cutting rules; 9.7, 9.10 |
+| Summit testing and go-live | 9.7, 9.9-9.14 (offline), 9.10 (real-PO), S.0-S.5 |
+| Out of scope (phase 1) | none built: no test-site Summit run, no paging, no state file, no duplicate-by-PO, no `demo` for Summit |
+| Open questions (Summit) | S1 answered (11 PDFs); S2 closed 24 Nov; S3 at S.2-S.3; S4 at S.0 / 9.14; S5 at S.0 / S.4 |
+
+### Risks (Phase S)
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| The seam refactor changes B1's live behaviour | High | Behaviour-unchanged tests and mutants (9.1, 9.2, 9.4); B1 seam 2 after every `mysys/` task; tag moved only after S-A, first B1 hourly run watched |
+| The peek writes on live (never checked there) | High | Guard-history test for untouched and decide-only Notes (9.12); S.3 reads a peeked Note's log before any booking |
+| A wrong Summit booking with no address check | High | Two readers agree; title PO = PDF PO; one project by Client Ref No. and a Summit Company; Client Internal No. again; three-way company; real-PO `false PROCEED: 0`; decide-only read by Joey; watched one-PO runs |
+| A person's Note taken and not returned | Med | Every check before the take; one-Assign return to the original assignee; ALERT and the stale-Note stop otherwise (9.13) |
+| Creator option or Documents name differs on Summit projects | Med | S.0 screenshots; W1 stops before Submit (`WRITE_NOT_STARTED`) |
+| Page 1 overflows or the peek runs long | Med | `MORE_PAGES`; `max_peeks_per_run` and `max_run_minutes` set from S.2-S.3 |
+| A second compaction PO for one job never books (strict duplicate rule) | Low | Known and out of scope (SPEC); decide-only shows how often; booked by hand |
+| B1 and Summit runs overlap on the Mac Mini | Low | Different accounts and locks; B1 at :07, Summit at :30; `max_run_minutes` each |
+
+### Open questions for the advisor's decision batch (one at a time, with the recommendation)
+
+**Answered by Joey, 24 Nov 2026 (decisions, 24 Nov 2026, Phase S approved):** Phase S approved as this phase's freeze point (A.1). 1: as recommended (Joey the Note side, Claude the project side under the live-lookup exception after Joey logs in). 2: the tag moves **once, after Checkpoint S-A** (not after each refactor merge), with one watched B1 hourly run; next at S.1. 4: Healthchecks only. 3 stays for 9.7's review stop.
+
+1. **Who fills `private/summit/fixtures/cases.toml`?** Recommended: Joey copies the Note side (title, body, original assignee) and states the expected result for each PO; Claude reads the project side (Projects search rows, Client Internal No., the Tasks table with Task Creator) under the 10 Nov 2026 live-lookup exception, after Joey logs in to live himself with the agent account, writing only into `private/`. The exception covers no Note Pool or Note window, so the Note side stays Joey's. Alternative: Joey copies everything by hand.
+2. **When does the `production` tag move during the build?** Recommended: after each refactor merge (9.1, 9.2, 9.4) and after Checkpoints S-A and S-C, each with one watched B1 hourly run, so a B1 break shows on one small PR; alternatives: after every shared-code merge (the other session's suggestion: safest, about ten tag moves), or once at S.1 (one big diff under B1's live run).
+3. **A PDF whose `Purchase Order No:` values differ between pages** (none of the 11 does): recommended `PO_MISMATCH`; asked at 9.7's review stop.
+4. **The GitHub backup heartbeat** (18 Nov 2026) for the Summit job: recommended Healthchecks only, as SPEC says; Summit runs don't rewrite B1's heartbeat issue, so the backup keeps meaning "B1 ran"; asked at 9.15.
+
+Settled since the first draft: the Summit run minute is **:30** (Joey, 24 Nov 2026, in the other planning session; its decisions entry lands with SPEC or in 9.15).
 
 ---
 
