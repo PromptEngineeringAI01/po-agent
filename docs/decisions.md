@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 24 Nov 2026, browser tools hook; Summit creator table; three agent-skills vendored; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, verify_pr.py advisory in CI; browser tools hook; Summit creator table; three agent-skills vendored; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: verify_pr.py runs in CI as an advisory job** (Joey; entry below): its own `verify-pr` job, not a required status, so a false positive never blocks a merge or skips gitleaks; `/verify-pr` runs it first from `main`'s copy. Loosens nothing.
 - **24 Nov 2026: a hook for the browser tools** (Joey: "保留例外，擋其餘"; entry below): `guard_browser.py` blocks Claude in Chrome, the pane's page scripts, field setting and network reads, and any MySys address in a browser tool or WebFetch; the 10 Nov live lookups keep working (tightens a safety control).
 - **24 Nov 2026: Summit creator table** (Joey; entry below): Summit Home Improvement is now Summit Renovations; Summit Project covers only Summit Developments (SPEC open question S2 closed). Loosens nothing.
 - **24 Nov 2026: three agent-skills vendored; medium review in a fresh context** (factory audit fix #5; entry below): `test-driven-development`, `incremental-implementation` and `code-review-and-quality` live in `.claude/skills/`, pinned at agent-skills v0.6.17; a medium-risk PR's review runs in a read-only sub-agent the builder starts, not in the builder's own context. Process only; loosens nothing.
@@ -17,6 +18,13 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - verify_pr.py in CI as an advisory job, and in /verify-pr (Joey; PR 161 follow-up)
+
+- **Decided:** CI runs `scripts/verify_pr.py` on every pull_request push in its own job, `verify-pr`, which is **not** a required status; the required `check` status stays `scripts/check.py` plus gitleaks. `/verify-pr` runs the script first (step 2) from `main`'s copy in the advisor's checkout, and that run is the one that counts; the skill's mechanical rules are marked *(script)* and not redone by hand.
+- **Why advisory (second-model review of the first patch):** inside the required `check` job, any FAIL, a false positive included (the guarded-action rule matches a helper of ours named `check`), would block a merge with no override short of lifting branch protection, which is enforced on admins too; it would also skip gitleaks on that run; a PR body fixed after the push would leave the red check on the head commit; and CI runs the PR's own copy of the script, so a PR could loosen the rules it is checked by.
+- **False positives:** a FAIL from the guarded-action rule that plainly isn't a Playwright page call is reported as a likely false positive for Joey to decide, not merged past silently.
+- **Loosens:** nothing. The required status is unchanged; the script adds an advisory signal and replaces hand greps in the skill.
 
 ## 24 Nov 2026 - Browser tools hook (Joey; tightens a safety control)
 
