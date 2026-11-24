@@ -11,10 +11,12 @@ finding:
 - FAIL: a commit not starting `test:` touches `tests/`, or a `test:` commit
   touches `src/`; a subject that isn't a Conventional Commit of type feat,
   fix, test, docs, chore or refactor (merge commits skipped); an em dash in
-  an added line; in an added line, a Playwright action outside the guard,
-  the live host outside its allowed files, or the Anthropic key's variable
-  name outside tests/test_config_secrets.py; a PR body without Intent, What
-  changed, Risk or Testing, or whose stated risk is below risk.py's.
+  an added line; in an added line, a Playwright action outside the guard
+  (in every file but prose: .md, .markdown, .txt, .rst, any case, since
+  prose can't call anything), the live host outside its allowed files, or
+  the Anthropic key's variable name outside tests/test_config_secrets.py
+  (both in every file type); a PR body without Intent, What changed, Risk or
+  Testing, or whose stated risk is below risk.py's.
 - WARN: `uv.lock` or `pyproject.toml` changed (the PR must say Joey approved
   the dependency); no PR body given.
 - REVIEW: a safety-sensitive file changed (the LLM reads its diff), or more
@@ -50,6 +52,10 @@ GUARD = "src/po_agent/mysys/guard.py"
 ACTIONS = ("click", "fill", "check", "set_input_files", "evaluate", "dispatch_event")
 # Whole names only: `guard_check(` or `checked(` is not a Playwright action.
 ACTION = re.compile(rf"\b({'|'.join(ACTIONS)})\(")
+# Prose can't call anything, so the action rule skips it (the verify-pr skill
+# names the calls). A denylist, so a new runnable type (.sh, .js, no
+# extension) stays checked.
+PROSE_SUFFIXES = (".md", ".markdown", ".txt", ".rst")
 # The test host ends in the live host's name, so it is excluded, as in
 # .claude/hooks/guard_bash.py.
 LIVE = re.compile(rf"(?<!test-){re.escape(LIVE_HOST)}", re.IGNORECASE)
@@ -174,7 +180,8 @@ def line_findings(diff: str) -> list[str]:
         where = f"{path}:{number}"
         if EM_DASH in text:
             findings.append(f"FAIL: em dash in an added line: {where}")
-        if path != GUARD and ACTION.search(text):
+        prose = path.lower().endswith(PROSE_SUFFIXES)
+        if not prose and path != GUARD and ACTION.search(text):
             findings.append(f"FAIL: Playwright action outside {GUARD}: {where}")
         if path not in LIVE_HOST_FILES and LIVE.search(text):
             findings.append(f"FAIL: live host outside its allowed files: {where}")
