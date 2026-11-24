@@ -303,9 +303,22 @@ expect = { result = "untouched" }
 [[case]]
 id = "live-title-po-not-pdf-po"
 base = "p1"
-covers = ["live-title-po-differs"]
+covers = ["live-cell-second-po"]
+# The body names 2600001B_048_1.pdf, a second internal number beside the
+# title's, so step 0 leaves it untouched (decisions, 24 Nov 2026; was
+# PO_MISMATCH after the take).
 config = { site = "live", title_rule = "live-b1-title", duplicate_ignores_cancelled = false }
 note = { title = "[B1 Homes] Order 2600002B/048" }
+expect = { result = "untouched" }
+
+[[case]]
+id = "live-title-po-not-pdf-po-body-silent"
+base = "p1"
+covers = ["live-title-po-differs"]
+# The body names no number, so the Note is eligible and step 4 compares the
+# title's PO with the PDF's.
+config = { site = "live", title_rule = "live-b1-title", duplicate_ignores_cancelled = false }
+note = { title = "[B1 Homes] Order 2600002B/048", body = "Please find attached Purchase Order." }
 expect = { result = "skip", reason = "PO_MISMATCH" }
 
 [[case]]

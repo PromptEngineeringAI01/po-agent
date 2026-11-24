@@ -14,16 +14,23 @@ The xdist guard (tests/xdist_guard.py) refuses any parallel run that selects
 a `testsite` test; the test-site lock (tests/testsite_lock.py) refuses a
 second seam-2 run from any worktree while one is going.
 
+The Hypothesis profiles for the property tests (tests/properties/) are set
+here: "check" (the default, used by scripts/check.py and CI) and "thorough"
+(on demand); tests/README.md says how to pick one and replay a failure.
+
 Values are fake.
 """
 
+import os
 import tempfile
 from collections.abc import Iterator
+from datetime import timedelta
 
 import keyring
 import pytest
 from fakes.browser import shorten_waits
 from fakes.mysys import FakeMySys, FakeNote, install, row
+from hypothesis import settings
 from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, sync_playwright
 
@@ -33,6 +40,22 @@ from po_agent.core.config import CONFIG_DIR
 # Both hooks of the xdist guard and of the test-site lock, as plugins
 # (tests/test_xdist_guard.py, tests/test_testsite_lock.py).
 pytest_plugins = ("xdist_guard", "testsite_lock")
+
+# "check": the same examples on every run (derandomize, Joey, 24 Nov 2026),
+# so an unrelated PR never goes red by chance; no example database, so CI
+# and the check write nothing. The deadline only catches a hang (a runaway
+# regex), not a slow machine. "thorough": new random examples each run, many
+# more of them, saved in .hypothesis/ (git-ignored) to replay a failure.
+settings.register_profile(
+    "check",
+    max_examples=60,
+    deadline=timedelta(seconds=2),
+    derandomize=True,
+    database=None,
+    print_blob=True,
+)
+settings.register_profile("thorough", max_examples=2000, deadline=None, print_blob=True)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "check"))
 
 
 @pytest.fixture(autouse=True)
