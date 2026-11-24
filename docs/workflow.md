@@ -64,7 +64,7 @@ The slash commands below are for Joey to type. From agent-skills 0.6.14 a model 
 |---|---|
 | Build a task (test-first, small commits) | `/agent-skills:build task <N>` (M2: `/agent-skills:build auto`); Stage 5 step 3 |
 | Run the tests | `/agent-skills:test` |
-| Before every PR | `/agent-skills:review`; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4; plus the second-model review on medium and high risk (Stage 5, Production build loop step 6) |
+| Before every PR | Review by risk (Stage 5, Production build loop step 6): medium = a read-only review sub-agent with the `code-review-and-quality` skill, high = the second-model review; plus `security-and-hardening` for 1.2, 1.3, 1.4 and M4 |
 | Library calls (Playwright, pdfplumber, pypdf) | `Use the source-driven-development skill …` (M1, M2, M4) |
 | Challenge a risky design in a fresh session | `Use the doubt-driven-development skill on …` (before M4) |
 | A bug or failure that isn't obvious | `Use the diagnosing-bugs skill on …` (`.claude/skills/diagnosing-bugs/`: a fast red-capable check first, ranked hypotheses, a regression test in its own `test:` commit) |
@@ -174,7 +174,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    - The session commits the tests as `test:` and carries on: no review stop (5 Nov 2026). It stops for Joey only when the tests force a behaviour choice that is his (e.g. what the run prints for a stopped Note), asked in plain words, one question at a time, with a recommendation.
    - A bug is reproduced first: a failing test, or for a test-site bug the seam-2 or decide-only output that shows it. Every bug fix carries a regression test that fails without the fix, in its own `test:` commit. If the cause isn't obvious, use the `diagnosing-bugs` skill (fast failing check = one pytest node id or `uv run scripts/check.py --quick <path>`; after two failed fixes that share a premise, test the premise first; then look for the same bug elsewhere and report it).
    - A refactor (8.x, or acceptance "behaviour unchanged") first proves the tests guard the code it moves: hand-written mutants in a scratch copy, a test row for each survivor (`.claude/skills/start-task/SKILL.md` -> Refactor tasks; decisions, 18 Nov 2026, refactor safety net).
-   - When Claude makes the same kind of mistake twice: one targeted regression test plus a line under **Lessons** in `CLAUDE.md` (Joey commits that line).
+   - When Claude makes the same kind of mistake twice: one targeted regression test plus a row in `tasks/friction-log.md`, then the correction ladder (`docs/factory-handbook.md` section 4).
 4. **Code** until `uv run scripts/check.py` prints "check: all passed", the task's tests pass and nothing under `tests/` changed since the `test:` commit. `/goal` is optional (offline code only).
    - Never `/goal` on anything that touches the test site (seam 2, decide-only, booking): no retry loops against MySys. Those runs stay one at a time, watched.
 5. **Evidence and risk.** Before review, the session writes the PR description with four sections:
@@ -187,17 +187,23 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    | Risk | Review |
    |---|---|
    | Low | None beyond `check.py` and `/verify-pr`. |
-   | Medium | The `code-review-and-quality` skill in the session (Joey types `/agent-skills:review`). |
+   | Medium | One read-only **review sub-agent** that the builder starts (Agent tool), with the prompt below. |
    | High | One **second-model review** (Appendix C). No fresh-session `/code-review` (5 Nov 2026). |
 
    - The reviewers rate every finding on two scales, 1-5: **harm** if it happens and **likelihood**. Anything that could break a Must-never rule or write a wrong value to MySys is a must-fix, however unlikely.
    - The session that wrote the code answers each finding in one line: **must-fix or overthinking**, and why. It fixes the must-fixes once and adds the triage table to the PR.
    - No second review round unless the fixes were large. Reviewers asked to find bugs always find something, so repeated rounds add noise, not safety.
    - For each must-fix, the triage also asks whether it could become a check instead of a fix (`docs/factory-handbook.md` section 4, the correction ladder); if so, the session names it as a follow-up in its report.
-   - The second-model review runs from a fresh, short context (a sub-agent of the advisor), not from the builder's long one: cheaper, and it doesn't inherit the builder's blind spots.
+   - Both reviews run from a fresh, short context, not from the builder's long one: cheaper, and they don't inherit the builder's blind spots. High: a sub-agent of the advisor (Appendix C). Medium: a sub-agent of the builder, started with this prompt (decisions, 24 Nov 2026, medium review in a fresh context):
+
+     ```text
+     Read-only review of this branch in <worktree path>. Use the code-review-and-quality skill on `git diff origin/main...HEAD`, CLAUDE.md (Must never) and the PR's Intent: <Intent, or the path of the PR body file>. Report each finding with file:line, one sentence, harm 1-5, likelihood 1-5 and the input that triggers it, worst first, at most 8. Change nothing: no edits, commits, pushes or test-site runs.
+     ```
+
+     The builder triages the findings as above.
 7. **PR, then `/verify-pr <n>`** in the advisor chat (`.claude/skills/verify-pr/`): commits, tests only in `test:` commits, safety files, repo hygiene, CI on the latest commit (CI runs `scripts/check.py`, so a green CI on the PR's head commit is the check; the advisor re-runs it locally only when the PR touches `scripts/check.py`, `.github/workflows/`, `pyproject.toml` or `uv.lock`, once Joey applies that change to the skill; decisions, 6 Nov 2026), and the four PR sections with the right risk level and, for high, the review triage. The mechanical rules (commit types, tests only in `test:` commits, em dashes, guarded actions and banned names in added lines, dependency files, the PR sections and the stated risk) are `uv run scripts/verify_pr.py`, run by the skill from `main`'s copy (the one that counts) and by CI's advisory `verify-pr` job on every PR push (not a required status, so a false positive never blocks a merge); the skill judges the rest. If it passes with no Important finding and CI is green on the latest commit, the advisor merges it with `gh pr merge <n> --merge --match-head-commit <sha>` (a merge commit) and tells Joey in one line. Anything Important, a red check, or a PR that touches the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`), the hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`): the advisor stops and asks Joey instead. Every other PR the advisor merges itself, including docs that loosen a rule with their decisions entry (Joey, 6 Nov 2026).
 8. **Reports to Joey** (from task sessions and the advisor) are in Traditional Chinese (code and repo text stay English), open with a one-line recap of what this session is about, use plain words (no shorthand from deep in the code), ask **one question at a time**, and end with the next action. A by-hand check (a mid-run takeover, placing extra Notes) is asked of Joey only in the by-hand tasks (4.6, M6) or when no offline or seam-2 test covers the case. When Joey asks "where are we?", the advisor lists the sessions in flight, the PRs waiting, and the open decisions.
-9. **Rules that matter are enforced, not just written.** Agents drift from `CLAUDE.md` as their context grows. A rule Claude has broken twice gets a Lessons line and, if it guards safety, a hook, a check or a `/verify-pr` step (Joey edits `.claude/`). How to pick the rung, and the checklist for skills, workaround comments and new automation: `docs/factory-handbook.md` sections 4 and 11.
+9. **Rules that matter are enforced, not just written.** Agents drift from `CLAUDE.md` as their context grows. A rule Claude has broken twice gets a row in `tasks/friction-log.md` and, if it guards safety, a hook, a check or a `/verify-pr` step (Joey edits `.claude/`). How to pick the rung, and the checklist for skills, workaround comments and new automation: `docs/factory-handbook.md` sections 4 and 11.
 
 10. **Test-site queue (Joey, 6 Nov 2026).** Each reset of the test site is Joey's time, so test-site runs are batched. A task session that needs seam 2 or decide-only tells the advisor instead of asking Joey for a reset; the advisor keeps the queue (which branch, which `-k` selection, in the fixed order of `tests/seam2/README.md`), asks Joey for **one** reset per batch, and has the sessions run one after another, never two at once (One agent at a time; the cross-worktree seam-2 lock). The Mac Mini's live job keeps running (decisions, 20 Nov 2026, one Send Email control). A PR whose only missing evidence is its queued seam-2 run waits as a draft; nothing else waits on it.
 
@@ -210,13 +216,13 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    ```
 
 2. **Fresh session:** `claude`. One task per session (M2: one `/agent-skills:build auto` run for the whole slice).
-3. **Build.** Name the task by its number ("the next unchecked task" would pick a by-hand one). By-hand tasks (M0b, 1.10, 3.4, 4.6, M6) are never built with `/agent-skills:build`.
+3. **Build.** Name the task by its number ("the next unchecked task" would pick a by-hand one). By-hand tasks (M0b, 1.10, 3.4, 4.6, M6) are never built with the build skills.
 
    - **Easiest:** in the advisor chat, say "merged, start the next one": it pulls `main`, creates the branch and opens a Terminal tab with Claude already running the right prompt.
    - **Normal tasks** (1.6, 1.7, 1.8, 1.9, 5.1, M2's 2.1 and 2.6): no plan mode, one prompt that runs through to the PR:
 
      ```text
-     /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md). When check passes, run the code-review-and-quality skill once, fix Important findings, tick <N>, push and open the PR with the Intent, What changed, Risk and Testing sections (Production build loop step 5). Then stop; don't merge.
+     Use the incremental-implementation and test-driven-development skills to build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md). When check passes, review by risk (Production build loop step 6; medium = one read-only review sub-agent with the code-review-and-quality skill), fix the must-fixes once, tick <N>, push and open the PR with the Intent, What changed, Risk and Testing sections (Production build loop step 5). Then stop; don't merge.
      ```
 
    - **Review-stop tasks** (1.4, M3: 3.1–3.6, M4: 4.1–4.5, 5.2; M2's 2.2–2.5 stop inside the auto run): press **Shift+Tab** to turn plan mode on, then:
@@ -228,7 +234,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
      Approve the plan (that turns plan mode off), then:
 
      ```text
-     /agent-skills:build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md).
+     Use the incremental-implementation and test-driven-development skills to build task <N> in tasks/todo.md (acceptance criteria in tasks/plan.md).
      <the extra lines for this slice, from the table below>
      Done means: task <N>'s acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed". Follow CLAUDE.md's TDD rule (it says which tasks stop for review).
      ```
@@ -243,7 +249,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    - **"auto" tasks** (M2, after M1 is merged): no plan mode, one session for the whole slice:
 
      ```text
-     /agent-skills:build auto tasks 2.1 to 2.6 in tasks/todo.md, in order, and stop after 2.6.
+     Use the incremental-implementation and test-driven-development skills to build tasks 2.1 to 2.6 in tasks/todo.md, in order, and stop after 2.6.
      Use the source-driven-development skill: build from the current official docs for each library call and cite them.
      The seam-1 fixture PDFs are generated fakes, never the trial PDFs in private/.
      Done means: each task's acceptance criteria in tasks/plan.md are met and uv run scripts/check.py ends with "check: all passed" after each one. Stop at every failing test and at the ask-first points in tasks/plan.md: the generator dependency (2.1), the address rules (2.4), the Claude prompt and model ID (2.5), the prices (2.6).
@@ -254,13 +260,9 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
 4. **Test first.** Claude writes the failing test and shows it failing. ✓ It fails because the code doesn't exist or doesn't handle the case yet, not because of a typo or an import error. On 1.2, 1.4, 2.2–2.5, M3 (3.1–3.6), M4 (4.1–4.5) and 5.2 it stops for you: reply `Test looks right. Commit it and continue.` On the other tasks it commits the test and carries on; check the failure in its summary.
 5. **Verify.** ✓ `check: all passed`. If the readers or address rules changed: `false PROCEED: 0` from seam 1 (in the check) and the real-PO seam on the laptop. If `mysys/` or the booker changed: the seam 2 result on the test site (reset first, 6.1).
 6. **Debug** anything not obvious: `Use the diagnosing-bugs skill on this: <paste the error>`.
-7. **Review**, once:
+7. **Review**, once, by risk: for medium, the session starts the read-only review sub-agent (Production build loop step 6, with its prompt).
 
-   ```text
-   /agent-skills:review
-   ```
-
-   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. Review by risk (Production build loop step 6): low = none; medium = this `/agent-skills:review`; high = one second-model review instead (Appendix C), with the must-fix triage. One review round plus its fixes is enough; don't review again unless the fixes were large.
+   For 1.2, 1.3, 1.4 and the M4 tasks, also: `Use the security-and-hardening skill on this diff: secrets, untrusted PDF text, the guard and the hooks.` Then `Fix the Important findings.` if there are any. Review by risk (Production build loop step 6): low = none; medium = the review sub-agent with the `code-review-and-quality` skill; high = one second-model review instead (Appendix C), with the must-fix triage. One review round plus its fixes is enough; don't review again unless the fixes were large.
 8. **Push and open the PR.** If `main` has moved since you branched, Claude merges it in first:
 
    ```text
@@ -268,7 +270,7 @@ Joey talks to one chat, the advisor. It starts each task session, relays his ans
    ```
 
 9. **Merge** (the advisor, with `gh pr merge <n> --merge --match-head-commit <sha>`, after `/verify-pr`; or you, by hand): open the PR → once CI exists (task 1.3), wait for the green **check** → read the Risk and Testing sections and skim **Files changed** for: no secret or real data, no live host (`prompt.mysys.com.au`), tests changed only in `test:` commits, files within the task → **Create a merge commit** (not squash).
-10. **Lessons.** If Claude made the same mistake twice, add one line under **Lessons** in `CLAUDE.md`. `/exit`.
+10. **Friction.** If Claude made the same mistake twice, add a row to `tasks/friction-log.md` and walk the correction ladder (`docs/factory-handbook.md` section 4). `/exit`.
 
 ### Straight after M1 merges
 
@@ -437,12 +439,12 @@ Rules for all hooks: read the tool call as JSON on stdin; exit 2 to block, with 
 | Claude asks to run `playwright-cli click` (or similar) | Say no. Claude only observes; you do the clicking. |
 | A trial PO is skipped as `DUPLICATE_TASK` | A task from mapping or an earlier run is still on its pln. Reset the test site (6.1). |
 | A hook blocks something you really want | Do it yourself by hand; that's the point of the hook. |
-| Claude says "done" without showing check output | *"Run uv run scripts/check.py and paste the output."* If it repeats, add a Lessons line. |
+| Claude says "done" without showing check output | *"Run uv run scripts/check.py and paste the output."* If it repeats, log it in `tasks/friction-log.md`. |
 | A Mac Mini run waits forever | A Keychain "allow access" dialog after a Python change: log in as `poagent` at the Mac, run the spike, click **Always Allow** (`docs/macmini-setup.md` section 7). |
 | No runs after a power cut or restart | The Mac is waiting at the FileVault screen: log in as `poagent` and lock the screen (`docs/macmini-setup.md` section 10). |
 | The Mac Mini can't log in to MySys | Check the spike output and try a login by hand in Safari on the Mac Mini; if MySys blocks the office address, record it in `docs/decisions.md` and tell the CEO. |
 
-## Appendix C - Second-model reviewer (medium and high risk PRs)
+## Appendix C - Second-model reviewer (high risk PRs)
 
 Task sessions build on Opus; the second review runs on **Opus in a fresh sub-agent**, so it doesn't share the builder's context or assumptions. It needs no other account, and the code stays with Anthropic. Fable 5.1, a different model, would share fewer blind spots, but on Joey's plan it needs usage credits (2 Nov 2026), so it is used only if Joey buys them. A model from another lab would catch more; add one later if Joey gets a second plan.
 
@@ -459,6 +461,8 @@ For each finding give: file:line, one sentence, harm 1-5, likelihood 1-5, and th
 ```
 
 The session that wrote the code then triages each finding "must-fix or overthinking" (Production build loop step 6) and pastes the reviewer's list and the triage into the PR.
+
+Medium-risk PRs don't use this reviewer: the builder starts its own read-only sub-agent with the `code-review-and-quality` skill (Production build loop step 6, decisions, 24 Nov 2026).
 
 ## Sources
 

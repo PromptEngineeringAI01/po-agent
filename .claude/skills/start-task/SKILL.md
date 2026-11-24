@@ -39,7 +39,7 @@ git -C <repo> log --oneline -1 origin/main
 ```text
 You're in your own git worktree on a new branch cut from up-to-date main. Follow CLAUDE.md exactly.
 
-Task: <N> in tasks/plan.md (<title>), this one task only. Use the incremental-implementation and test-driven-development skills (by skill name: agent-skills 0.6.14+ makes /agent-skills:build user-only); the commit rule below wins over their combined commit. Read its acceptance, SPEC.md (incl. Production), docs/specs/spec.md <sections>, and the code from earlier tasks it builds on: <files>.
+Task: <N> in tasks/plan.md (<title>), this one task only. Use the incremental-implementation and test-driven-development skills (vendored in .claude/skills/); CLAUDE.md and the commit rule below win over them. Read its acceptance, SPEC.md (incl. Production), docs/specs/spec.md <sections>, and the code from earlier tasks it builds on: <files>.
 
 Key points: <3-6 lines from the task's acceptance and any carried-over notes from the previous PR's review>.
 
@@ -54,7 +54,7 @@ Workflow (docs/workflow.md, Production build loop):
 1. Write the failing tests, show they fail for the expected reason, commit them as test:, and carry on (no review stop). Stop and ask Joey only for a behaviour choice that is his, in plain words, with your recommendation.
 2. Code until `uv run scripts/check.py` prints "check: all passed", the <N> tests pass and `git diff <test commit>..HEAD -- tests/` is empty (/goal optional, offline only). Commit as feat: (fix: for a bug). If the change alters what the agent does in MySys or prints in run output, or loosens a safety control, add a dated docs/decisions.md entry plus the SPEC.md lines in the same commit; tick the task in tasks/todo.md.
 3. Write the PR description with Intent (opening with 3-5 plain-language lines for Joey), What changed, Risk (low/medium/high, with the reason) and Testing (paste the check tail and seam output; never screenshots or real data), per docs/workflow.md Production build loop step 5.
-4. Review once, by risk (step 6): low = none; medium = the code-review-and-quality skill; high = one second-model review (Appendix C; the advisor runs it on your worktree). Answer each finding "must-fix or overthinking" in one line, fix the must-fixes once, and put the triage in the PR.
+4. Review once, by risk (step 6): low = none; medium = start one read-only sub-agent (Agent tool) with the prompt in docs/workflow.md step 6: the code-review-and-quality skill on `git diff origin/main...HEAD`, CLAUDE.md Must never and the PR's Intent, findings with harm and likelihood, change nothing; high = one second-model review (Appendix C; the advisor runs it on your worktree). Answer each finding "must-fix or overthinking" in one line, fix the must-fixes once, and put the triage in the PR.
 5. Push, open a PR to main (don't merge), report the URL. The advisor verifies it with /verify-pr.
 ```
 
