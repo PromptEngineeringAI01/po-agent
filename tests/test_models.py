@@ -229,7 +229,8 @@ DECISION_ENGINE = re.compile(r"(?!core/|mysys/)[a-z0-9_]+/decision\.py")
 def builds_a_proceed(tree: ast.AST) -> bool:
     """A call of a class named ...Proceed, or of a pydantic model_* method on
     one or on a value named ...proceed (model_validate, model_construct,
-    model_copy)."""
+    model_copy); and, on any value, model_construct or model_copy(update=...),
+    which skip validation (no src code uses them)."""
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -238,6 +239,11 @@ def builds_a_proceed(tree: ast.AST) -> bool:
             return True
         if isinstance(func, ast.Attribute):
             if func.attr.endswith("Proceed"):
+                return True
+            if func.attr == "model_construct" or (
+                func.attr == "model_copy"
+                and any(keyword.arg == "update" for keyword in node.keywords)
+            ):
                 return True
             owner = func.value
             if (
@@ -266,6 +272,10 @@ def test_only_a_client_decision_engine_constructs_a_proceed() -> None:
         ("models.B1Proceed(note_id='1')", True),
         ("B1Proceed.model_validate({})", True),
         ("proceed.model_copy(update={'pln': 'pln_1'})", True),
+        # A Proceed under another name (run.py's `decision`): no validation.
+        ("decision.model_copy(update={'po_number': '1/023'})", True),
+        ("decision.model_construct(note_id='1')", True),
+        ("lookup.model_copy()", False),
         ("isinstance(decision, Proceed)", False),
         ("Skip(reason=reason)", False),
     ],
