@@ -35,7 +35,6 @@ from playwright.sync_api import (
 from playwright.sync_api import Error as PlaywrightError
 from pydantic import ValidationError
 
-from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import Site, check_project, match_project
 from po_agent.core.errors import (
     LoginFailed,
@@ -53,6 +52,7 @@ from po_agent.core.models import (
 )
 from po_agent.core.runlog import RunLog
 from po_agent.core.trace import Booking
+from po_agent.mysys import tasks as task_table
 from po_agent.mysys import wait
 from po_agent.mysys.guard import ActionGuard
 
@@ -1099,7 +1099,7 @@ def settled_tasks(window: Locator) -> dict[str, str]:
         """The tasks once the table is whole, else None."""
         nonlocal empty_throughout
         try:
-            tasks = rules.compaction_tasks(task_rows(window))
+            tasks = task_table.compaction_tasks(task_rows(window))
             whole = set(tasks) == _task_options(window)
         except (PartialWrite, UnexpectedScreen, PlaywrightError):
             tasks, whole = None, False  # a half-rendered row
@@ -1163,7 +1163,7 @@ def reopen_project(
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
     # Step 10 passed, so each was Cancelled; one live again (Undo
     # Cancellation meanwhile) would make this booking a duplicate.
-    if rules.live_tasks({task.task_no: task.status for task in lookup.tasks}):
+    if task_table.live_tasks({t.task_no: t.status for t in lookup.tasks}):
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
     return window
 

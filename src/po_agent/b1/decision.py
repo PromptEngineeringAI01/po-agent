@@ -23,6 +23,7 @@ from po_agent.core.models import (
     Skip,
     SkipReason,
 )
+from po_agent.mysys.tasks import CANCELLED
 
 # Each profile's Note Pool title rule: test-body-filename on test,
 # live-b1-title on live (core/config.py).
@@ -185,7 +186,7 @@ def check_duplicate(
     number; a Cancelled one only when ignores_cancelled is false. On a pass,
     every existing task number, Cancelled ones too, for W2."""
     for task in tasks:
-        if not (ignores_cancelled and task.status.strip() == rules.CANCELLED):
+        if not (ignores_cancelled and task.status.strip() == CANCELLED):
             return Skip(reason=SkipReason.DUPLICATE_TASK)
     return tuple(task.task_no for task in tasks)
 
