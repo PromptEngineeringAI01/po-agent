@@ -32,11 +32,9 @@ First run the mechanical rules of steps 2-4 (commit types, tests only in `test:`
 uv run scripts/verify_pr.py origin/<headRefName> --pr $ARGUMENTS
 ```
 
-Every `FAIL:` line is Important. `WARN:` and `REVIEW:` lines are for the steps below to judge; don't re-check by hand what a FAIL rule already covers. CI runs the same script on every PR push, but not after a PR body edit, so this run is the one that counts for the body rules.
+Every `FAIL:` line is Important, with one exception: a guarded-action hit that plainly isn't a Playwright page call (a function of ours named `check`, a test's sample string) is named in the report as a likely false positive for Joey to decide. `WARN:` and `REVIEW:` lines are for the steps below to judge. Rules marked *(script)* below are this script's: don't redo them by hand. CI's advisory `verify-pr` job runs the same script on every PR push, but from the PR's own copy and not after a body edit, so this run (from `main`'s copy, in the advisor's checkout) is the one that counts.
 
-- **Fail** if a commit whose subject doesn't start with `test:` touches `tests/` (CLAUDE.md, TDD: test changes go in their own commit).
-- **Fail** if a `test:` commit touches `src/`.
-- Every subject is a Conventional Commit (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`).
+- *(script)* Test changes only in `test:` commits, no `test:` commit touching `src/` (CLAUDE.md, TDD), and every subject a Conventional Commit (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`).
 - Flag a `test:` commit that changes an existing expected result. It passes without asking Joey only if the PR explains it as an intended behaviour change **and** the PR carries the `docs/decisions.md` entry that made that change: quote both. Otherwise it's Important (CLAUDE.md Must never #8; decisions, 6 Nov 2026).
 
 ## 3. Safety-sensitive files
@@ -53,17 +51,17 @@ Show the full diff, and say plainly whether it **loosens or tightens** a control
 - `config/test.toml`, `docs/macmini-setup.md`, `scripts/macmini-run.sh`, the launchd plist
 - the model ID, the Claude prompt, or the address rules (then the live-Claude seam must have been run and shown `false PROCEED: 0`)
 
-Also grep the diff's added lines for: `click(`, `fill(`, `check(`, `set_input_files(`, `evaluate(`, `dispatch_event(` outside `guard.py`; the live host name outside `LIVE_HOST` in `src/po_agent/core/config.py`, `config/live.toml`, `.claude/hooks/guard_bash.py` and `tests/test_hooks.py`; `ANTHROPIC_API_KEY` outside `tests/test_config_secrets.py`. Any hit is Important.
+*(script)* In added lines: guarded page calls (`click(`, `fill(`, `check(`, `set_input_files(`, `evaluate(`, `dispatch_event(`) outside `guard.py`, the live host name outside its allowed files, and the Anthropic key name outside `tests/test_config_secrets.py`. Each FAIL is Important (step 2's false-positive exception applies).
 
 ## 4. Repo hygiene
 
 - No `.pdf`, image, `.env*`, trace or codegen file, and nothing under `private/`, `logs/`, `state/`.
 - `uv.lock` and `pyproject.toml` unchanged, unless the PR says Joey approved the dependency.
-- No em dash in added lines: `git diff origin/main...origin/<headRefName> | grep '^+' | grep -c '—'` must be 0.
+- *(script)* No em dash in added lines.
 - If the PR changes what the agent does in MySys or prints in run output, or loosens a safety control: a dated `docs/decisions.md` entry is in the PR, with the `SPEC.md` lines it changes in the same commit (`tasks/plan.md` only when a task's plan changes; decisions, 5 Nov 2026).
 - Real data: only the 3 trial POs' internal numbers, PO numbers and test-site plns may appear. No addresses, client names or PDF text.
 - A PR that builds a task in `tasks/todo.md` ticks that task (`- [x] **<N>**`; the PR number is welcome but not required, since the tick is made before the PR exists); a missing tick is Important, so the list can't fall behind `main`.
-- The PR has Intent, What changed, Risk and Testing. Risk names the **one fact** the change is safe because of (e.g. "only docs and skills changed; nothing under `src/`") and how far that fact was proven: **stated**, **line cited**, **walked through**, **run** (a command and its output in Testing) or **reproduced** (the old failure shown, then gone). Missing, or a high-risk PR proven no further than "stated", is Important. Run `uv run scripts/risk.py origin/<headRefName>` (after `git fetch`); a stated risk lower than computed is Important (decisions, 19 Nov 2026, risk is computed). Its 400-line warning is a Nit, not a blocker. High: the second-model findings and the must-fix triage are in the PR (decisions, 5 Nov 2026, lighter process).
+- The PR has Intent, What changed, Risk and Testing. Risk names the **one fact** the change is safe because of (e.g. "only docs and skills changed; nothing under `src/`") and how far that fact was proven: **stated**, **line cited**, **walked through**, **run** (a command and its output in Testing) or **reproduced** (the old failure shown, then gone). Missing, or a high-risk PR proven no further than "stated", is Important. *(script)* The four sections are present and the stated risk isn't below `scripts/risk.py`'s (decisions, 19 Nov 2026, risk is computed); its 400-line REVIEW line is a Nit, not a blocker. High: the second-model findings and the must-fix triage are in the PR (decisions, 5 Nov 2026, lighter process).
 - Scope (the agent stayed inside its task): every file in step 3's list is either in the task's **Files** in `tasks/plan.md` or named in the PR's What changed with a reason tied to the task. For a PR with no plan task (audit, docs, chore), check against its Intent instead. A file with neither, or a change the task didn't ask for (a refactor, a renamed helper, an unrelated fix), is Important: out of scope (CLAUDE.md, "Do only what the task asks"; "An unrelated failure you notice: report it, don't fix it").
 
 ## 5. Local check (only when CI can't vouch for it)
@@ -85,14 +83,14 @@ gh pr checks $ARGUMENTS --watch
 gh pr view $ARGUMENTS --json headRefOid,mergeable -q '.headRefOid+" "+.mergeable'
 ```
 
-Every check passes, the runs are for `headRefOid` (not an older push), and `mergeable` is `MERGEABLE`. If it reads `UNKNOWN`, wait briefly and read it again.
+The `check` job passes and its run is for `headRefOid` (not an older push), and `mergeable` is `MERGEABLE`. The advisory `verify-pr` job may be red for a false positive or a body fixed since; step 2's run already judged that. If it reads `UNKNOWN`, wait briefly and read it again.
 
 ## 7. Merge (decisions, 2 Nov 2026)
 
 Merge only if all of these hold; otherwise report and ask Joey:
 
 - Steps 2-6 found nothing Important, and CI passed on `headRefOid` (plus the local check when step 5 required it).
-- Every CI check passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
+- The `check` job passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
 - The PR doesn't touch the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`), the hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`). Those PRs stay Joey's to merge; every other PR passing the steps above is merged here, including docs that loosen a rule with their decisions entry (decisions, 6 Nov 2026).
 
 ```bash
