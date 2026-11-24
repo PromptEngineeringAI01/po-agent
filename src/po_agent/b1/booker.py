@@ -322,7 +322,7 @@ def _w4(
         window = driver.find_note_again(guard, page, *login, note_id)  # row 25
         booking.link_project(guard, page, window, proceed.pln, log=log, note_id=note_id)
         return window
-    except BaseException as error:  # Ctrl+C too
+    except BaseException as error:  # noqa: BLE001 - Ctrl+C too; this raises
         _stop_after_submit(page, error, note_id, "W4")
 
 
@@ -343,5 +343,5 @@ def _w5(
         booking.mark_solved(guard, window, agent, log=log, note_id=note_id)
         booking.check_solved_log(window, before)
         driver.gone_from_pending(guard, page, *login, note_id)
-    except BaseException as error:  # Ctrl+C too
+    except BaseException as error:  # noqa: BLE001 - Ctrl+C too; this raises
         _stop_after_submit(page, error, note_id, "W5")

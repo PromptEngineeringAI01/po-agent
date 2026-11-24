@@ -24,8 +24,8 @@ No changed `.py` file: say so in one line and stop.
 If `uv run scripts/check.py --help` lists `--quick`, use `uv run scripts/check.py --quick <test paths>` with the test paths from "Which tests" below, and skip to step 3. Else run:
 
 ```bash
-uv run ruff format --check <changed .py>
-uv run ruff check <changed .py>
+uv run ruff format --check --no-cache <changed .py>
+uv run ruff check --no-cache <changed .py>
 uv run python scripts/guard_check.py
 uv run pytest <test files> -q -x -m "not live_claude and not testsite and not real_data"
 ```
