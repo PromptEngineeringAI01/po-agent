@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: `refactor:` is a commit type** (Joey, audit fix #2; entry below): CLAUDE.md's Conventional Commits list adds `refactor:`, which tasks 8.3 and 8.4 already used; `scripts/verify_pr.py` accepts it. Loosens nothing.
 - **23 Nov 2026: Summit Home is client 2** (ADR-003 Accepted, option C; Joey said yes under the CEO's delegation; six entries below): a read-only peek with every check before the take; the Client Internal No. check in place of the address check (loosens a control); Summit's decision rules; return to the original assignee (taking a person's Note is allowed for Summit); a separate Agent 2 run; testing and go-live without the test site (loosens a control). Spec only: nothing built yet.
 - **21 Nov 2026: one wait module** (task 8.4; Joey's settled design of 9 Nov; entry below): every MySys wait in `mysys/wait.py`; its retry refuses any action but the four opening clicks (tightens a safety control). No change in MySys or run output; the tests' timeout patches move to the one module in their own `test:` commit.
 - **20 Nov 2026: secrets pre-flight** (threat-model gap 3; entry below): `po-agent preflight --site test|live` reports whether the site's MySys secrets are set and well-formed, names and status only, no login. Joey runs it on the Mac Mini before a live run.
@@ -11,6 +12,13 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - `refactor:` is an allowed commit type (Joey, audit fix #2)
+
+- **Decided:** the Conventional Commit types are `feat:`, `fix:`, `test:`, `docs:`, `chore:` and `refactor:`. CLAUDE.md (How we work) lists all six; `scripts/verify_pr.py` fails any other subject (merge commits skipped).
+- **Why:** behaviour-unchanged tasks (8.3, 8.4) already committed as `refactor:`, which the old five-type list didn't name, so /verify-pr's rule and the practice disagreed.
+- **Also decided:** the em dash rule is checked on added lines only (existing lines stay); the CI step that runs `verify_pr.py` and the verify-pr skill change are Joey's to apply after the PR merges (`.github/workflows/` and `skills/verify-pr/` are his).
+- **Loosens:** nothing. A dev-tooling rule; no change in MySys or run output.
 
 ## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
 
