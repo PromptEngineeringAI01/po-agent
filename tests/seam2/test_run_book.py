@@ -27,7 +27,8 @@ import pytest
 
 from po_agent import cli
 from po_agent.core import run
-from po_agent.mysys import driver, tasks
+from po_agent.mysys import driver
+from po_agent.mysys import tasks as task_table
 from po_agent.mysys.guard import ActionGuard
 
 pytestmark = pytest.mark.testsite
@@ -69,7 +70,7 @@ def read_site(config, login) -> tuple[driver.NotePoolList, dict[str, tuple]]:
                 for t in driver.project_lookup(
                     guard, page, *login, number, "test"
                 ).tasks
-                if t.status.strip() != tasks.CANCELLED
+                if t.status.strip() != task_table.CANCELLED
             )
             for number in TRIAL_PLNS
         }
