@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 24 Nov 2026, verify_pr.py advisory in CI; browser tools hook; Summit creator table; three agent-skills vendored; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, Phase S approved; verify_pr.py advisory in CI; browser tools hook; Summit creator table; three agent-skills vendored; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: Phase S approved** (Joey; entry below): Summit build tasks 9.1-9.15 start; real-PO cases split Note side Joey, project side Claude (live-lookup exception); `production` tag moves once after Checkpoint S-A; Healthchecks only for Summit. Loosens nothing.
 - **24 Nov 2026: verify_pr.py runs in CI as an advisory job** (Joey; entry below): its own `verify-pr` job, not a required status, so a false positive never blocks a merge or skips gitleaks; `/verify-pr` runs it first from `main`'s copy. Loosens nothing.
 - **24 Nov 2026: a hook for the browser tools** (Joey: "保留例外，擋其餘"; entry below): `guard_browser.py` blocks Claude in Chrome, the pane's page scripts, field setting and network reads, and any MySys address in a browser tool or WebFetch; the 10 Nov live lookups keep working (tightens a safety control).
 - **24 Nov 2026: Summit creator table** (Joey; entry below): Summit Home Improvement is now Summit Renovations; Summit Project covers only Summit Developments (SPEC open question S2 closed). Loosens nothing.
@@ -18,6 +19,15 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - Phase S approved: Summit build order and the advisor's decision batch (Joey; loosens nothing)
+
+- **A.1:** Joey approved `tasks/plan.md` -> Phase S (tasks 9.1-9.15, live steps S.0-S.5) as the freeze point for Summit ("核准，從 9.1 開始").
+- **Real-PO cases (open question 1):** Joey writes the Note side of `private/summit/fixtures/cases.toml` (title, body, original assignee, expected result); Claude reads the project side (Projects search, Client Internal No., Tasks table with Task Creator) under the 10 Nov 2026 live-lookup exception, after Joey logs in himself, writing only into `private/`. No new live exception.
+- **`production` tag (open question 2):** moves once during the build, after Checkpoint S-A (9.1-9.6 merged, B1 seam 2 full sequence green), followed by one watched B1 hourly run; the next move is at S.1.
+- **Heartbeat (open question 4):** Summit uses its own Healthchecks check only; the GitHub backup heartbeat stays B1's.
+- **Also:** the `/start-task` brief names both clients and picks from Phase S (A.3).
+- **Carried in:** `tasks/plan.md` (Phase S open questions), `tasks/todo.md` (A.1, A.3), `.claude/skills/start-task/SKILL.md`.
 
 ## 24 Nov 2026 - verify_pr.py in CI as an advisory job, and in /verify-pr (Joey; PR 161 follow-up)
 
