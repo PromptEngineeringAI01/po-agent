@@ -10,8 +10,10 @@
 
 Books B1 Homes `/048` compaction POs in MySys (third-party, browser only): Note → Compaction Test task on the project, PO PDF attached, On Hold, Note linked and Solved. A deterministic Playwright script does every click through the action guard. Two code readers (pdfplumber, pypdf) must agree, and the PDF's address is checked against MySys. Anything uncertain → skip → Note back to the pool.
 
+Client 2, Summit Home (`src/po_agent/summit/`, `SPEC.md` → Client 2): the same shared guard and booker, its own MySys login (Agent 2) and run, live only. Its PDF must say COMPACTION TEST; the project's Client Internal No. is checked instead of the address; a skipped Note goes back to its original assignee.
+
 <!-- Current phase and where the source of truth is. Update when the phase changes (stale phase text misleads every session). -->
-**Now:** production phase, test site only. Run mode books end to end, including from the office Mac Mini (launchd, hourly, no state between runs). What's left and its status: `tasks/todo.md`. Active spec: `SPEC.md`. Decisions: `docs/decisions.md` (wins over any spec).
+**Now:** B1 Homes runs live hourly on the office Mac Mini (launchd, no state between runs); B1 changes are still proven on the test site. Summit phase 1: Claude builds and tests it offline (no test-site phase); Joey runs its live steps S.0-S.5 on the Mac Mini. What's left and its status: `tasks/todo.md`. Active spec: `SPEC.md`. Decisions: `docs/decisions.md` (wins over any spec).
 
 <!-- HOW: only the commands most tasks need, each with what "healthy" looks like. The full list stays in SPEC.md (progressive disclosure). -->
 ## Commands
@@ -33,7 +35,7 @@ Hooks, permissions, `guard.py` and `check.py` enforce most of these; the rule st
 3. Touch the live site (`prompt.mysys.com.au`) in code, config, tests or commands; run the agent or the wrapper on live; log in to live from any test, command or seam; or read or set a live secret (`mysys_live_*`): only Joey does, on the Mac Mini. The only exceptions, with their limits, are in `SPEC.md` → Boundaries → Live site.
 4. Send, reply to, forward or delete email; access Outlook; leave "Send Email Notification" ticked.
 5. Put a secret anywhere (code, config, docs, logs, screenshots, run output, chat). Secrets come from `PO_AGENT_<NAME>` env vars, else keyring service `po-agent`. Never use the name `ANTHROPIC_API_KEY` (except `tests/test_config_secrets.py`, which proves it's ignored).
-6. Commit or copy out anything from `private/`, `logs/`, `state/`, traces, or a recording with credentials. Real client data never goes into a committed file, PR, issue or run output. Only exception: the 3 trial POs' internal numbers, PO numbers and test-site plns; their PDFs, addresses and client names stay in `private/` and MySys (`SPEC.md` assumption 2; decisions, 16 Oct 2026, D2).
+6. Commit or copy out anything from `private/`, `logs/`, `state/`, traces, or a recording with credentials. Real client data never goes into a committed file, PR, issue or run output. Only exception: B1's 3 trial POs' internal numbers, PO numbers and test-site plns; their PDFs, addresses and client names stay in `private/` and MySys (`SPEC.md` assumption 2; decisions, 16 Oct 2026, D2). No Summit identifier is excepted: its PDFs, Note titles, addresses and real PO numbers stay in `private/summit/`; its company names, creators and staff user names may be committed (decisions, 23 Nov 2026).
 7. Start a write (Create New Task) before every check in scope has passed (`SPEC.md` → In the MVP).
 8. Edit a test, fixture or expected result to make it pass. An intended behaviour change may change one in its own `test:` commit, with its `docs/decisions.md` entry (decisions, 6 Nov 2026).
 9. Push to `main`, force-push, or merge any way except `/verify-pr`. PRs touching the guard (`guard.py`, `scripts/guard_check.py`), hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`) are Joey's to merge.
@@ -43,7 +45,7 @@ Hooks, permissions, `guard.py` and `check.py` enforce most of these; the rule st
 
 1. `uv run scripts/check.py` passes; show its output.
 2. Touched the readers or address rules → run `uv run pytest tests/seam1 -s` and show `false PROCEED: 0`, then the real-PO seam on the laptop.
-3. Touched `mysys/` or the booker → run seam 2 on the test site (or ask Joey to); show the result.
+3. Touched `mysys/` or the booker → run B1's seam 2 on the test site (or ask Joey to); show the result. Summit has no seam 2: its proof is the offline tests and the real-PO seam, then Joey's live steps.
 4. Review the diff against Must never, `SPEC.md` and `tasks/plan.md` at the depth its risk sets (`docs/workflow.md`, build loop steps 5-6). Important = breaks behaviour, writes a wrong value to MySys, leaks data or breaks a Must-never rule. At most five Nits.
 5. Flag it when the change makes this file, `SPEC.md` or `docs/macmini-setup.md` out of date.
 

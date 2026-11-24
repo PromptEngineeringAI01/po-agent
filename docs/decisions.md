@@ -1,5 +1,6 @@
-# PO Agent - decision log (updated 24 Nov 2026, verify_pr.py advisory in CI; three agent-skills vendored; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, verify_pr.py advisory in CI; Summit creator table; three agent-skills vendored; grading scripts high risk; ruff tightened; `refactor:` commits; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
 - **24 Nov 2026: verify_pr.py runs in CI as an advisory job** (Joey; entry below): its own `verify-pr` job, not a required status, so a false positive never blocks a merge or skips gitleaks; `/verify-pr` runs it first from `main`'s copy. Loosens nothing.
+- **24 Nov 2026: Summit creator table** (Joey; entry below): Summit Home Improvement is now Summit Renovations; Summit Project covers only Summit Developments (SPEC open question S2 closed). Loosens nothing.
 - **24 Nov 2026: three agent-skills vendored; medium review in a fresh context** (factory audit fix #5; entry below): `test-driven-development`, `incremental-implementation` and `code-review-and-quality` live in `.claude/skills/`, pinned at agent-skills v0.6.17; a medium-risk PR's review runs in a read-only sub-agent the builder starts, not in the builder's own context. Process only; loosens nothing.
 - **24 Nov 2026: the grading scripts are high risk** (PR 162 second-model review, finding 4): `scripts/risk.py` rates a change to `scripts/risk.py` or `scripts/verify_pr.py` high (was medium), and `verify_pr.py` prints `REVIEW:` for both, so a PR can't loosen the scripts that grade it unseen; `tests/test_risk.py` moves `scripts/risk.py` from its medium rows to high (Must never #8). Tightens dev tooling; loosens nothing.
 - **24 Nov 2026: ruff tightened** (factory audit fix #4; Joey; entry below): BLE and RUF100 selected, `po_agent` pinned first-party, both ruff steps run `--no-cache`. Tightens dev tooling; nothing changes in MySys or run output.
@@ -23,6 +24,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 - **Why advisory (second-model review of the first patch):** inside the required `check` job, any FAIL, a false positive included (the guarded-action rule matches a helper of ours named `check`), would block a merge with no override short of lifting branch protection, which is enforced on admins too; it would also skip gitleaks on that run; a PR body fixed after the push would leave the red check on the head commit; and CI runs the PR's own copy of the script, so a PR could loosen the rules it is checked by.
 - **False positives:** a FAIL from the guarded-action rule that plainly isn't a Playwright page call is reported as a likely false positive for Joey to decide, not merged past silently.
 - **Loosens:** nothing. The required status is unchanged; the script adds an advisory signal and replaces hand greps in the skill.
+
+## 24 Nov 2026 - Summit creator table: Summit Renovations; Summit Project is Summit Developments only (Joey; loosens nothing)
+
+- **Joey (24 Nov 2026):** "Summit Home Improvement has changed their name to Summit Renovations." "For Summit Project, it only includes Summit Developments."
+- **Now:** the creator table row Summit Home Improvement is Summit Renovations (creator rule unchanged: the previous task's Task Creator); Summit Project's aliases are exactly `["Summit Developments"]`, so SPEC open question S2 is closed. The 23 Nov 2026 entries below keep their wording as a dated record.
+- **Loosens?** No: a company outside the table is still `COMPANY_UNKNOWN` (skip, never a wrong write).
+- **Carried in:** `SPEC.md` v1.61 (Creator table, open question S2).
 
 ## 24 Nov 2026 - Three agent-skills vendored; medium review in a fresh context (factory audit fix #5; loosens nothing)
 
