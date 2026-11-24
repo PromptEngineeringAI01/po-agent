@@ -65,8 +65,8 @@ class FakeDriver:
         self.calls.append("open_note_pool")
         return "panel"
 
-    def set_note_pool_filters(self, guard, panel, pool_name):
-        self.calls.append(f"filters {pool_name}")
+    def set_note_pool_filters(self, guard, panel, filters):
+        self.calls.append(f"filters {filters.pool}")
 
     def read_note_pool(self, guard, panel):
         self.reads += 1

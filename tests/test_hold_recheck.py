@@ -34,6 +34,7 @@ from keyring.backends.null import Keyring as NullKeyring
 from playwright.sync_api import Browser, Page
 
 from po_agent import cli
+from po_agent.b1.decision import B1ProjectRule
 from po_agent.core import controls, run, trace
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import UnexpectedScreen
@@ -99,7 +100,7 @@ def mysys(env, tmp_path):
         install(env, fake)
         answers = states or {}
 
-        def recheck_hold(guard, page, base_url, username, password, booked, site):
+        def recheck_hold(guard, page, base_url, username, password, booked, rule):
             fake.calls.append(f"recheck {booked.task_id}")
             guard.history.append(("search_project", "done"))
             answer = answers.get(booked.task_id, "on_hold")
@@ -541,7 +542,9 @@ def test_a_project_that_isnt_the_booked_one_is_not_found(monkeypatch, lookup, wi
     read = []
     monkeypatch.setattr(booking, "read_hold", lambda *a: read.append(a) or "on_hold")
 
-    state = driver.recheck_hold(None, None, "url", "user", "pw", BOOKED, "test")
+    state = driver.recheck_hold(
+        None, None, "url", "user", "pw", BOOKED, B1ProjectRule("test")
+    )
 
     assert (state, read) == ("not_found", [])
 
@@ -554,6 +557,8 @@ def test_the_booked_project_is_read_for_the_task(monkeypatch):
     )
     monkeypatch.setattr(booking, "read_hold", lambda project, task: f"{project} {task}")
 
-    state = driver.recheck_hold(None, None, "url", "user", "pw", BOOKED, "test")
+    state = driver.recheck_hold(
+        None, None, "url", "user", "pw", BOOKED, B1ProjectRule("test")
+    )
 
     assert state == "project tsk_200001"

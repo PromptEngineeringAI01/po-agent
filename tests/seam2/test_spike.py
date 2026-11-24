@@ -10,6 +10,7 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1.decision import note_pool_filters
 from po_agent.core import run
 from po_agent.mysys import driver
 
@@ -38,7 +39,7 @@ def test_spike_reads_the_note_pool_and_finds_the_three_trial_notes(
         credentials["mysys_test_password"],
     )
     panel = driver.open_note_pool(guard, page)
-    driver.set_note_pool_filters(guard, panel, config.pool_name)
+    driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
     listing = driver.read_note_pool(guard, panel)
 
     check_note_pool_reset(listing)

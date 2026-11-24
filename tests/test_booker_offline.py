@@ -69,7 +69,7 @@ import pytest
 from playwright.sync_api import Browser, ConsoleMessage, Page
 
 from po_agent.b1 import readers
-from po_agent.b1.decision import decide
+from po_agent.b1.decision import B1ProjectRule, decide
 from po_agent.b1.models import B1Proceed
 from po_agent.core import controls
 from po_agent.core.config import CONFIG_DIR
@@ -188,6 +188,7 @@ def fake_mysys(
     *,
     tasks: list[tuple[str, str]],
     search_pln: str = PLN,
+    search_pages: int = 1,
     internal_no: str = INTERNAL_NO,
     multiple: str = "",
     mangle: str | None = None,
@@ -311,7 +312,8 @@ function search(text) {{
     document.getElementById('rows').innerHTML =
       '<tr><td><a href="#" onclick="document.getElementById(\\'project\\').hidden = false; return false">{search_pln}</a></td>'
       + '<td>{INTERNAL_NO}</td><td>Active</td><td>B1 Homes</td></tr>';
-    document.getElementById('footer').textContent = 'Page 1 of 1(1 Items)';
+    document.getElementById('footer').textContent =
+      'Page 1 of {search_pages}({search_pages} Items)';
   }}, 200);
 }}
 function addDoc(input, area) {{
@@ -532,7 +534,7 @@ def run_book(
         login=login,
         controls=gate,
         agent=AGENT,
-        site="test",
+        project_rule=B1ProjectRule("test"),
         document_type=document_type,
         stop_after=stop_after,
         log=log,
@@ -594,10 +596,12 @@ def test_w1_checks_the_note_reopens_the_project_and_fills_the_form_without_submi
         {"tasks": [CANCELLED, ("tsk_200002", "New Project")]},
         # The search now matches another project.
         {"tasks": [CANCELLED], "search_pln": "pln_10009"},
+        # The search now has a second results page (task 9.2 mutants).
+        {"tasks": [CANCELLED], "search_pages": 2},
         # The reopened project's Client Internal No. fails the match rule.
         {"tasks": [CANCELLED], "internal_no": "2600009B"},
     ],
-    ids=["new-task", "other-pln", "other-internal-no"],
+    ids=["new-task", "other-pln", "two-result-pages", "other-internal-no"],
 )
 def test_a_reopened_project_not_as_decided_is_write_not_started(
     serve, guard, search, fake
