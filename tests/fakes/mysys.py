@@ -21,9 +21,9 @@ from types import SimpleNamespace
 import pytest
 from seam1.seam1_cases import CASES, text_pdf
 
-from po_agent.b1.models import MySysLookup, NotePoolRow
 from po_agent.core import run
 from po_agent.core.errors import UnexpectedScreen
+from po_agent.core.models import MySysLookup, NotePoolRow
 from po_agent.mysys import booking, driver
 
 # The test site's pool (screen-map "Live vs test") and the agent's user name

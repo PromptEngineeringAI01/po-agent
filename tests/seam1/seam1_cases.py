@@ -15,12 +15,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from po_agent.b1.decision import TitleRule
-from po_agent.b1.models import (
-    MySysLookup,
-    NotePoolRow,
-    NoteSnapshot,
-    SkipReason,
-)
+from po_agent.core.models import MySysLookup, NotePoolRow, NoteSnapshot, SkipReason
 
 CASES_FILE = Path(__file__).parent / "fixtures" / "cases.toml"
 POOL = "Agent Pool"

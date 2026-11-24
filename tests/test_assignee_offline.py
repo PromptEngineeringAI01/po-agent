@@ -30,7 +30,6 @@ import pytest
 from fakes.mysys import AGENT, PERSON, POOL, FakeNote
 
 from po_agent import cli
-from po_agent.b1.models import NotePoolRow
 from po_agent.core import controls
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import (
@@ -39,6 +38,7 @@ from po_agent.core.errors import (
     PoAgentError,
     UnexpectedScreen,
 )
+from po_agent.core.models import NotePoolRow
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 

@@ -13,7 +13,8 @@ from seam1_cases import POOL, Seam1Case, pdf_bytes
 
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1.decision import NoteChecked, check_note_and_pdf, eligible_internal_no
-from po_agent.b1.models import DeterministicReading, NoteSnapshot, Skip, SkipReason
+from po_agent.b1.models import DeterministicReading
+from po_agent.core.models import NoteSnapshot, Skip, SkipReason
 
 STEPS_2A_TO_4 = {
     SkipReason.NOTE_ALREADY_LINKED,

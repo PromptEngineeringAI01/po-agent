@@ -16,8 +16,8 @@ from seam1_cases import CASES, POOL, Seam1Case, pdf_bytes
 
 from po_agent.b1 import decision, readers
 from po_agent.b1.decision import decide, eligible_internal_no
-from po_agent.b1.models import CompactionTask, MySysLookup, Proceed, Skip, SkipReason
 from po_agent.b1.readers import PdfTexts
+from po_agent.core.models import CompactionTask, MySysLookup, Proceed, Skip, SkipReason
 
 PDF_BYTES = b"%PDF-stand-in"
 

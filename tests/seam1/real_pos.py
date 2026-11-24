@@ -26,7 +26,8 @@ import pytest
 from po_agent.b1 import reader_rules as rules
 from po_agent.b1 import readers
 from po_agent.b1.decision import decide, eligible_internal_no
-from po_agent.b1.models import (
+from po_agent.core.errors import WriteNotStarted
+from po_agent.core.models import (
     MySysLookup,
     NotePoolRow,
     NoteSnapshot,
@@ -34,7 +35,6 @@ from po_agent.b1.models import (
     Skip,
     SkipReason,
 )
-from po_agent.core.errors import WriteNotStarted
 
 # The 3 trial POs (SPEC.md -> Trial conditions): internal numbers only.
 TRIAL_INTERNAL_NOS = ("2609017B", "2609034B", "2610002B")

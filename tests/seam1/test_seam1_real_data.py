@@ -27,7 +27,7 @@ from real_pos import (
 )
 from seam1_cases import CASES, text_pdf
 
-from po_agent.b1.models import Proceed
+from po_agent.core.models import Proceed
 
 SEAM1 = Path(__file__).resolve().parent
 

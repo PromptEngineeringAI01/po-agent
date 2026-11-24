@@ -16,7 +16,7 @@ from po_agent.b1.address import (
     parse_project_address,
     verify_address,
 )
-from po_agent.b1.models import SkipReason
+from po_agent.core.models import SkipReason
 
 PROJECT = "Lot 123 (#45) Sample Lane Sampleville 6000 WA"
 # The real B1 layout: the Job Address block shares its lines with the

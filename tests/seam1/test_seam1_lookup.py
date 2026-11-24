@@ -16,7 +16,7 @@ from po_agent.b1.decision import (
     eligible_internal_no,
     match_project,
 )
-from po_agent.b1.models import (
+from po_agent.core.models import (
     CompactionTask,
     MySysLookup,
     SearchRow,

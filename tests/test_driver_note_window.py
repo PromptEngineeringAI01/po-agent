@@ -19,9 +19,9 @@ from urllib.parse import quote
 import pytest
 from playwright.sync_api import Browser, Page
 
-from po_agent.b1.models import NotePoolRow
 from po_agent.core import runlog
 from po_agent.core.errors import UnexpectedScreen
+from po_agent.core.models import NotePoolRow
 from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ALLOWLIST, ActionGuard, Kind
 
