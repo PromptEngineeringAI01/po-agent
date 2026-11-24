@@ -23,7 +23,7 @@ git -C <repo> log --oneline -1 origin/main
 
 ## 2. Pick the task
 
-`$ARGUMENTS`, or the first unchecked task in `tasks/todo.md` in the order of `tasks/plan.md` -> Phase P.
+`$ARGUMENTS`, or the first unchecked task in `tasks/todo.md` in the order of `tasks/plan.md` -> Phase S (Summit, from 24 Nov 2026).
 
 - **By-hand tasks** (M0b.x, 1.10, 3.4, 4.6, M6, anything marked "by hand"): don't start a session. Tell Joey what the task needs from him, in a few lines.
 - **Decision batch first** (decisions, 6 Nov 2026, faster shipping): if this task has an ask-first point or an open behaviour choice that Joey hasn't answered in `docs/decisions.md`, ask it now, together with the same kind of question for the next two or three tasks (one AskUserQuestion, up to four questions, each with a recommendation), and record the answers in `docs/decisions.md` (in the task's PR, or a docs PR if several tasks share them) before starting.
@@ -48,7 +48,7 @@ Decided already (Joey, <date>; don't ask again): <each answer from the decision 
 Tests: the fewest that pin the acceptance criteria and Must-never points; no mocking our own code; fakes only at MySys, the Anthropic API and the clock. No tautological test: an expected value is written out from SPEC.md or the plan, never computed the way the code computes it. Pick cases by partitioning the spec (each rule's in, out and boundary), not by reading the code. Every bug gets a regression test that fails without the fix; for a bug that isn't obvious, use the diagnosing-bugs skill.
 Reports to Joey: in Traditional Chinese (code and repo text stay English), open with a one-line recap, use plain words, ask one question at a time, end with the next action. Ask him for a by-hand check only when no offline or seam-2 test covers the case.
 
-The agent is for B1 Homes only. No PDF generator.
+Clients: B1 Homes (`src/po_agent/b1/`, live) and Summit Home (`src/po_agent/summit/`, SPEC.md -> Client 2: live only, no test-site phase, no seam 2; Claude never touches live). B1's behaviour stays unchanged unless the task says otherwise; a change under `mysys/` runs B1's seam 2. No PDF generator.
 
 Workflow (docs/workflow.md, Production build loop):
 1. Write the failing tests, show they fail for the expected reason, commit them as test:, and carry on (no review stop). Stop and ask Joey only for a behaviour choice that is his, in plain words, with your recommendation.

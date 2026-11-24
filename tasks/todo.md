@@ -13,9 +13,9 @@ Decisions D1–D7 (16 Oct 2026) are in `tasks/plan.md` → Decisions from the do
 Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SPEC names them. B1 behaviour stays unchanged; any `mysys/` change runs B1's seam 2 on the test site (the advisor may batch resets). High risk = one second-model review. Open questions for the decision batch: plan -> Phase S.
 
 **Before 9.1 (admin)**
-- [ ] **A.1** Joey approves Phase S (freeze point for this phase) · by hand
+- [x] **A.1** (done 24 Nov 2026) Joey approves Phase S (freeze point for this phase) · by hand
 - [ ] **A.2** PR 165's hand edits merged (CLAUDE.md first line and Must never #6, `docs/workflow.md` phases) · Joey
-- [ ] **A.3** `/start-task` brief no longer says "B1 Homes only" or "in the order of Phase P" (`.claude/skills/start-task/SKILL.md`, Claude-editable: the advisor or a small task, or Joey by hand)
+- [x] **A.3** `/start-task` brief no longer says "B1 Homes only" or "in the order of Phase P" (`.claude/skills/start-task/SKILL.md`, Claude-editable: the advisor or a small task, or Joey by hand)
 - [ ] **A.4** `production` tag moves during the build as Joey picks (plan -> Phase S, open question 2), each followed by one watched B1 hourly run · by hand
 
 **S-A Seam, B1 unchanged**
