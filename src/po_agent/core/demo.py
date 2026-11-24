@@ -134,7 +134,7 @@ def _offer_return(
             guard, page, str(config.base_url), progress.note_id
         )
         booking.return_note(guard, window, config.pool_name)
-    except Exception:
+    except Exception:  # noqa: BLE001 - never raises: any failure is "not returned"
         booking.save_snapshot(page, "return")
         output.info("demo: note not returned to the pool")
         return

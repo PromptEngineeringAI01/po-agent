@@ -82,7 +82,7 @@ def pdf_text(data: bytes) -> str:
             warnings.simplefilter("ignore")
             with pdfplumber.open(io.BytesIO(data)) as pdf:
                 return "\n".join(page.extract_text() or "" for page in pdf.pages)
-    except Exception:  # pdfminer raises many types; its message can quote the file
+    except Exception:  # noqa: BLE001 - pdfminer raises many types; its message can quote the file
         raise WriteNotStarted("PDF not readable", reason="PDF_UNREADABLE") from None
 
 
@@ -102,7 +102,7 @@ def pypdf_text_layer(data: bytes) -> str:
             warnings.simplefilter("ignore")
             reader = pypdf.PdfReader(io.BytesIO(data))
             return "\n".join(page.extract_text() or "" for page in reader.pages)
-    except Exception:  # pypdf raises many types; its message can quote the file
+    except Exception:  # noqa: BLE001 - pypdf raises many types; its message can quote the file
         return ""
 
 

@@ -3,8 +3,9 @@
 Runs each step in order, stops on the first failure, and prints
 "check: all passed" when every step passes:
 
-- default: ruff format --check, ruff check, mypy, guard check, repo data, then the
-  offline tests in parallel (pytest-xdist; decisions, 19 Nov 2026).
+- default: ruff format --check and ruff check (both --no-cache), mypy, guard
+  check, repo data, then the offline tests in parallel (pytest-xdist;
+  decisions, 19 Nov 2026).
 - `--quick <test paths>`: the same fast steps on the whole repo, then pytest
   on only those paths with the same marker filter, in parallel only past
   QUICK_PARALLEL_MIN selected tests. An inner-loop check, not the gate.
@@ -125,8 +126,13 @@ def script(path: str) -> Callable[[], bool]:
 
 
 FAST_STEPS: list[Step] = [
-    ("ruff format --check .", command("ruff", "format", "--check", ".")),
-    ("ruff check .", command("ruff", "check", ".")),
+    # --no-cache: a stale local cache can't pass what CI fails (friction log,
+    # 20 Nov 2026).
+    (
+        "ruff format --check --no-cache .",
+        command("ruff", "format", "--check", "--no-cache", "."),
+    ),
+    ("ruff check --no-cache .", command("ruff", "check", "--no-cache", ".")),
     ("mypy", command("mypy")),  # files and flags: pyproject [tool.mypy]
     ("guard check", script("scripts/guard_check.py")),
     ("repo data", repo_data),
