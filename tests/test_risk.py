@@ -57,6 +57,8 @@ def test_high_paths(risk, path):
         "src/po_agent/mysysx.py",  # not inside mysys/
         "scripts/heartbeat_check.py",
         "scripts/macmini-run.sh",
+        "scripts/risk_helper.py",  # near misses: whole paths only
+        "scripts/old/verify_pr.py",
     ),
 )
 def test_medium_paths(risk, path):
