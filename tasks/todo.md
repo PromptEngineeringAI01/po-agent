@@ -24,7 +24,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.3** `--client b1|summit`; `config/clients/summit.toml` (Summit Renovations; Summit Project = Summit Developments only; `enabled = false`); Summit secret names; `preflight --client summit`; `--site test --client summit` refused · step · high
 - [ ] **9.4** Client interface (`core/client.py`) in the run loop; `core/` imports no client package (except `demo.py`) · step · refactor · high
 - [ ] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
-- [ ] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
+- [x] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
 
 **Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; first B1 hourly run watched after any tag move past here.
 
