@@ -33,6 +33,8 @@ def risk():
         "src/po_agent/b1/address.py",
         "scripts/guard_check.py",
         "scripts/check.py",
+        "scripts/risk.py",
+        "scripts/verify_pr.py",
         ".claude/hooks/guard_bash.py",
         ".claude/hooks/protect_paths.py",
         ".claude/settings.json",
@@ -55,7 +57,8 @@ def test_high_paths(risk, path):
         "src/po_agent/mysysx.py",  # not inside mysys/
         "scripts/heartbeat_check.py",
         "scripts/macmini-run.sh",
-        "scripts/risk.py",
+        "scripts/risk_helper.py",  # near misses: whole paths only
+        "scripts/old/verify_pr.py",
     ),
 )
 def test_medium_paths(risk, path):
@@ -85,7 +88,7 @@ def test_low_paths(risk, path):
     (
         ([], "low"),
         (["docs/a.md", "tests/test_x.py"], "low"),
-        (["docs/a.md", "scripts/risk.py", "tests/test_risk.py"], "medium"),
+        (["docs/a.md", "scripts/heartbeat_check.py", "tests/test_risk.py"], "medium"),
         (
             ["docs/a.md", "src/po_agent/core/run.py", "src/po_agent/mysys/guard.py"],
             "high",

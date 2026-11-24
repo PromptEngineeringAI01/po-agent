@@ -371,8 +371,12 @@ def test_safety_sensitive_files_are_flagged_for_review(tmp_path):
         "scripts/macmini-run.sh",
         "scripts/au.com.prompteng.po-agent.plist",
         "src/po_agent/b1/address.py",
+        "scripts/risk.py",
+        "scripts/verify_pr.py",
     )
-    commit(repo, "chore: x", {path: "x = 1\n" for path in (*safety, "docs/x.md")})
+    # Not flagged: a doc, and a near miss of a safety file's name.
+    others = ("docs/x.md", "scripts/risk_helper.py")
+    commit(repo, "chore: x", {path: "x = 1\n" for path in (*safety, *others)})
     review = "REVIEW: safety-sensitive file changed:"
     assert run(repo, body("High")) == (
         0,
@@ -385,6 +389,8 @@ def test_safety_sensitive_files_are_flagged_for_review(tmp_path):
             f"{review} scripts/check.py",
             f"{review} scripts/guard_check.py",
             f"{review} scripts/macmini-run.sh",
+            f"{review} scripts/risk.py",
+            f"{review} scripts/verify_pr.py",
             f"{review} src/po_agent/b1/address.py",
             f"{review} src/po_agent/mysys/guard.py",
             "verify_pr: 0 fail, 0 warn",

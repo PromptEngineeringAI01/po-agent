@@ -5,8 +5,9 @@ The table is docs/workflow.md, Production build loop step 5 (decisions,
 
 - high: `src/po_agent/mysys/` (the guard and every MySys write), the booker,
   the readers and decision engine, the address rules, `scripts/guard_check.py`,
-  `scripts/check.py` (= CI), `.claude/hooks/`, `.claude/settings*.json` and
-  `.github/workflows/`;
+  `scripts/check.py` (= CI), `scripts/risk.py` and `scripts/verify_pr.py` (the
+  scripts that grade a PR, so a PR can't loosen them unseen), `.claude/hooks/`,
+  `.claude/settings*.json` and `.github/workflows/`;
 - medium: any other file under `src/` or `scripts/`;
 - low: everything else (docs, tests, skills, tasks).
 
@@ -38,6 +39,8 @@ HIGH_FILES = (
     "src/po_agent/b1/address.py",
     "scripts/guard_check.py",
     "scripts/check.py",
+    "scripts/risk.py",
+    "scripts/verify_pr.py",
 )
 HIGH_GLOBS = (".claude/settings*.json",)
 MEDIUM_PREFIXES = ("src/", "scripts/")
