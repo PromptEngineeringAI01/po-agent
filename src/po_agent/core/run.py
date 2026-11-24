@@ -637,6 +637,6 @@ def _return_after_stop(
                     log,
                     note_id,
                 )
-    except Exception:
+    except Exception:  # noqa: BLE001 - never raises: any failure is "not returned"
         return False
     return True

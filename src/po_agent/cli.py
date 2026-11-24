@@ -278,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
         summary.mode = mode
         summary.site = options.site if options.site in ("test", "live") else None
         exit_code = _run(mode, options, summary, trace)
-    except BaseException as error:  # the catch-all: nothing reaches stderr
+    except BaseException as error:  # noqa: BLE001 - the catch-all: nothing reaches stderr
         failure = error
         exit_code = _report(error, summary.run_id, detailed_log)
     trace.end(failure)

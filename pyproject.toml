@@ -25,13 +25,20 @@ target-version = "py312"
 extend-exclude = ["*.md"]  # docs hold illustrative snippets, not code
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "T10", "T20"]
+# BLE: a catch-all keeps `# noqa: BLE001 - <reason>`; RUF100: no dead noqa.
+select = ["E", "F", "W", "I", "UP", "B", "BLE", "T10", "T20", "RUF100"]
 
 [tool.ruff.lint.per-file-ignores]
 # CLAUDE.md: only core/output.py prints (the run-output contract); scripts and
 # tests may print too. No file may keep a debugger call (T10).
 "!src/**" = ["T20"]
 "src/po_agent/core/output.py" = ["T20"]
+# Joey's hooks fail closed on any error by design.
+".claude/hooks/*" = ["BLE"]
+
+[tool.ruff.lint.isort]
+# A module not built yet is still sorted as ours (friction log, 20 Nov 2026).
+known-first-party = ["po_agent"]
 
 [tool.mypy]
 python_version = "3.12"
