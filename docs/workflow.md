@@ -1,12 +1,16 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.23 · 24 Nov 2026 · **Owner:** Joey Wu
+**Version:** v5.24 · 24 Nov 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Now: production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 as a supervised `po-agent demo` (one trial PO, Joey's Enter before every write), from the laptop and the Mac Mini. The goal is now the agent running by itself, hourly, on the Mac Mini: unattended on the test site first, then on live after the go-live gates (`SPEC.md` -> Production; `tasks/plan.md` -> Phase P). The stages below still describe how each task is built.
 
+**Client 2, Summit Home** (from 23 Nov 2026; `SPEC.md` -> Client 2; ADR-003 Accepted): same repo, `src/po_agent/summit/` beside `b1/`, live only. Its phase S: spec (done, PR 158), plan (`tasks/plan.md` -> Phase S), the shared-seam refactor (B1 proven on the test site as before), the Summit readers as a review-stop task with the real-PO seam on Joey's PDFs in `private/summit/`, then Joey's live steps S.0-S.5 on the Mac Mini. No test-site phase and no seam 2 for Summit; Claude never touches live (CLAUDE.md Must never #3).
+
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes, opens and, once verified, merges PRs (`gh pr merge <n> --merge --match-head-commit <sha>`, decisions, 2 Nov 2026).
+
+**v5.24:** client 2, Summit Home: the phase S paragraph and its row in Where you are; the P row says live (decisions, 23 Nov 2026, Summit entries). Adds no rule.
 
 **v5.23:** Appendix A: both ruff steps of the check run `--no-cache` (decisions, 24 Nov 2026, ruff tightened). Loosens nothing.
 
@@ -41,7 +45,8 @@
 | 5 | Build, one task at a time | 1.1-1.8 done (PRs #9, #12-#14, #16-#18, #20). The supervised demo (`po-agent demo`, PRs #21-#30) proved the booking steps in `mysys/booking.py` on the test site |
 | **A** | **Milestone A:** decide-only on the Mac Mini, demo to the CEO | **Not done as planned:** the 28 Oct CEO demo was the supervised booking demo instead (decisions, 27 Oct 2026); decide-only runs come back in P (3.4) |
 | 7 | MVP demo | **Shown, 28 Oct 2026:** `po-agent demo` booked 2609017B from the laptop and the Mac Mini; "page blocked" fixed (PR #29), 10 of 10 hands-off runs without it |
-| **P** | **Production** (decisions, 29 Oct 2026) | **In progress.** In order: docs catch-up (this version); decide 2.1-2.6; run controls 3.1-3.6 and decide-only runs; real booker 4.1-4.5; unattended on the test site (1.9, 1.10, 4.6, 5.1, 5.2); go live after the gates in `SPEC.md` -> Production |
+| **P** | **Production** (decisions, 29 Oct 2026) | **Done for B1:** live hourly since 12 Nov 2026 (G.8). Was: In order: docs catch-up (this version); decide 2.1-2.6; run controls 3.1-3.6 and decide-only runs; real booker 4.1-4.5; unattended on the test site (1.9, 1.10, 4.6, 5.1, 5.2); go live after the gates in `SPEC.md` -> Production |
+| **S** | **Client 2, Summit Home** (decisions, 23 Nov 2026) | **In progress.** Spec done (PR 158); next the plan (`tasks/plan.md` -> Phase S), then its tasks, then Joey's live steps S.0-S.5 |
 | 6 | Verify on the test site and the Mac Mini | Part of P (unattended on test) |
 | 8 | After the MVP | Folded into P |
 

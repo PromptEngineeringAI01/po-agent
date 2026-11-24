@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.60 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.61 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -554,8 +554,8 @@ Company names, creators and aliases may be committed; they are in `config/client
 | Summit New Homes | - | NH Sub Floor |
 | Summit SouthWest | - | Compactions |
 | Summit Granny Flats | - | Allison Wells |
-| Summit Project | Summit Developments; more names to come from Joey (open question S2) | previous task |
-| Summit Home Improvement | - | previous task |
+| Summit Project | Summit Developments (the only one; Joey, 24 Nov 2026) | previous task |
+| Summit Renovations (was Summit Home Improvement) | - | previous task |
 | Summit Homes Display | - | previous task |
 
 Names are compared trimmed and case-insensitive, whole name only. A name not in the table (including a company the paper list strikes out) is `COMPANY_UNKNOWN`: a missing alias costs coverage, never a wrong write.
@@ -684,7 +684,7 @@ A miss at any step stops the order until it is understood, as for B1.
 ### Open questions (Summit)
 
 - **S1** No Summit PDF in `private/` yet: the readers task needs 3-5+ (S.0).
-- **S2** Joey: the other names under Summit Project (aliases) - "稍後給清單". Until then only Summit Developments; others skip `COMPANY_UNKNOWN`.
+- **S2** Closed (Joey, 24 Nov 2026): Summit Project covers only Summit Developments.
 - **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings.
 - **S4** Documents: does MySys rename `-` to `_` in an uploaded name; is the Type Client Documents; is Sale Office "Prompt Engineering Pty Ltd" on Summit projects.
 - **S5** Locked/Unlocked after the take (open question 12 for Summit): does a taken Note move to Locked, and does Agent 2's My Notes list it.
