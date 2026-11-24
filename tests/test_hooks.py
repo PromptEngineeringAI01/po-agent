@@ -23,7 +23,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 HOOKS = ROOT / ".claude" / "hooks"
-HOOK_NAMES = ("protect_paths", "guard_bash", "format_python", "stop_quick_check")
+HOOK_NAMES = (
+    "protect_paths",
+    "guard_bash",
+    "guard_browser",
+    "format_python",
+    "stop_quick_check",
+)
+SETTINGS = ROOT / ".claude" / "settings.json"
 
 LIVE_HOST = "prompt.mysys.com.au"
 TEST_URL = "https://test-prompt.mysys.com.au/index.php?option=com_cweb"
@@ -84,7 +91,7 @@ def test_hook_script_exists(name):
     assert (HOOKS / f"{name}.py").is_file()
 
 
-@pytest.mark.parametrize("name", ("protect_paths", "guard_bash"))
+@pytest.mark.parametrize("name", ("protect_paths", "guard_bash", "guard_browser"))
 def test_malformed_input_blocks(name):
     assert_blocked(run_hook(name, "not json"), name)
 
@@ -608,6 +615,234 @@ def test_protect_paths_follows_a_symlink_out_of_the_plans_folder(places):
     except OSError as exc:
         pytest.skip(f"this account can't create symlinks: {exc}")
     assert_blocked(protect(link, places), "protect_paths")
+
+
+# --- guard_browser ---------------------------------------------------------
+# The browser tools and WebFetch (decisions, 24 Nov 2026, browser tools).
+# Claude in Chrome is blocked whole; in the built-in pane, clicks and typing
+# still pass, since the hook can't tell a search click from a write and the
+# 10 Nov live-lookup exception needs them.
+
+PANE = "mcp__Claude_Browser__"
+CHROME = "mcp__claude-in-chrome__"
+DOCS_URL = "https://docs.python.org/3.12/library/pathlib.html"
+
+
+def tool_call(name: str, tool_input) -> dict:
+    return {
+        "hook_event_name": "PreToolUse",
+        "tool_name": name,
+        "tool_input": tool_input,
+        "cwd": str(ROOT),
+    }
+
+
+def browser(name: str, tool_input) -> subprocess.CompletedProcess:
+    return run_hook("guard_browser", tool_call(name, tool_input))
+
+
+def batch(*actions: tuple[str, dict]) -> dict:
+    return {"actions": [{"name": name, "input": inp} for name, inp in actions]}
+
+
+BROWSER_BLOCKED = {
+    # Claude in Chrome is Joey's own browser: every tool, even a screenshot.
+    "chrome click": (CHROME + "computer", {"action": "left_click", "ref": "ref_1"}),
+    "chrome screenshot": (CHROME + "computer", {"action": "screenshot"}),
+    "chrome tabs": (CHROME + "tabs_context_mcp", {}),
+    "chrome page text": (CHROME + "get_page_text", {}),
+    "chrome file upload": (CHROME + "file_upload", {"paths": ["a.pdf"]}),
+    "chrome upload image": (CHROME + "upload_image", {"imageId": "1"}),
+    # Pane tools outside the 10 Nov exception
+    "pane javascript": (
+        PANE + "javascript_tool",
+        {"action": "javascript_exec", "text": "document.title"},
+    ),
+    "pane form input": (PANE + "form_input", {"ref": "ref_1", "value": True}),
+    "pane network requests": (PANE + "read_network_requests", {}),
+    "pane unknown tool": (PANE + "gif_creator", {"action": "start_recording"}),
+    # Claude never opens MySys itself, live or test
+    "pane navigate live": (PANE + "navigate", {"url": f"https://{LIVE_HOST}/"}),
+    "pane navigate test site": (PANE + "navigate", {"url": TEST_URL}),
+    "pane navigate any case": (
+        PANE + "navigate",
+        {"url": "HTTPS://Test-Prompt.MySys.Com.Au/index.php"},
+    ),
+    "pane navigate encoded dots": (
+        PANE + "navigate",
+        {"url": "https://test-prompt%2Emysys%2ecom%2Eau/"},
+    ),
+    "pane navigate no scheme": (PANE + "navigate", {"url": LIVE_HOST}),
+    "pane preview live": (PANE + "preview_start", {"url": f"https://{LIVE_HOST}"}),
+    "batch navigates to MySys": (
+        PANE + "browser_batch",
+        batch(("navigate", {"url": TEST_URL})),
+    ),
+    # A batch is checked item by item
+    "batch hides javascript": (
+        PANE + "browser_batch",
+        batch(
+            ("computer", {"action": "screenshot"}),
+            ("javascript_tool", {"action": "javascript_exec", "text": "1"}),
+        ),
+    ),
+    "batch full tool name": (
+        PANE + "browser_batch",
+        batch((PANE + "form_input", {"ref": "ref_1", "value": "x"})),
+    ),
+    "batch names a chrome tool": (
+        PANE + "browser_batch",
+        batch((CHROME + "computer", {"action": "screenshot"})),
+    ),
+    "batch navigates to a script": (
+        PANE + "browser_batch",
+        batch(("navigate", {"url": "javascript:document.title='x'"})),
+    ),
+    "nested batch": (PANE + "browser_batch", batch(("browser_batch", batch()))),
+    # Only web addresses: a script, data or file URL runs in the open page
+    "pane navigate javascript url": (
+        PANE + "navigate",
+        {"url": "javascript:document.title='x'"},
+    ),
+    "pane navigate javascript url, any case and spaces": (
+        PANE + "navigate",
+        {"url": "  JavaScript:void 0"},
+    ),
+    "pane navigate data url": (PANE + "navigate", {"url": "data:text/html,<p>x</p>"}),
+    "pane navigate file url": (PANE + "navigate", {"url": "file:///C:/a.pdf"}),
+    "pane navigate view-source url": (
+        PANE + "navigate",
+        {"url": "view-source:https://example.com/"},
+    ),
+    "pane navigate url not a string": (PANE + "navigate", {"url": ["back"]}),
+    "pane preview script url": (PANE + "preview_start", {"url": "javascript:1"}),
+    # Host spellings a browser turns into the real host
+    "pane navigate ideographic dots": (
+        PANE + "navigate",
+        {"url": "https://test-prompt.mysys\u3002com\u3002au/"},
+    ),
+    "pane navigate encoded ideographic dots": (
+        PANE + "navigate",
+        {"url": "https://test-prompt.mysys%E3%80%82com%E3%80%82au/"},
+    ),
+    "pane navigate fullwidth host": (
+        PANE + "navigate",
+        {
+            "url": "https://\uff4d\uff59\uff53\uff59\uff53\uff0e\uff43\uff4f\uff4d\uff0e\uff41\uff55/"
+        },
+    ),
+    "pane navigate soft hyphen in host": (
+        PANE + "navigate",
+        {"url": "https://test-prompt.mys\u00adys.com.au/"},
+    ),
+    # Another browser server, whatever its spelling, is blocked whole
+    "chrome under another spelling": ("mcp__Claude_in_Chrome__computer", {}),
+    "another preview server": ("mcp__Claude_Preview__preview_eval", {"js": "1"}),
+    "devtools browser server": ("mcp__chrome-devtools__click", {"uid": "1"}),
+    "batch actions not a list": (PANE + "browser_batch", {"actions": "computer"}),
+    "batch item without a name": (PANE + "browser_batch", {"actions": [{}]}),
+    # WebFetch never reaches MySys either
+    "webfetch live": ("WebFetch", {"url": f"https://{LIVE_HOST}/", "prompt": "x"}),
+    "webfetch test site": ("WebFetch", {"url": TEST_URL, "prompt": "x"}),
+}
+
+BROWSER_ALLOWED = {
+    "pane screenshot": (PANE + "computer", {"action": "screenshot"}),
+    # The 10 Nov live lookup: a click and the internal number, in Joey's session
+    "pane click": (
+        PANE + "computer",
+        {"action": "left_click", "ref": "ref_12", "action_summary": "Runs a search"},
+    ),
+    "pane type": (
+        PANE + "computer",
+        {"action": "type", "text": "12345", "action_summary": "Types a number"},
+    ),
+    "pane read page": (PANE + "read_page", {"filter": "interactive"}),
+    "pane page text": (PANE + "get_page_text", {}),
+    "pane find": (PANE + "find", {"query": "Search"}),
+    "pane console": (PANE + "read_console_messages", {"onlyErrors": True}),
+    "pane tabs context": (PANE + "tabs_context", {}),
+    "pane navigate docs": (PANE + "navigate", {"url": DOCS_URL}),
+    "pane navigate back": (PANE + "navigate", {"url": "back"}),
+    "pane navigate forward": (PANE + "navigate", {"url": "forward"}),
+    "pane navigate without a scheme": (PANE + "navigate", {"url": "docs.python.org"}),
+    "pane preview by name": (PANE + "preview_start", {"name": "docs"}),
+    "pane batch of click and read": (
+        PANE + "browser_batch",
+        batch(
+            ("computer", {"action": "left_click", "ref": "ref_3"}),
+            ("get_page_text", {}),
+        ),
+    ),
+    "webfetch docs": ("WebFetch", {"url": DOCS_URL, "prompt": "x"}),
+    # Tools outside the hook's matcher pass if it is ever called for them
+    "other mcp tool": ("mcp__ccd_session__mark_chapter", {"title": "x"}),
+}
+
+
+@pytest.mark.parametrize(
+    "tool, tool_input", BROWSER_BLOCKED.values(), ids=BROWSER_BLOCKED.keys()
+)
+def test_guard_browser_blocks(tool, tool_input):
+    assert_blocked(browser(tool, tool_input), "guard_browser")
+
+
+@pytest.mark.parametrize(
+    "tool, tool_input", BROWSER_ALLOWED.values(), ids=BROWSER_ALLOWED.keys()
+)
+def test_guard_browser_allows(tool, tool_input):
+    assert_allowed(browser(tool, tool_input))
+
+
+def test_guard_browser_blocks_a_call_with_no_tool_name():
+    payload = {"hook_event_name": "PreToolUse", "tool_input": {"url": DOCS_URL}}
+    assert_blocked(run_hook("guard_browser", payload), "guard_browser")
+
+
+def settings() -> dict:
+    return json.loads(SETTINGS.read_text(encoding="utf-8"))
+
+
+def test_settings_run_guard_browser_before_every_browser_tool_and_webfetch():
+    entries = [
+        entry
+        for entry in settings()["hooks"]["PreToolUse"]
+        if any("guard_browser.py" in hook["command"] for hook in entry["hooks"])
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert all(hook.get("onFailure") == "block" for hook in entry["hooks"])
+    for tool in (
+        PANE + "computer",
+        PANE + "browser_batch",
+        PANE + "a_tool_added_later",
+        CHROME + "computer",
+        CHROME + "file_upload",
+        "mcp__Claude_in_Chrome__computer",
+        "mcp__Claude_Preview__preview_eval",
+        "mcp__chrome-devtools__click",
+        "WebFetch",
+    ):
+        assert re.fullmatch(entry["matcher"], tool), tool
+    for tool in (
+        "Bash",
+        "Read",
+        "WebSearch",
+        "mcp__ccd_session__mark_chapter",
+        "mcp__ccd_turn__update_plan",
+        "mcp__visualize__show_widget",
+    ):
+        assert not re.search(entry["matcher"], tool), tool
+
+
+def test_settings_deny_chrome_and_the_risky_pane_tools():
+    deny = set(settings()["permissions"]["deny"])
+    assert {
+        "mcp__claude-in-chrome",
+        PANE + "javascript_tool",
+        PANE + "form_input",
+        PANE + "read_network_requests",
+    } <= deny
 
 
 # --- format_python ---------------------------------------------------------
