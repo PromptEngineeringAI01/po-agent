@@ -1143,7 +1143,7 @@ def reopen_project(
 ) -> Locator:
     """W1's reopen (the assignee check reloaded, so step 10's window is
     gone): the same reads as step 10, and the project must still be the
-    one decided: the client's `rule` matches the Proceed's pln, its check of
+    one decided: the client's `rule` matches the Proceed's pln, its judge of
     the opened project (Client Internal No. for B1) passes and the settled
     Compaction Test tasks are the Proceed's (none created meanwhile). Any
     mismatch -> WriteNotStarted."""
@@ -1157,7 +1157,7 @@ def reopen_project(
         rule,
         decided_pln=proceed.pln,
     )
-    if window is None or rule.check(lookup, proceed.internal_no) != proceed.pln:
+    if window is None or rule.judge(lookup, proceed.internal_no) != proceed.pln:
         raise WriteNotStarted("project not as decided", step="W1")
     if {task.task_no for task in lookup.tasks} != set(proceed.existing_task_nos):
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
@@ -1188,7 +1188,7 @@ def recheck_hold(
     lookup, window = _lookup_and_window(
         guard, page, base_url, username, password, booked.internal_no, rule
     )
-    if window is None or rule.check(lookup, booked.internal_no) != booked.pln:
+    if window is None or rule.judge(lookup, booked.internal_no) != booked.pln:
         return "not_found"
     return booking.read_hold(window, booked.task_id)
 

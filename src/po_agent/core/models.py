@@ -138,6 +138,6 @@ class ProjectRule(Protocol):
         (nothing is opened)."""
         ...
 
-    def check(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
+    def judge(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
         """The opened project still passes: its pln, else a Skip."""
         ...

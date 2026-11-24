@@ -208,7 +208,7 @@ class B1ProjectRule:
     ) -> Skip | str:
         return match_project(rows, more_pages, internal_no, self.site)
 
-    def check(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
+    def judge(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
         return check_project(lookup, internal_no, self.site)
 
 
