@@ -1,4 +1,5 @@
-# PO Agent - decision log (updated 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+# PO Agent - decision log (updated 24 Nov 2026, ruff tightened; 23 Nov 2026, Summit Home as client 2; 21 Nov 2026, one wait module; run lock; secrets pre-flight; 20 Nov 2026, the readers as one value; process: bug-fix skill, spec review pass, test rules; one Send Email control; one seam-2 run at a time; mypy in the check; merge rule in SPEC)
+- **24 Nov 2026: ruff tightened** (factory audit fix #4; Joey; entry below): BLE and RUF100 selected, `po_agent` pinned first-party, both ruff steps run `--no-cache`. Tightens dev tooling; nothing changes in MySys or run output.
 - **23 Nov 2026: Summit Home is client 2** (ADR-003 Accepted, option C; Joey said yes under the CEO's delegation; six entries below): a read-only peek with every check before the take; the Client Internal No. check in place of the address check (loosens a control); Summit's decision rules; return to the original assignee (taking a person's Note is allowed for Summit); a separate Agent 2 run; testing and go-live without the test site (loosens a control). Spec only: nothing built yet.
 - **21 Nov 2026: one wait module** (task 8.4; Joey's settled design of 9 Nov; entry below): every MySys wait in `mysys/wait.py`; its retry refuses any action but the four opening clicks (tightens a safety control). No change in MySys or run output; the tests' timeout patches move to the one module in their own `test:` commit.
 - **20 Nov 2026: secrets pre-flight** (threat-model gap 3; entry below): `po-agent preflight --site test|live` reports whether the site's MySys secrets are set and well-formed, names and status only, no login. Joey runs it on the Mac Mini before a live run.
@@ -11,6 +12,14 @@
 Source of truth for decisions behind `docs/intent.md`, `SPEC.md` (MVP) and `docs/specs/` (v1 spec pack v1.2, ADR-001, ADR-002). If any spec disagrees with this log, this log wins. Author: Joey Wu.
 
 After `tasks/plan.md` is approved (the freeze point), add a dated entry here for every change to what the agent does in MySys or prints in its run output, and for anything that loosens a safety control, in the same commit as the `SPEC.md` changes (`tasks/plan.md` only when a task's plan changes; 5 Nov 2026). Tightening a dev-tooling rule needs only a clear commit message (24 Oct 2026, below).
+
+## 24 Nov 2026 - ruff tightened (Joey; factory audit fix #4; loosens nothing)
+
+- **Why:** two rules lived only in prose or luck. `src/` carried `# noqa: BLE001` comments while BLE wasn't selected, so they were dead and a blind `except` went unchecked. And a stale local ruff cache kept `ruff check` green on an I001 that CI caught (friction log, 20 Nov 2026; commit 5f86d7b).
+- **Decided (Joey, 24 Nov 2026):** pyproject `[tool.ruff.lint]` selects `BLE` (blind except) and `RUF100` (unused `noqa`); `[tool.ruff.lint.isort] known-first-party = ["po_agent"]`; `.claude/hooks/*` is exempt from BLE (Joey's hooks fail closed on any error by design); `scripts/check.py` runs `ruff format --check` and `ruff check` with `--no-cache`, in the full check and in `--quick`. A justified catch-all keeps `# noqa: BLE001 - <reason>`. Not now: PT, SIM, C901, mypy on tests.
+- **Tests changed (Must never #8):** `tests/test_check.py` expects `--no-cache` in both ruff steps (names and commands, full and `--quick`), the ruff config, and three probes that run ruff on small snippets with the repo's config.
+- **Loosens?** No: tightens dev tooling. The seven catch-alls in `src/` keep their behaviour; each now carries a `noqa` with its reason.
+- Carried in: `pyproject.toml`, `scripts/check.py`, `SPEC.md` v1.60 (Commands, Code Style), `docs/workflow.md` Appendix A.
 
 ## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
 

@@ -1,12 +1,14 @@
 # PO Agent — Claude Code workflow (MVP build)
 
-**Version:** v5.22 · 20 Nov 2026 · **Owner:** Joey Wu
+**Version:** v5.23 · 24 Nov 2026 · **Owner:** Joey Wu
 
 **Goal of the MVP:** show that the agent runs by itself on the office Mac Mini, hourly, against the MySys test site, and books the 3 trial POs correctly (`SPEC.md` S1–S8; CEO decision 3). Everything in this runbook serves that goal; anything for after the MVP is in Stage 8.
 
 **Now: production** (from 29 Oct 2026). The MVP demo was shown on 28 Oct 2026 as a supervised `po-agent demo` (one trial PO, Joey's Enter before every write), from the laptop and the Mac Mini. The goal is now the agent running by itself, hourly, on the Mac Mini: unattended on the test site first, then on live after the go-live gates (`SPEC.md` -> Production; `tasks/plan.md` -> Phase P). The stages below still describe how each task is built.
 
 **Approach:** Addy Osmani's agent-skills (Define → Plan → Build → Verify → Review → Ship). CLAUDE.md, hooks, one check command and CI on GitHub keep it safe. Claude writes, opens and, once verified, merges PRs (`gh pr merge <n> --merge --match-head-commit <sha>`, decisions, 2 Nov 2026).
+
+**v5.23:** Appendix A: both ruff steps of the check run `--no-cache` (decisions, 24 Nov 2026, ruff tightened). Loosens nothing.
 
 **v5.22:** from mattpocock/skills, cursor pstack and addyosmani/agent-skills (decisions, 20 Nov 2026, process): a `diagnosing-bugs` skill for bugs that aren't obvious (step 3, Stage 5 step 6); test rules (no tautological test, cases by spec partition, a regression test per bug; step 3); sessions call agent-skills by skill name, since 0.6.14+ makes its slash commands Joey-only (Skills you'll use). Loosens nothing.
 
@@ -364,8 +366,8 @@ Not part of the MVP. In short: `/agent-skills:code-simplify` once; Matt Pocock's
 
 **Check command:** `uv run scripts/check.py` runs, in order, and stops non-zero on the first failure; on success it prints `check: all passed`:
 
-1. `ruff format --check .`
-2. `ruff check .`
+1. `ruff format --check --no-cache .`
+2. `ruff check --no-cache .` (both `--no-cache` since 24 Nov 2026)
 3. `mypy` (added 20 Nov 2026; config in pyproject `[tool.mypy]`)
 4. `python scripts/guard_check.py` (no browser action calls outside `act()` in `src/po_agent/mysys/guard.py`; the full banned list is in `tasks/plan.md` task 1.4)
 5. Repo-data check: nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case
