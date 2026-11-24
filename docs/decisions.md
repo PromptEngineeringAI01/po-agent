@@ -16,12 +16,13 @@ After `tasks/plan.md` is approved (the freeze point), add a dated entry here for
 ## 24 Nov 2026 - Browser tools hook (Joey; tightens a safety control)
 
 - **Problem:** the hooks and deny rules saw only Bash and file edits (decisions, 10 Nov 2026, live lookups: "Hooks unchanged"). The browser tools (the desktop app's built-in pane and Claude in Chrome) and WebFetch had no rule at all, so Claude could run page scripts, set fields, upload a file or open MySys, live or test, with nothing in the way. Claude in Chrome is Joey's own Chrome, signed in to live MySys and Outlook (Must never #2, #3, #4).
-- **Decided (Joey, choosing "keep the exception, block the rest"):** a PreToolUse hook `.claude/hooks/guard_browser.py` on `mcp__Claude_Browser__.*|mcp__claude-in-chrome__.*|WebFetch`, plus deny rules for Claude in Chrome and the three pane tools below:
-  - Claude in Chrome: every tool blocked in this project (file upload and image upload included).
-  - Built-in pane: only a listed set of tools passes (look, read, click, type, navigate, tabs, preview, batch); `javascript_tool`, `form_input`, `read_network_requests` and any tool added later are blocked. `browser_batch` is checked item by item; a nested batch is blocked.
-  - No browser tool or WebFetch input may name a MySys host, live or test (percent-decoded, any case): Claude never opens MySys itself.
+- **Decided (Joey, choosing "keep the exception, block the rest"):** a PreToolUse hook `.claude/hooks/guard_browser.py` on any MCP server named like chrome, browser or preview, and WebFetch (matcher `mcp__.*([Cc]hrome|[Bb]rowser|[Pp]review).*__.*|WebFetch`), plus deny rules for Claude in Chrome and the three pane tools below:
+  - Claude in Chrome, and any browser server other than the built-in pane, under any spelling: every tool blocked in this project (file upload and image upload included).
+  - Built-in pane: only a listed set of tools passes (look, read, click, type, navigate, tabs, preview, batch); `javascript_tool`, `form_input`, `read_network_requests` and any tool added later are blocked. `navigate` and `preview_start` take only an http, https or schemeless address, "back" or "forward", so no `javascript:`, `data:` or `file:` URL runs in the open page. `browser_batch` is checked item by item; a nested batch is blocked.
+  - No browser tool or WebFetch input may name a MySys host, live or test (percent-decoded, any case, fullwidth or ideographic dots and letters, format characters dropped): Claude never opens MySys itself. An IP address is not caught; the hook matches text, so it's a backstop.
+  - From the second-model review (pr-reviewer, 24 Nov 2026): the script-URL, look-alike-host and other-server rules; tested in their own `test:` commit.
 - **Unchanged:** the 10 Nov live-lookup exception. Clicks and typing in the pane still pass, because the hook sees only a ref or a point and can't tell a search click from a write; Joey logs in himself, and the narrow list plus Joey watching the pane stay the control. Seam 2 reaches the test site through Playwright, as before.
-- **Carried in:** `docs/workflow.md` hook table; `docs/threat-model.md` Boundary 5 row E. No `SPEC.md` change: nothing the agent does in MySys or prints changes.
+- **Carried in:** `docs/workflow.md` hook table and settings shape; `docs/threat-model.md` Boundary 5 row E; one `SPEC.md` line under Boundaries (Joey opens the live page in the pane himself). Nothing the agent does in MySys or prints changes.
 
 ## 23 Nov 2026 - Summit Home is client 2, as ADR-003 option C (Joey, with the CEO's delegated data approval; spec only)
 
