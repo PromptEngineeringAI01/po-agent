@@ -224,6 +224,81 @@ def test_playwright_actions_in_guard_and_longer_names_pass(tmp_path):
     assert (code, fails(lines)) == (0, [])
 
 
+def test_playwright_action_names_in_prose_files_pass(tmp_path):
+    # Prose (.md, .markdown, .txt, .rst, any case) can't call anything
+    # (decisions, 24 Nov 2026). The verify-pr skill lists these names.
+    repo = make_repo(tmp_path)
+    prose = "".join(f"Never call {action}( outside the guard.\n" for action in ACTIONS)
+    call = f"page.{ACTIONS[0]}(target)\n"
+    commit(
+        repo,
+        "docs: x",
+        {
+            "docs/x.md": prose,
+            ".claude/skills/x/SKILL.md": prose,
+            "docs/README.MD": call,
+            "docs/x.py.md": call,
+            "docs/x.markdown": call,
+            "docs/x.rst": call,
+            "notes/x.txt": call,
+        },
+    )
+    code, lines = run(repo, body("High"))
+    assert (code, fails(lines)) == (0, [])
+
+
+def test_playwright_action_in_any_other_file_outside_guard_fails(tmp_path):
+    # Every file type but prose stays checked, wherever it lives: Python in
+    # any case or spelling, shell, JavaScript, an extensionless script.
+    repo = make_repo(tmp_path)
+    call = f"page.{ACTIONS[1]}(target)\n"
+    commit(
+        repo,
+        "docs: x",
+        {
+            "bin/run": "#!/usr/bin/env python3\n" + call,
+            "docs/X.PY": call,
+            "docs/example.md": f"{ACTIONS[1]}(\n",
+            "docs/example.py": call,
+            "scripts/run.sh": f'python -c "page.{ACTIONS[0]}(x)"\n',
+            "tools/x.pyw": call,
+            "web/x.js": f"await page.{ACTIONS[0]}(sel);\n",
+        },
+    )
+    code, lines = run(repo, body("Medium"))
+    assert code == 1
+    where = "FAIL: Playwright action outside src/po_agent/mysys/guard.py:"
+    assert fails(lines) == [
+        f"{where} bin/run:2",
+        f"{where} docs/X.PY:1",
+        f"{where} docs/example.py:1",
+        f"{where} scripts/run.sh:1",
+        f"{where} tools/x.pyw:1",
+        f"{where} web/x.js:1",
+    ]
+
+
+def test_live_host_and_key_name_still_fail_in_markdown(tmp_path):
+    repo = make_repo(tmp_path)
+    commit(
+        repo,
+        "docs: x",
+        {
+            "docs/x.md": (
+                f"Open https://{LIVE_HOST}/ and {ACTIONS[0]}( it.\n"
+                f"Set {KEY_NAME} first.\n"
+            )
+        },
+    )
+    code, lines = run(repo, body("Medium"))
+    assert code == 1
+    assert fails(lines) == [
+        "FAIL: live host outside its allowed files: docs/x.md:1",
+        "FAIL: Anthropic key variable outside tests/test_config_secrets.py:"
+        " docs/x.md:2",
+    ]
+
+
 def test_live_host_outside_its_files_fails_in_any_case(tmp_path):
     repo = make_repo(tmp_path)
     commit(repo, "test: x", {"tests/test_hooks_extra.py": f"H = '{LIVE_HOST}'\n"})
