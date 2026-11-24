@@ -694,7 +694,51 @@ BROWSER_BLOCKED = {
         PANE + "browser_batch",
         batch((CHROME + "computer", {"action": "screenshot"})),
     ),
+    "batch navigates to a script": (
+        PANE + "browser_batch",
+        batch(("navigate", {"url": "javascript:document.title='x'"})),
+    ),
     "nested batch": (PANE + "browser_batch", batch(("browser_batch", batch()))),
+    # Only web addresses: a script, data or file URL runs in the open page
+    "pane navigate javascript url": (
+        PANE + "navigate",
+        {"url": "javascript:document.title='x'"},
+    ),
+    "pane navigate javascript url, any case and spaces": (
+        PANE + "navigate",
+        {"url": "  JavaScript:void 0"},
+    ),
+    "pane navigate data url": (PANE + "navigate", {"url": "data:text/html,<p>x</p>"}),
+    "pane navigate file url": (PANE + "navigate", {"url": "file:///C:/a.pdf"}),
+    "pane navigate view-source url": (
+        PANE + "navigate",
+        {"url": "view-source:https://example.com/"},
+    ),
+    "pane navigate url not a string": (PANE + "navigate", {"url": ["back"]}),
+    "pane preview script url": (PANE + "preview_start", {"url": "javascript:1"}),
+    # Host spellings a browser turns into the real host
+    "pane navigate ideographic dots": (
+        PANE + "navigate",
+        {"url": "https://test-prompt.mysys\u3002com\u3002au/"},
+    ),
+    "pane navigate encoded ideographic dots": (
+        PANE + "navigate",
+        {"url": "https://test-prompt.mysys%E3%80%82com%E3%80%82au/"},
+    ),
+    "pane navigate fullwidth host": (
+        PANE + "navigate",
+        {
+            "url": "https://\uff4d\uff59\uff53\uff59\uff53\uff0e\uff43\uff4f\uff4d\uff0e\uff41\uff55/"
+        },
+    ),
+    "pane navigate soft hyphen in host": (
+        PANE + "navigate",
+        {"url": "https://test-prompt.mys\u00adys.com.au/"},
+    ),
+    # Another browser server, whatever its spelling, is blocked whole
+    "chrome under another spelling": ("mcp__Claude_in_Chrome__computer", {}),
+    "another preview server": ("mcp__Claude_Preview__preview_eval", {"js": "1"}),
+    "devtools browser server": ("mcp__chrome-devtools__click", {"uid": "1"}),
     "batch actions not a list": (PANE + "browser_batch", {"actions": "computer"}),
     "batch item without a name": (PANE + "browser_batch", {"actions": [{}]}),
     # WebFetch never reaches MySys either
@@ -720,6 +764,9 @@ BROWSER_ALLOWED = {
     "pane tabs context": (PANE + "tabs_context", {}),
     "pane navigate docs": (PANE + "navigate", {"url": DOCS_URL}),
     "pane navigate back": (PANE + "navigate", {"url": "back"}),
+    "pane navigate forward": (PANE + "navigate", {"url": "forward"}),
+    "pane navigate without a scheme": (PANE + "navigate", {"url": "docs.python.org"}),
+    "pane preview by name": (PANE + "preview_start", {"name": "docs"}),
     "pane batch of click and read": (
         PANE + "browser_batch",
         batch(
@@ -771,10 +818,20 @@ def test_settings_run_guard_browser_before_every_browser_tool_and_webfetch():
         PANE + "a_tool_added_later",
         CHROME + "computer",
         CHROME + "file_upload",
+        "mcp__Claude_in_Chrome__computer",
+        "mcp__Claude_Preview__preview_eval",
+        "mcp__chrome-devtools__click",
         "WebFetch",
     ):
         assert re.fullmatch(entry["matcher"], tool), tool
-    for tool in ("Bash", "Read", "WebSearch", "mcp__ccd_session__mark_chapter"):
+    for tool in (
+        "Bash",
+        "Read",
+        "WebSearch",
+        "mcp__ccd_session__mark_chapter",
+        "mcp__ccd_turn__update_plan",
+        "mcp__visualize__show_widget",
+    ):
         assert not re.search(entry["matcher"], tool), tool
 
 
