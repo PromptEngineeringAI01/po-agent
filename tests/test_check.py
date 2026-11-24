@@ -170,8 +170,8 @@ def test_run_checks_all_passed(capsys, check_script):
 def test_steps_are_in_spec_order(check_script):
     names = [name for name, _ in check_script.STEPS]
     assert names == [
-        "ruff format --check .",
-        "ruff check .",
+        "ruff format --check --no-cache .",
+        "ruff check --no-cache .",
         "mypy",
         "guard check",
         "repo data",
@@ -193,8 +193,11 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
 
     python_m = [sys.executable, "-m"]
     assert calls == [
-        ([*python_m, "ruff", "format", "--check", "."], check_script.ROOT),
-        ([*python_m, "ruff", "check", "."], check_script.ROOT),
+        (
+            [*python_m, "ruff", "format", "--check", "--no-cache", "."],
+            check_script.ROOT,
+        ),
+        ([*python_m, "ruff", "check", "--no-cache", "."], check_script.ROOT),
         ([*python_m, "mypy"], check_script.ROOT),
         ([sys.executable, "scripts/guard_check.py"], check_script.ROOT),
         (
@@ -283,6 +286,46 @@ def test_mypy_config():
     assert {k: v for k, v in strict[0].items() if k != "module"} == STRICT_FLAGS
 
 
+def test_ruff_config():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    lint = pyproject["tool"]["ruff"]["lint"]
+    assert {"BLE", "RUF100"} <= set(lint["select"])
+    # A module not built yet is still sorted as ours (friction log, 20 Nov 2026).
+    assert lint["isort"]["known-first-party"] == ["po_agent"]
+    # Joey's hooks fail closed on any error by design.
+    assert lint["per-file-ignores"][".claude/hooks/*"] == ["BLE"]
+
+
+def ruff_codes(code: str, path: str) -> set[str]:
+    """The codes `ruff check` reports on `code` as if it were the file at
+    `path`, with the repo's config and no cache."""
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--no-cache"]
+        + ["--output-format", "concise", "--stdin-filename", path, "-"],
+        cwd=ROOT,
+        input=code,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return {line.split()[1] for line in result.stdout.splitlines() if ": " in line}
+
+
+BLIND_EXCEPT = "def f():\n    try:\n        pass\n    except Exception:\n        pass\n"
+
+
+def test_lint_catches_a_blind_except():
+    assert ruff_codes(BLIND_EXCEPT, "src/po_agent/probe.py") == {"BLE001"}
+
+
+def test_lint_lets_the_hooks_catch_everything():
+    assert ruff_codes(BLIND_EXCEPT, ".claude/hooks/probe.py") == set()
+
+
+def test_lint_catches_an_unused_noqa():
+    assert ruff_codes("X = 1  # noqa: E501\n", "src/po_agent/probe.py") == {"RUF100"}
+
+
 @pytest.mark.parametrize("bad", ["private/notes.txt", "stray.pdf"])
 def test_repo_data_only_rejects_a_staged_path(
     tmp_path, monkeypatch, capsys, check_script, bad
@@ -368,8 +411,8 @@ def test_quick_runs_the_fast_checks_then_only_the_given_tests(
     paths = ["tests/test_check.py", "tests/test_guard.py"]
     assert exit_info.value.code == 0
     assert calls[:4] == [
-        [*python_m, "ruff", "format", "--check", "."],
-        [*python_m, "ruff", "check", "."],
+        [*python_m, "ruff", "format", "--check", "--no-cache", "."],
+        [*python_m, "ruff", "check", "--no-cache", "."],
         [*python_m, "mypy"],
         [sys.executable, "scripts/guard_check.py"],
     ]
