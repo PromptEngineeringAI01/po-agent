@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.62 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.63 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -504,9 +504,9 @@ There is **no test-site phase** for Summit (Joey, 23 Nov 2026: "forget about the
 
 In `run`, `run --decide-only` and `spike`, logged in as Agent 2:
 - **Note Pool filters:** Source = `source_filter` (the receiving mailbox; new guard action), Locked/Unlocked = **Unlocked**, Assigned Pool and Assigned User at their defaults (Summit has no pool), Status Pending (never set), Search/filter empty. Each read back, as B1's.
-- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee is anything except an agent account (`Agent 1 (MySys Only)` or `Agent 2 (Summit Homes)`), and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026).
+- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee passes the **assignee rule** below, and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026).
 - Anything else is untouched, with no NOTE line (as B1's step 0). Order newest first by Note ID; page 1 only, and a second page is `ALERT MORE_PAGES` as for B1 (the spike shows whether the filtered list fits one page; open question S3).
-- **Taking a person's Note is allowed for Summit** (Joey, 23 Nov 2026: "any assignee"): the admins' manual process takes Notes from whoever holds them. B1's "the Assignee must be the pool" stays B1's.
+- **Assignee rule** (Joey, 24 Nov 2026; replaces 23 Nov's "any assignee"): Summit Notes arrive in the Note Pool unassigned (`---`). The **first run of the day** (a run that starts before `any_assignee_before`, 08:00 Perth, so the 07:30 run) takes a Note whatever its assignee, except an agent account (`Agent 1 (MySys Only)`, `Agent 2 (Summit Homes)`), to catch Notes an admin picked up overnight. **Every later run** takes only Assignee `---`. The run decides from its own start time (no state between runs). B1's "the Assignee must be the pool" stays B1's.
 
 ### The peek: every check before the take
 
@@ -578,7 +578,7 @@ On PROCEED in `run`:
 A Note is returned only when it was taken and then stopped **before Submit** (kill switch before W1/W2, `WRITE_NOT_STARTED`, a W1 recheck change). With the peek, every business skip happens before the take, so a return is rare. One **Assign**, never Unassign or Unlink (Joey, 23 Nov 2026):
 - Original assignee a **user** (an option of the Note window's user list): user list = that user, pool list `--Select Pool--`.
 - Original assignee a **pool** (an option of the pool list): B1's return (user list `--Select User--`, pool list = that pool).
-- Original assignee **`---`**: user list = `return_unassigned_to` (**Gita Valani**, Joey, 23 Nov 2026), pool list `--Select Pool--`.
+- Original assignee **`---`**: back to `---` (Joey, 24 Nov 2026: "assign to the original assignee so it can be anyone or ---"; replaces 23 Nov's Gita Valani): user list `--Select User--`, pool list `--Select Pool--`, Assign, and "Assignee:" must read `---`. Whether MySys accepts that Assign is open question S6, checked by hand in S.0; until it is confirmed, this case stays with Agent 2 with the ALERT below.
 - The name in both lists or neither: the Note stays with Agent 2, `ALERT UNEXPECTED_SCREEN` (fixed detail "Note not returned"), exit 1; the stale-Note stop holds later Summit runs until Joey moves it by hand.
 - Read back: "Assignee:" reads the target and a new "User Assigned" (or pool) log line. Every return unticks Send Email first, through the shared control.
 
@@ -619,7 +619,7 @@ agent_user_name = "Agent 2 (Summit Homes)"
 source_filter = "support@prompteng.com.au"         # Note Pool Source filter (receiving mailbox)
 sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
 locked_filter = "Unlocked"
-return_unassigned_to = "Gita Valani"
+any_assignee_before = "08:00"     # Perth; a run starting earlier takes any non-agent assignee, later runs only `---`
 max_notes_per_run = 1               # bookings per run; raised by its own PR for hourly runs
 max_peeks_per_run = 10              # Notes opened per run; set from the spike and decide-only (S3)
 project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
@@ -684,11 +684,12 @@ A miss at any step stops the order until it is understood, as for B1.
 
 ### Open questions (Summit)
 
-- **S1** No Summit PDF in `private/` yet: the readers task needs 3-5+ (S.0).
+- **S1** Closed (24 Nov 2026): Joey saved 11 real Summit POs at the top of `private/summit/`; the readers task moves them into `private/summit/pdfs/`.
 - **S2** Closed (Joey, 24 Nov 2026): Summit Project covers only Summit Developments.
 - **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings.
 - **S4** Documents: does MySys rename `-` to `_` in an uploaded name; is the Type Client Documents; is Sale Office "Prompt Engineering Pty Ltd" on Summit projects.
 - **S5** Locked/Unlocked after the take (open question 12 for Summit): does a taken Note move to Locked, and does Agent 2's My Notes list it.
+- **S6** Returning a Note to `---`: does Assign with `--Select User--` and `--Select Pool--` leave "Assignee:" reading `---` (no Unassign, Must never #2)? Joey tries it by hand in S.0 on a Note he is handling anyway. If MySys refuses, Joey picks the fallback target then.
 
 ## Open Questions
 
