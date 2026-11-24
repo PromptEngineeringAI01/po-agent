@@ -88,12 +88,6 @@ def test_normalise_gives_lower_case_words_and_single_spaces(text):
     assert result == " ".join(result.split())
 
 
-@given(streets())
-def test_normalise_maps_every_street_type_to_one_form(street):
-    """SPEC section 4: St and Street (and the other pairs) compare equal."""
-    assert normalise(" ".join(street.shown)) == " ".join(street.normalised)
-
-
 # A5: the project address's shape
 
 

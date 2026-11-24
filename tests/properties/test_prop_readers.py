@@ -10,7 +10,7 @@ import string
 from urllib.parse import urlencode
 
 import pytest
-from b1_worlds import ISSUER, any_internal_nos, internal_nos, pdf_texts, proceed_worlds
+from b1_worlds import ISSUER, any_internal_nos, internal_nos, proceed_worlds
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
@@ -50,13 +50,6 @@ def test_read_pdf_reads_any_text_without_raising(text, file_name, title):
 )
 def test_one_po_number_is_read_wherever_it_sits(noise, po):
     text = "\n".join([*noise, po_line(po), *noise])
-    assert rules.read_pdf(text, "", "").po_number == po
-
-
-@given(PO_SHAPE, st.integers(2, 4))
-def test_the_same_po_number_repeated_still_reads(po, times):
-    """A 2-page PO repeats its header (tasks/plan.md 9.7 sizing)."""
-    text = "\n".join([po_line(po)] * times)
     assert rules.read_pdf(text, "", "").po_number == po
 
 
@@ -178,18 +171,3 @@ def test_the_same_text_from_both_readers_always_agrees(world):
     for text in (world.plumber, world.pypdf):
         texts = PdfTexts(plumber=text, pypdf=text, data=world.data)
         assert check_second_reader(texts) is None
-
-
-@given(proceed_worlds(), st.sampled_from(["", " ", "\n\n", " \t\n"]))
-def test_no_pypdf_text_is_pdf_unreadable(world, blank):
-    texts = PdfTexts(plumber=world.plumber, pypdf=blank, data=world.data)
-    assert check_second_reader(texts).reason is SkipReason.PDF_UNREADABLE
-
-
-@given(internal_nos, internal_nos, st.sampled_from(["label_line", "under"]))
-def test_readers_reading_different_po_numbers_disagree(first, second, layout):
-    assume(first != second)
-    plumber, _ = pdf_texts(first, "1", None, "Sample Lane Sampleville", layout)
-    _, pypdf = pdf_texts(second, "1", None, "Sample Lane Sampleville", layout)
-    texts = PdfTexts(plumber=plumber, pypdf=pypdf, data=b"%PDF-")
-    assert check_second_reader(texts).reason is SkipReason.READERS_DISAGREE

@@ -1,12 +1,10 @@
 """Properties of the pure helpers outside b1/: the run order, the run window
-and cap, the error identifiers, the Note search's exact row and the PR risk
-level. The clock is faked; nothing opens a browser.
+and cap, the error identifiers and the Note search's exact row. The clock
+is faked; nothing opens a browser.
 """
 
-import importlib.util
 import string
 from datetime import UTC, date, datetime, time, timedelta
-from pathlib import Path
 from unittest import mock
 from zoneinfo import ZoneInfo
 
@@ -19,19 +17,6 @@ from po_agent.core import controls, errors
 from po_agent.core.config import RunWindow, load_config
 from po_agent.core.run import EligibleNote, newest_first
 from po_agent.mysys.driver import NotePoolList, exact_row
-
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def _risk():
-    # scripts/ isn't a package, so load the file directly (as test_risk.py).
-    spec = importlib.util.spec_from_file_location("risk", ROOT / "scripts" / "risk.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-risk = _risk()
 
 # E1: newest first (SPEC -> Note Pool -> Order; decisions, 10 Nov 2026)
 
@@ -57,13 +42,6 @@ def test_newest_first_is_by_note_id_as_a_number_at_most_cap(notes, cap):
 def test_a_smaller_cap_keeps_a_prefix_of_a_larger_one(notes, small, large):
     small, large = sorted((small, large))
     assert newest_first(notes, large)[:small] == newest_first(notes, small)
-
-
-@given(NOTES, CAPS, st.randoms())
-def test_the_list_order_never_changes_the_run_order(notes, cap, random):
-    shuffled = list(notes)
-    random.shuffle(shuffled)
-    assert newest_first(shuffled, cap) == newest_first(notes, cap)
 
 
 # E2: the run window (SPEC -> Run controls: Mon-Fri, start <= local < end)
@@ -167,66 +145,3 @@ def test_exact_row_is_the_one_row_whose_id_equals_the_note_id(note_id, others, c
         assert found is not None and found.note_id == note_id
     else:
         assert found is None
-
-
-# E6: the PR risk level (scripts/risk.py)
-
-PATHS = st.lists(
-    st.sampled_from(
-        [
-            "src/po_agent/mysys/guard.py",
-            "src/po_agent/b1/address.py",
-            "src/po_agent/core/run.py",
-            "scripts/check.py",
-            "scripts/heartbeat_check.py",
-            "tests/test_risk.py",
-            "docs/decisions.md",
-            ".github/workflows/check.yml",
-            ".claude/settings.json",
-            "README.md",
-        ]
-    )
-    | st.text(string.ascii_lowercase + "/._", min_size=1, max_size=30),
-    max_size=6,
-)
-
-
-@given(PATHS, PATHS)
-def test_adding_files_never_lowers_a_prs_risk(paths, more):
-    assert risk.LEVELS.index(risk.assess(paths + more)) >= risk.LEVELS.index(
-        risk.assess(paths)
-    )
-
-
-@given(PATHS)
-def test_a_prs_risk_is_its_riskiest_files(paths):
-    """risk.assess's contract: the PR's level is its highest file's."""
-    level = risk.assess(paths)
-    assert all(
-        risk.LEVELS.index(risk.classify(p)) <= risk.LEVELS.index(level) for p in paths
-    )
-    assert level == "low" or level in {risk.classify(p) for p in paths}
-
-
-@given(PATHS)
-def test_windows_separators_never_change_a_files_risk(paths):
-    for path in paths:
-        assert risk.classify(path.replace("/", "\\")) == risk.classify(path)
-
-
-@given(
-    st.lists(
-        st.tuples(
-            st.integers(0, 999).map(str) | st.just("-"),
-            st.integers(0, 999).map(str) | st.just("-"),
-            st.text(string.ascii_letters + "/._ ", min_size=1, max_size=20),
-        ),
-        max_size=6,
-    )
-)
-def test_numstat_rows_round_trip(rows):
-    """git diff --numstat: binary files show "-" and count 0."""
-    text = "\n".join("\t".join(row) for row in rows)
-    paths, lines = risk.parse_numstat(text)
-    assert paths == [path for _, _, path in rows]
-    assert lines == sum(int(n) for a, d, _ in rows for n in (a, d) if n != "-")

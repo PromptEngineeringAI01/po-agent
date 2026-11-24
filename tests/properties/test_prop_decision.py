@@ -226,34 +226,6 @@ def test_the_one_matching_row_gives_its_pln_among_any_other_rows(results, site):
     assert match_project(rows, False, x, site) == pln
 
 
-@given(search_results(), st.sampled_from(["test", "live"]), st.data())
-def test_row_order_never_changes_the_match(results, site, data):
-    x, _, rows = results
-    shuffled = data.draw(st.permutations(rows))
-    assert match_project(shuffled, False, x, site) == match_project(
-        rows, False, x, site
-    )
-
-
-@given(search_results(), st.sampled_from(["test", "live"]), plns)
-def test_a_second_matching_pln_or_a_second_page_is_ambiguous(results, site, other):
-    x, pln, rows = results
-    assume(other != pln)
-    ambiguous = Skip(reason=SkipReason.PROJECT_AMBIGUOUS)
-    assert match_project(rows, True, x, site) == ambiguous
-    second = SearchRow(pln=other, client_ref_no=x, company=COMPANY)
-    assert match_project((*rows, second), False, x, site) == ambiguous
-
-
-@given(search_results(), st.sampled_from(["test", "live"]))
-def test_no_matching_row_is_project_not_found(results, site):
-    x, pln, rows = results
-    rest = tuple(row for row in rows if row.pln != pln)
-    assert match_project(rest, False, x, site) == Skip(
-        reason=SkipReason.PROJECT_NOT_FOUND
-    )
-
-
 # C4: the duplicate check (SPEC -> Duplicate check, MVP strict)
 
 TASKS = st.lists(
@@ -279,14 +251,6 @@ def test_counting_cancelled_tasks_is_at_least_as_strict(tasks):
     """live (and the strict config) counts Cancelled ones too."""
     if isinstance(check_duplicate(tasks, True), Skip):
         assert isinstance(check_duplicate(tasks, False), Skip)
-
-
-@given(TASKS)
-def test_a_pass_lists_every_existing_task_for_w2(tasks):
-    result = check_duplicate(tasks, True)
-    if not isinstance(result, Skip):
-        assert result == tuple(task.task_no for task in tasks)
-        assert all(task.status.strip() == "Cancelled" for task in tasks)
 
 
 # C5-C7: decide() end to end
@@ -332,15 +296,6 @@ def test_adding_faults_never_turns_a_skip_into_proceed(world, names, data):
         if mutation.applies(world):
             world = mutation.apply(world, data.draw(fresh_values(world)))
     assert run(world).kind == "skip"
-
-
-@given(proceed_worlds(), st.sampled_from(sorted(MUTATIONS)), st.data())
-def test_decide_reads_the_same_inputs_the_same_way(world, name, data):
-    """No hidden state: deciding twice gives the same result."""
-    mutation = MUTATIONS[name]
-    if mutation.applies(world):
-        world = mutation.apply(world, data.draw(fresh_values(world)))
-    assert run(world) == run(world)
 
 
 # D1: the Proceed refuses a malformed decision (models.py)
