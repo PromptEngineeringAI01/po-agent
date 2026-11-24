@@ -224,6 +224,59 @@ def test_playwright_actions_in_guard_and_longer_names_pass(tmp_path):
     assert (code, fails(lines)) == (0, [])
 
 
+def test_playwright_action_names_in_non_python_files_pass(tmp_path):
+    # Prose can't call anything; guard_check.py's AST scan of .py files is the
+    # control (decisions, 24 Nov 2026). The verify-pr skill lists these names.
+    repo = make_repo(tmp_path)
+    prose = "".join(f"Never call {action}( outside the guard.\n" for action in ACTIONS)
+    commit(
+        repo,
+        "docs: x",
+        {
+            "docs/x.md": prose,
+            ".claude/skills/x/SKILL.md": prose,
+            "notes/x.txt": "page.click(target)\n",
+        },
+    )
+    code, lines = run(repo, body("High"))
+    assert (code, fails(lines)) == (0, [])
+
+
+def test_playwright_action_in_any_py_file_outside_guard_fails(tmp_path):
+    # By extension, not folder: a .py under docs/ still fails.
+    repo = make_repo(tmp_path)
+    commit(
+        repo,
+        "docs: x",
+        {"docs/example.py": "page.fill(target)\n", "docs/example.md": "fill(\n"},
+    )
+    code, lines = run(repo, body("Medium"))
+    assert code == 1
+    assert fails(lines) == [
+        "FAIL: Playwright action outside src/po_agent/mysys/guard.py: docs/example.py:1"
+    ]
+
+
+def test_live_host_and_key_name_still_fail_in_markdown(tmp_path):
+    repo = make_repo(tmp_path)
+    commit(
+        repo,
+        "docs: x",
+        {
+            "docs/x.md": (
+                f"Open https://{LIVE_HOST}/ and click( it.\nSet {KEY_NAME} first.\n"
+            )
+        },
+    )
+    code, lines = run(repo, body("Medium"))
+    assert code == 1
+    assert fails(lines) == [
+        "FAIL: live host outside its allowed files: docs/x.md:1",
+        "FAIL: Anthropic key variable outside tests/test_config_secrets.py:"
+        " docs/x.md:2",
+    ]
+
+
 def test_live_host_outside_its_files_fails_in_any_case(tmp_path):
     repo = make_repo(tmp_path)
     commit(repo, "test: x", {"tests/test_hooks_extra.py": f"H = '{LIVE_HOST}'\n"})
