@@ -39,7 +39,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 **S-C Run, offline**
 - [ ] **9.11** Note Pool for Summit: Source and Unlocked filters read back, Source column read, list eligibility (sender, `---`, not an agent, title shape); `spike --client summit` · step · high
 - [ ] **9.12** The peek (read-only open, iframe body rule, download, readers, lookup, decide) and `run --decide-only --client summit`; guard history read-only for untouched Notes · step · high
-- [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> Gita Valani, else ALERT) · step · high
+- [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> `---` once S.0 confirms it, else ALERT) · step · high
 - [ ] **9.14** Summit booking W1-W5: decided Creator (missing option -> `WRITE_NOT_STARTED`), full PO, body, previous-task recheck at W1, Documents name per S.0; `run --client summit` books (needs S.0 screens) · step · high
 - [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist at :30 (07:30-17:30 Mon-Fri Perth; Joey, 24 Nov 2026), Healthchecks `healthchecks_ping_url_summit`, alert issues `po-agent alert summit <run_id>`, `docs/macmini-setup.md` and `docs/ops-runbook.md` · step · medium · ask-first files
 
