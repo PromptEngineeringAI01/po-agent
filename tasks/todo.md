@@ -19,7 +19,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **A.4** `production` tag moves during the build as Joey picks (plan -> Phase S, open question 2), each followed by one watched B1 hourly run · by hand
 
 **S-A Seam, B1 unchanged**
-- [ ] **9.1** Shared models (`core/models.py`); the Creator travels in the `Proceed`, no `CREATOR` constant in `mysys/` · step · refactor · high
+- [x] **9.1** Shared models (`core/models.py`); the Creator travels in the `Proceed`, no `CREATOR` constant in `mysys/` · step · refactor · high
 - [ ] **9.2** `mysys/` imports no client package and holds no client constant; the booker moves to `mysys/booker.py`; B1 seam 2 green · step · refactor · high
 - [ ] **9.3** `--client b1|summit`; `config/clients/summit.toml` (Summit Renovations; Summit Project = Summit Developments only; `enabled = false`); Summit secret names; `preflight --client summit`; `--site test --client summit` refused · step · high
 - [ ] **9.4** Client interface (`core/client.py`) in the run loop; `core/` imports no client package (except `demo.py`) · step · refactor · high

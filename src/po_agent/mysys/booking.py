@@ -35,7 +35,6 @@ from po_agent.core.runlog import RunLog
 from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 
-CREATOR = "Perth Scheduling"
 HOLD_NOTE = "ON HOLD UNTIL CALL UP"
 REMINDER = "Send me a reminder email every days"
 # Row 11: "There are 58 related jobs with the same sales type/ suburb/ ...".
@@ -641,12 +640,14 @@ def fill_task_form(
     body: str,
     file_name: str,
     data: bytes,
+    *,
+    creator: str,
 ) -> None:
-    """Step 6 up to Submit: Creator, - Compaction Test, PO Number, the PDF to
-    Documents from memory (the admin's block: the task's own Client
-    Documents; decisions, 12 Nov 2026), Note = the email body; then every
-    read-back."""
-    guard.act("set_creator", form, _field(form, "Creator", "select"), CREATOR)
+    """Step 6 up to Submit: Creator (the Proceed's), - Compaction Test, PO
+    Number, the PDF to Documents from memory (the admin's block: the task's
+    own Client Documents; decisions, 12 Nov 2026), Note = the email body;
+    then every read-back."""
+    guard.act("set_creator", form, _field(form, "Creator", "select"), creator)
     compaction = form.get_by_role("checkbox", name="- Compaction Test", exact=True)
     guard.act("tick_compaction_test", form, compaction)
     po_box = _field(form, "PO Number", "input")
@@ -661,10 +662,12 @@ def fill_task_form(
     }
     guard.act("upload_document", form, upload, payload)
     guard.act("set_task_note", form, _field(form, "Note", "textarea"), body)
-    check_task_form(form, po_number, body, file_name)
+    check_task_form(form, po_number, body, file_name, creator=creator)
 
 
-def check_task_form(form: Locator, po_number: str, body: str, file_name: str) -> None:
+def check_task_form(
+    form: Locator, po_number: str, body: str, file_name: str, *, creator: str
+) -> None:
     """Row 09 read-back before Submit; any mismatch -> WriteNotStarted."""
     documents = _container(form, "Documents", 'input[type="file"]')
     if not _shows(documents.get_by_text(file_name, exact=True), wait.LOAD_TIMEOUT_MS):
@@ -673,7 +676,7 @@ def check_task_form(form: Locator, po_number: str, body: str, file_name: str) ->
     po_docs = _container(form, "PO Documents", 'input[type="file"]')
     try:
         checks = {
-            "creator": _chosen(_field(form, "Creator", "select")) == CREATOR,
+            "creator": _chosen(_field(form, "Creator", "select")) == creator,
             "ticked": form.get_by_role("checkbox", checked=True).count() == 1
             and form.get_by_role(
                 "checkbox", name="- Compaction Test", exact=True
@@ -782,9 +785,11 @@ def _details_row(project: Locator, task_no: str) -> Locator:
     return header.locator("xpath=following-sibling::tr[1]")
 
 
-def check_new_task_row(project: Locator, task_no: str, agent: str) -> Locator:
+def check_new_task_row(
+    project: Locator, task_no: str, agent: str, *, creator: str
+) -> Locator:
     """Row 10: the new task's details row shows Lodged By the agent and Task
-    Creator Perth Scheduling (the first two columns); returns that row."""
+    Creator the Proceed's creator (the first two columns); returns that row."""
     details = _details_row(project, task_no)
     try:
         cells = [c.strip() for c in details.locator("td").all_inner_texts()]
@@ -794,7 +799,7 @@ def check_new_task_row(project: Locator, task_no: str, agent: str) -> Locator:
         raise UnexpectedScreen("task row not recognised")
     if cells[0] != agent:
         raise AccuracyBreach("new task not as booked", field="lodged_by")
-    if cells[1] != CREATOR:
+    if cells[1] != creator:
         raise AccuracyBreach("new task not as booked", field="task_creator")
     return details
 
@@ -821,15 +826,17 @@ def task_detail_window(page: Page, task_no: str) -> Locator:
     )
 
 
-def open_task_detail(guard: ActionGuard, project: Locator, details: Locator) -> None:
-    """The Task Creator cell of the new task's details row (never its header
-    row, which holds Cancel and Hold)."""
-    cell = details.get_by_role("cell", name=CREATOR, exact=True)
+def open_task_detail(
+    guard: ActionGuard, project: Locator, details: Locator, *, creator: str
+) -> None:
+    """The Task Creator cell (`creator`) of the new task's details row (never
+    its header row, which holds Cancel and Hold)."""
+    cell = details.get_by_role("cell", name=creator, exact=True)
     guard.act("open_new_task_detail", project, cell)
 
 
 def check_task_detail(
-    page: Page, task_no: str, po_number: str, body: str, agent: str
+    page: Page, task_no: str, po_number: str, body: str, agent: str, *, creator: str
 ) -> Locator:
     """Row 19: the screen must name the new task, else PartialWrite; then
     PO Number, Lodged By and Notes in its `tsk_<n> [Compaction Test]`
@@ -852,7 +859,7 @@ def check_task_detail(
         "po_number": (_labelled(task, "PO Number:"), po_number),
         "lodged_by": (_labelled(task, "Lodged By:"), agent),
         "notes": (_labelled(task, "Notes"), " ".join(body.split())),
-        "task_creator": (_labelled(client, "Task Creator:"), CREATOR),
+        "task_creator": (_labelled(client, "Task Creator:"), creator),
     }
     for name, (read, wanted) in values.items():
         if read != wanted:

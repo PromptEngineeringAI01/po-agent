@@ -32,6 +32,9 @@ TitleRule = Literal["test-body-filename", "live-b1-title"]
 Site = Literal["test", "live"]
 
 UNLINKED_PROJECT = "---"
+# B1's Creator on every task it books (ADR-003 decision 3: a client rule,
+# carried in the Proceed; SPEC.md -> Client 2: Creator table).
+CREATOR = "Perth Scheduling"
 # Spec open question 10: live numbers look like 2609034B; until confirmed,
 # accept upper-case letters and digits only.
 _INTERNAL_NO = r"[0-9A-Z]+"
@@ -218,4 +221,5 @@ def decide(
         pdf_file_name=checked.pdf_file_name,
         pdf_bytes=texts.data,
         existing_task_nos=task_nos,
+        creator=CREATOR,
     )
