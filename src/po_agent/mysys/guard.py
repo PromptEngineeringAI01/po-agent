@@ -63,6 +63,8 @@ ALLOWLIST: dict[str, Kind] = {
     "open_pool": Kind.CLICK,
     "set_pool_filter": Kind.SELECT,
     "set_locked_filter": Kind.SELECT,
+    # Summit's Source filter, `filter_source` (SPEC -> Client 2, task 9.6).
+    "set_source_filter": Kind.SELECT,
     "search_note_pool": Kind.FILL,
     "refresh_note_pool": Kind.CLICK,  # row 27 (decisions, 25 Oct 2026)
     "open_note": Kind.CLICK,
