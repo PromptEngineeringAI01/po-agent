@@ -42,6 +42,9 @@ SECRET_NAMES = (
     "mysys_test_password",
     "mysys_live_username",
     "mysys_live_password",
+    # Summit's own live pair (task 9.3; decisions, 23 Nov 2026, separate run)
+    "mysys_live_summit_username",
+    "mysys_live_summit_password",
 )
 
 
