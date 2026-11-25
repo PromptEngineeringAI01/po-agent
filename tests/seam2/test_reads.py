@@ -139,7 +139,7 @@ def test_reads_each_trial_project(config, login, guard, internal_no):
     creators = {
         t.task_creator for t in lookup.project_tasks if t.name == "Compaction Test"
     }
-    assert creators <= {"Perth Scheduling"}
+    assert creators == {"Perth Scheduling"}  # each trial project has one
     assert only_reading(guard)
 
     fixtures = private_fixtures()
