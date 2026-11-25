@@ -300,6 +300,88 @@ def test_no_trace_folder_lists_no_bookings(tmp_path):
     assert log.recent_bookings("test", "b1") == ()
 
 
+# --- each client re-checks only its own bookings (task 9.5) ---------------------
+# SPEC.md -> Client 2, The separate run: the booked event gains `client`; the
+# re-check reads its own site's and client's events; an event without a
+# client (written before 9.5) is B1's.
+
+
+def seed_without_client(tmp_path: Path, day: date, n: int) -> None:
+    """A booked event as runs before 9.5 wrote it: no `client` key."""
+    note_id, pln, task_id, internal_no = booked(n)
+    event = {
+        "run_id": SEED_RUN,
+        "ts": "2026-10-30T01:02:03+00:00",
+        "note_id": note_id,
+        "step": "W5",
+        "name": "booked",
+        "outcome": "pass",
+        "duration_ms": 0,
+        "pln": pln,
+        "task_id": task_id,
+        "internal_no": internal_no,
+        "site": "test",
+    }
+    trace_dir(tmp_path).mkdir(parents=True, exist_ok=True)
+    path = trace_dir(tmp_path) / f"{day.isoformat()}.jsonl"
+    with open(path, "a", encoding="utf-8") as file:
+        file.write(json.dumps(event) + "\n")
+
+
+def test_each_client_lists_only_its_own_bookings_and_b1_the_old_ones(tmp_path):
+    seed(tmp_path, FRIDAY, booked(1), client="b1")
+    seed(tmp_path, FRIDAY, booked(2), client="summit")
+    seed_without_client(tmp_path, FRIDAY, 3)
+
+    log = trace.Trace("20261102T020000Z-0001")
+    log.start(trace_dir(tmp_path), MONDAY)
+
+    assert [b.task_id for b in log.recent_bookings("test", "b1")] == [
+        "tsk_200003",
+        "tsk_200001",
+    ]
+    assert [b.task_id for b in log.recent_bookings("test", "summit")] == ["tsk_200002"]
+
+
+def test_a_booking_with_a_client_outside_its_type_is_not_written(tmp_path):
+    # Written without its client it would read as B1's.
+    log = trace.Trace(SEED_RUN)
+    log.start(tmp_path, FRIDAY)
+
+    log.booked(
+        note_id="300001",
+        pln="pln_10001",
+        task_id="tsk_200001",
+        internal_no="2600001B",
+        site="test",
+        client="Sampleville",
+    )
+
+    path = tmp_path / f"{FRIDAY.isoformat()}.jsonl"
+    assert not path.exists() or "booked" not in path.read_text("utf-8")
+
+
+def test_a_b1_booking_s_event_names_b1(mysys, capsys, tmp_path):
+    mysys({"300002": FakeNote("2600001B")})  # PROCEED -> booked
+
+    assert book_run() == 0
+
+    stdout_of(capsys)
+    (event,) = [e for e in events_of(tmp_path) if e["name"] == "booked"]
+    assert event["client"] == "b1"
+
+
+def test_a_b1_run_does_not_recheck_summit_s_bookings(mysys, capsys, tmp_path):
+    seed(tmp_path, FRIDAY, booked(1), client="summit")
+    seed(tmp_path, FRIDAY, booked(2), client="b1")
+    fake = mysys({"300002": FakeNote("2600001B", names=())})  # NO_PDF
+
+    assert decide_only() == 0
+
+    stdout_of(capsys)
+    assert rechecked(fake) == ["tsk_200002"]
+
+
 # --- the re-check in a run -------------------------------------------------------
 
 
