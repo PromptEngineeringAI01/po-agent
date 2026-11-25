@@ -133,6 +133,11 @@ def test_reads_each_trial_project(config, login, guard, internal_no):
     assert lookup.more_pages is False
     assert lookup.address  # read, not compared: never an address in a test
     assert all(task.task_no.startswith("tsk_") for task in lookup.tasks)
+    # Task 9.8: every task is read; the Compaction Test ones are `tasks`.
+    compaction = [
+        t.task_no for t in lookup.project_tasks if t.name == "Compaction Test"
+    ]
+    assert compaction == [task.task_no for task in lookup.tasks]
     assert only_reading(guard)
 
     fixtures = private_fixtures()

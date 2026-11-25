@@ -17,6 +17,7 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page
 
 from po_agent.core.errors import UnexpectedScreen
+from po_agent.core.models import ProjectTask
 from po_agent.mysys import booking, driver, tasks, wait
 
 AGENT = "Agent 1 (MySys Only)"
@@ -179,3 +180,58 @@ def test_a_status_that_fills_in_after_the_first_read_is_read_settled(page):
     tasks = driver.settled_tasks(window)
 
     assert tasks == {"tsk_200001": "Cancelled", "tsk_200002": "New Project"}
+
+
+# Every task (task 9.8): the settled read also gives each task's name,
+# status and Task Creator, from the same rows; the settling rule is
+# unchanged (Compaction Test numbers equal the select's options).
+
+MIXED = f"""
+<tr><td><div><span>(tsk_200003) | Site Classification</span><div><button>Cancel</button><button>Hold</button></div></div></td></tr>
+<tr><td>---</td><td>Fake Creator A</td><td>Certification Passed</td></tr>
+{ROWS}"""
+
+
+def test_every_task_is_read_settled_with_its_creator(page):
+    page.set_content(project_page(options=BOTH, rows=MIXED, late_ms=600))
+    window = booking.project_window(page, "pln_10001")
+
+    assert driver.settled_project_tasks(window) == (
+        ProjectTask(
+            task_no="tsk_200003",
+            name="Site Classification",
+            status="Certification Passed",
+            task_creator="Fake Creator A",
+        ),
+        ProjectTask(
+            task_no="tsk_200001",
+            name="Compaction Test",
+            status="Cancelled",
+            task_creator="Perth Scheduling",
+        ),
+        ProjectTask(
+            task_no="tsk_200002",
+            name="Compaction Test",
+            status="New Project",
+            task_creator="Perth Scheduling",
+        ),
+    )
+
+
+@pytest.mark.usefixtures("short_waits")
+def test_a_project_without_compaction_tasks_reads_its_other_tasks(page):
+    # The select lists no Compaction Test, so "none" still counts only after
+    # the full wait; the other tasks are then read as the table shows them.
+    first = "\n".join(MIXED.strip().splitlines()[:2])
+    page.set_content(project_page(options=(), rows=first, late_ms=300))
+    window = booking.project_window(page, "pln_10001")
+
+    assert driver.settled_project_tasks(window) == (
+        ProjectTask(
+            task_no="tsk_200003",
+            name="Site Classification",
+            status="Certification Passed",
+            task_creator="Fake Creator A",
+        ),
+    )
+    assert driver.settled_tasks(window) == {}
