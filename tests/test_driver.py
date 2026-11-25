@@ -17,6 +17,7 @@ from playwright.sync_api import Browser, Page
 
 from po_agent.b1.decision import note_pool_filters
 from po_agent.core.errors import LoginFailed, UnexpectedScreen
+from po_agent.core.models import NotePoolFilters
 from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 
@@ -56,7 +57,7 @@ FILTERS = {
     "filter_user_id": ["All Users", "Unassigned", "Agent 1 (MySys Only)"],
     "filter_allocation_pool_id": ["All Pools", POOL, "Other Pool"],
     "filter_creator_id": ["All Creators", "<user>"],
-    "filter_source": ["All Sources"],
+    "filter_source": ["All Sources", "support@fake-mailbox.test"],
     "filter_status": ["All Status", "Pending", "Solved", "Discard"],
     "filter_lock_status": ["All", "Locked", "Unlocked"],
     "filter_note_type": ["All Note Types", "internal"],
@@ -88,16 +89,26 @@ def note_pool_page(
     duplicates: int = 0,
     pages: int = 1,
     total: int | None = None,
+    reverts: str | None = None,
 ) -> str:
     """The panel after a fresh login (defaults) unless told otherwise.
 
     duplicates: how many of the next reloads add every row twice while the
     footer keeps the right count (row 27). pages/total: footer override.
+    reverts: a filter whose choice doesn't stick (it reads its default again
+    after the list reloads). A row's sixth value is its Source cell (the
+    sender), its seventh the mailbox the Source filter lists it under.
     """
     chosen = {**DEFAULTS, **(filters or {})}
     selects = "".join(select(name, chosen[name]) for name in FILTERS)
     config = json.dumps(
-        {"rows": rows, "duplicates": duplicates, "pages": pages, "total": total}
+        {
+            "rows": rows,
+            "duplicates": duplicates,
+            "pages": pages,
+            "total": total,
+            "reverts": reverts,
+        }
     )
     headers = "".join(
         f"<th>{h}</th>"
@@ -145,9 +156,11 @@ function shown() {{
   const user = value('filter_user_id');
   const pool = value('filter_allocation_pool_id');
   const lock = value('filter_lock_status');
+  const source = value('filter_source');
   return CONFIG.rows.filter(r =>
     (user === 'All Users' || r[1] === user) &&
     (pool === 'All Pools' || r[1] === pool) &&
+    (source === 'All Sources' || r[6] === source) &&
     (lock === 'All' || (lock === 'Locked') === (r[4] === 1)));
 }}
 function render() {{
@@ -158,7 +171,8 @@ function render() {{
   body.innerHTML = '';
   for (let c = 0; c < copies; c++) for (const r of rows) {{
     const tr = document.createElement('tr');
-    for (const text of ['', r[0], r[1], r[2], '---', '---', '01 Jan 2026 00:00', '<user>', r[3], 'Pending', '']) {{
+    const sender = r.length > 5 ? r[5] : '<user>';
+    for (const text of ['', r[0], r[1], r[2], '---', '---', '01 Jan 2026 00:00', sender, r[3], 'Pending', '']) {{
       const td = document.createElement('td'); td.textContent = text; tr.appendChild(td);
     }}
     body.appendChild(tr);
@@ -170,6 +184,7 @@ function render() {{
     'Page 1 of ' + CONFIG.pages + '<br>(' + total + ' Items)';
 }}
 function reload() {{
+  if (CONFIG.reverts) document.querySelector('select[name=' + CONFIG.reverts + ']').selectedIndex = 0;
   document.getElementById('footer').hidden = true;
   document.querySelector('tbody').innerHTML = '';
   setTimeout(render, 300);
@@ -293,6 +308,71 @@ def test_text_left_in_search_filter_is_an_unexpected_screen(page, guard):
         driver.set_note_pool_filters(guard, panel, note_pool_filters(POOL))
 
     assert "300001" not in str(caught.value)
+
+
+# --- Summit's filters and the Source column (task 9.11) --------------------------
+
+MAILBOX = "support@fake-mailbox.test"  # the Source filter: the receiving mailbox
+SENDER = "noreply@fake-builder.test"  # the Source column: the sender
+SUMMIT_TITLE = "Fake Builder Homes - Lot 1 - PO: 123456/020/01 - READY"
+# id, assignee, project, subject/note, locked, Source cell, mailbox
+SUMMIT_ROWS = [
+    ("462003", "---", "---", SUMMIT_TITLE, 0, SENDER, MAILBOX),
+    ("462002", "---", "---", SUMMIT_TITLE, 1, SENDER, MAILBOX),
+    ("462001", "---", "---", "Other Note", 0, "someone@fake-other.test", "other"),
+]
+SUMMIT_FILTERS = NotePoolFilters(source=MAILBOX, locked="Unlocked")
+
+
+def test_summit_s_source_and_unlocked_are_set_by_name_and_read_back(page, guard):
+    panel = panel_of(page, note_pool_page(rows=SUMMIT_ROWS))
+
+    driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+    # Assigned Pool stays at its default: Summit has no pool.
+    assert actions(guard) == ["set_source_filter", "set_locked_filter"]
+    listing = driver.read_note_pool(guard, panel, with_source=True)
+    assert [(row.note_id, row.source) for row in listing.rows] == [("462003", SENDER)]
+
+
+@pytest.mark.parametrize("name", ["filter_source", "filter_lock_status"])
+def test_a_summit_filter_that_does_not_read_back_is_an_unexpected_screen(
+    page, guard, name
+):
+    panel = panel_of(page, note_pool_page(rows=SUMMIT_ROWS, reverts=name))
+
+    with pytest.raises(UnexpectedScreen):
+        driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+
+def test_the_pool_off_its_default_with_summit_s_filters_is_an_unexpected_screen(
+    page, guard
+):
+    panel = panel_of(
+        page,
+        note_pool_page(rows=SUMMIT_ROWS, filters={"filter_allocation_pool_id": POOL}),
+    )
+
+    with pytest.raises(UnexpectedScreen):
+        driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+
+def test_b1_s_read_leaves_the_source_cell_unread(page, guard):
+    panel = panel_of(page, note_pool_page())
+
+    listing = driver.read_note_pool(guard, panel)
+
+    assert {row.source for row in listing.rows} == {None}
+
+
+def test_a_list_without_a_source_column_is_an_unexpected_screen_when_asked(page, guard):
+    panel = panel_of(page, POOL_PANEL_HTML)
+
+    assert [row.note_id for row in driver.read_note_pool(guard, panel).rows] == [
+        "300001"
+    ]
+    with pytest.raises(UnexpectedScreen):
+        driver.read_note_pool(guard, panel, with_source=True)
 
 
 def test_the_stale_note_read_lists_only_the_agents_rows_at_the_defaults(page, guard):

@@ -71,6 +71,7 @@ ALL_LOCKED = "All"
 PROJECT_BUTTON = re.compile(r"^pln_\d+$")
 POOL_FILTER = "filter_allocation_pool_id"
 LOCK_FILTER = "filter_lock_status"
+SOURCE_FILTER = "filter_source"
 USER_FILTER = "filter_user_id"
 ALL_USERS = "All Users"
 PENDING = "Pending"
@@ -80,7 +81,7 @@ FILTER_DEFAULTS = {
     USER_FILTER: ALL_USERS,
     POOL_FILTER: "All Pools",
     "filter_creator_id": "All Creators",
-    "filter_source": "All Sources",
+    SOURCE_FILTER: "All Sources",
     "filter_status": PENDING,
     LOCK_FILTER: "All",
     "filter_note_type": "All Note Types",
@@ -91,6 +92,7 @@ COLUMNS = {
     "project": "Project",
     "subject_note": "Subject/Note",
 }
+SOURCE_COLUMN = {"source": "Source"}  # read when asked (task 9.11)
 
 
 @dataclass(frozen=True)
@@ -198,11 +200,18 @@ def wait_for_list(panel: Locator, before: ElementHandle | None = None) -> None:
 def set_note_pool_filters(
     guard: ActionGuard, panel: Locator, filters: NotePoolFilters
 ) -> None:
-    """Assigned Pool and Locked/Unlocked as the client's `filters` say, each
-    read back; every other filter at its default and every textbox empty."""
-    _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, filters.pool)
+    """Assigned Pool, Source and Locked/Unlocked as the client's `filters`
+    say (a filter it leaves None stays at its default), each read back;
+    every other filter at its default and every textbox empty. B1 sets its
+    pool and Locked; Summit Source and Unlocked (task 9.11)."""
+    wanted: dict[str, str] = {LOCK_FILTER: filters.locked}
+    if filters.pool is not None:
+        _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, filters.pool)
+        wanted[POOL_FILTER] = filters.pool
+    if filters.source is not None:
+        _set_filter(guard, panel, "set_source_filter", SOURCE_FILTER, filters.source)
+        wanted[SOURCE_FILTER] = filters.source
     _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, filters.locked)
-    wanted = {POOL_FILTER: filters.pool, LOCK_FILTER: filters.locked}
     _check_filters(panel, {**FILTER_DEFAULTS, **wanted})
 
 
@@ -360,17 +369,22 @@ def _check_filters(panel: Locator, wanted: dict[str, str]) -> None:
         raise UnexpectedScreen("Note Pool filters not readable") from None
 
 
-def read_note_pool(guard: ActionGuard, panel: Locator) -> NotePoolList:
+def read_note_pool(
+    guard: ActionGuard, panel: Locator, *, with_source: bool = False
+) -> NotePoolList:
     """Page 1 of the list. Its row count must equal the footer's (or the page
-    size, with more pages); else one more Refresh, then UnexpectedScreen."""
+    size, with more pages); else one more Refresh, then UnexpectedScreen.
+    `with_source`: the Source column is read too, and a list without one is
+    UnexpectedScreen (Summit's eligible read, task 9.11)."""
+    columns = {**COLUMNS, **SOURCE_COLUMN} if with_source else COLUMNS
     try:
-        listing = _read_list(panel)
+        listing = _read_list(panel, columns)
         if listing is None:
             before = _first_row(panel)
             refresh = panel.get_by_role("button", name="Refresh", exact=True)
             guard.act("refresh_note_pool", panel, refresh)
             wait_for_list(panel, before)
-            listing = _read_list(panel)
+            listing = _read_list(panel, columns)
     except PlaywrightError:
         raise UnexpectedScreen("Note Pool list not readable") from None
     if listing is None:
@@ -448,7 +462,7 @@ def _set_filter(
     wait_for_list(panel, before)
 
 
-def _read_list(panel: Locator) -> NotePoolList | None:
+def _read_list(panel: Locator, columns: dict[str, str]) -> NotePoolList | None:
     """The list, or None if its row count doesn't match the footer."""
     rows = panel.locator("tbody tr")
     if _no_record(panel).count():
@@ -462,7 +476,7 @@ def _read_list(panel: Locator) -> NotePoolList | None:
         return None
     headers = [h.strip() for h in panel.locator("thead th").all_text_contents()]
     try:
-        index = {field: headers.index(name) for field, name in COLUMNS.items()}
+        index = {field: headers.index(name) for field, name in columns.items()}
     except ValueError:
         raise UnexpectedScreen("Note Pool columns not recognised") from None
     read = []
