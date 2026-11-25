@@ -574,6 +574,17 @@ def test_protect_paths_allows_the_claude_temp_folder(places):
     assert_allowed(protect(places["temp"] / "claude" / "x.txt", places))
 
 
+# The desktop app's side-session notes (friction log, 23 Nov 2026):
+# ~/AppData/Local/Claude-Data/<one folder>/side-session-notes/.
+APP_DATA = "AppData/Local/Claude-Data"
+NOTES = f"{APP_DATA}/claude_abc/side-session-notes"
+
+
+def test_protect_paths_allows_the_side_session_notes_folder(places):
+    path = places["home"] / NOTES / "local_123" / "note.md"
+    assert_allowed(protect(path, places))
+
+
 OUTSIDE_BLOCKED = {
     "home settings": ".claude/settings.json",
     "home local settings": ".claude/settings.local.json",
@@ -582,6 +593,11 @@ OUTSIDE_BLOCKED = {
     "another project's memory": ".claude/projects/other/memory/m.md",
     "escape out of plans": ".claude/plans/../settings.json",
     "anywhere else in home": "notes.txt",
+    "lookalike notes folder": f"{NOTES}-evil/n.md",
+    "notes folder one level too deep": f"{APP_DATA}/a/b/side-session-notes/n.md",
+    "the app's data folder itself": f"{APP_DATA}/claude_abc/config.json",
+    "the notes folder as a file": NOTES,
+    "escape out of the notes folder": f"{NOTES}/../../config.json",
 }
 
 

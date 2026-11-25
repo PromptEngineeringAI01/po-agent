@@ -9,7 +9,9 @@ Every path is resolved first (absolute, `..` collapsed, symlinks followed) and
 then matched by whole folders, never as a string prefix, so `plans-evil/`
 isn't inside `plans/`. Outside the repo, only three folders may be written
 (decisions, 24 Oct 2026): `~/.claude/plans/`, this project's memory folder and
-`<temp>/claude/`.
+`<temp>/claude/`; plus the desktop app's side-session notes folders,
+`~/AppData/Local/Claude-Data/<one folder>/side-session-notes/` (friction log,
+23 Nov 2026).
 
 A Claude Code worktree under `.claude/worktrees/<name>/` is a checkout of
 this repo, so a path inside one gets the same rules, measured from that
@@ -73,6 +75,19 @@ def allowed_outside(project_raw: str) -> list[Path]:
     ]
 
 
+def in_side_session_notes(path: Path) -> bool:
+    """Inside `~/AppData/Local/Claude-Data/<one folder>/side-session-notes/`,
+    the Claude desktop app's notes shared by linked sessions. `path` is
+    already resolved, so `..` can't climb out; the folder name must match
+    whole (`side-session-notes-evil` doesn't)."""
+    base = comparable((Path.home() / "AppData" / "Local" / "Claude-Data").resolve())
+    here = comparable(path)
+    if not here.is_relative_to(base):
+        return False
+    rest = here.relative_to(base).parts
+    return len(rest) >= 3 and rest[1] == os.path.normcase("side-session-notes")
+
+
 def decide_in_repo(path: Path, project: Path, in_worktree: bool = False) -> str | None:
     """'ask', or None to allow; raises Blocked."""
     parts = [p.lower() for p in path.relative_to(project).parts]
@@ -112,6 +127,8 @@ def decide(payload: dict) -> str | None:
     if inside(path, project):
         return decide_in_repo(path, project)
     if any(inside(path, folder) for folder in allowed_outside(project_raw)):
+        return None
+    if in_side_session_notes(path):
         return None
     raise Blocked(f"{path} is outside the repo and the allowed folders")
 
