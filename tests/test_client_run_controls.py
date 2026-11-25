@@ -33,9 +33,12 @@ import pytest
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
+from po_agent.b1.client import B1Client
+from po_agent.b1.models import B1Proceed
 from po_agent.core import controls, run, runlock, secrets
 from po_agent.core.config import CONFIG_DIR, load_config, parse_client
 from po_agent.core.errors import ConfigError, PartialWrite
+from po_agent.mysys.guard import ActionGuard
 
 MONDAY_10_PERTH = datetime(2026, 11, 2, 2, 0, tzinfo=UTC)
 RUN_ID = "20261102T020000Z-abcd"
@@ -391,3 +394,67 @@ def test_a_bad_command_line_s_summary_names_no_client(env, capsys):
 
     assert code == 2
     assert summary_of(lines)["client"] is None
+
+
+# --- review fixes (9.5 second-model review) ---------------------------------------
+
+
+class UntouchedPage:
+    """A page nothing may touch: any use of it fails the test."""
+
+    def __getattr__(self, name):
+        raise AssertionError("MySys was touched")
+
+
+def test_summit_s_booking_stops_at_w1_when_its_client_switch_is_off(tmp_path):
+    # Review Moderate 3: the run's booking path re-reads Summit's own client
+    # file in before_write, not only the site's.
+    folder = config_dir(tmp_path, site_on=True, summit_on=False)
+    config = load_config("live", folder)
+    proceed = B1Proceed(
+        note_id="300001",
+        internal_no="2600001B",
+        pln="pln_10001",
+        po_number="2600001B/048",
+        email_body="fake body",
+        pdf_file_name="2600001B_048_1.pdf",
+        pdf_bytes=b"%PDF-fake",
+        existing_task_nos=(),
+        creator="Fake Creator",
+    )
+
+    with pytest.raises(controls.KillSwitch):
+        run._book(
+            ActionGuard(),
+            UntouchedPage(),
+            config,
+            B1Client(config),
+            ("https://fake.test", "fake-user", "fake-password"),
+            proceed,
+            folder,
+            note_id="300001",
+            profile=summit_profile(),
+        )
+
+
+def test_an_unknown_client_s_before_write_fails_closed(tmp_path):
+    # Review Nit 1: a client that is neither B1 nor one with a client file
+    # never passes the kill switch as B1.
+    gate, checked = summit_gate(
+        config_dir(tmp_path, site_on=True, summit_on=True), client="other"
+    )
+
+    with pytest.raises(ConfigError):
+        gate.before_write("300001", "W1")
+
+    assert checked == []
+
+
+def test_a_refused_summit_run_releases_its_lock(env, started, capsys):
+    # Review Nit 3: the refusal comes after the lock, which it releases.
+    for _ in range(2):
+        code, lines = run_cli(capsys, SUMMIT_RUN)
+
+        assert code == 2
+        assert LOCK_HELD not in lines
+        assert any(NOT_BUILT in line for line in lines if line.startswith("ALERT"))
