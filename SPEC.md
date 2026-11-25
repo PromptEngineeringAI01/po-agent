@@ -684,7 +684,7 @@ creator_rule = "previous_task"
 |---|---|---|
 | S.0 | By-hand screenshots above; 3-5+ real Summit POs and `cases.toml` in `private/summit/` | Screens written into `docs/screen-map.md` (redacted); real-PO seam `false PROCEED: 0` |
 | S.1 | Agent 2's secrets in `poagent`'s Keychain; `po-agent preflight --site live --client summit`; Agent 2's My Notes holds no Pending Note and the team stops assigning to Agent 2 by hand | pre-flight exit 0 |
-| S.2 | Kill-switch PR flips the client's `enabled`; Joey moves the `production` tag; `spike live summit` (G.5) | exit 0, eligible count read, no `MORE_PAGES` |
+| S.2 | Kill-switch PR flips the client's `enabled`; Joey moves the `production` tag; `spike live summit` (G.5) | exit 0, eligible count read, no `MORE_PAGES`; at least 1 eligible when Joey knows a Summit Note is waiting (unlinked, Assignee `---`), else a list-level rule is missing it (decisions, 25 Nov 2026, Summit Note Pool list) |
 | S.3 | `decide-only live summit` (G.6) | Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee |
 | S.4 | `run live summit`, `max_notes_per_run = 1`, watched (G.7); 5.2's trace check on the first | each booked task correct in MySys (Creator, PO, Documents, Note, On Hold, linked, Solved) |
 | S.5 | Cap raised by its own PR; the Summit launchd job and Healthchecks check loaded (G.8) | first hourly run watched, exit 0 |
