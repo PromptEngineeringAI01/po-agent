@@ -15,6 +15,7 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1.decision import B1ProjectRule, note_pool_filters
 from po_agent.core import run, runlog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
@@ -44,7 +45,7 @@ def read_site(config, login, check) -> tuple[dict[str, str], dict]:
         driver.reload_home(guard, page, *login)
         panel = driver.open_note_pool(guard, page)
         driver.leave_menu(guard, page)
-        driver.set_note_pool_filters(guard, panel, config.pool_name)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
         listing = driver.read_note_pool(guard, panel)
         check(listing)
         found = run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
@@ -57,7 +58,7 @@ def read_site(config, login, check) -> tuple[dict[str, str], dict]:
             number: tuple(
                 t.task_no
                 for t in driver.project_lookup(
-                    guard, page, *login, number, "test"
+                    guard, page, *login, number, B1ProjectRule("test")
                 ).tasks
             )
             for number in TRIAL_INTERNAL_NOS

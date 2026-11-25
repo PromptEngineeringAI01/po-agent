@@ -46,6 +46,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
+from po_agent.core.models import NotePoolFilters
 
 
 def decide_only(*extra: str) -> int:
@@ -126,6 +127,29 @@ def test_eligible_notes_go_newest_first_up_to_the_cap_from_one_list_read(mysys, 
     assert summary["mode"] == "decide-only"
     assert (summary["seen"], summary["eligible"]) == (5, 4)
     assert (summary["skipped"], summary["booked"], summary["exit_code"]) == (3, 0, 0)
+
+
+def test_the_run_filters_the_profile_s_pool_locked(mysys, capsys):
+    # Task 9.2: the filters come from the client (B1: the profile's pool,
+    # Locked); the driver holds none.
+    fake = mysys({"300001": FakeNote("2600001B")})
+
+    assert decide_only() == 0
+
+    assert fake.filters == [NotePoolFilters(pool=POOL, locked="Locked")]
+
+
+def test_the_body_read_is_the_one_ending_with_the_pdf_s_file_name(mysys, capsys):
+    # Task 9.2: B1's body rule (SPEC.md -> Email body) is the run's choice.
+    fake = mysys({"300001": FakeNote("2600001B", names=("2600001B_048_2.pdf",))})
+
+    assert decide_only() == 0
+
+    ((note_id, rule),) = fake.body_rules
+    assert note_id == "300001"
+    assert rule.search("Please find attached file 2600001B_048_2.pdf \n")
+    assert not rule.search("Please find attached file 2600001B_048_1.pdf")
+    assert not rule.search("2600001B_048_2.pdf is attached")
 
 
 def test_one_note_line_per_note_and_nothing_booked(mysys, capsys):

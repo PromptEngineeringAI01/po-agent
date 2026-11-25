@@ -31,6 +31,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
+from po_agent.b1 import decision
 from po_agent.b1 import reader_rules as rules
 from po_agent.core import output
 from po_agent.core import run as runs
@@ -43,6 +44,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.secrets import SecretName
 from po_agent.mysys import booking, driver, wait
+from po_agent.mysys import tasks as task_table
 from po_agent.mysys.guard import ActionGuard
 
 # The one trial PO (Must never #6 allows its identifiers in committed files).
@@ -168,7 +170,7 @@ def _steps(
     output.info("logged in")
     panel = driver.open_note_pool(guard, page)
     booking.leave_menu(guard, page)
-    driver.set_note_pool_filters(guard, panel, pool)
+    driver.set_note_pool_filters(guard, panel, decision.note_pool_filters(pool))
     output.info("note pool filters set")
     listing = driver.read_note_pool(guard, panel)
     eligible = runs.eligible_notes(listing.rows, config.title_rule, pool)
@@ -199,7 +201,7 @@ def _steps(
         raise WriteNotStarted("Note already linked", reason="NOTE_ALREADY_LINKED")
     file_name = rules.pdf_file_name(booking.download_hrefs(window))
     file_po = rules.po_from_file_name(file_name)
-    body = booking.note_body(window, file_name)
+    body = booking.note_body(window, decision.body_rule(file_name))
     downloaded, data = booking.download_pdf(guard, page, window)
     if downloaded != file_name:
         raise WriteNotStarted("download not the linked file", reason="NO_PDF")
@@ -221,8 +223,8 @@ def _steps(
     project = booking.open_project(guard, page, projects, pln)
     if not rules.same_internal_no(booking.client_internal_no(project), INTERNAL_NO):
         raise WriteNotStarted("project internal number", reason="PROJECT_MISMATCH")
-    tasks = rules.compaction_tasks(booking.task_rows(project))
-    if rules.live_tasks(tasks):
+    tasks = task_table.compaction_tasks(booking.task_rows(project))
+    if task_table.live_tasks(tasks):
         raise WriteNotStarted("Compaction Test task exists", reason="DUPLICATE_TASK")
     output.info("demo: project checked")
     if options.until_check:
@@ -233,7 +235,9 @@ def _steps(
     progress.step = "S6"
     _ask("create the Compaction Test task", progress)
     form = booking.open_task_form(guard, page, project)
-    booking.fill_task_form(guard, form, po_number, body, file_name, data)
+    booking.fill_task_form(
+        guard, form, po_number, body, file_name, data, creator=decision.CREATOR
+    )
     output.info("demo: task form filled")
     _ask("submit the task", progress)
     progress.written = True

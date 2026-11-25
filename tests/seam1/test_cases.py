@@ -104,6 +104,7 @@ def test_expected_proceed_is_a_valid_proceed(seam1_case: Seam1Case) -> None:
         pdf_file_name=seam1_case.note.attachment_names[0],
         pdf_bytes=b"%PDF-stand-in",
         existing_task_nos=expect.existing_task_nos,
+        creator="Perth Scheduling",
     )
 
 

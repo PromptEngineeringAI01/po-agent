@@ -320,6 +320,7 @@ def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path
         pdf_file_name="2600002B_048_1.pdf",
         pdf_bytes=b"%PDF-fake",
         existing_task_nos=(),
+        creator="Perth Scheduling",
     )
 
     with pytest.raises(WriteNotStarted) as error:

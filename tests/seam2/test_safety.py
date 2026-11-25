@@ -26,6 +26,7 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1.decision import note_pool_filters
 from po_agent.core import run
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard, Refusal, Refused
@@ -67,7 +68,7 @@ def read_pool(config, login) -> driver.NotePoolList:
         driver.reload_home(guard, page, *login)
         panel = driver.open_note_pool(guard, page)
         driver.leave_menu(guard, page)
-        driver.set_note_pool_filters(guard, panel, config.pool_name)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
         listing = driver.read_note_pool(guard, panel)
     assert listing.pages == 1, "Agent Pool has more than one page"
     return listing
@@ -111,7 +112,7 @@ def test_vet_refuses_discard_in_an_open_trial_note_window_and_nothing_changes(
     driver.reload_home(guard, page, *login)
     panel = driver.open_note_pool(guard, page)
     driver.leave_menu(guard, page)
-    driver.set_note_pool_filters(guard, panel, pool)
+    driver.set_note_pool_filters(guard, panel, note_pool_filters(pool))
     listing = driver.read_note_pool(guard, panel)
     check_note_pool_reset(listing)
     (note,) = [

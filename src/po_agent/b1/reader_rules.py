@@ -2,7 +2,8 @@
 
 Pure functions, no browser code: the deterministic reading (task 2.2), the
 pypdf text for the second reader (task 2.5), the attachment rule, the PDF
-checks, the project match and the task rows (SPEC.md -> MySys screen rules).
+checks and the project match (SPEC.md -> MySys screen rules). The task rows
+are MySys's, shared by every client: `mysys/tasks.py` (task 9.2).
 A failed demo check raises a typed error with a fixed detail and a
 SkipReason; PDF text, addresses and cell text never go into it.
 """
@@ -18,7 +19,7 @@ import pdfplumber
 import pypdf
 
 from po_agent.b1.models import DeterministicReading
-from po_agent.core.errors import PartialWrite, WriteNotStarted
+from po_agent.core.errors import WriteNotStarted
 from po_agent.core.models import SkipReason
 
 COMPANY = "B1 Homes"
@@ -31,13 +32,6 @@ _FILE_NAME = re.compile(rf"([0-9A-Z]+)_{PO_SUFFIX}(?:_[0-9]+)?\.(?i:pdf)")
 _PDF_PO = re.compile(r"Purchase Order No\.?\s*:?\s*([0-9A-Z]+/[0-9]{3})")
 # A live-style title "[B1 Homes] Order 2609034B/048", read on either site.
 _TITLE_PO = re.compile(rf"\[B1 Homes\] Order ([0-9A-Z]+/{PO_SUFFIX})(?=\s|$)")
-# "(tsk_200001) | Compaction Test" plus the row's button texts, which
-# inner text can run on without a break.
-_TASK_HEADER = re.compile(
-    r"\((tsk_[0-9]+)\) \| Compaction Test"
-    r"(?:\s*(?:Undo Cancellation|Cancel|Un-Hold|Hold))*\s*"
-)
-CANCELLED = "Cancelled"
 
 # pypdf and pdfminer (under pdfplumber) log their warnings ("EOF marker not
 # found", "MediaBox missing from /Page"), which would reach stderr; only
@@ -164,30 +158,3 @@ def match_project(rows: Sequence[Mapping[str, str]], internal_no: str) -> str:
     if len(plns) > 1:
         raise WriteNotStarted("project ambiguous", reason="PROJECT_AMBIGUOUS")
     return plns.pop()
-
-
-def compaction_tasks(rows: Sequence[Sequence[str]]) -> dict[str, str]:
-    """Task number -> Status cell for every "(tsk_...) | Compaction Test"
-    header row. The details row right below it ends with the Status cell."""
-    tasks = {}
-    for index, cells in enumerate(rows):
-        match = _TASK_HEADER.fullmatch(cells[0].strip()) if cells else None
-        if match is None:
-            continue
-        if index + 1 >= len(rows) or len(rows[index + 1]) < 2:
-            raise PartialWrite("task row not recognised", reason="TASK_ROW")
-        tasks[match.group(1)] = rows[index + 1][-1].strip()
-    return tasks
-
-
-def live_tasks(tasks: Mapping[str, str]) -> list[str]:
-    """Compaction Test tasks that aren't Cancelled (test site, row 07)."""
-    return [task for task, status in tasks.items() if status != CANCELLED]
-
-
-def new_task(before: set[str], after: Mapping[str, str]) -> str:
-    """Step 6 read-back: exactly one Compaction Test task not seen before."""
-    new = [task for task in after if task not in before]
-    if len(new) != 1:
-        raise PartialWrite("new task not found", reason="NO_NEW_TASK")
-    return new[0]

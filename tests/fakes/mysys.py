@@ -87,6 +87,9 @@ class FakeMySys:
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
     counts: Counter = field(default_factory=Counter)  # (Note ID, call name)
+    # What the run passed in: the Note Pool filters, (Note ID, body rule).
+    filters: list = field(default_factory=list)
+    body_rules: list = field(default_factory=list)
 
     def _note(self, window: str) -> tuple[str, FakeNote]:
         note_id = window.removeprefix("window-")
@@ -141,9 +144,10 @@ class FakeMySys:
     def leave_menu(self, guard, page):
         self.calls.append("leave_menu")
 
-    def set_note_pool_filters(self, guard, panel, pool_name):
+    def set_note_pool_filters(self, guard, panel, filters):
         # The list reloads by itself after a filter change (screen-map row 27).
         self.calls.append("filters")
+        self.filters.append(filters)
 
     def read_note_pool(self, guard, panel):
         # Page 1 of `pool_pages`, as the footer "Page 1 of N" tells (screen-map
@@ -228,14 +232,15 @@ class FakeMySys:
             return None
         return driver.Pdf(file_name=note.names[0], data=PDF)
 
-    def note_body(self, window, file_name):
+    def note_body(self, window, body):
         # The Note body, one line ending with the file name (screen-map row 02).
         note_id, _ = self._note(window)
         self._call("body", note_id)
+        self.body_rules.append((note_id, body))
         return CLEAN.note.body
 
     def project_lookup(
-        self, guard, page, base_url, username, password, internal_no, site
+        self, guard, page, base_url, username, password, internal_no, rule
     ):
         # The real one reloads base_url: the Note window is gone after it
         # (screen-map rows 25, 27).
@@ -267,7 +272,7 @@ class FakeMySys:
         rows = (row(note_id, note.internal_no, assignee=note.assignee),)
         return "panel", driver.NotePoolList(rows=rows, total=1, pages=1)
 
-    def reopen_project(self, guard, page, base_url, username, password, proceed, site):
+    def reopen_project(self, guard, page, base_url, username, password, proceed, rule):
         # The project window (screen-map row 07).
         self._call("reopen", proceed.note_id)
         return "project"
@@ -276,7 +281,7 @@ class FakeMySys:
         self._step("form")  # Create New Task (screen-map row 08)
         return "form"
 
-    def fill_task_form(self, guard, form, po_number, body, file_name, data):
+    def fill_task_form(self, guard, form, po_number, body, file_name, data, *, creator):
         self._step("fill")  # Compaction Test ticked and filled (screen-map row 09)
 
     def submit_task(self, guard, form):
@@ -288,14 +293,14 @@ class FakeMySys:
         self._step("new_task")
         return self.task_no
 
-    def check_new_task_row(self, project, task_no, agent):
+    def check_new_task_row(self, project, task_no, agent, *, creator):
         self._step("task_row")  # the new task's details row (screen-map row 10)
         return "details"
 
-    def open_task_detail(self, guard, project, details):
+    def open_task_detail(self, guard, project, details, *, creator):
         self._step("open_detail")  # opened from the details row (screen-map row 19)
 
-    def check_task_detail(self, page, task_no, po_number, body, agent):
+    def check_task_detail(self, page, task_no, po_number, body, agent, *, creator):
         self._step("detail")  # the task detail screen (screen-map row 19)
         return "detail-window"
 

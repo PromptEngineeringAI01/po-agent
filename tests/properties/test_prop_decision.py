@@ -301,6 +301,7 @@ def proceeds(draw):
         "pdf_file_name": f"{x}_048{draw(st.sampled_from(['', '_1']))}.pdf",
         "pdf_bytes": b"%PDF-",
         "existing_task_nos": tuple(draw(st.lists(task_nos, max_size=3))),
+        "creator": "Perth Scheduling",
     }
 
 
@@ -326,6 +327,7 @@ def test_a_well_formed_proceed_is_accepted(fields):
             ("pdf_bytes", lambda v: b""),
             ("existing_task_nos", lambda v: (*v, "TSK_1")),
             ("note_id", lambda v: ""),
+            ("creator", lambda v: ""),
         ]
     ),
 )
