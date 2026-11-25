@@ -403,3 +403,31 @@ project_tasks = [
   { task_no = "tsk_300002", name = "Compaction Test", status = "cancelled", task_creator = "Compactions" },
 ]
 expect_skip = "DUPLICATE_TASK"
+
+[[case]]
+id = "duplicate-number-twice-live-then-cancelled"
+project_tasks = [
+  { task_no = "tsk_300002", name = "Compaction Test", status = "New Project", task_creator = "Compactions" },
+  { task_no = "tsk_300002", name = "Compaction Test", status = "Cancelled", task_creator = "Compactions" },
+]
+expect_skip = "DUPLICATE_TASK"
+
+# --- More boundaries (9.9 review) ---
+
+[[case]]
+id = "pypdf-reads-no-text"
+empty = "pypdf"
+expect_skip = "PDF_UNREADABLE"
+
+[[case]]
+id = "readers-disagree-on-the-company"
+pypdf_replace = [["Summit Homes Group\nPurchase", "Summit New Homes\nPurchase"]]
+expect_skip = "READERS_DISAGREE"
+
+[[case]]
+id = "project-one-pln-under-two-table-companies"
+search_rows = [
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" },
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit New Homes" },
+]
+expect_skip = "PROJECT_AMBIGUOUS"

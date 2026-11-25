@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from po_agent.b1.readers import PdfTexts
 from po_agent.core.config import load_client
@@ -185,3 +186,13 @@ def test_no_false_proceed() -> None:
             count += 1
     print(f"false PROCEED: {count}")
     assert count == 0
+
+
+@pytest.mark.parametrize("creator", ["", "  ", "---", " --- "])
+def test_a_proceed_naming_no_creator_is_refused(creator: str) -> None:
+    """Every value is checked again (core/models.py, Proceed): a creator
+    that names nobody can't reach W1, whatever decide() did."""
+    result, _ = run(next(c for c in CASES if c["id"] == "clean"))
+    assert isinstance(result, SummitProceed)
+    with pytest.raises(ValidationError):
+        SummitProceed(**{**result.model_dump(), "creator": creator})
