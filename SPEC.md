@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.69 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.70 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -543,7 +543,7 @@ In this order (cheap first, so a non-compaction PDF costs no project search):
 | Company known | the title company, the PDF's top-left company and (after the search) the project's Company each name a row of the creator table, directly or by an alias | `COMPANY_UNKNOWN` (new) |
 | Project | Projects search by the Client Ref No. = the PO before its first `/`; a row matches when Client Ref No. (trimmed, case-insensitive) equals it **and** its Company is one of the table's companies. Exactly one → its pln; none → `PROJECT_NOT_FOUND`; more, or a second page → `PROJECT_AMBIGUOUS`. The project window's **Client Internal No.** must equal it too, else `UNEXPECTED_SCREEN` (as B1) | as listed |
 | Company agrees | title, PDF and project Company map to the **same** table row (Joey, 23 Nov 2026) | `COMPANY_MISMATCH` (new) |
-| Duplicate | any Compaction Test task on the project not Cancelled → skip, whatever its PO (B1's live rule; `duplicate_ignores_cancelled = false`; Joey, 23 Nov 2026) | `DUPLICATE_TASK` |
+| Duplicate | any Compaction Test task on the project not Cancelled → skip, whatever its PO (Joey, 23 Nov 2026). A Cancelled one doesn't block a Summit booking (Joey, 25 Nov 2026; unlike B1 live, which counts it); its number is still recorded for W2 | `DUPLICATE_TASK` |
 | Creator | the row's creator; for a "previous task" row, the previous task's Task Creator (below) | `CREATOR_UNKNOWN` (new) |
 
 **No address check for Summit** (Joey, 23 Nov 2026; decisions, 23 Nov 2026, Client Internal No. check): `b1/address.py` and the Job Address agreement are not used. The identity link is instead: two readers agree on the PO, the PDF's PO equals the title's, exactly one project with that Client Ref No. and a Summit Company, its Client Internal No. equal again, and the company agreeing three ways.
@@ -573,7 +573,7 @@ Names are compared trimmed and case-insensitive, whole name only. A name not in 
 
 **Previous task** (Joey, 23 Nov 2026: such a project always has an earlier task that isn't a compaction task): from the settled Tasks table, the task with the **highest task number** whose name is not `Compaction Test` and whose Status is not Cancelled; its details row's **Task Creator** is the creator. No such task, or a Task Creator empty or `---` → `CREATOR_UNKNOWN`.
 
-The creator travels in the `Proceed` (ADR-003 decision 3) and replaces B1's `Perth Scheduling` in every Creator write and read-back (W1 form, W2 new-task row and task detail).
+The creator travels in the `Proceed` (ADR-003 decision 3), with the full PO, the pln, the email body, the Note's original assignee and, for a previous-task row, that task's number and Task Creator (W1's recheck) and replaces B1's `Perth Scheduling` in every Creator write and read-back (W1 form, W2 new-task row and task detail).
 
 ### The take and the booking
 

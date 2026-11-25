@@ -25,8 +25,9 @@ class NotePoolRow(BaseModel):
 
 
 class SkipReason(StrEnum):
-    """Skip reasons, exactly docs/specs/spec.md section 3 (no Claude reasons
-    since decisions, 2 Nov 2026)."""
+    """Skip reasons: docs/specs/spec.md section 3 (no Claude reasons since
+    decisions, 2 Nov 2026), and Summit's three (SPEC.md -> Client 2,
+    Decision checks; task 9.9). The trace's closed outcome set follows."""
 
     PROJECT_NOT_FOUND = "PROJECT_NOT_FOUND"
     NO_PDF = "NO_PDF"
@@ -43,6 +44,9 @@ class SkipReason(StrEnum):
     DUPLICATE_TASK = "DUPLICATE_TASK"
     UNEXPECTED_SCREEN = "UNEXPECTED_SCREEN"  # before any write
     PARTIAL_WRITE = "PARTIAL_WRITE"  # after Submit; not a final skip
+    COMPANY_UNKNOWN = "COMPANY_UNKNOWN"  # Summit: a name not in the table
+    COMPANY_MISMATCH = "COMPANY_MISMATCH"  # Summit: names on different rows
+    CREATOR_UNKNOWN = "CREATOR_UNKNOWN"  # Summit: no creator to write
 
 
 class Frozen(BaseModel):
