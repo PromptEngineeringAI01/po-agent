@@ -28,6 +28,7 @@ LARGE = 400  # changed lines (added + deleted) above which the PR is hard to rev
 
 HIGH_PREFIXES = (
     "src/po_agent/mysys/",
+    "src/po_agent/summit/",  # all decision logic (SPEC Client 2, Project Structure)
     ".claude/hooks/",
     ".github/workflows/",
 )
