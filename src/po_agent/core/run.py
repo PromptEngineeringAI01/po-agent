@@ -46,12 +46,13 @@ from collections.abc import Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 from playwright.sync_api import Locator, Page
 
 from po_agent.core import controls, output
 from po_agent.core.client import Client, EligibleNote
-from po_agent.core.config import Config
+from po_agent.core.config import ClientProfile, Config
 from po_agent.core.errors import (
     AccuracyBreach,
     GuardRefusal,
@@ -86,6 +87,28 @@ HOLD_LOST_DETAIL = {
     "not_on_hold": "booked task not on hold",
     "not_found": "booked task not found",
 }
+
+
+class Account(NamedTuple):
+    """The run's MySys account (task 9.5; SPEC.md -> The separate run): the
+    agent's user name in MySys and its secret pair. B1: Agent 1, the site's
+    pair. Summit: its client file's agent (Agent 2) and its own pair, so the
+    stale-Note stop's My Notes is Agent 2's."""
+
+    agent: str
+    username: SecretName
+    password: SecretName
+
+
+def client_name(profile: ClientProfile | None) -> str:
+    """The run's client: B1 has no client file."""
+    return "b1" if profile is None else profile.client
+
+
+def account(config: Config, profile: ClientProfile | None) -> Account:
+    username, password = mysys_names(config.site, client_name(profile))
+    agent = config.agent_user_name if profile is None else profile.agent_user_name
+    return Account(agent, username, password)
 
 
 def newest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote, ...]:
@@ -127,15 +150,17 @@ def spike(
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
     summary: output.RunSummary,
+    profile: ClientProfile | None = None,
 ) -> int:
     """Log in, filter and read the Note Pool once, print counts. Read-only.
     The client's filters are asked before the browser opens, so a client
-    that refuses stops before any login (9.4 review)."""
+    that refuses stops before any login (9.4 review). `profile`: the
+    client's file, None for B1."""
     filters = client.filters()
+    _, username, password = account(config, profile)
     guard = ActionGuard()
     with driver.open_browser(headed=options.headed, slow_mo=options.slow_mo) as page:
         driver.go_home(page, str(config.base_url))
-        username, password = mysys_names(config.site)
         driver.login(guard, page, credentials[username], credentials[password])
         output.info("logged in")
         panel = driver.open_note_pool(guard, page)
@@ -212,13 +237,24 @@ def decide_only(
     downloads: Path,
     logs: Path | None,
     trace: Trace | None = None,
+    profile: ClientProfile | None = None,
 ) -> int:
     """The decide-only run. `downloads` is the run's po-agent-dl-<run_id>
     folder (D2), removed at the end; `logs` is set only with --detailed-log.
     The error event goes to the run log here; cli.py writes its traceback.
-    `trace` gets the run log's events (7.3)."""
+    `trace` gets the run log's events (7.3). `profile`: the client's file,
+    None for B1."""
     return _note_loop(
-        config, client, credentials, options, summary, downloads, logs, None, trace
+        config,
+        client,
+        credentials,
+        options,
+        summary,
+        downloads,
+        logs,
+        None,
+        trace,
+        profile,
     )
 
 
@@ -232,6 +268,7 @@ def book_run(
     logs: Path | None,
     config_dir: Path,
     trace: Trace | None = None,
+    profile: ClientProfile | None = None,
 ) -> int:
     """The run that books (4.5): as decide-only, but a PROCEED is booked.
     `config_dir` is where `before_write` re-reads the kill switch."""
@@ -245,6 +282,7 @@ def book_run(
         logs,
         config_dir,
         trace,
+        profile,
     )
 
 
@@ -258,14 +296,23 @@ def _note_loop(
     logs: Path | None,
     config_dir: Path | None,
     trace: Trace | None,
+    profile: ClientProfile | None,
 ) -> int:
     """`config_dir` None: decide-only, nothing booked. The client's filters
-    are asked first, so a client that refuses stops before any login."""
+    are asked first, so a client that refuses stops before any login. The
+    run's account, caps, kill switch and hold re-check are its client's
+    (`profile`, None for B1; task 9.5)."""
     filters = client.filters()
     guard = ActionGuard()
     log = RunLog(summary.run_id, guard, logs, trace)
-    username, password = mysys_names(config.site)
-    login = (str(config.base_url), credentials[username], credentials[password])
+    run_as = account(config, profile)
+    name = client_name(profile)
+    agent = run_as.agent
+    login = (
+        str(config.base_url),
+        credentials[run_as.username],
+        credentials[run_as.password],
+    )
     progress = _Progress()
     started = controls.now()
     browser = _Browser(options, downloads)
@@ -276,7 +323,7 @@ def _note_loop(
             driver.login(guard, page, login[1], login[2])
             output.info("logged in")
             if trace is not None:
-                bookings = trace.recent_bookings(config.site)
+                bookings = trace.recent_bookings(config.site, name)
                 _hold_recheck(guard, page, client, login, log, bookings)
             if config.stale_read == "my_notes":
                 # Live: the agent's My Notes, between two reloads, so the
@@ -288,7 +335,7 @@ def _note_loop(
             panel = driver.open_note_pool(guard, page)
             driver.leave_menu(guard, page)
             if config.stale_read == "note_pool":
-                controls.stale_note_stop(guard, panel, config.agent_user_name)
+                controls.stale_note_stop(guard, panel, agent)
             driver.set_note_pool_filters(guard, panel, filters)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, client, summary)
@@ -300,7 +347,9 @@ def _note_loop(
                 pass  # the run goes on
             ordered = newest_first(found, len(found))
             for done, note in enumerate(ordered):
-                if controls.cap_reached(config, started, done):
+                if controls.cap_reached(
+                    config, started, done, profile=profile, booked=summary.booked
+                ):
                     output.info(
                         "run cap reached: {left} notes left for the next run",
                         left=len(ordered) - done,
@@ -318,6 +367,7 @@ def _note_loop(
                             note,
                             progress,
                             config_dir,
+                            profile,
                         )
                 except controls.NoteTaken:
                     # At the W1 check, nothing written: the Note stays with
@@ -348,7 +398,7 @@ def _note_loop(
             not submitted
             and isinstance(error, Exception)
             and _return_after_stop(
-                guard, config, client, options, login, log, progress.note_id
+                guard, agent, client, options, login, log, progress.note_id
             )
         )
         try:
@@ -461,7 +511,11 @@ def _one_note(
     note: EligibleNote,
     progress: _Progress,
     config_dir: Path | None,
+    profile: ClientProfile | None = None,
 ) -> output.Note:
+    """One Note, as the run's agent for the run's client (`profile`, None
+    for B1)."""
+    agent = account(config, profile).agent
     note_id = progress.note_id = note.note_id
     progress.taken = False
     po_number = client.po_number(note)
@@ -471,7 +525,7 @@ def _one_note(
     if not in_pool:  # a person has it: never taken
         return _untouched(client, note)
     progress.taken = True
-    driver.take_note(guard, window, config.agent_user_name, log, note_id)
+    driver.take_note(guard, window, agent, log, note_id)
     decision = _decide(guard, page, client, login, log, note, window)
     if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
@@ -487,6 +541,7 @@ def _one_note(
                 config_dir,
                 note_id=note_id,
                 log=log,
+                profile=profile,
             )
         except BaseException as error:
             if _submitted(error):
@@ -502,6 +557,7 @@ def _one_note(
                 task_id=task_no,
                 internal_no=note.internal_no,
                 site=config.site,
+                client=client_name(profile),
             )
         except OSError:
             pass  # the NOTE line still goes out
@@ -515,14 +571,12 @@ def _one_note(
     # Found again and read before it goes back: the open window can be
     # minutes old, and a person may have taken the Note meanwhile.
     window = driver.find_note_again(guard, page, *login, note_id)
-    still_ours = driver.read_assignee(window) == config.agent_user_name
+    still_ours = driver.read_assignee(window) == agent
     log.event("assignee_check", note_id=note_id, step="return", ok=still_ours)
     if not still_ours:  # a person has it now: left with them
         progress.taken = False
         return _untouched(client, note)
-    driver.return_note(
-        guard, window, config.agent_user_name, client.return_target(), log, note_id
-    )
+    driver.return_note(guard, window, agent, client.return_target(), log, note_id)
     progress.taken = False
     if isinstance(decision, Proceed):
         reason, pln = DECIDE_ONLY, decision.pln
@@ -549,12 +603,16 @@ def _book(
     *,
     note_id: str,
     log: RunLog | None = None,
+    profile: ClientProfile | None = None,
 ) -> str:
     """W1-W5 for this browser context: the assignee check holds its page.
     `note_id` is the Note the run holds: a decision for another Note is
     WriteNotStarted before W1."""
-    check = controls.assignee_check(guard, page, login, config.agent_user_name, log)
-    gate = controls.Controls(config.site, config_dir, check)
+    agent = account(config, profile).agent
+    check = controls.assignee_check(guard, page, login, agent, log)
+    gate = controls.Controls(
+        config.site, config_dir, check, client=client_name(profile)
+    )
     task_no = booker.book(
         proceed,
         note_id=note_id,
@@ -562,7 +620,7 @@ def _book(
         page=page,
         login=login,
         controls=gate,
-        agent=config.agent_user_name,
+        agent=agent,
         project_rule=client.project_rule(),
         document_type=client.document_type(),
         stop_after="W5",
@@ -612,7 +670,7 @@ def _decide(
 
 def _return_after_stop(
     guard: ActionGuard,
-    config: Config,
+    agent: str,
     client: Client,
     options: argparse.Namespace,
     login: tuple[str, str, str],
@@ -629,11 +687,11 @@ def _return_after_stop(
             headed=options.headed, slow_mo=options.slow_mo
         ) as page:
             window = driver.find_note_again(guard, page, *login, note_id)
-            if driver.read_assignee(window) == config.agent_user_name:
+            if driver.read_assignee(window) == agent:
                 driver.return_note(
                     guard,
                     window,
-                    config.agent_user_name,
+                    agent,
                     client.return_target(),
                     log,
                     note_id,

@@ -11,13 +11,14 @@ so page text, a PDF line, an address or a Note body can't be written even if
 code passed one. No traceback, no message, no typed value.
 
 A booking (run mode, after W5) is one `booked` event that also carries the
-task's pln, task number, internal number and site, each a closed type
-(decisions, 11 Nov 2026, hold re-check): the same values as the run
-output's NOTE line, never more. Every other event has none of the three
-keys. At the start of each run, `recent_bookings(site)` reads that site's
-back from the files of today and the previous working day (test and live
-share the Mac Mini's trace folder), so the run can re-check that each
-booked task is still On Hold.
+task's pln, task number, internal number, site and client, each a closed
+type (decisions, 11 Nov 2026, hold re-check; client: task 9.5): the same
+values as the run output's NOTE line, never more. Every other event has
+none of these keys. At the start of each run, `recent_bookings(site,
+client)` reads that site's and client's back from the files of today and
+the previous working day (test and live, B1 and Summit share the Mac
+Mini's trace folder; an event without a client is B1's), so the run can
+re-check that each booked task is still On Hold.
 
 The day's file is named by the date in the run window's time zone, so one
 working day is one file. At run start, files named <date>.jsonl older than
@@ -79,7 +80,10 @@ _PLN = re.compile(r"pln_[0-9]{1,12}")
 _TASK_ID = re.compile(r"tsk_[0-9]{1,12}")
 _INTERNAL_NO = re.compile(r"[0-9A-Z]{1,16}")
 # The booked event's own keys, written only when set.
-BOOKED_KEYS = frozenset({"pln", "task_id", "internal_no", "site"})
+BOOKED_KEYS = frozenset({"pln", "task_id", "internal_no", "site", "client"})
+# An event without `client` was written before 9.5, when B1 was the only
+# client (decisions, 23 Nov 2026, separate run).
+UNNAMED_CLIENT = "b1"
 
 
 def _one_of(allowed: frozenset[str]):
@@ -114,6 +118,7 @@ Pln = Annotated[str, _matches(_PLN)]
 TaskId = Annotated[str, _matches(_TASK_ID)]
 InternalNo = Annotated[str, _matches(_INTERNAL_NO)]
 Site = Literal["test", "live"]
+Client = Literal["b1", "summit"]
 
 
 class TraceEvent(BaseModel):
@@ -132,6 +137,7 @@ class TraceEvent(BaseModel):
     task_id: TaskId | None = None
     internal_no: InternalNo | None = None
     site: Site | None = None
+    client: Client | None = None
 
     @field_serializer("ts")
     def _iso(self, ts: datetime) -> str:
@@ -150,6 +156,7 @@ _FIELD_TYPES: dict[str, TypeAdapter[str | None]] = {
     "task_id": TypeAdapter(TaskId | None),
     "internal_no": TypeAdapter(InternalNo | None),
     "site": TypeAdapter(Site | None),
+    "client": TypeAdapter(Client | None),
 }
 
 
@@ -241,11 +248,21 @@ class Trace:
         )
 
     def booked(
-        self, *, note_id: str, pln: str, task_id: str, internal_no: str, site: str
+        self,
+        *,
+        note_id: str,
+        pln: str,
+        task_id: str,
+        internal_no: str,
+        site: str,
+        client: str,
     ) -> None:
-        """A booking that passed W5: its task, for the next runs' hold
-        re-check. A value outside its closed type is dropped, and a booking
-        missing one is never re-checked."""
+        """A booking that passed W5: its task and client, for the next runs'
+        hold re-check. A value outside its closed type is dropped, and a
+        booking missing one is never re-checked. A client outside its type
+        writes no event: without one it would read as B1's."""
+        if _kept("client", client) is None:
+            return
         self.event(
             note_id=note_id,
             step="W5",
@@ -255,13 +272,15 @@ class Trace:
             task_id=task_id,
             internal_no=internal_no,
             site=site,
+            client=client,
         )
 
-    def recent_bookings(self, site: str) -> tuple[Booking, ...]:
-        """`site`'s booked events in today's file and the previous working
-        day's (Monday: Friday's), newest first, each task once. No trace, a
-        missing or unreadable file, or a line that isn't a whole booked
-        event: left out, never an error."""
+    def recent_bookings(self, site: str, client: str) -> tuple[Booking, ...]:
+        """`site`'s and `client`'s booked events in today's file and the
+        previous working day's (Monday: Friday's), newest first, each task
+        once; an event without a client is B1's. No trace, a missing or
+        unreadable file, or a line that isn't a whole booked event: left
+        out, never an error."""
         if self.path is None or self.today is None:
             return ()
         previous = self.today - timedelta(days=1)
@@ -275,18 +294,20 @@ class Trace:
             except OSError:
                 continue
             for line in reversed(lines):
-                booking = _booking(line, site)
+                booking = _booking(line, site, client)
                 if booking is not None and booking.task_id not in found:
                     found[booking.task_id] = booking
         return tuple(found.values())
 
 
-def _booking(line: str, site: str) -> Booking | None:
+def _booking(line: str, site: str, client: str) -> Booking | None:
     try:
         event = TraceEvent.model_validate_json(line)
     except ValidationError:
         return None
     if event.name != "booked" or event.outcome != "pass" or event.site != site:
+        return None
+    if (event.client or UNNAMED_CLIENT) != client:
         return None
     if None in (event.note_id, event.pln, event.task_id, event.internal_no):
         return None
