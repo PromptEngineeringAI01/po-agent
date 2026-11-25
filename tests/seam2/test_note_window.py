@@ -16,6 +16,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from po_agent.b1.decision import note_pool_filters
 from po_agent.core import run, runlog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
@@ -66,7 +67,7 @@ def test_note_window_takes_a_note_and_hands_it_back(
     driver.reload_home(guard, page, *login)
     panel = driver.open_note_pool(guard, page)
     driver.leave_menu(guard, page)
-    driver.set_note_pool_filters(guard, panel, pool)
+    driver.set_note_pool_filters(guard, panel, note_pool_filters(pool))
     listing = driver.read_note_pool(guard, panel)
     # Precondition: exactly one Pending, unlinked, eligible 2609034B Note in
     # the Agent Pool. Only the Note this test uses (Joey, 2 Nov 2026:

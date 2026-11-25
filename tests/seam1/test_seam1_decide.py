@@ -16,6 +16,7 @@ from seam1_cases import CASES, POOL, Seam1Case, pdf_bytes
 
 from po_agent.b1 import decision, readers
 from po_agent.b1.decision import decide, eligible_internal_no
+from po_agent.b1.models import B1Proceed
 from po_agent.b1.readers import PdfTexts
 from po_agent.core.models import CompactionTask, MySysLookup, Proceed, Skip, SkipReason
 
@@ -114,6 +115,16 @@ def test_no_false_proceed() -> None:
             count += 1
     print(f"false PROCEED: {count}")
     assert count == 0
+
+
+def test_every_b1_proceed_is_a_b1_proceed_with_perth_scheduling() -> None:
+    # Task 9.1: B1's Creator is a B1 rule, set by its decision engine and
+    # carried in the Proceed (SPEC -> Client 2: Creator table, last line).
+    proceeds = [run(case) for case in CASES if case.expect.result == "proceed"]
+    assert proceeds
+    for result in proceeds:
+        assert isinstance(result, B1Proceed)
+        assert result.creator == "Perth Scheduling"
 
 
 def test_the_three_fake_pos_proceed() -> None:

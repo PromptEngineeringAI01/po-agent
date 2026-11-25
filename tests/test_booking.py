@@ -14,14 +14,14 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page
 
-from po_agent.b1 import reader_rules as rules
+from po_agent.b1.decision import body_rule
 from po_agent.core.errors import (
     GuardRefusal,
     PartialWrite,
     UnexpectedScreen,
     WriteNotStarted,
 )
-from po_agent.mysys import booking, driver, wait
+from po_agent.mysys import booking, driver, tasks, wait
 from po_agent.mysys.guard import ActionGuard
 
 AGENT = "Agent 1 (MySys Only)"
@@ -31,6 +31,7 @@ FILE = "2600001B_048_1.pdf"
 BODY = f"Please find attached Purchase Order / Quotation file {FILE}"
 CLOSE = '<div><span title="Close">close</span></div>'
 PDF = b"%PDF-1.4 fake"
+CREATOR = "Perth Scheduling"  # B1's Creator, from its Proceed
 
 
 # `browser` is tests/conftest.py's: one headless Chromium per module.
@@ -167,7 +168,9 @@ def test_download_links_are_read_from_the_note_window(page):
 
 def test_note_body_is_the_body_line_not_a_title_with_the_same_text(page):
     page.set_content(note_page(title=BODY))
-    assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
+    assert (
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE)) == BODY
+    )
 
 
 # Live G.6 (10 Nov 2026, Joey's DevTools look): an email Note's body is
@@ -198,12 +201,14 @@ def quick(monkeypatch):
 def test_note_body_from_the_email_iframe(page):
     page.set_content(note_page(body=email_iframe(LIVE_BODY)))
     window = booking.note_window(page, NOTE_ID)
-    assert booking.note_body(window, FILE) == f"{LIVE_LINE}\n{FILE}"
+    assert booking.note_body(window, body_rule(FILE)) == f"{LIVE_LINE}\n{FILE}"
 
 
 def test_note_body_from_an_email_iframe_without_font(page):
     page.set_content(note_page(body=email_iframe(f"<p>{BODY}</p>")))
-    assert booking.note_body(booking.note_window(page, NOTE_ID), FILE) == BODY
+    assert (
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE)) == BODY
+    )
 
 
 def test_note_body_waits_for_an_email_iframe_that_loads_late(page):
@@ -214,34 +219,34 @@ def test_note_body_waits_for_an_email_iframe_that_loads_late(page):
         + f" {LIVE_BODY!r}; }}, 500);</script>"
     )
     window = booking.note_window(page, NOTE_ID)
-    assert booking.note_body(window, FILE) == f"{LIVE_LINE}\n{FILE}"
+    assert booking.note_body(window, body_rule(FILE)) == f"{LIVE_LINE}\n{FILE}"
 
 
 def test_no_pre_and_no_iframe_is_no_body(page, quick):
     page.set_content(note_page(body="<p>nothing here</p>"))
     with pytest.raises(UnexpectedScreen) as caught:
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
     assert FILE not in str(caught.value)
 
 
 def test_a_pre_and_an_iframe_both_matching_is_no_body(page, quick):
     page.set_content(note_page(body=f"<pre>{BODY}</pre>" + email_iframe(LIVE_BODY)))
     with pytest.raises(UnexpectedScreen):
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
 
 
 def test_an_iframe_not_ending_with_the_file_name_is_no_body(page, quick):
     html = f"<p>{LIVE_LINE}</p><p>{FILE}</p><p>Regards, fake sender</p>"
     page.set_content(note_page(body=email_iframe(html)))
     with pytest.raises(UnexpectedScreen) as caught:
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
     assert "fake sender" not in str(caught.value)
 
 
 def test_two_iframes_both_matching_is_no_body(page, quick):
     page.set_content(note_page(body=email_iframe(LIVE_BODY) * 2))
     with pytest.raises(UnexpectedScreen):
-        booking.note_body(booking.note_window(page, NOTE_ID), FILE)
+        booking.note_body(booking.note_window(page, NOTE_ID), body_rule(FILE))
 
 
 def test_mark_solved_unticks_email_and_reads_back(page, guard):
@@ -288,7 +293,9 @@ function addDoc(input, rows) {{
 def test_task_form_is_filled_and_read_back(page, guard):
     page.set_content(task_form_page())
     form = booking.task_form(page)
-    booking.fill_task_form(guard, form, "2600001B/048", BODY, FILE, PDF)
+    booking.fill_task_form(
+        guard, form, "2600001B/048", BODY, FILE, PDF, creator=CREATOR
+    )
     assert page.locator("body").get_attribute("data-submitted") is None
     assert "upload_document" in actions(guard)
     # The PDF goes to Documents (the task's Client Documents), not PO
@@ -305,7 +312,7 @@ def test_a_two_line_iframe_body_fills_and_reads_back_the_same(page, guard):
     page.set_content(task_form_page())
     form = booking.task_form(page)
     booking.fill_task_form(
-        guard, form, "2600001B/048", f"{LIVE_LINE}\n{FILE}", FILE, PDF
+        guard, form, "2600001B/048", f"{LIVE_LINE}\n{FILE}", FILE, PDF, creator=CREATOR
     )
     assert "set_task_note" in actions(guard)
 
@@ -314,7 +321,13 @@ def test_task_form_with_another_box_ticked_does_not_submit(page, guard):
     page.set_content(task_form_page(multiple="checked"))
     with pytest.raises(WriteNotStarted):
         booking.fill_task_form(
-            guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+            guard,
+            booking.task_form(page),
+            "2600001B/048",
+            BODY,
+            FILE,
+            PDF,
+            creator=CREATOR,
         )
     assert "submit_task" not in actions(guard)
 
@@ -1079,7 +1092,7 @@ def test_wait_new_task_reads_past_a_half_added_row(
         submit_page(details_after_ms=details_after_ms, status_after_ms=status_after_ms)
     )
     project = booking.project_window(page, "pln_10001")
-    before = set(rules.compaction_tasks(booking.task_rows(project)))
+    before = set(tasks.compaction_tasks(booking.task_rows(project)))
     assert len(before) == 7
     form = booking.task_form(page)
     booking.submit_task(guard, form)
@@ -1164,7 +1177,13 @@ def test_task_form_without_a_po_documents_block_does_not_submit(page, guard):
     page.set_content(html.replace(po_documents, ""))
     with pytest.raises(WriteNotStarted):
         booking.fill_task_form(
-            guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+            guard,
+            booking.task_form(page),
+            "2600001B/048",
+            BODY,
+            FILE,
+            PDF,
+            creator=CREATOR,
         )
     assert "submit_task" not in actions(guard)
 
@@ -1177,7 +1196,7 @@ def test_task_form_po_documents_with_only_a_header_row_reads_as_empty(page, guar
     assert empty in html
     page.set_content(html.replace(empty, header))
     booking.fill_task_form(
-        guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF
+        guard, booking.task_form(page), "2600001B/048", BODY, FILE, PDF, creator=CREATOR
     )
     assert "upload_document" in actions(guard)
 

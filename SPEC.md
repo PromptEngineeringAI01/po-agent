@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.63 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.65 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -108,7 +108,7 @@ Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses the main ch
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
 Supervised demo:     uv run po-agent demo --site test --headed [--until-check]   one PO, Enter before every write (decisions, 27 Oct 2026)
-Secrets pre-flight:  uv run po-agent preflight --site test|live   secret names and ok / not set / malformed / store unavailable, never values; no login, no network; exit 2 if any is not ok (decisions, 20 Nov 2026, secrets pre-flight)
+Secrets pre-flight:  uv run po-agent preflight --site test|live [--client b1|summit]   secret names and ok / not set / malformed / store unavailable, never values; no login, no network; exit 2 if any is not ok (decisions, 20 Nov 2026, secrets pre-flight)
 Link probe:          uv run po-agent demo --site test --probe-link   opens Choose Project, searches, snapshots, selects nothing (decisions, 28 Oct 2026)
 Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
 Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only test|live   site required; fetch, enabled from config/<site>.toml on main, production tag, sync, run, log, alert
@@ -132,8 +132,8 @@ pyproject.toml, uv.lock         [project.scripts] po-agent = "po_agent.cli:main"
 src/po_agent/
   cli.py                        argument parsing; maps errors to exit codes
   core/                         reusable for the next MySys automations
-    config.py                   load + validate config/<site>.toml (test, live); each refuses any host but its own (TEST_HOST, LIVE_HOST)
-    secrets.py                  PO_AGENT_* env var, else keyring; one MySys pair per site; `inspect` = status only, for the pre-flight
+    config.py                   load + validate config/<site>.toml (test, live); each refuses any host but its own (TEST_HOST, LIVE_HOST); and config/clients/<client>.toml (summit only, task 9.3)
+    secrets.py                  PO_AGENT_* env var, else keyring; one MySys pair per site and client (Summit: live only); `inspect` = status only, for the pre-flight
     output.py                   the ONLY module that prints (stdout contract below)
     runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log), its one traceback writer; feeds the trace
     trace.py                    the safe trace (7.3): allowlisted fields only, one file per day, 90 days
@@ -141,21 +141,23 @@ src/po_agent/
     demo.py                     supervised demo: one trial PO, Enter before every write (decisions, 27 Oct 2026)
     controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
     errors.py                   typed errors, their exit codes and ALERT kinds
-    models.py                   shared models (pydantic): Note Pool row, Note window, project lookup, SkipReason, Skip, Proceed (ADR-003 decision 2)
-  mysys/                        reusable
+    models.py                   shared models (pydantic): Note Pool row, Note window, project lookup, SkipReason, Skip, Proceed (ADR-003 decision 2); NotePoolFilters and ProjectRule, the client values `mysys/` takes (decision 3)
+  mysys/                        reusable and client-free: no client import or constant (ADR-003 decision 3; tests/test_mysys_client_free.py)
     guard.py                    action guard: vet() resolves and allows or refuses; act() is the ONLY code that clicks, types, ticks or uploads
     driver.py                   login, navigation, reads; writes only through guard.py
     booking.py                  the demo's screens, Note to Solved, proven on the test site 28 Oct 2026; the base for the booker (4.1-4.5)
+    booker.py                   W1-W5 with read-back, shared by every client: the project rule from the caller, the Creator and the Documents file name from the Proceed (moved from b1/, task 9.2)
+    tasks.py                    the project's Tasks table: Compaction Test rows, live tasks, the new task (moved from b1/reader_rules.py, task 9.2)
     wait.py                     every MySys wait and timeout: poll until true, read until settled, the one retry of an opening click (refuses any other action)
   b1/                           rules for this automation
     models.py                   B1's models (pydantic): Reading, B1Proceed (the /048 PO and file name)
     reader_rules.py             the code readers (pdfplumber and pypdf + patterns)
     readers.py                  both readers' texts as one value; the two-readers rule (agreement, address check on both)
     address.py                  normaliser + address check against the project's address
-    decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given)
-    booker.py                   W1–W5 with read-back
+    decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given); B1's values for `mysys/`: Note Pool filters (the pool, Locked), the body rule (ends with the file name), B1ProjectRule
 config/test.toml                test-site profile; no secrets
 config/live.toml                live profile; no secrets; ask-first for Claude (protect_paths)
+config/clients/summit.toml      Summit's client values and creator table (Client 2 -> The separate run); no secrets
 scripts/check.py                the one check command
 scripts/guard_check.py          fails if browser action calls appear outside mysys/guard.py
 scripts/macmini-run.sh          Mac Mini wrapper `<mode> <test|live>`: fetch, enabled from config/<site>.toml on origin/main, check out the production tag, uv sync, run, append to runs.log, alert issue without Note IDs
@@ -198,7 +200,7 @@ trace_dir = "~/Library/Logs/po-agent/trace"   # the safe trace (7.3): written on
 Python 3.12, ruff format and ruff check (pyproject `[tool.ruff.lint]`: a catch-all `except` keeps `# noqa: BLE001 - <reason>`, an unused `noqa` fails, `po_agent` is always first-party; decisions, 24 Nov 2026), type hints throughout, checked by mypy with the pydantic plugin on `src` and `scripts` (strict flags for every module listed in the pyproject override; add each new module there; no `# type: ignore` without an error code and a reason), pydantic models at every boundary, small pure functions in `b1/`. Every MySys write is a **named guarded action** on one element inside its window (see [MySys screen rules](#mysys-screen-rules) → Windows and locators), found by accessible role and name, or by its visible label where the screen map marks the field weak, then read back:
 
 ```python
-# src/po_agent/b1/booker.py
+# src/po_agent/mysys/booker.py
 def set_po_number(guard: ActionGuard, task_form: Locator, po_number: str) -> None:
     field = field_by_label(task_form, "PO Number", role="textbox")   # weak: no accessible name (screen map row 09)
     guard.act("set_po_number", task_form, field, po_number)   # vet() first: refuses if not allowlisted, denylisted, or not exactly one match

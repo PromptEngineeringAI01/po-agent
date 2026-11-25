@@ -61,14 +61,16 @@ faked, as in tests/test_assignee_offline.py. The `Proceed` comes from
 
 import importlib.util
 import json
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from playwright.sync_api import Browser, ConsoleMessage, Page
 
-from po_agent.b1 import booker, readers
-from po_agent.b1.decision import decide
+from po_agent.b1 import readers
+from po_agent.b1.decision import B1ProjectRule, decide
+from po_agent.b1.models import B1Proceed
 from po_agent.core import controls
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import (
@@ -79,7 +81,7 @@ from po_agent.core.errors import (
 )
 from po_agent.core.models import CompactionTask, NotePoolRow, Proceed
 from po_agent.core.runlog import RunLog
-from po_agent.mysys import booking, driver
+from po_agent.mysys import booker, booking, driver
 from po_agent.mysys.guard import ActionGuard, Refusal
 
 # Local fakes: every MySys wait short (tests/fakes/browser.py).
@@ -186,6 +188,7 @@ def fake_mysys(
     *,
     tasks: list[tuple[str, str]],
     search_pln: str = PLN,
+    search_pages: int = 1,
     internal_no: str = INTERNAL_NO,
     multiple: str = "",
     mangle: str | None = None,
@@ -270,7 +273,7 @@ def fake_mysys(
 <div id="form" hidden><div>
   <h3>Create New Task</h3>
   <div><div>Multiple Units</div><input type="checkbox" aria-label="multiple" {multiple}></div>
-  <div><div>Creator</div><select id="creator"><option>Choose...</option><option selected>&lt;project creator&gt;</option><option>Perth Scheduling</option></select></div>
+  <div><div>Creator</div><select id="creator"><option>Choose...</option><option selected>&lt;project creator&gt;</option><option>Perth Scheduling</option><option>Compactions</option></select></div>
   <div><input type="checkbox" aria-label="- 1.Single Storey Engineering Bundle"> - 1.Single Storey Engineering Bundle</div>
   <div><input type="checkbox" aria-label="- Compaction Test"
     onchange="document.getElementById('sub_form').hidden = !this.checked"> - Compaction Test</div>
@@ -309,7 +312,8 @@ function search(text) {{
     document.getElementById('rows').innerHTML =
       '<tr><td><a href="#" onclick="document.getElementById(\\'project\\').hidden = false; return false">{search_pln}</a></td>'
       + '<td>{INTERNAL_NO}</td><td>Active</td><td>B1 Homes</td></tr>';
-    document.getElementById('footer').textContent = 'Page 1 of 1(1 Items)';
+    document.getElementById('footer').textContent =
+      'Page 1 of {search_pages}({search_pages} Items)';
   }}, 200);
 }}
 function addDoc(input, area) {{
@@ -530,7 +534,7 @@ def run_book(
         login=login,
         controls=gate,
         agent=AGENT,
-        site="test",
+        project_rule=B1ProjectRule("test"),
         document_type=document_type,
         stop_after=stop_after,
         log=log,
@@ -592,10 +596,12 @@ def test_w1_checks_the_note_reopens_the_project_and_fills_the_form_without_submi
         {"tasks": [CANCELLED, ("tsk_200002", "New Project")]},
         # The search now matches another project.
         {"tasks": [CANCELLED], "search_pln": "pln_10009"},
+        # The search now has a second results page (task 9.2 mutants).
+        {"tasks": [CANCELLED], "search_pages": 2},
         # The reopened project's Client Internal No. fails the match rule.
         {"tasks": [CANCELLED], "internal_no": "2600009B"},
     ],
-    ids=["new-task", "other-pln", "other-internal-no"],
+    ids=["new-task", "other-pln", "two-result-pages", "other-internal-no"],
 )
 def test_a_reopened_project_not_as_decided_is_write_not_started(
     serve, guard, search, fake
@@ -679,6 +685,69 @@ def test_w2_submits_once_finds_the_new_task_and_reads_it_back(serve, guard, sear
     assert page.locator("body").get_attribute("data-opened") == NEW_TASK
     # Back on the project's task table, ready for W3.
     assert booking.project_window(page, PLN).locator("#tasks").is_visible()
+
+
+# Task 9.1: the Creator comes from the Proceed (ADR-003 decision 3), so a
+# Proceed with another creator is set and read back with that creator.
+OTHER_CREATOR = "Compactions"  # one of Summit's creators (SPEC -> Creator table)
+
+
+def proceed_with_creator(creator: str) -> B1Proceed:
+    return B1Proceed(**{**proceed_for_p1().model_dump(), "creator": creator})
+
+
+def test_the_proceeds_creator_is_set_at_w1_and_read_back_at_w1_and_w2(
+    serve, guard, search
+):
+    served = serve(
+        tasks=[CANCELLED],
+        row_creator=OTHER_CREATOR,
+        detail={"task_creator": OTHER_CREATOR},
+    )
+    page = served[0]
+
+    task_no = run_book(
+        served, guard, proceed_with_creator(OTHER_CREATOR), stop_after="W2"
+    )
+
+    assert task_no == NEW_TASK
+    assert actions(guard) == REOPEN + FILL + W2
+    # W1: set and read back before Submit.
+    assert page.locator("#creator").input_value() == OTHER_CREATOR
+    # W2: the details row's Task Creator cell opened the detail screen.
+    assert page.locator("body").get_attribute("data-opened") == NEW_TASK
+
+
+@pytest.mark.parametrize(
+    ("fake", "opened"),
+    [
+        # The row reads B1's creator: stopped there, no detail screen.
+        ({"detail": {"task_creator": OTHER_CREATOR}}, None),
+        # The detail screen reads B1's creator.
+        ({"row_creator": OTHER_CREATOR}, NEW_TASK),
+    ],
+    ids=["row", "detail"],
+)
+def test_b1s_creator_on_the_page_is_an_accuracy_breach_for_another_creator(
+    serve, guard, search, fake, opened
+):
+    served = serve(tasks=[CANCELLED], **fake)
+
+    with pytest.raises(AccuracyBreach) as caught:
+        run_book(served, guard, proceed_with_creator(OTHER_CREATOR), stop_after="W2")
+
+    assert (caught.value.step, caught.value.field) == ("W2", "task_creator")
+    assert actions(guard).count("submit_task") == 1
+    assert served[0].locator("body").get_attribute("data-opened") == opened
+
+
+def test_mysys_holds_no_creator() -> None:
+    # ADR-003 decision 3: no client value is a constant in mysys/.
+    mysys = Path(booking.__file__).parent
+    for path in mysys.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "Perth Scheduling" not in text, path.name
+        assert not re.search(r"^CREATOR", text, re.MULTILINE), path.name
 
 
 @pytest.mark.parametrize(

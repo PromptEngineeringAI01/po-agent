@@ -120,4 +120,4 @@ Use at the matching workflow step:
 - [ ] **A new or changed skill:** write two or three scenarios it must handle and run them before relying on it (section 7).
 - [ ] **A new screen or flow:** update `docs/screen-map.md` in the same task.
 - [ ] **Before automating more** (wider auto-merge, a new unattended job): is the inner loop clean, with nothing we still catch only by reading diffs? (section 9)
-- [ ] **Once per phase:** list the review findings that came back more than once and turn each into a check.
+- [ ] **At each checkpoint in `tasks/todo.md`:** decide every "Proposed" row in `tasks/friction-log.md` (a task, a patch for Joey, or "No" with a reason), and list the review findings that came back more than once and turn each into a check.

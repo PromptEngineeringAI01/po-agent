@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from po_agent.b1.decision import check_project
+from po_agent.b1.decision import B1ProjectRule, check_project, note_pool_filters
 from po_agent.core import run
 from po_agent.mysys import driver
 
@@ -94,7 +94,7 @@ def test_reads_downloads_the_pdf_of_one_note(config, login, guard, tmp_path):
         driver.reload_home(guard, page, *login)
         panel = driver.open_note_pool(guard, page)
         driver.leave_menu(guard, page)
-        driver.set_note_pool_filters(guard, panel, config.pool_name)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
         listing = driver.read_note_pool(guard, panel)
         # Precondition: the one eligible 2609034B Note in the Agent Pool.
         found = [
@@ -125,7 +125,9 @@ def test_reads_downloads_the_pdf_of_one_note(config, login, guard, tmp_path):
 @pytest.mark.parametrize("internal_no", list(TRIAL_PLNS))
 def test_reads_each_trial_project(config, login, guard, internal_no):
     with driver.open_browser(headed=False, slow_mo=0) as page:
-        lookup = driver.project_lookup(guard, page, *login, internal_no, config.site)
+        lookup = driver.project_lookup(
+            guard, page, *login, internal_no, B1ProjectRule(config.site)
+        )
 
     assert check_project(lookup, internal_no, config.site) == TRIAL_PLNS[internal_no]
     assert lookup.more_pages is False

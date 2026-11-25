@@ -21,11 +21,11 @@ from collections.abc import Iterator
 
 import pytest
 
-from po_agent.b1 import booker
+from po_agent.b1.decision import B1ProjectRule, note_pool_filters
 from po_agent.core import controls, run, runlog
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.models import Proceed
-from po_agent.mysys import booking, driver
+from po_agent.mysys import booker, booking, driver
 from po_agent.mysys.guard import ActionGuard, Refusal, Refused
 
 pytestmark = pytest.mark.testsite
@@ -84,7 +84,7 @@ def test_booker_w2_submits_reads_the_new_task_back_and_the_hold_checkbox_is_refu
         driver.reload_home(guard, page, *login)
         panel = driver.open_note_pool(guard, page)
         driver.leave_menu(guard, page)
-        driver.set_note_pool_filters(guard, panel, pool)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(pool))
         listing = driver.read_note_pool(guard, panel)
         found = [
             n
@@ -114,7 +114,7 @@ def test_booker_w2_submits_reads_the_new_task_back_and_the_hold_checkbox_is_refu
             login=login,
             controls=gate,
             agent=agent,
-            site=config.site,
+            project_rule=B1ProjectRule(config.site),
             document_type=config.project_document_type,
             stop_after="W2",
         )

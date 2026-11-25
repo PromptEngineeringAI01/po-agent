@@ -20,11 +20,11 @@ from collections.abc import Iterator
 
 import pytest
 
-from po_agent.b1 import booker
+from po_agent.b1.decision import B1ProjectRule, note_pool_filters
 from po_agent.core import controls, run, runlog
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.models import Proceed
-from po_agent.mysys import driver
+from po_agent.mysys import booker, driver
 from po_agent.mysys.guard import ActionGuard
 
 pytestmark = pytest.mark.testsite
@@ -86,7 +86,7 @@ def test_booker_w3_holds_the_new_task_once_and_reads_it_back(
         driver.reload_home(guard, page, *login)
         panel = driver.open_note_pool(guard, page)
         driver.leave_menu(guard, page)
-        driver.set_note_pool_filters(guard, panel, pool)
+        driver.set_note_pool_filters(guard, panel, note_pool_filters(pool))
         listing = driver.read_note_pool(guard, panel)
         found = [
             n
@@ -116,7 +116,7 @@ def test_booker_w3_holds_the_new_task_once_and_reads_it_back(
             login=login,
             controls=gate,
             agent=agent,
-            site=config.site,
+            project_rule=B1ProjectRule(config.site),
             document_type=config.project_document_type,
             stop_after="W3",
         )

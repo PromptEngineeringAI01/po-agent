@@ -3,8 +3,9 @@ client (ADR-003 decisions 2-3; SPEC.md -> Code style: pydantic at every
 boundary). A client's own rules (B1's /048 PO, its readings) stay in its
 package (`b1/models.py`)."""
 
+from collections.abc import Sequence
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
@@ -90,7 +91,11 @@ class Proceed(Frozen):
     """Step 11: the only input the booker takes. Every value is checked here
     again, so a malformed decision can't reach a write. MySys's own formats
     are checked here; a client's PO and file-name rules in its subclass
-    (`b1.models.B1Proceed`), and only a client's decision engine builds one."""
+    (`b1.models.B1Proceed`), and only a client's decision engine builds one.
+
+    `creator` is the Create New Task form's Creator, set at W1 and read back
+    at W1 and W2 (ADR-003 decision 3; a client rule, never a constant in
+    `mysys/`)."""
 
     note_id: str = Field(min_length=1)
     internal_no: str = Field(min_length=1)
@@ -101,6 +106,16 @@ class Proceed(Frozen):
     pdf_bytes: bytes = Field(min_length=1, repr=False)
     # The project's Compaction Test task numbers at step 10, for W2.
     existing_task_nos: tuple[Annotated[str, Field(pattern=r"^tsk_[0-9]+$")], ...]
+    creator: str = Field(min_length=1)
+
+
+class NotePoolFilters(Frozen):
+    """The Note Pool filters a client's run sets, each read back; every
+    other filter stays at its default (screen-map rows 01, 27). A client
+    value (ADR-003 decision 3): `mysys/` holds none."""
+
+    pool: str = Field(min_length=1)  # Assigned Pool
+    locked: Literal["Locked", "Unlocked"]  # Locked/Unlocked
 
 
 class Skip(Frozen):
@@ -110,3 +125,19 @@ class Skip(Frozen):
     def retryable(self) -> bool:
         """Section 3: only PROJECT_NOT_FOUND is retried (final in the MVP)."""
         return self.reason is SkipReason.PROJECT_NOT_FOUND
+
+
+class ProjectRule(Protocol):
+    """A client's project match rule (ADR-003 decision 3): `mysys/` reads
+    the Projects search and the project, the client judges them."""
+
+    def match(
+        self, rows: Sequence[SearchRow], more_pages: bool, internal_no: str
+    ) -> Skip | str:
+        """Step 8: the pln to open from page 1's search rows, else a Skip
+        (nothing is opened)."""
+        ...
+
+    def judge(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
+        """The opened project still passes: its pln, else a Skip."""
+        ...

@@ -1,9 +1,9 @@
 """Differential tests for the multi-client refactor (tasks/plan.md Phase S):
 the current B1 decision code against tests/oracle, frozen at main be84448.
 
-A refactor that keeps B1's behaviour keeps both equal. When 9.1 adds the
-Creator to the Proceed, its `test:` commit compares the shared fields and
-`creator == "Perth Scheduling"` here.
+A refactor that keeps B1's behaviour keeps both equal. Since 9.1 the
+Proceed also carries the Creator, which the frozen code doesn't have: the
+other fields are compared and the Creator must be B1's, "Perth Scheduling".
 """
 
 import b1_worlds
@@ -31,6 +31,10 @@ def test_decide_matches_the_frozen_b1_code(world, names, data):
             world = MUTATIONS[name].apply(world, data.draw(fresh_values(world)))
     new = b1_worlds.outcome(world, models, readers, decision)
     old = b1_worlds.outcome(world, old_models, old_readers, old_decision)
+    if new.kind == "proceed":
+        value = dict(new.value)
+        assert value.pop("creator") == "Perth Scheduling"
+        new = new._replace(value=value)
     assert new == old
 
 
