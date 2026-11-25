@@ -26,8 +26,8 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import B1ProjectRule, note_pool_filters
-from po_agent.core import run
 from po_agent.mysys import driver
 from po_agent.mysys import tasks as task_table
 from po_agent.mysys.guard import ActionGuard
@@ -83,7 +83,7 @@ def pool_rows(listing: driver.NotePoolList) -> set[tuple[str, str, str]]:
 
 
 def trial_notes(config, listing: driver.NotePoolList) -> dict[str, list[str]]:
-    found = run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
+    found = b1_client.eligible_notes(listing.rows, config.title_rule, config.pool_name)
     return {
         number: [n.note_id for n in found if n.internal_no == number]
         for number in TRIAL_PLNS
@@ -143,7 +143,9 @@ def test_a_fresh_copy_of_a_booked_po_is_skipped_and_a_non_048_note_is_untouched(
     copies = trial_notes(config, listing)[COPY]
     eligible = {
         n.note_id
-        for n in run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
+        for n in b1_client.eligible_notes(
+            listing.rows, config.title_rule, config.pool_name
+        )
     }
     others = {
         r

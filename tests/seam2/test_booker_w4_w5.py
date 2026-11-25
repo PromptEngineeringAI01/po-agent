@@ -21,6 +21,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import B1ProjectRule, note_pool_filters
 from po_agent.core import controls, run, runlog
 from po_agent.core.config import CONFIG_DIR
@@ -90,7 +91,7 @@ def test_booker_w4_w5_links_the_pln_marks_solved_and_reads_back(
         listing = driver.read_note_pool(guard, panel)
         found = [
             n
-            for n in run.eligible_notes(listing.rows, config.title_rule, pool)
+            for n in b1_client.eligible_notes(listing.rows, config.title_rule, pool)
             if n.internal_no == TRIAL_INTERNAL_NO
         ]
         if listing.pages != 1 or len(found) != 1:
@@ -102,7 +103,9 @@ def test_booker_w4_w5_links_the_pln_marks_solved_and_reads_back(
         taken.append(note.note_id)
         driver.take_note(guard, window, agent, log, note.note_id)
         with driver.note_downloads(page, tmp_path):
-            proceed = run._decide(guard, page, config, login, log, note, window)
+            proceed = run._decide(
+                guard, page, b1_client.B1Client(config), login, log, note, window
+            )
         assert isinstance(proceed, Proceed)
         assert proceed.pln == TRIAL_PLN
 

@@ -12,6 +12,7 @@ import pytest
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
+from po_agent.b1 import client as b1_client
 from po_agent.core import run
 from po_agent.core.errors import LoginFailed
 from po_agent.core.models import NotePoolRow
@@ -117,7 +118,7 @@ def summary_of(lines: list[str]) -> dict:
 
 
 def test_eligible_notes_keeps_the_order_and_the_internal_number():
-    found = run.eligible_notes(ROWS, "test-body-filename", POOL)
+    found = b1_client.eligible_notes(ROWS, "test-body-filename", POOL)
 
     assert found == (
         run.EligibleNote(note_id="300001", internal_no="2600001B"),

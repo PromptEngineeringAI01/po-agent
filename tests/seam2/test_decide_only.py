@@ -15,8 +15,9 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import B1ProjectRule, note_pool_filters
-from po_agent.core import run, runlog
+from po_agent.core import runlog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -48,7 +49,9 @@ def read_site(config, login, check) -> tuple[dict[str, str], dict]:
         driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
         listing = driver.read_note_pool(guard, panel)
         check(listing)
-        found = run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
+        found = b1_client.eligible_notes(
+            listing.rows, config.title_rule, config.pool_name
+        )
         notes = {
             n.internal_no: n.note_id
             for n in found

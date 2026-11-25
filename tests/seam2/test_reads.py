@@ -24,8 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import B1ProjectRule, check_project, note_pool_filters
-from po_agent.core import run
 from po_agent.mysys import driver
 
 pytestmark = pytest.mark.testsite
@@ -99,7 +99,7 @@ def test_reads_downloads_the_pdf_of_one_note(config, login, guard, tmp_path):
         # Precondition: the one eligible 2609034B Note in the Agent Pool.
         found = [
             note
-            for note in run.eligible_notes(
+            for note in b1_client.eligible_notes(
                 listing.rows, config.title_rule, config.pool_name
             )
             if note.internal_no == DOWNLOAD_NOTE

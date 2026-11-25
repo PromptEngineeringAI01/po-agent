@@ -26,8 +26,8 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import note_pool_filters
-from po_agent.core import run
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard, Refusal, Refused
 
@@ -117,7 +117,7 @@ def test_vet_refuses_discard_in_an_open_trial_note_window_and_nothing_changes(
     check_note_pool_reset(listing)
     (note,) = [
         n
-        for n in run.eligible_notes(listing.rows, config.title_rule, pool)
+        for n in b1_client.eligible_notes(listing.rows, config.title_rule, pool)
         if n.internal_no == DISCARD_NOTE
     ]
     window = driver.open_note(guard, page, panel, note.note_id)
@@ -147,7 +147,9 @@ def test_full_run_unticks_send_email_after_the_latest_check_before_note_window_w
     check_note_pool_reset(before)  # one Note per trial PO
     trial = {
         n.note_id
-        for n in run.eligible_notes(before.rows, config.title_rule, config.pool_name)
+        for n in b1_client.eligible_notes(
+            before.rows, config.title_rule, config.pool_name
+        )
         if n.internal_no in TRIAL_INTERNAL_NOS
     }
     others = {

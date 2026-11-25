@@ -10,8 +10,8 @@ import json
 import pytest
 
 from po_agent import cli
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import note_pool_filters
-from po_agent.core import run
 from po_agent.mysys import driver
 
 pytestmark = pytest.mark.testsite
@@ -43,7 +43,7 @@ def test_spike_reads_the_note_pool_and_finds_the_three_trial_notes(
     listing = driver.read_note_pool(guard, panel)
 
     check_note_pool_reset(listing)
-    found = run.eligible_notes(listing.rows, config.title_rule, config.pool_name)
+    found = b1_client.eligible_notes(listing.rows, config.title_rule, config.pool_name)
     assert sorted(note.internal_no for note in found) == sorted(
         ["2609017B", "2609034B", "2610002B"]
     )

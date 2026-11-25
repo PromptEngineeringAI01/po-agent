@@ -15,8 +15,9 @@ from collections.abc import Iterator
 
 import pytest
 
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import note_pool_filters
-from po_agent.core import controls, run, runlog
+from po_agent.core import controls, runlog
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys import driver
@@ -88,7 +89,7 @@ def test_the_assignee_check_reads_the_agent_for_a_taken_trial_note(
     listing = driver.read_note_pool(guard, panel)
     found = [
         n
-        for n in run.eligible_notes(listing.rows, config.title_rule, pool)
+        for n in b1_client.eligible_notes(listing.rows, config.title_rule, pool)
         if n.internal_no == TRIAL_INTERNAL_NO
     ]
     if listing.pages != 1 or len(found) != 1:
