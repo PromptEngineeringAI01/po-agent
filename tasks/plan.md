@@ -742,7 +742,7 @@ Unattended runs need what a watched demo didn't: someone told when the job stops
 
 ## Phase S: Summit Home (client 2)
 
-**Planned 24 Nov 2026** from `SPEC.md` v1.59 -> Client 2: Summit Home (`summit`), phase 1; `docs/decisions.md` 23 Nov 2026 (Summit entries); `docs/specs/ADR-003-more-clients.md` (Accepted, option C); the gap map and Joey's process in `private/summit/process-2026-11-23/` (laptop only). With Joey's two corrections of 24 Nov 2026 (going into SPEC in parallel): "Summit Home Improvement" is now **"Summit Renovations"**, and "Summit Project" has one alias only, **"Summit Developments"** (SPEC open question S2 closed).
+**Planned 24 Nov 2026** from `SPEC.md` v1.59 -> Client 2: Summit Home (`summit`), phase 1; `docs/decisions.md` 23 Nov 2026 (Summit entries); `docs/specs/ADR-003-more-clients.md` (Accepted, option C); the gap map and Joey's process in `private/summit/process-2026-11-23/` (laptop only). With Joey's two corrections of 24 Nov 2026 (going into SPEC in parallel): "Summit Home Improvement" is now **"Summit Renovations"**, and "Summit Project" has one alias only, **"Summit Developments"** (SPEC open question S2 closed; widened 25 Nov 2026: also "Summit Projects", MySys's spelling, and Summit SouthWest gains "Summit South West", decisions, 25 Nov 2026, MySys company spellings).
 
 **Goal:** Summit's compaction POs booked on live by a separate hourly run as "Agent 2 (Summit Homes)", through the same guard and W1-W5 as B1, with B1's behaviour unchanged. No test-site phase: Claude builds and proves Summit offline (fakes, seam 1, the real-PO seam on the laptop); Joey runs every live step (S.0-S.5) on the Mac Mini. CLAUDE.md Must never #3 is unchanged.
 

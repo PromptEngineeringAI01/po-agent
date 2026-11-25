@@ -158,7 +158,7 @@ At Checkpoint S-A Joey decided the 10 "Proposed" rows of `tasks/friction-log.md`
 ## 24 Nov 2026 - Summit creator table: Summit Renovations; Summit Project is Summit Developments only (Joey; loosens nothing)
 
 - **Joey (24 Nov 2026):** "Summit Home Improvement has changed their name to Summit Renovations." "For Summit Project, it only includes Summit Developments."
-- **Now:** the creator table row Summit Home Improvement is Summit Renovations (creator rule unchanged: the previous task's Task Creator); Summit Project's aliases are exactly `["Summit Developments"]`, so SPEC open question S2 is closed. The 23 Nov 2026 entries below keep their wording as a dated record.
+- **Now:** the creator table row Summit Home Improvement is Summit Renovations (creator rule unchanged: the previous task's Task Creator); Summit Project's aliases are exactly `["Summit Developments"]`, so SPEC open question S2 is closed. The 23 Nov 2026 entries below keep their wording as a dated record. *(Aliases widened by 25 Nov 2026, MySys company spellings: Summit Projects joins Summit Developments; this entry keeps its wording as a dated record.)*
 - **Loosens?** No: a company outside the table is still `COMPANY_UNKNOWN` (skip, never a wrong write).
 - **Carried in:** `SPEC.md` v1.61 (Creator table, open question S2).
 
