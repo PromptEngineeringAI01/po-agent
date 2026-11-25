@@ -34,6 +34,7 @@ creator = "NH Sub Floor"
 
 [[company]]
 name = "Summit SouthWest"
+aliases = ["Summit South West"]     # MySys's spelling (Joey, 25 Nov 2026)
 creator = "Compactions"
 
 [[company]]
@@ -42,7 +43,7 @@ creator = "Allison Wells"
 
 [[company]]
 name = "Summit Project"
-aliases = ["Summit Developments"]   # the only one (Joey, 24 Nov 2026)
+aliases = ["Summit Developments", "Summit Projects"]   # Summit Projects: MySys's spelling (Joey, 25 Nov 2026)
 creator_rule = "previous_task"
 
 [[company]]

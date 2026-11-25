@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.70 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.71 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -567,11 +567,13 @@ Company names, creators and aliases may be committed; they are in `config/client
 | Summit Easystart | New Gen and EasyStart | NH Sub Floor |
 | Summit Homes Group | - | Compactions |
 | Summit New Homes | - | NH Sub Floor |
-| Summit SouthWest | - | Compactions |
+| Summit SouthWest | Summit South West (MySys's spelling; Joey, 25 Nov 2026) | Compactions |
 | Summit Granny Flats | - | Allison Wells |
-| Summit Project | Summit Developments (the only one; Joey, 24 Nov 2026) | previous task |
+| Summit Project | Summit Developments (Joey, 24 Nov 2026); Summit Projects (MySys's spelling; Joey, 25 Nov 2026) | previous task |
 | Summit Renovations (was Summit Home Improvement) | - | previous task |
 | Summit Homes Display | - | previous task |
+
+Summit North West is an old name that won't appear again (Joey, 25 Nov 2026): no row, so a project under it is not a match (`PROJECT_NOT_FOUND`).
 
 Names are compared trimmed and case-insensitive, whole name only. A name not in the table (including a company the paper list strikes out) is `COMPANY_UNKNOWN`: a missing alias costs coverage, never a wrong write.
 
@@ -645,7 +647,7 @@ creator = "NH Sub Floor"
 
 [[company]]
 name = "Summit Project"
-aliases = ["Summit Developments"]
+aliases = ["Summit Developments", "Summit Projects"]
 creator_rule = "previous_task"
 # ... one [[company]] per table row; exactly one of creator / creator_rule
 ```
@@ -699,7 +701,7 @@ A miss at any step stops the order until it is understood, as for B1.
 ### Open questions (Summit)
 
 - **S1** Closed (24 Nov 2026): Joey saved 11 real Summit POs at the top of `private/summit/`; the readers task moves them into `private/summit/pdfs/`.
-- **S2** Closed (Joey, 24 Nov 2026): Summit Project covers only Summit Developments.
+- **S2** Closed (Joey, 24 Nov 2026): Summit Project covers Summit Developments; MySys spells the company Summit Projects, the same row (Joey, 25 Nov 2026).
 - **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings.
 - **S4** Documents: does MySys rename `-` to `_` in an uploaded name; is the Type Client Documents; is Sale Office "Prompt Engineering Pty Ltd" on Summit projects.
 - **S5** Locked/Unlocked after the take (open question 12 for Summit): does a taken Note move to Locked, and does Agent 2's My Notes list it.

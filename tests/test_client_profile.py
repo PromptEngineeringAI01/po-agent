@@ -19,15 +19,20 @@ from po_agent.core.errors import ConfigError
 ROOT = Path(__file__).resolve().parent.parent
 SUMMIT_TOML = ROOT / "config" / "clients" / "summit.toml"
 
-# SPEC.md -> Creator table, with Joey's corrections of 24 Nov 2026: (name,
+# SPEC.md -> Creator table, with Joey's corrections of 24 and 25 Nov 2026: (name,
 # aliases, creator, creator_rule), in the table's order.
 SPEC_CREATOR_TABLE = [
     ("Summit Easystart", ("New Gen and EasyStart",), "NH Sub Floor", None),
     ("Summit Homes Group", (), "Compactions", None),
     ("Summit New Homes", (), "NH Sub Floor", None),
-    ("Summit SouthWest", (), "Compactions", None),
+    ("Summit SouthWest", ("Summit South West",), "Compactions", None),
     ("Summit Granny Flats", (), "Allison Wells", None),
-    ("Summit Project", ("Summit Developments",), None, "previous_task"),
+    (
+        "Summit Project",
+        ("Summit Developments", "Summit Projects"),
+        None,
+        "previous_task",
+    ),
     ("Summit Renovations", (), None, "previous_task"),
     ("Summit Homes Display", (), None, "previous_task"),
 ]
