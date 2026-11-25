@@ -29,7 +29,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from playwright.sync_api import Locator, Page
 
 from po_agent.core.config import (
-    CLIENT_FILES,
     ClientProfile,
     Config,
     RunWindow,
@@ -228,10 +227,12 @@ class Controls:
         submitted = step not in NOT_SUBMITTED
         try:
             config = load_config(self.site, self.config_dir)
+            # Any client but B1 must have its client file (load_client
+            # refuses an unknown one): never treated as B1 (9.5 review).
             profile = (
-                load_client(self.client, self.site, self.config_dir)
-                if self.client in CLIENT_FILES
-                else None
+                None
+                if self.client == "b1"
+                else load_client(self.client, self.site, self.config_dir)
             )
             enabled = run_enabled(config, profile)
         except ConfigError:
