@@ -26,7 +26,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
 - [x] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
 
-**Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; first B1 hourly run watched after any tag move past here.
+**Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; friction log's "Proposed" rows decided (`docs/factory-handbook.md` §11); release summary read before the tag moves (`docs/macmini-setup.md`); first B1 hourly run watched after any tag move past here.
 
 **S-B Decide, offline**
 - [ ] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers · step · **review stop** · high
