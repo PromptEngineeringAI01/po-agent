@@ -42,7 +42,7 @@ def proceed(**overrides: object) -> B1Proceed:
     return B1Proceed(**values)  # type: ignore[arg-type]
 
 
-# --- SkipReason: exactly docs/specs/spec.md section 3 ---
+# --- SkipReason: docs/specs/spec.md section 3 and SPEC.md -> Client 2 ---
 
 
 def test_skip_reasons_are_exactly_the_spec_table() -> None:
@@ -62,6 +62,10 @@ def test_skip_reasons_are_exactly_the_spec_table() -> None:
         "DUPLICATE_TASK",
         "UNEXPECTED_SCREEN",
         "PARTIAL_WRITE",
+        # Summit's three (SPEC.md -> Client 2, Decision checks; task 9.9).
+        "COMPANY_UNKNOWN",
+        "COMPANY_MISMATCH",
+        "CREATOR_UNKNOWN",
     }
 
 
