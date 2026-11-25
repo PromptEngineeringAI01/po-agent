@@ -79,6 +79,10 @@ def eligible_notes(
         po = title_po(row.subject_note)
         if po is not None:
             found.append(
-                EligibleNote(note_id=row.note_id, internal_no=po.split("/")[0])
+                EligibleNote(
+                    note_id=row.note_id,
+                    internal_no=po.split("/")[0],
+                    title=row.subject_note,
+                )
             )
     return tuple(found)

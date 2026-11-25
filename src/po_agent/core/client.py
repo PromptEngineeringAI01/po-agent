@@ -20,11 +20,11 @@ SPEC lists, nothing for a client not yet known (ADR-003's rule of three):
 """
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from re import Pattern
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from po_agent.core.models import (
+    BodyRule,
     MySysLookup,
     NotePoolFilters,
     NotePoolRow,
@@ -38,10 +38,14 @@ from po_agent.core.models import (
 @dataclass(frozen=True)
 class EligibleNote:
     """A Note Pool row the client's list eligibility kept: its Note ID and
-    the number its project is searched by."""
+    the number its project is searched by. `title`: the row's Subject/Note
+    cell, for a client whose decision reads the title there (Summit, task
+    9.12; B1's step 0 reads it at the list and keeps ""). Untrusted page
+    text: never printed, and not part of what names the Note."""
 
     note_id: str
     internal_no: str
+    title: str = field(default="", compare=False, repr=False)
 
 
 class Client(Protocol):
@@ -59,7 +63,7 @@ class Client(Protocol):
         """The PO a NOTE line shows for this Note."""
         ...
 
-    def body_rule(self, file_name: str) -> Pattern[str]:
+    def body_rule(self, file_name: str) -> BodyRule:
         """Which text in the Note window is the email body, given the PDF's
         file name."""
         ...

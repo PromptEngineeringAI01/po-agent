@@ -42,9 +42,11 @@ from po_agent.core.errors import (
 )
 from po_agent.core.models import (
     COMPACTION_TEST,
+    BodyRule,
     MySysLookup,
     NotePoolFilters,
     NotePoolRow,
+    OneIframeBody,
     Proceed,
     ProjectRule,
     ProjectTask,
@@ -948,17 +950,20 @@ def return_note(
 # Attachment and download (rows 02, 05)
 
 
-def note_body(window: Locator, body: re.Pattern[str]) -> str:
-    """The Note's body (row 02): the one source in the window whose text
-    `body` finds (the caller's body rule; B1's: ends with the file name),
-    either a <pre> (test site, 27 Oct 2026; the title heading and the
-    file-name <span> end with it too) or the document body of an iframe
-    (live email Notes: MySys's get_email_body; decisions, 10 Nov 2026, Note
-    body iframe). None or more than one -> UnexpectedScreen.
+def note_body(window: Locator, body: BodyRule) -> str:
+    """The Note's body (row 02) by the client's body rule. A pattern (B1's:
+    ends with the file name): the one source in the window whose text
+    `body` finds, either a <pre> (test site, 27 Oct 2026; the title heading
+    and the file-name <span> end with it too) or the document body of an
+    iframe (live email Notes: MySys's get_email_body; decisions, 10 Nov
+    2026, Note body iframe). None or more than one -> UnexpectedScreen.
+    OneIframeBody (Summit's): `_one_iframe_body`.
 
     An iframe's document loads after the window shows, so while any iframe
     in the window is still empty the read waits, up to 15 s. Read only:
     nothing in a frame is clicked. Untrusted data: never printed."""
+    if isinstance(body, OneIframeBody):
+        return _one_iframe_body(window)
     pres = window.locator("pre").filter(has_text=body)
     frames = window.locator("iframe")
 
@@ -982,6 +987,44 @@ def note_body(window: Locator, body: re.Pattern[str]) -> str:
         if frames.count():
             wait.until(wait.within(window.page), settled)
         found, _ = read()
+    except PlaywrightError:
+        raise UnexpectedScreen("Note body not readable") from None
+    if len(found) != 1:
+        raise UnexpectedScreen("Note body not found once")
+    return found[0]
+
+
+def _one_iframe_body(window: Locator) -> str:
+    """Summit's rule (task 9.12; SPEC.md -> Client 2, Email body): the text
+    of the one iframe in the window whose document body is not empty, its
+    line breaks kept. Read once the window holds an iframe and every iframe
+    has its text, the same on BODY_SETTLE_READS reads in a row (about a
+    second: a body still arriving is never read cut short, as it becomes
+    the task Note), or when the load wait
+    (15 s) runs out; then none, or more than one, non-empty ->
+    UnexpectedScreen. A <pre> is never the body."""
+    frames = window.locator("iframe")
+
+    def texts() -> tuple[str, ...]:
+        return tuple(
+            frame.content_frame.locator("body").inner_text().strip()
+            for frame in frames.all()
+        )
+
+    def read() -> tuple[str, ...] | None:
+        try:
+            return texts()
+        except PlaywrightError:
+            return None  # a frame re-rendering: read again
+
+    def loaded(found: tuple[str, ...]) -> bool:
+        return bool(found) and all(found)
+
+    try:
+        settled = wait.settled(
+            wait.within(window.page), read, loaded, reads=wait.BODY_SETTLE_READS
+        )
+        found = [text for text in (settled or texts()) if text]
     except PlaywrightError:
         raise UnexpectedScreen("Note body not readable") from None
     if len(found) != 1:

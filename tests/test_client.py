@@ -7,8 +7,10 @@ pinned through the run loop's offline tests (tests/seam2/
 test_run_loop_offline.py, tests/test_run_spike.py, tests/test_exit_codes.py,
 tests/test_hold_recheck.py), which pass unchanged; here: the interface holds
 SPEC's differences and nothing more (ADR-003's rule of three), and Summit's
-implementation refuses every one not built yet: 9.11 fills `filters` and
-`eligible` (tests/test_summit_eligibility.py), 9.12-9.14 the rest.
+implementation refuses every one not built yet: 9.11 filled `filters` and
+`eligible` (tests/test_summit_eligibility.py), 9.12 `po_number`,
+`body_rule`, `project_rule` and `decide` (tests/test_summit_client.py,
+tests/test_summit_decide_only.py), 9.13-9.14 the rest.
 """
 
 import argparse
@@ -60,10 +62,6 @@ def lookup() -> MySysLookup:
 
 # One refusal per member: the call the run loop makes.
 SUMMIT_CALLS = {
-    "po_number": (NOTE,),
-    "body_rule": ("123456_020_01.pdf",),
-    "project_rule": (),
-    "decide": (SNAPSHOT, NOTE, b"%PDF-fake", lookup),
     "document_type": (),
     "return_target": (),
 }
@@ -82,8 +80,16 @@ def test_each_client_implements_every_member(implementation: type) -> None:
     assert MEMBERS <= members(implementation)
 
 
-# Built in 9.11 (tests/test_summit_eligibility.py).
-SUMMIT_BUILT = {"filters", "eligible"}
+# Built in 9.11 (tests/test_summit_eligibility.py) and 9.12, the peek
+# (tests/test_summit_client.py).
+SUMMIT_BUILT = {
+    "filters",
+    "eligible",
+    "po_number",
+    "body_rule",
+    "project_rule",
+    "decide",
+}
 
 
 def summit_profile():
@@ -123,12 +129,13 @@ def test_b1_s_values_come_from_its_site_profile() -> None:
     )
 
 
-@pytest.mark.parametrize("mode", ["decide-only", "run"])
+@pytest.mark.parametrize("mode", ["run"])
 def test_summit_s_stub_refuses_before_the_browser_opens(mode, mysys):
-    # 9.4 review: cli.py refuses Summit's Note-loop modes today; were that
-    # gate lifted before their tasks land, the stub still stops the run
+    # 9.4 review: cli.py refuses Summit's run, which books, until 9.14; were
+    # that gate lifted before its tasks land, the run loop still stops it
     # before any login with Summit's credentials (no MySys call at all).
-    # The spike is built (9.11): tests/test_summit_spike.py.
+    # The spike (9.11) and decide-only (9.12) are built:
+    # tests/test_summit_spike.py, tests/test_summit_decide_only.py.
     fake = mysys({"300001": FakeNote("2600001B")})
     options = argparse.Namespace(
         client="summit",

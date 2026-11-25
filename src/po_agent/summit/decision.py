@@ -14,6 +14,7 @@ check for Summit (decisions, 23 Nov 2026): the identity link is the PO.
 
 import re
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from po_agent.b1.readers import PdfTexts
 from po_agent.core.config import Company
@@ -74,6 +75,30 @@ def match_project(
         return _skip(SkipReason.PROJECT_NOT_FOUND)
     ((pln, _), company), *_ = found.items()
     return pln, company
+
+
+@dataclass(frozen=True)
+class SummitProjectRule:
+    """Summit's project match rule for the driver's project reads (the
+    peek's lookup, the hold re-check, W1's reopen; core.models.ProjectRule):
+    `match_project` on the creator table, then the opened project's Client
+    Internal No. equal to the Client Ref No. again."""
+
+    companies: tuple[Company, ...]
+
+    def match(
+        self, rows: Sequence[SearchRow], more_pages: bool, internal_no: str
+    ) -> Skip | str:
+        matched = match_project(rows, more_pages, internal_no, self.companies)
+        return matched if isinstance(matched, Skip) else matched[0]
+
+    def judge(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
+        pln = self.match(lookup.search_rows, lookup.more_pages, internal_no)
+        if isinstance(pln, Skip):
+            return pln
+        if fold(lookup.project_internal_no) != fold(internal_no):
+            return _skip(SkipReason.UNEXPECTED_SCREEN)
+        return pln
 
 
 def previous_task(tasks: Sequence[ProjectTask]) -> Skip | ProjectTask:
