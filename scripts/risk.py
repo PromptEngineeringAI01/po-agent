@@ -4,9 +4,11 @@ The table is docs/workflow.md, Production build loop step 5 (decisions,
 19 Nov 2026, risk is computed). The highest file wins:
 
 - high: `src/po_agent/mysys/` (the guard and every MySys write), the booker,
-  the readers and decision engine, the address rules, `scripts/guard_check.py`,
-  `scripts/check.py` (= CI), `scripts/risk.py` and `scripts/verify_pr.py` (the
-  scripts that grade a PR, so a PR can't loosen them unseen), `.claude/hooks/`,
+  the readers and decision engine, the address rules, all of
+  `src/po_agent/summit/` and `config/clients/` (company table, creators),
+  `scripts/guard_check.py`, `scripts/check.py` (= CI), `scripts/risk.py` and
+  `scripts/verify_pr.py` (the scripts that grade a PR, so a PR can't loosen
+  them unseen), `.claude/hooks/`,
   `.claude/settings*.json` and `.github/workflows/`;
 - medium: any other file under `src/` or `scripts/`;
 - low: everything else (docs, tests, skills, tasks).
@@ -29,6 +31,7 @@ LARGE = 400  # changed lines (added + deleted) above which the PR is hard to rev
 HIGH_PREFIXES = (
     "src/po_agent/mysys/",
     "src/po_agent/summit/",  # all decision logic (SPEC Client 2, Project Structure)
+    "config/clients/",  # company table, creators, aliases (SPEC Client 2)
     ".claude/hooks/",
     ".github/workflows/",
 )
