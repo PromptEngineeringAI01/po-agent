@@ -8,6 +8,14 @@ repos:
     rev: v8.30.1
     hooks:
       - id: gitleaks
+  # A file still holding git conflict markers (friction log, 25 Nov 2026);
+  # scripts/check.py's "conflict markers" step fails the same in CI.
+  # It checks only while a merge or rebase is in progress; no
+  # --assume-in-merge, which flags bare ======= lines. CI catches the rest.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
   # The repo-data rule from scripts/check.py, on the whole index: no private/,
   # logs/, state/, traces, images or stray PDFs (CI runs the same rule).
   - repo: local
