@@ -235,3 +235,48 @@ def test_a_project_without_compaction_tasks_reads_its_other_tasks(page):
         ),
     )
     assert driver.settled_tasks(window) == {}
+
+
+# Mutant survivors of the 9.8 rewrite (refactor safety net).
+
+OTHER_TASK = "\n".join(MIXED.strip().splitlines()[:2])
+
+
+@pytest.mark.usefixtures("short_waits")
+def test_other_rows_still_changing_at_the_end_of_the_wait_are_an_unexpected_screen(
+    page,
+):
+    # No Compaction Test task, but the other task's Status keeps changing:
+    # the last read is not the answer until it equals the one before.
+    ticking = """<script>let n = 0; setInterval(() => {
+      const cells = [...document.querySelectorAll('#tasks td')];
+      cells[cells.length - 1].textContent = 'Loading ' + (n++);
+    }, 30)</script>"""
+    page.set_content(project_page(options=(), rows=OTHER_TASK, late_ms=0) + ticking)
+    window = booking.project_window(page, "pln_10001")
+
+    with pytest.raises(UnexpectedScreen):
+        driver.settled_project_tasks(window)
+
+
+@pytest.mark.usefixtures("short_waits")
+def test_a_compaction_task_after_other_tasks_is_still_waited_for(page):
+    # Another task shows first, the Compaction Test rows and their option a
+    # second later: "no Compaction Test task" counts only after the full
+    # wait, whatever else the table shows.
+    late = f"""<script>setTimeout(() => {{
+      document.getElementById('tasks').innerHTML = `{MIXED}`;
+      const select = document.querySelector('select');
+      for (const task of {list(BOTH)}) {{
+        const option = document.createElement('option');
+        option.textContent = '(' + task + ') [Compaction Test]';
+        select.appendChild(option);
+      }}
+    }}, 1000)</script>"""
+    page.set_content(project_page(options=(), rows=OTHER_TASK, late_ms=0) + late)
+    window = booking.project_window(page, "pln_10001")
+
+    assert driver.settled_tasks(window) == {
+        "tsk_200001": "Cancelled",
+        "tsk_200002": "New Project",
+    }
