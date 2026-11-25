@@ -34,6 +34,8 @@ def risk():
         "src/po_agent/summit/readers.py",  # SPEC Client 2: all decision logic
         "src/po_agent/summit/decision.py",
         "src/po_agent/summit/companies.py",
+        "config/clients/summit.toml",  # company table, creators, aliases
+        "config/clients/b1.toml",
         "scripts/guard_check.py",
         "scripts/check.py",
         "scripts/risk.py",
