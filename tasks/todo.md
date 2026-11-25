@@ -22,7 +22,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [x] **9.1** Shared models (`core/models.py`); the Creator travels in the `Proceed`, no `CREATOR` constant in `mysys/` · step · refactor · high
 - [x] **9.2** `mysys/` imports no client package and holds no client constant; the booker moves to `mysys/booker.py` (PRs 177, 178); B1 seam 2 still pending, batched by the advisor before Checkpoint S-A · step · refactor · high
 - [x] **9.3** `--client b1|summit`; `config/clients/summit.toml` (Summit Renovations; Summit Project = Summit Developments only; `enabled = false`); Summit secret names; `preflight --client summit`; `--site test --client summit` refused · step · high
-- [ ] **9.4** Client interface (`core/client.py`) in the run loop; `core/` imports no client package (except `demo.py`) · step · refactor · high
+- [x] **9.4** Client interface (`core/client.py`) in the run loop; `core/` imports no client package (except `demo.py`) · step · refactor · high
 - [ ] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
 - [x] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
 
@@ -37,9 +37,9 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 **Checkpoint S-B:** Summit seam 1 `false PROCEED: 0` in CI; friction log's "Proposed" rows decided; real-PO `false PROCEED: 0` on the laptop, clean-PO skips reviewed with Joey.
 
 **S-C Run, offline**
-- [ ] **9.11** Note Pool for Summit: Source and Unlocked filters read back, Source column read, list eligibility (sender, `---`, not an agent, title shape); `spike --client summit` · step · high
+- [ ] **9.11** Note Pool for Summit: Source and Unlocked filters read back, Source column read, list eligibility (sender, `---`, not an agent, title shape); `spike --client summit`; from 9.4: `NotePoolRow` gains the Source cell, `NotePoolFilters` gains `source` and its `pool` becomes optional, `SummitClient.filters`/`eligible` filled · step · high
 - [ ] **9.12** The peek (read-only open, iframe body rule, download, readers, lookup, decide) and `run --decide-only --client summit`; guard history read-only for untouched Notes · step · high
-- [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> `---` once S.0 confirms it, else ALERT) · step · high
+- [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> `---` once S.0 confirms it, else ALERT); from 9.4: `Client.return_target()` takes the original assignee read in the peek · step · high
 - [ ] **9.14** Summit booking W1-W5: decided Creator (missing option -> `WRITE_NOT_STARTED`), full PO, body, previous-task recheck at W1, Documents name per S.0; `run --client summit` books (needs S.0 screens) · step · high
 - [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist at :30 (07:30-17:30 Mon-Fri Perth; Joey, 24 Nov 2026), Healthchecks `healthchecks_ping_url_summit`, alert issues `po-agent alert summit <run_id>`, `docs/macmini-setup.md` and `docs/ops-runbook.md` · step · medium · ask-first files
 

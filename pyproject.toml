@@ -62,11 +62,13 @@ module = [
     "po_agent",
     "po_agent.b1",
     "po_agent.b1.address",
+    "po_agent.b1.client",
     "po_agent.b1.decision",
     "po_agent.b1.models",
     "po_agent.b1.reader_rules",
     "po_agent.b1.readers",
     "po_agent.core",
+    "po_agent.core.client",
     "po_agent.core.controls",
     "po_agent.core.demo",
     "po_agent.core.errors",
@@ -82,6 +84,8 @@ module = [
     "po_agent.mysys.guard",
     "po_agent.mysys.tasks",
     "po_agent.mysys.wait",
+    "po_agent.summit",
+    "po_agent.summit.client",
 ]
 disallow_any_generics = true
 disallow_subclassing_any = true

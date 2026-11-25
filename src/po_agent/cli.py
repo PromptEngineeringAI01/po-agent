@@ -53,7 +53,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from po_agent.b1.client import B1Client
 from po_agent.core import controls, demo, output, run, runlock, runlog, secrets
+from po_agent.core.client import Client
 from po_agent.core.config import (
     CONFIG_DIR,
     SITE_HOSTS,
@@ -64,6 +66,7 @@ from po_agent.core.config import (
 from po_agent.core.errors import ConfigError, PoAgentError, RunLockStuck, identifier
 from po_agent.core.secrets import SecretName
 from po_agent.core.trace import Trace
+from po_agent.summit.client import SummitClient
 
 LOGS_DIR = Path(__file__).resolve().parents[2] / "logs"
 STATE_DIR = Path(__file__).resolve().parents[2] / "state"  # git-ignored
@@ -171,19 +174,36 @@ def start(
     counts. The Note loop's run log goes to logs/ only with --detailed-log,
     and to the run's trace always."""
     trace = _TRACES.get(summary.run_id)
-    if mode == "spike":
-        return run.spike(config, credentials, options, summary)
     downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
     if mode == "demo":
         return demo.run(config, credentials, options, summary, downloads)
+    client = client_for(options.client, config)
+    if mode == "spike":
+        return run.spike(config, client, credentials, options, summary)
     logs = LOGS_DIR if options.detailed_log else None
     if mode == "run":
         return run.book_run(
-            config, credentials, options, summary, downloads, logs, CONFIG_DIR, trace
+            config,
+            client,
+            credentials,
+            options,
+            summary,
+            downloads,
+            logs,
+            CONFIG_DIR,
+            trace,
         )
     return run.decide_only(
-        config, credentials, options, summary, downloads, logs, trace
+        config, client, credentials, options, summary, downloads, logs, trace
     )
+
+
+def client_for(name: str, config: Config) -> Client:
+    """The run loop's client (task 9.4; core/client.py). Summit's is a stub
+    that refuses; `_run` refuses its modes before this until 9.11-9.14."""
+    if name == "summit":
+        return SummitClient()
+    return B1Client(config)
 
 
 def _demo_read_only(options: argparse.Namespace) -> bool:

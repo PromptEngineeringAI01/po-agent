@@ -87,9 +87,14 @@ class FakeMySys:
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
     counts: Counter = field(default_factory=Counter)  # (Note ID, call name)
-    # What the run passed in: the Note Pool filters, (Note ID, body rule).
+    # What the run passed in: the Note Pool filters, (Note ID, body rule),
+    # (step, project rule), W2's Documents Type (task 9.4: the client's) and
+    # (step, agent) where a read-back names the agent.
     filters: list = field(default_factory=list)
     body_rules: list = field(default_factory=list)
+    rules: list = field(default_factory=list)
+    document_types: list = field(default_factory=list)
+    agents: list = field(default_factory=list)
 
     def _note(self, window: str) -> tuple[str, FakeNote]:
         note_id = window.removeprefix("window-")
@@ -246,6 +251,7 @@ class FakeMySys:
         # (screen-map rows 25, 27).
         (note_id,) = [n for n, v in self.notes.items() if v.internal_no == internal_no]
         self._call("lookup", note_id)
+        self.rules.append(("lookup", rule))
         return self.notes[note_id].lookup
 
     def return_note(self, guard, window, agent, pool, log, note_id):
@@ -275,6 +281,7 @@ class FakeMySys:
     def reopen_project(self, guard, page, base_url, username, password, proceed, rule):
         # The project window (screen-map row 07).
         self._call("reopen", proceed.note_id)
+        self.rules.append(("reopen", rule))
         return "project"
 
     def open_task_form(self, guard, page, project):
@@ -295,6 +302,7 @@ class FakeMySys:
 
     def check_new_task_row(self, project, task_no, agent, *, creator):
         self._step("task_row")  # the new task's details row (screen-map row 10)
+        self.agents.append(("task_row", agent))
         return "details"
 
     def open_task_detail(self, guard, project, details, *, creator):
@@ -302,6 +310,7 @@ class FakeMySys:
 
     def check_task_detail(self, page, task_no, po_number, body, agent, *, creator):
         self._step("detail")  # the task detail screen (screen-map row 19)
+        self.agents.append(("detail", agent))
         return "detail-window"
 
     def back_to_project(self, guard, page, window, pln):
@@ -313,6 +322,7 @@ class FakeMySys:
         # The new task's section of the project's Documents tab (screen-map
         # row 19).
         self._step("document")
+        self.document_types.append(document_type)
 
     def project_window(self, page, pln):
         self._step("project_window")  # the project window (screen-map row 07)
@@ -352,6 +362,7 @@ class FakeMySys:
         # (decisions, 4 Nov 2026, W4 and W5; 20 Nov 2026, one Send Email
         # control; screen-map row 14).
         self._step("solved")
+        self.agents.append(("solved", agent))
         _unticked(log, note_id, "W5")
         guard.history.append(("mark_solved", "done"))  # as guard.act records it
 

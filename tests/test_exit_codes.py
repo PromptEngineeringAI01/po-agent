@@ -25,6 +25,7 @@ from fakes.mysys import AGENT, POOL, FakeNote, FakePage
 from keyring.backends.null import Keyring as NullKeyring
 
 from po_agent import cli
+from po_agent.b1.client import B1Client
 from po_agent.b1.models import B1Proceed
 from po_agent.core import run
 from po_agent.core.config import CONFIG_DIR, load_config
@@ -323,11 +324,14 @@ def test_book_refuses_a_decision_for_another_note_before_w1(env, mysys, tmp_path
         creator="Perth Scheduling",
     )
 
+    config = load_config("test", config_dir)
+
     with pytest.raises(WriteNotStarted) as error:
         run._book(
             ActionGuard(),
             FakePage(fake.calls),
-            load_config("test", config_dir),
+            config,
+            B1Client(config),
             ("https://fake.test", "fake-user", "fake-password"),
             other,
             config_dir,

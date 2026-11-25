@@ -16,8 +16,9 @@ from collections.abc import Iterator
 
 import pytest
 
+from po_agent.b1 import client as b1_client
 from po_agent.b1.decision import note_pool_filters
-from po_agent.core import run, runlog
+from po_agent.core import runlog
 from po_agent.mysys import driver
 from po_agent.mysys.guard import ActionGuard
 
@@ -75,7 +76,7 @@ def test_note_window_takes_a_note_and_hands_it_back(
     # stays for the other seam-2 tests.
     found = [
         n
-        for n in run.eligible_notes(listing.rows, config.title_rule, pool)
+        for n in b1_client.eligible_notes(listing.rows, config.title_rule, pool)
         if n.internal_no == TRIAL_INTERNAL_NO
     ]
     if listing.pages != 1 or len(found) != 1:

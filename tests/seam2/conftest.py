@@ -83,7 +83,7 @@ def check_note_pool_reset(config) -> Callable[[driver.NotePoolList], None]:
     Under Agent Pool + Locked, Status Pending: exactly one eligible, unlinked
     Note per trial PO. The error names counts and trial numbers only.
     """
-    from po_agent.core.run import eligible_notes
+    from po_agent.b1.client import eligible_notes
 
     def check(listing: driver.NotePoolList) -> None:
         found = eligible_notes(listing.rows, config.title_rule, config.pool_name)
