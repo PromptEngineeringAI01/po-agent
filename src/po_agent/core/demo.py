@@ -33,8 +33,8 @@ from playwright.sync_api import Page, sync_playwright
 
 from po_agent.b1 import decision
 from po_agent.b1 import reader_rules as rules
+from po_agent.b1.client import eligible_notes
 from po_agent.core import output
-from po_agent.core import run as runs
 from po_agent.core.config import Config
 from po_agent.core.errors import (
     PartialWrite,
@@ -173,7 +173,7 @@ def _steps(
     driver.set_note_pool_filters(guard, panel, decision.note_pool_filters(pool))
     output.info("note pool filters set")
     listing = driver.read_note_pool(guard, panel)
-    eligible = runs.eligible_notes(listing.rows, config.title_rule, pool)
+    eligible = eligible_notes(listing.rows, config.title_rule, pool)
     found = [note for note in eligible if note.internal_no == INTERNAL_NO]
     summary.seen, summary.eligible = len(listing.rows), len(eligible)
     if len(found) != 1:

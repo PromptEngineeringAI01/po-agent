@@ -49,17 +49,8 @@ from pathlib import Path
 
 from playwright.sync_api import Locator, Page
 
-from po_agent.b1 import reader_rules as rules
-from po_agent.b1 import readers
-from po_agent.b1.decision import (
-    B1ProjectRule,
-    TitleRule,
-    body_rule,
-    decide,
-    eligible_internal_no,
-    note_pool_filters,
-)
 from po_agent.core import controls, output
+from po_agent.core.client import Client, EligibleNote
 from po_agent.core.config import Config
 from po_agent.core.errors import (
     AccuracyBreach,
@@ -70,7 +61,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     identifier,
 )
-from po_agent.core.models import NotePoolRow, NoteSnapshot, Proceed, Skip, SkipReason
+from po_agent.core.models import NoteSnapshot, Proceed, Skip, SkipReason
 from po_agent.core.runlog import RunLog
 from po_agent.core.secrets import SecretName, mysys_names
 from po_agent.core.trace import Booking, Trace
@@ -97,24 +88,6 @@ HOLD_LOST_DETAIL = {
 }
 
 
-@dataclass(frozen=True)
-class EligibleNote:
-    note_id: str
-    internal_no: str
-
-
-def eligible_notes(
-    rows: Sequence[NotePoolRow], rule: TitleRule, pool_name: str
-) -> tuple[EligibleNote, ...]:
-    """Step 0 on every row, in list order (newest first)."""
-    found = []
-    for row in rows:
-        internal_no = eligible_internal_no(row, rule, pool_name)
-        if internal_no is not None:
-            found.append(EligibleNote(note_id=row.note_id, internal_no=internal_no))
-    return tuple(found)
-
-
 def newest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote, ...]:
     """By Note ID as a number (a longer ID is newer), newest first, at most
     `cap`. With no state between runs, an old Note that always skips (e.g.
@@ -128,14 +101,14 @@ def newest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote,
 
 
 def _read_eligible(
-    guard: ActionGuard, panel: Locator, config: Config, summary: output.RunSummary
+    guard: ActionGuard, panel: Locator, client: Client, summary: output.RunSummary
 ) -> tuple[EligibleNote, ...]:
-    """The run's one Note Pool read: step 0 on every row, counts printed.
-    A second page is never read, so it stops the run before any Note is
-    taken: MorePages, ALERT MORE_PAGES, exit 1 (7.2; decisions, 5 Nov
-    2026). In run modes the stale-Note read, a superset, stops first."""
+    """The run's one Note Pool read: the client's step 0 on every row,
+    counts printed. A second page is never read, so it stops the run before
+    any Note is taken: MorePages, ALERT MORE_PAGES, exit 1 (7.2; decisions,
+    5 Nov 2026). In run modes the stale-Note read, a superset, stops first."""
     listing = driver.read_note_pool(guard, panel)
-    found = eligible_notes(listing.rows, config.title_rule, config.pool_name)
+    found = client.eligible(listing.rows)
     summary.seen = len(listing.rows)
     summary.eligible = len(found)
     output.info(
@@ -150,6 +123,7 @@ def _read_eligible(
 
 def spike(
     config: Config,
+    client: Client,
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
     summary: output.RunSummary,
@@ -162,9 +136,9 @@ def spike(
         driver.login(guard, page, credentials[username], credentials[password])
         output.info("logged in")
         panel = driver.open_note_pool(guard, page)
-        driver.set_note_pool_filters(guard, panel, note_pool_filters(config.pool_name))
+        driver.set_note_pool_filters(guard, panel, client.filters())
         output.info("note pool filters set")
-        _read_eligible(guard, panel, config, summary)
+        _read_eligible(guard, panel, client, summary)
     return 0
 
 
@@ -228,6 +202,7 @@ def _submitted(error: BaseException) -> bool:
 
 def decide_only(
     config: Config,
+    client: Client,
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
     summary: output.RunSummary,
@@ -240,12 +215,13 @@ def decide_only(
     The error event goes to the run log here; cli.py writes its traceback.
     `trace` gets the run log's events (7.3)."""
     return _note_loop(
-        config, credentials, options, summary, downloads, logs, None, trace
+        config, client, credentials, options, summary, downloads, logs, None, trace
     )
 
 
 def book_run(
     config: Config,
+    client: Client,
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
     summary: output.RunSummary,
@@ -257,12 +233,21 @@ def book_run(
     """The run that books (4.5): as decide-only, but a PROCEED is booked.
     `config_dir` is where `before_write` re-reads the kill switch."""
     return _note_loop(
-        config, credentials, options, summary, downloads, logs, config_dir, trace
+        config,
+        client,
+        credentials,
+        options,
+        summary,
+        downloads,
+        logs,
+        config_dir,
+        trace,
     )
 
 
 def _note_loop(
     config: Config,
+    client: Client,
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
     summary: output.RunSummary,
@@ -287,7 +272,7 @@ def _note_loop(
             output.info("logged in")
             if trace is not None:
                 bookings = trace.recent_bookings(config.site)
-                _hold_recheck(guard, page, config, login, log, bookings)
+                _hold_recheck(guard, page, client, login, log, bookings)
             if config.stale_read == "my_notes":
                 # Live: the agent's My Notes, between two reloads, so the
                 # Note Pool opens from a fresh page (decisions, 10 Nov 2026,
@@ -299,11 +284,9 @@ def _note_loop(
             driver.leave_menu(guard, page)
             if config.stale_read == "note_pool":
                 controls.stale_note_stop(guard, panel, config.agent_user_name)
-            driver.set_note_pool_filters(
-                guard, panel, note_pool_filters(config.pool_name)
-            )
+            driver.set_note_pool_filters(guard, panel, client.filters())
             output.info("note pool filters set")
-            found = _read_eligible(guard, panel, config, summary)
+            found = _read_eligible(guard, panel, client, summary)
             try:
                 # The opening guard actions (login, Note Pool, filters):
                 # step 0, no Note, even when no Note follows (7.3 review).
@@ -321,14 +304,22 @@ def _note_loop(
                 try:
                     with driver.note_downloads(page, downloads):
                         line = _one_note(
-                            guard, page, config, login, log, note, progress, config_dir
+                            guard,
+                            page,
+                            config,
+                            client,
+                            login,
+                            log,
+                            note,
+                            progress,
+                            config_dir,
                         )
                 except controls.NoteTaken:
                     # At the W1 check, nothing written: the Note stays with
                     # the person, and the next Note gets a fresh browser.
                     _close_context(page)
                     progress.taken = False
-                    line = _untouched(note)
+                    line = _untouched(client, note)
                     page = browser.fresh()
                 output.note(line)
                 progress.note_id = None  # done: a later error isn't this Note's
@@ -351,7 +342,9 @@ def _note_loop(
         returned = not progress.taken or (
             not submitted
             and isinstance(error, Exception)
-            and _return_after_stop(guard, config, options, login, log, progress.note_id)
+            and _return_after_stop(
+                guard, config, client, options, login, log, progress.note_id
+            )
         )
         try:
             log.event(
@@ -399,7 +392,7 @@ def _note_loop(
 def _hold_recheck(
     guard: ActionGuard,
     page: Page,
-    config: Config,
+    client: Client,
     login: tuple[str, str, str],
     log: RunLog,
     bookings: Sequence[Booking],
@@ -414,9 +407,7 @@ def _hold_recheck(
     checked = bookings[:HOLD_RECHECK_CAP]
     lost = 0
     for booked in checked:
-        state = driver.recheck_hold(
-            guard, page, *login, booked, B1ProjectRule(config.site)
-        )
+        state = driver.recheck_hold(guard, page, *login, booked, client.project_rule())
         held = state not in HOLD_LOST_DETAIL
         try:
             log.flush(note_id=None, step="0")
@@ -446,16 +437,12 @@ def _hold_recheck(
     driver.reload_home(guard, page, *login)
 
 
-def _po_number(note: EligibleNote) -> str:
-    return f"{note.internal_no}/{rules.PO_SUFFIX}"
-
-
-def _untouched(note: EligibleNote) -> output.Note:
+def _untouched(client: Client, note: EligibleNote) -> output.Note:
     return output.Note(
         note_id=note.note_id,
         outcome="untouched",
         reason=NOTE_TAKEN,
-        po_number=_po_number(note),
+        po_number=client.po_number(note),
     )
 
 
@@ -463,6 +450,7 @@ def _one_note(
     guard: ActionGuard,
     page: Page,
     config: Config,
+    client: Client,
     login: tuple[str, str, str],
     log: RunLog,
     note: EligibleNote,
@@ -471,15 +459,15 @@ def _one_note(
 ) -> output.Note:
     note_id = progress.note_id = note.note_id
     progress.taken = False
-    po_number = _po_number(note)
+    po_number = client.po_number(note)
     window = driver.find_note_again(guard, page, *login, note_id)
     in_pool = driver.read_assignee(window) == config.pool_name
     log.event("assignee_check", note_id=note_id, step="2", ok=in_pool)
     if not in_pool:  # a person has it: never taken
-        return _untouched(note)
+        return _untouched(client, note)
     progress.taken = True
     driver.take_note(guard, window, config.agent_user_name, log, note_id)
-    decision = _decide(guard, page, config, login, log, note, window)
+    decision = _decide(guard, page, client, login, log, note, window)
     if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
     if config_dir is not None and isinstance(decision, Proceed):
@@ -488,6 +476,7 @@ def _one_note(
                 guard,
                 page,
                 config,
+                client,
                 login,
                 decision,
                 config_dir,
@@ -525,9 +514,9 @@ def _one_note(
     log.event("assignee_check", note_id=note_id, step="return", ok=still_ours)
     if not still_ours:  # a person has it now: left with them
         progress.taken = False
-        return _untouched(note)
+        return _untouched(client, note)
     driver.return_note(
-        guard, window, config.agent_user_name, config.pool_name, log, note_id
+        guard, window, config.agent_user_name, client.return_target(), log, note_id
     )
     progress.taken = False
     if isinstance(decision, Proceed):
@@ -548,6 +537,7 @@ def _book(
     guard: ActionGuard,
     page: Page,
     config: Config,
+    client: Client,
     login: tuple[str, str, str],
     proceed: Proceed,
     config_dir: Path,
@@ -568,8 +558,8 @@ def _book(
         login=login,
         controls=gate,
         agent=config.agent_user_name,
-        project_rule=B1ProjectRule(config.site),
-        document_type=config.project_document_type,
+        project_rule=client.project_rule(),
+        document_type=client.document_type(),
         stop_after="W5",
         log=log,
     )
@@ -581,15 +571,16 @@ def _book(
 def _decide(
     guard: ActionGuard,
     page: Page,
-    config: Config,
+    client: Client,
     login: tuple[str, str, str],
     log: RunLog,
     note: EligibleNote,
     window: Locator,
 ) -> Skip | Proceed:
-    """Steps 2a-11 on what the Note window and MySys show. decide() reads the
-    project only once the Note and PDF checks pass (that read reloads, so the
-    window is gone after it)."""
+    """Steps 2a-11 on what the Note window and MySys show: the driver reads,
+    the client decides. The client calls the project lookup only once the
+    Note and PDF checks pass (that read reloads, so the window is gone after
+    it)."""
     note_id = note.note_id
     linked = not driver.is_unlinked(window, log, note_id)
     names: tuple[str, ...] = ()
@@ -600,30 +591,24 @@ def _decide(
     snapshot = NoteSnapshot(
         note_id=note_id,
         title="",  # step 0 read the title rule on the Note Pool cell
-        body=driver.note_body(window, body_rule(pdf.file_name)) if pdf else "",
+        body=driver.note_body(window, client.body_rule(pdf.file_name)) if pdf else "",
         attachment_names=names,
         project_linked=linked,
     )
-    texts = (
-        readers.read(pdf.data)
-        if pdf
-        else readers.PdfTexts(plumber="", pypdf="", data=b"")
-    )
-    return decide(
+    return client.decide(
         snapshot,
-        note.internal_no,
-        texts,
+        note,
+        pdf.data if pdf else None,
         lambda: driver.project_lookup(
-            guard, page, *login, note.internal_no, B1ProjectRule(config.site)
+            guard, page, *login, note.internal_no, client.project_rule()
         ),
-        site=config.site,
-        duplicate_ignores_cancelled=config.duplicate_ignores_cancelled,
     )
 
 
 def _return_after_stop(
     guard: ActionGuard,
     config: Config,
+    client: Client,
     options: argparse.Namespace,
     login: tuple[str, str, str],
     log: RunLog,
@@ -644,7 +629,7 @@ def _return_after_stop(
                     guard,
                     window,
                     config.agent_user_name,
-                    config.pool_name,
+                    client.return_target(),
                     log,
                     note_id,
                 )

@@ -137,7 +137,8 @@ src/po_agent/
     output.py                   the ONLY module that prints (stdout contract below)
     runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log), its one traceback writer; feeds the trace
     trace.py                    the safe trace (7.3): allowlisted fields only, one file per day, 90 days
-    run.py                      Note loop, RUN_SUMMARY
+    run.py                      Note loop, RUN_SUMMARY; asks the run's client (client.py), imports no client package
+    client.py                   the client interface (task 9.4; ADR-003 decision 2): Note Pool filters, list eligibility, NOTE line PO, body rule, project rule, decide, Documents Type, return target; core/ imports no client package except demo.py (tests/test_mysys_client_free.py)
     demo.py                     supervised demo: one trial PO, Enter before every write (decisions, 27 Oct 2026)
     controls.py                 kill switch, Perth window, run cap, before_write, assignee check, stale-Note stop
     errors.py                   typed errors, their exit codes and ALERT kinds
@@ -155,6 +156,9 @@ src/po_agent/
     readers.py                  both readers' texts as one value; the two-readers rule (agreement, address check on both)
     address.py                  normaliser + address check against the project's address
     decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given); B1's values for `mysys/`: Note Pool filters (the pool, Locked), the body rule (ends with the file name), B1ProjectRule
+    client.py                   B1 as the run loop's client (core/client.py): step 0 on the Note Pool rows, its values from config/<site>.toml
+  summit/                       Summit Home's rules (Client 2); no browser code, as b1/
+    client.py                   Summit as the run loop's client: a stub that refuses (ALERT CONFIG, exit 2) until tasks 9.9-9.14
 config/test.toml                test-site profile; no secrets
 config/live.toml                live profile; no secrets; ask-first for Claude (protect_paths)
 config/clients/summit.toml      Summit's client values and creator table (Client 2 -> The separate run); no secrets
