@@ -108,7 +108,7 @@ Real-PO seam (laptop): uv run pytest tests/seam1 -m real_data   uses the main ch
 Decide only:         uv run po-agent run --site test --decide-only
 Real run:            uv run po-agent run --site test
 Supervised demo:     uv run po-agent demo --site test --headed [--until-check]   one PO, Enter before every write (decisions, 27 Oct 2026)
-Secrets pre-flight:  uv run po-agent preflight --site test|live   secret names and ok / not set / malformed / store unavailable, never values; no login, no network; exit 2 if any is not ok (decisions, 20 Nov 2026, secrets pre-flight)
+Secrets pre-flight:  uv run po-agent preflight --site test|live [--client b1|summit]   secret names and ok / not set / malformed / store unavailable, never values; no login, no network; exit 2 if any is not ok (decisions, 20 Nov 2026, secrets pre-flight)
 Link probe:          uv run po-agent demo --site test --probe-link   opens Choose Project, searches, snapshots, selects nothing (decisions, 28 Oct 2026)
 Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
 Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only test|live   site required; fetch, enabled from config/<site>.toml on main, production tag, sync, run, log, alert
@@ -132,8 +132,8 @@ pyproject.toml, uv.lock         [project.scripts] po-agent = "po_agent.cli:main"
 src/po_agent/
   cli.py                        argument parsing; maps errors to exit codes
   core/                         reusable for the next MySys automations
-    config.py                   load + validate config/<site>.toml (test, live); each refuses any host but its own (TEST_HOST, LIVE_HOST)
-    secrets.py                  PO_AGENT_* env var, else keyring; one MySys pair per site; `inspect` = status only, for the pre-flight
+    config.py                   load + validate config/<site>.toml (test, live); each refuses any host but its own (TEST_HOST, LIVE_HOST); and config/clients/<client>.toml (summit only, task 9.3)
+    secrets.py                  PO_AGENT_* env var, else keyring; one MySys pair per site and client (Summit: live only); `inspect` = status only, for the pre-flight
     output.py                   the ONLY module that prints (stdout contract below)
     runlog.py                   detailed JSON-lines log to logs/ (only with --detailed-log), its one traceback writer; feeds the trace
     trace.py                    the safe trace (7.3): allowlisted fields only, one file per day, 90 days
@@ -157,6 +157,7 @@ src/po_agent/
     decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given); B1's values for `mysys/`: Note Pool filters (the pool, Locked), the body rule (ends with the file name), B1ProjectRule
 config/test.toml                test-site profile; no secrets
 config/live.toml                live profile; no secrets; ask-first for Claude (protect_paths)
+config/clients/summit.toml      Summit's client values and creator table (Client 2 -> The separate run); no secrets
 scripts/check.py                the one check command
 scripts/guard_check.py          fails if browser action calls appear outside mysys/guard.py
 scripts/macmini-run.sh          Mac Mini wrapper `<mode> <test|live>`: fetch, enabled from config/<site>.toml on origin/main, check out the production tag, uv sync, run, append to runs.log, alert issue without Note IDs

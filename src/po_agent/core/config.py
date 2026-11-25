@@ -1,4 +1,6 @@
-"""Load and validate config/<site>.toml (SPEC.md -> Project Structure).
+"""Load and validate config/<site>.toml (SPEC.md -> Project Structure) and a
+client's config/clients/<client>.toml (task 9.3; SPEC.md -> Client 2, The
+separate run): only Summit has one, live only, with its creator table.
 
 Two profiles: config/test.toml and config/live.toml (decisions, 10 Nov 2026,
 live profile). Each file's `base_url` must be https on exactly its own site's
@@ -137,6 +139,111 @@ def parse_config(data: dict) -> Config:
         loc = error.errors(include_url=False)[0]["loc"]
         field = ".".join(str(part) for part in loc) or None
         raise ConfigError("invalid config value", field=field) from None
+
+
+def _fold(name: str) -> str:
+    """A company name or alias as it is compared: trimmed, case-folded."""
+    return name.strip().casefold()
+
+
+def _not_blank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("blank")
+    return value
+
+
+class Company(_Section):
+    """One creator-table row (SPEC.md -> Client 2, Creator table): the row's
+    creator, or `previous_task` (the previous task's Task Creator), never
+    both."""
+
+    name: str
+    aliases: tuple[str, ...] = ()
+    creator: str | None = Field(None, min_length=1)
+    creator_rule: Literal["previous_task"] | None = None
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def _name_not_blank(cls, name: str) -> str:
+        return _not_blank(name)
+
+    @field_validator("aliases", mode="after")
+    @classmethod
+    def _aliases_not_blank(cls, aliases: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(_not_blank(alias) for alias in aliases)
+
+    @model_validator(mode="after")
+    def _one_creator(self) -> "Company":
+        if (self.creator is None) == (self.creator_rule is None):
+            raise ValueError("exactly one of creator and creator_rule")
+        return self
+
+
+class ClientProfile(_Section):
+    """config/clients/<client>.toml: a client's own values beside the site's
+    (SPEC.md -> Client 2, The separate run). Only Summit has one; B1's values
+    stay in config/<site>.toml."""
+
+    client: Literal["summit"]
+    # Summit has no test-site profile (decisions, 23 Nov 2026).
+    sites: tuple[Literal["live"], ...] = Field(min_length=1)
+    enabled: StrictBool
+    agent_user_name: str = Field(min_length=1)
+    source_filter: str = Field(min_length=1)
+    sender: str = Field(min_length=1)
+    locked_filter: Literal["Unlocked"]
+    any_assignee_before: time
+    max_notes_per_run: int = Field(gt=0)
+    max_peeks_per_run: int = Field(gt=0)
+    project_document_type: str = Field(min_length=1)
+    company: tuple[Company, ...] = Field(min_length=1)
+
+    @field_validator("company", mode="after")
+    @classmethod
+    def _names_unique(cls, companies: tuple[Company, ...]) -> tuple[Company, ...]:
+        # Every name and alias names one row only, so a company maps to at
+        # most one creator.
+        seen: set[str] = set()
+        for company in companies:
+            for name in (company.name, *company.aliases):
+                if _fold(name) in seen:
+                    raise ValueError("a company name or alias appears twice")
+                seen.add(_fold(name))
+        return companies
+
+
+CLIENT_FILES = ("summit",)
+
+
+def parse_client(data: dict) -> ClientProfile:
+    try:
+        return ClientProfile.model_validate(data)
+    except ValidationError as error:
+        # The field path only: pydantic's text includes the input value.
+        loc = error.errors(include_url=False)[0]["loc"]
+        field = ".".join(str(part) for part in loc) or None
+        raise ConfigError("invalid client config value", field=field) from None
+
+
+def load_client(client: str, site: str, config_dir: Path = CONFIG_DIR) -> ClientProfile:
+    """config/clients/<client>.toml; a client without a file is refused
+    before any file is opened, and the file must name its own client and
+    list the site."""
+    if client not in CLIENT_FILES:
+        raise ConfigError("client has no client file")
+    try:
+        with open(config_dir / "clients" / f"{client}.toml", "rb") as file:
+            data = tomllib.load(file)
+    except OSError:
+        raise ConfigError("client file not readable") from None
+    except tomllib.TOMLDecodeError:
+        raise ConfigError("client file is not valid TOML") from None
+    profile = parse_client(data)
+    if profile.client != client:
+        raise ConfigError("client file is for another client", field="client")
+    if site not in profile.sites:
+        raise ConfigError("client does not run on that site", field="sites")
+    return profile
 
 
 def load_config(site: str, config_dir: Path = CONFIG_DIR) -> Config:
