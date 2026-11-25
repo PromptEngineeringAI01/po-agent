@@ -31,6 +31,9 @@ def risk():
         "src/po_agent/b1/readers.py",
         "src/po_agent/b1/decision.py",
         "src/po_agent/b1/address.py",
+        "src/po_agent/summit/readers.py",  # SPEC Client 2: readers, rules, decision engine
+        "src/po_agent/summit/decision.py",
+        "src/po_agent/summit/companies.py",
         "scripts/guard_check.py",
         "scripts/check.py",
         "scripts/risk.py",
@@ -55,6 +58,7 @@ def test_high_paths(risk, path):
         "src/po_agent/b1/models.py",
         "src/po_agent/cli.py",
         "src/po_agent/mysysx.py",  # not inside mysys/
+        "src/po_agent/summitx.py",  # not inside summit/
         "scripts/heartbeat_check.py",
         "scripts/macmini-run.sh",
         "scripts/risk_helper.py",  # near misses: whole paths only
