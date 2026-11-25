@@ -168,6 +168,28 @@ pdf_replace = [
 ]
 expect_skip = "NOT_COMPACTION"
 
+[[case]]
+id = "notes-say-compaction-testing"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "COMPACTION TESTING"],
+]
+expect_skip = "NOT_COMPACTION"
+
+# The item row itself (Joey, 25 Nov 2026: item line only).
+
+[[case]]
+id = "item-row-compaction-testing"
+pdf_replace = [["COMPACTION TEST", "COMPACTION TESTING"]]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "item-description-on-a-line-of-its-own"
+plumber_replace = [["COMPACTION TEST 1.000 EA 99.00 99.00", "1.000 EA 99.00 99.00\nCOMPACTION TEST"]]
+expect_company = "Summit Homes Group"
+expect_po = "123456/020/01"
+expect_compaction = true
+
 # --- the Purchase Order No: value (open question 3: anything uncertain -> PO_MISMATCH) ---
 
 [[case]]
