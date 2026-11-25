@@ -20,13 +20,13 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 
 **S-A Seam, B1 unchanged**
 - [x] **9.1** Shared models (`core/models.py`); the Creator travels in the `Proceed`, no `CREATOR` constant in `mysys/` · step · refactor · high
-- [x] **9.2** `mysys/` imports no client package and holds no client constant; the booker moves to `mysys/booker.py` (PRs 177, 178); B1 seam 2 still pending, batched by the advisor before Checkpoint S-A · step · refactor · high
+- [x] **9.2** `mysys/` imports no client package and holds no client constant; the booker moves to `mysys/booker.py` (PRs 177, 178); B1 seam 2 green at Checkpoint S-A (runs 1-10a) · step · refactor · high
 - [x] **9.3** `--client b1|summit`; `config/clients/summit.toml` (Summit Renovations; Summit Project = Summit Developments only; `enabled = false`); Summit secret names; `preflight --client summit`; `--site test --client summit` refused · step · high
 - [x] **9.4** Client interface (`core/client.py`) in the run loop; `core/` imports no client package (except `demo.py`) · step · refactor · high
 - [x] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
 - [x] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
 
-**Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; friction log's "Proposed" rows decided (`docs/factory-handbook.md` §11); release summary read before the tag moves (`docs/macmini-setup.md`); first B1 hourly run watched after any tag move past here.
+**Checkpoint S-A:** check green; import test green; B1 seam 2 green (done 25 Nov: Joey ran runs 1-10a only, all passed on a00cfb7; runs 11 and 12 skipped, since 9.1-9.5 didn't change their code; decisions, 25 Nov 2026); 9.6 merged; friction log's "Proposed" rows decided (`docs/factory-handbook.md` §11; done 25 Nov, PR 186); release summary read before the tag moves (`docs/macmini-setup.md`); first B1 hourly run watched after any tag move past here.
 
 **S-B Decide, offline**
 - [ ] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers · step · **review stop** · high
