@@ -23,7 +23,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [x] **9.2** `mysys/` imports no client package and holds no client constant; the booker moves to `mysys/booker.py` (PRs 177, 178); B1 seam 2 still pending, batched by the advisor before Checkpoint S-A · step · refactor · high
 - [x] **9.3** `--client b1|summit`; `config/clients/summit.toml` (Summit Renovations; Summit Project = Summit Developments only; `enabled = false`); Summit secret names; `preflight --client summit`; `--site test --client summit` refused · step · high
 - [x] **9.4** Client interface (`core/client.py`) in the run loop; `core/` imports no client package (except `demo.py`) · step · refactor · high
-- [ ] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
+- [x] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
 - [x] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
 
 **Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; friction log's "Proposed" rows decided (`docs/factory-handbook.md` §11); release summary read before the tag moves (`docs/macmini-setup.md`); first B1 hourly run watched after any tag move past here.
@@ -41,7 +41,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.12** The peek (read-only open, iframe body rule, download, readers, lookup, decide) and `run --decide-only --client summit`; guard history read-only for untouched Notes · step · high
 - [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> `---` once S.0 confirms it, else ALERT); from 9.4: `Client.return_target()` takes the original assignee read in the peek · step · high
 - [ ] **9.14** Summit booking W1-W5: decided Creator (missing option -> `WRITE_NOT_STARTED`), full PO, body, previous-task recheck at W1, Documents name per S.0; `run --client summit` books (needs S.0 screens) · step · high
-- [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist at :30 (07:30-17:30 Mon-Fri Perth; Joey, 24 Nov 2026), Healthchecks `healthchecks_ping_url_summit`, alert issues `po-agent alert summit <run_id>`, `docs/macmini-setup.md` and `docs/ops-runbook.md` · step · medium · ask-first files
+- [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist at :30 (07:30-17:30 Mon-Fri Perth; Joey, 24 Nov 2026), Healthchecks `healthchecks_ping_url_summit`, alert issues `po-agent alert summit <run_id>`, `docs/macmini-setup.md` and `docs/ops-runbook.md`; plus the 9.5 list in decisions, 25 Nov 2026, per-client run controls (wrapper reads the client's `enabled`, `stop_group` browser kill, runbook lock path and `rm -rf` step, Summit leftovers when only Summit is stopped) · step · medium · ask-first files
 
 **Checkpoint S-C:** SPEC's offline Summit tests green; friction log's "Proposed" rows decided; B1 seam 2 booking cases green; the client file still `enabled = false`.
 

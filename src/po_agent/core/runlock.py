@@ -1,9 +1,12 @@
-"""One run at a time per site (docs/decisions.md, 21 Nov 2026, run lock).
+"""One run at a time per site and client (docs/decisions.md, 21 Nov 2026,
+run lock; task 9.5, 23 Nov 2026, separate run).
 
-An OS file lock on `state/run-<site>.lock`, taken at the start of every
-`po-agent` run (cli._run) and held until the process ends. It keeps a launchd
-run and a manual run, or a slow run and the next hour's, from logging in to
-one site with its one agent account at once.
+An OS file lock on `state/run-<site>.lock` (B1) or
+`state/run-<site>-<client>.lock` (Summit; `lock_name`), taken at the start of
+every `po-agent` run (cli._run) and held until the process ends. It keeps a
+launchd run and a manual run, or a slow run and the next hour's, from
+logging in to one site with one agent account at once. Each client has its
+own MySys account, so a B1 run and a Summit run don't block each other.
 
 - The OS frees the lock when its process dies, however it dies, so a crash or
   a kill never leaves a stale lock and no one has to delete a file.
@@ -34,6 +37,12 @@ from pathlib import Path
 # A holder older than this is stuck, not just busy (a run takes minutes).
 STUCK_AFTER_S = 3600
 _WINDOWS_LOCK_OFFSET = 2**30
+
+
+def lock_name(site: str, client: str) -> str:
+    """The lock file's name in `state/`: B1 keeps the name it had before
+    there were two clients."""
+    return f"run-{site}.lock" if client == "b1" else f"run-{site}-{client}.lock"
 
 
 class RunLockHeld(Exception):

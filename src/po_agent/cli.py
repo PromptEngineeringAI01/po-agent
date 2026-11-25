@@ -35,10 +35,13 @@ The safe trace (7.3) starts right after config is loaded, when config sets
 `trace_dir` (core/trace.py): the run log's events, then one run_end event
 (pass, or the reported error's type). It is a file, never stdout.
 
-Order: run_id (before anything can fail), command line, the run lock
-(decisions, 21 Nov 2026: held by another run -> INFO, exit 0), leftover
-download folders swept (D2), config, the kill switch and the Perth window (3.5:
-exit 0, nothing launched), secrets, then the mode. Config and secret
+Order: run_id (before anything can fail), command line, the client file
+(Summit), the run lock per site and client (decisions, 21 Nov 2026: held by
+another run -> INFO, exit 0; 23 Nov 2026: Summit's own lock), Summit's
+refusal until its modes land (before any secret, login or browser), the
+run's own client's leftover download folders swept (D2), config, the kill
+switch (the site's, and the client file's) and the Perth window (3.5: exit
+0, nothing launched), secrets, then the mode. Config and secret
 problems exit 2 before any browser is launched. `run` books since 4.5 (its
 refusal until then, D1, is gone); `run --decide-only` books nothing.
 """
@@ -59,6 +62,7 @@ from po_agent.core.client import Client
 from po_agent.core.config import (
     CONFIG_DIR,
     SITE_HOSTS,
+    ClientProfile,
     Config,
     load_client,
     load_config,
@@ -148,14 +152,33 @@ def new_run_id() -> str:
     return f"{start}-{os.urandom(2).hex()}"
 
 
-def sweep_download_dirs() -> None:
-    """Removes leftover po-agent-dl-* folders from the system temp dir (D2).
+def _download_prefix(client: str) -> str:
+    """B1's folders keep the name they had before there were two clients:
+    po-agent-dl-<run_id>; Summit's are po-agent-dl-summit-<run_id>."""
+    return DOWNLOAD_PREFIX if client == "b1" else f"{DOWNLOAD_PREFIX}{client}-"
+
+
+def download_dir(client: str, run_id: str) -> Path:
+    """The run's download folder in the system temp dir (D2)."""
+    return Path(tempfile.gettempdir()) / f"{_download_prefix(client)}{run_id}"
+
+
+def sweep_download_dirs(client: str = "b1") -> None:
+    """Removes the client's leftover download folders from the system temp
+    dir (D2). Only its own: the other client's run may be going on now
+    (each client has its own run lock; task 9.5).
 
     A folder that can't be removed stops the run (exit 2) before login.
     Symlinks and junctions are left alone: rmtree refuses them, and they hold
     no download themselves.
     """
-    for path in Path(tempfile.gettempdir()).glob(DOWNLOAD_PREFIX + "*"):
+    # B1's prefix starts every other client's: skip theirs.
+    others = tuple(
+        _download_prefix(other) for other in CLIENTS if other not in ("b1", client)
+    )
+    for path in Path(tempfile.gettempdir()).glob(_download_prefix(client) + "*"):
+        if others and path.name.startswith(others):
+            continue
         if not path.is_dir() or path.is_symlink() or path.is_junction():
             continue
         shutil.rmtree(path, ignore_errors=True)
@@ -169,17 +192,20 @@ def start(
     credentials: dict[SecretName, str],
     options: argparse.Namespace,
     summary: output.RunSummary,
+    profile: ClientProfile | None = None,
 ) -> int:
     """The mode's entry point and its exit code; it fills the summary's
     counts. The Note loop's run log goes to logs/ only with --detailed-log,
-    and to the run's trace always."""
+    and to the run's trace always. `profile`: the client's file, None for
+    B1."""
     trace = _TRACES.get(summary.run_id)
-    downloads = Path(tempfile.gettempdir()) / f"{DOWNLOAD_PREFIX}{summary.run_id}"
+    name = getattr(options, "client", "b1")  # the demo has no --client
+    downloads = download_dir(name, summary.run_id)
     if mode == "demo":
         return demo.run(config, credentials, options, summary, downloads)
-    client = client_for(options.client, config)
+    client = client_for(name, config)
     if mode == "spike":
-        return run.spike(config, client, credentials, options, summary)
+        return run.spike(config, client, credentials, options, summary, profile)
     logs = LOGS_DIR if options.detailed_log else None
     if mode == "run":
         return run.book_run(
@@ -192,9 +218,10 @@ def start(
             logs,
             CONFIG_DIR,
             trace,
+            profile,
         )
     return run.decide_only(
-        config, client, credentials, options, summary, downloads, logs, trace
+        config, client, credentials, options, summary, downloads, logs, trace, profile
     )
 
 
@@ -251,16 +278,13 @@ def _run(
         raise ConfigError("a demo that writes needs --headed")
     client = getattr(options, "client", "b1")  # the demo has no --client
     names = secret_names(mode, options.site, client)  # before any file is read
-    if client == "summit":
-        # Its client file is checked (ALERT CONFIG on any breach), then the
-        # mode is refused until its task lands: spike 9.11, decide-only 9.12,
-        # run 9.14.
-        load_client(client, options.site, CONFIG_DIR)
-        raise ConfigError("mode not built for this client yet")
-    # The run lock (core/runlock.py), per site, before anything else touches
-    # disk or MySys: the sweep below deletes another run's download folder.
+    # A client file is checked first (ALERT CONFIG on any breach).
+    profile = None if client == "b1" else load_client(client, options.site, CONFIG_DIR)
+    # The run lock (core/runlock.py), per site and client, before anything
+    # else touches disk or MySys: the sweep below deletes the client's other
+    # runs' download folders.
     try:
-        lock = runlock.acquire(STATE_DIR / f"run-{options.site}.lock")
+        lock = runlock.acquire(STATE_DIR / runlock.lock_name(options.site, client))
     except runlock.RunLockHeld as held:
         if held.held_s is not None and held.held_s > runlock.STUCK_AFTER_S:
             raise RunLockStuck("run lock held for over an hour") from None
@@ -269,7 +293,7 @@ def _run(
     except OSError:
         raise ConfigError("run lock not available") from None
     try:
-        return _run_locked(mode, options, summary, trace, names)
+        return _run_locked(mode, options, summary, trace, names, client, profile)
     finally:
         lock.release()
 
@@ -280,11 +304,20 @@ def _run_locked(
     summary: output.RunSummary,
     trace: Trace,
     names: tuple[SecretName, ...],
+    client: str,
+    profile: ClientProfile | None,
 ) -> int:
-    sweep_download_dirs()
+    if client == "summit":
+        # Refused until its task lands (spike 9.11, decide-only 9.12, run
+        # 9.14): before any secret is read, any login or any browser.
+        raise ConfigError("mode not built for this client yet")
+    if profile is None:  # B1: the sweep's call as before there were two clients
+        sweep_download_dirs()
+    else:
+        sweep_download_dirs(client)
     config = load_config(options.site, CONFIG_DIR)
     _start_trace(trace, config)
-    if not config.enabled:
+    if not controls.run_enabled(config, profile):
         output.info("kill switch on: run not started")
         return 0
     if mode in WINDOW_MODES and not controls.in_window(
@@ -294,7 +327,9 @@ def _run_locked(
         return 0
     credentials = {name: secrets.get(name) for name in names}
     output.info("config loaded")
-    return start(mode, config, credentials, options, summary)
+    if profile is None:  # B1: start's call as before there were two clients
+        return start(mode, config, credentials, options, summary)
+    return start(mode, config, credentials, options, summary, profile)
 
 
 def _report(error: BaseException, run_id: str, detailed_log: bool) -> int:
@@ -324,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         summary.mode = mode
         summary.site = options.site if options.site in ("test", "live") else None
+        summary.client = getattr(options, "client", "b1")  # the demo is B1's
         exit_code = _run(mode, options, summary, trace)
     except BaseException as error:  # noqa: BLE001 - the catch-all: nothing reaches stderr
         failure = error

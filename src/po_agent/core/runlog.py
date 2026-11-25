@@ -76,11 +76,18 @@ class RunLog:
         self._write(event, note_id, step, ok, names)
 
     def booked(
-        self, *, note_id: str, pln: str, task_id: str, internal_no: str, site: str
+        self,
+        *,
+        note_id: str,
+        pln: str,
+        task_id: str,
+        internal_no: str,
+        site: str,
+        client: str,
     ) -> None:
         """A booking that passed W5: the run log's "booked" event (with
         --detailed-log) and the trace's booked event, which the next runs'
-        hold re-check reads."""
+        hold re-check of the same site and client reads."""
         self.flush(note_id=note_id, step="W5")
         if self.trace is not None:
             self.trace.booked(
@@ -89,10 +96,17 @@ class RunLog:
                 task_id=task_id,
                 internal_no=internal_no,
                 site=site,
+                client=client,
             )
         if self.path is None:
             return
-        ids = {"pln": pln, "task_id": task_id, "internal_no": internal_no, "site": site}
+        ids = {
+            "pln": pln,
+            "task_id": task_id,
+            "internal_no": internal_no,
+            "site": site,
+            "client": client,
+        }
         names = {key: identifier(value) for key, value in ids.items()}
         _append(self.path, _line(self.run_id, "booked", note_id, "W5", True, names))
 

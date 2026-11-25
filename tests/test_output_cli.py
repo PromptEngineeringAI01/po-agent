@@ -48,9 +48,12 @@ NOTE_FIELDS = {
     "cost_aud",
 }
 ALERT_FIELDS = {"note_id", "step", "detail"}
+# 9.5: RUN_SUMMARY gains "client", B1's too (decisions, 23 Nov 2026,
+# separate run; SPEC.md -> Client 2, The separate run).
 SUMMARY_FIELDS = {
     "run_id",
     "site",
+    "client",
     "mode",
     "seen",
     "eligible",

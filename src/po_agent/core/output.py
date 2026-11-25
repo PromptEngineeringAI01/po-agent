@@ -116,8 +116,11 @@ class SecretCheck(_Line):
 
 
 class RunSummary(_Line):
+    # run_id stays the first key: the Mac Mini wrapper reads it from there.
     run_id: str = Field(pattern=r"^\d{8}T\d{6}Z-[0-9a-f]{4}$")
     site: Literal["test", "live"] | None = None
+    # The run's client, B1's too (9.5; decisions, 23 Nov 2026, separate run).
+    client: Literal["b1", "summit"] | None = None
     mode: Mode | None = None
     seen: Count = 0
     eligible: Count = 0

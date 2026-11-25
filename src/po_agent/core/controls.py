@@ -2,11 +2,16 @@
 built before any booking code (D1).
 
 - Kill switch: `enabled` is read at run start (cli.py) and again from
-  config/<site>.toml before every write step (`Controls.before_write`).
+  config/<site>.toml before every write step (`Controls.before_write`). A
+  client with its own file (Summit) also needs that file's `enabled`, at
+  both points (`run_enabled`; task 9.5, SPEC.md -> The separate run).
 - Perth window: `run` and `run --decide-only` start only Mon-Fri 07:00-18:00
   in `run_window.tz`; `spike`, `demo` and seam 2 ignore it.
 - Run cap: checked before each Note is started; a Note in progress is
-  finished (Open question 7).
+  finished (Open question 7). B1: Notes started, the site's
+  `max_notes_per_run`. Summit: its client file's `max_peeks_per_run` (Notes
+  opened) and `max_notes_per_run` (bookings). Both: the site's
+  `max_run_minutes`.
 - Stale-Note stop (D6): `run` and `run --decide-only`, after login and
   before the eligible list is read; `spike` skips it.
 - Assignee check (3.6), before W1 and W4 only (D7): a fresh Note Pool read,
@@ -23,7 +28,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from playwright.sync_api import Locator, Page
 
-from po_agent.core.config import Config, RunWindow, load_config
+from po_agent.core.config import (
+    ClientProfile,
+    Config,
+    RunWindow,
+    load_client,
+    load_config,
+)
 from po_agent.core.errors import (
     ConfigError,
     MorePages,
@@ -59,12 +70,30 @@ def in_window(window: RunWindow, at: datetime) -> bool:
     return local.weekday() < 5 and window.start <= local.time() < window.end
 
 
-def cap_reached(config: Config, started: datetime, done: int) -> bool:
-    """Before starting a Note: `done` Notes started since `started`."""
-    elapsed = now() - started
-    return done >= config.max_notes_per_run or elapsed >= timedelta(
-        minutes=config.max_run_minutes
-    )
+def run_enabled(config: Config, profile: ClientProfile | None) -> bool:
+    """The kill switch: the site's `enabled`, and the client file's when the
+    run's client has one (`profile`; None for B1)."""
+    return config.enabled and (profile is None or profile.enabled)
+
+
+def cap_reached(
+    config: Config,
+    started: datetime,
+    done: int,
+    *,
+    profile: ClientProfile | None = None,
+    booked: int = 0,
+) -> bool:
+    """Before starting a Note: `done` Notes started (opened) and `booked`
+    bookings since `started`. B1 (`profile` None): the site's
+    max_notes_per_run on Notes started. A client file: its max_peeks_per_run
+    on Notes opened and its max_notes_per_run on bookings. The site's
+    max_run_minutes for every client."""
+    if now() - started >= timedelta(minutes=config.max_run_minutes):
+        return True
+    if profile is None:
+        return done >= config.max_notes_per_run
+    return done >= profile.max_peeks_per_run or booked >= profile.max_notes_per_run
 
 
 class KillSwitch(Exception):
@@ -175,21 +204,37 @@ def assignee_check(
 
 class Controls:
     """The booker's gate before each W step. `assignee_check(note_id, step)`
-    raises if the Note isn't with the agent (3.6)."""
+    raises if the Note isn't with the agent (3.6). `client` names the run's
+    client: one with a client file (Summit) re-reads that file's kill
+    switch too."""
 
     def __init__(
-        self, site: str, config_dir: Path, assignee_check: AssigneeCheck
+        self,
+        site: str,
+        config_dir: Path,
+        assignee_check: AssigneeCheck,
+        *,
+        client: str = "b1",
     ) -> None:
         self.site = site
         self.config_dir = config_dir
         self.assignee_check = assignee_check
+        self.client = client
 
     def before_write(self, note_id: str, step: str) -> None:
         if step not in STEPS:
             raise ValueError("not a write step")
         submitted = step not in NOT_SUBMITTED
         try:
-            enabled = load_config(self.site, self.config_dir).enabled
+            config = load_config(self.site, self.config_dir)
+            # Any client but B1 must have its client file (load_client
+            # refuses an unknown one): never treated as B1 (9.5 review).
+            profile = (
+                None
+                if self.client == "b1"
+                else load_client(self.client, self.site, self.config_dir)
+            )
+            enabled = run_enabled(config, profile)
         except ConfigError:
             if submitted:
                 raise PartialWrite(

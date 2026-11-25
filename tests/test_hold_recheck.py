@@ -116,7 +116,11 @@ def mysys(env, tmp_path):
 
 
 def seed(
-    tmp_path: Path, day: date, *bookings: tuple[str, str, str, str], site="test"
+    tmp_path: Path,
+    day: date,
+    *bookings: tuple[str, str, str, str],
+    site="test",
+    client="b1",
 ) -> None:
     """Writes `booked` events, as an earlier run would, to `day`'s file."""
     trace_dir(tmp_path).parent.mkdir(exist_ok=True)  # as the Mac Mini has it
@@ -129,6 +133,7 @@ def seed(
             task_id=task_id,
             internal_no=internal_no,
             site=site,
+            client=client,
         )
 
 
@@ -199,7 +204,8 @@ def test_a_booking_writes_a_booked_event_with_its_pln_task_and_internal_no(
         "2600001B",
         "test",
     )
-    assert set(event) == KEYS | {"pln", "task_id", "internal_no", "site"}
+    # 9.5: the booked event gains `client` (decisions, 23 Nov 2026, separate run).
+    assert set(event) == KEYS | {"pln", "task_id", "internal_no", "site", "client"}
     # Every other event keeps exactly the 7.3 fields.
     assert all(set(e) == KEYS for e in events if e["name"] != "booked")
 
@@ -214,6 +220,7 @@ def test_booked_values_outside_their_closed_type_are_dropped(tmp_path):
         task_id="tsk_200001 | Compaction Test",
         internal_no="2600001B/048 Sampleville",
         site="Sampleville",
+        client="b1",
     )
 
     (line,) = (tmp_path / f"{FRIDAY.isoformat()}.jsonl").read_text("utf-8").splitlines()
@@ -224,7 +231,7 @@ def test_booked_values_outside_their_closed_type_are_dropped(tmp_path):
     assert all(event.get(key) is None for key in keys)
     # A booking missing a value can't be re-checked: it isn't listed.
     log.start(tmp_path, MONDAY)
-    assert log.recent_bookings("test") == ()
+    assert log.recent_bookings("test", "b1") == ()
 
 
 # --- which bookings are re-checked -----------------------------------------------
@@ -244,7 +251,7 @@ def test_recent_bookings_are_today_and_the_previous_working_day_newest_first(
     log = trace.Trace("20261102T020000Z-0001")
     log.start(trace_dir(tmp_path), MONDAY)
 
-    found = log.recent_bookings("test")
+    found = log.recent_bookings("test", "b1")
     assert [b.task_id for b in found] == ["tsk_200004", "tsk_200003", "tsk_200002"]
     first = found[0]
     assert (first.note_id, first.pln, first.internal_no) == (
@@ -261,7 +268,7 @@ def test_on_a_tuesday_the_previous_working_day_is_monday(tmp_path):
     log = trace.Trace("20261103T020000Z-0001")
     log.start(trace_dir(tmp_path), date(2026, 11, 3))
 
-    assert [b.task_id for b in log.recent_bookings("test")] == ["tsk_200002"]
+    assert [b.task_id for b in log.recent_bookings("test", "b1")] == ["tsk_200002"]
 
 
 def test_a_task_booked_twice_in_the_files_is_listed_once(tmp_path):
@@ -271,7 +278,7 @@ def test_a_task_booked_twice_in_the_files_is_listed_once(tmp_path):
     log = trace.Trace("20261102T020000Z-0001")
     log.start(trace_dir(tmp_path), MONDAY)
 
-    assert [b.task_id for b in log.recent_bookings("test")] == ["tsk_200001"]
+    assert [b.task_id for b in log.recent_bookings("test", "b1")] == ["tsk_200001"]
 
 
 def test_only_the_runs_own_sites_bookings_are_listed(tmp_path):
@@ -282,15 +289,97 @@ def test_only_the_runs_own_sites_bookings_are_listed(tmp_path):
     log = trace.Trace("20261102T020000Z-0001")
     log.start(trace_dir(tmp_path), MONDAY)
 
-    assert [b.task_id for b in log.recent_bookings("test")] == ["tsk_200002"]
-    assert [b.task_id for b in log.recent_bookings("live")] == ["tsk_200001"]
+    assert [b.task_id for b in log.recent_bookings("test", "b1")] == ["tsk_200002"]
+    assert [b.task_id for b in log.recent_bookings("live", "b1")] == ["tsk_200001"]
 
 
 def test_no_trace_folder_lists_no_bookings(tmp_path):
     log = trace.Trace("20261102T020000Z-0001")
     log.start(tmp_path / "missing" / "trace", MONDAY)
 
-    assert log.recent_bookings("test") == ()
+    assert log.recent_bookings("test", "b1") == ()
+
+
+# --- each client re-checks only its own bookings (task 9.5) ---------------------
+# SPEC.md -> Client 2, The separate run: the booked event gains `client`; the
+# re-check reads its own site's and client's events; an event without a
+# client (written before 9.5) is B1's.
+
+
+def seed_without_client(tmp_path: Path, day: date, n: int) -> None:
+    """A booked event as runs before 9.5 wrote it: no `client` key."""
+    note_id, pln, task_id, internal_no = booked(n)
+    event = {
+        "run_id": SEED_RUN,
+        "ts": "2026-10-30T01:02:03+00:00",
+        "note_id": note_id,
+        "step": "W5",
+        "name": "booked",
+        "outcome": "pass",
+        "duration_ms": 0,
+        "pln": pln,
+        "task_id": task_id,
+        "internal_no": internal_no,
+        "site": "test",
+    }
+    trace_dir(tmp_path).mkdir(parents=True, exist_ok=True)
+    path = trace_dir(tmp_path) / f"{day.isoformat()}.jsonl"
+    with open(path, "a", encoding="utf-8") as file:
+        file.write(json.dumps(event) + "\n")
+
+
+def test_each_client_lists_only_its_own_bookings_and_b1_the_old_ones(tmp_path):
+    seed(tmp_path, FRIDAY, booked(1), client="b1")
+    seed(tmp_path, FRIDAY, booked(2), client="summit")
+    seed_without_client(tmp_path, FRIDAY, 3)
+
+    log = trace.Trace("20261102T020000Z-0001")
+    log.start(trace_dir(tmp_path), MONDAY)
+
+    assert [b.task_id for b in log.recent_bookings("test", "b1")] == [
+        "tsk_200003",
+        "tsk_200001",
+    ]
+    assert [b.task_id for b in log.recent_bookings("test", "summit")] == ["tsk_200002"]
+
+
+def test_a_booking_with_a_client_outside_its_type_is_not_written(tmp_path):
+    # Written without its client it would read as B1's.
+    log = trace.Trace(SEED_RUN)
+    log.start(tmp_path, FRIDAY)
+
+    log.booked(
+        note_id="300001",
+        pln="pln_10001",
+        task_id="tsk_200001",
+        internal_no="2600001B",
+        site="test",
+        client="Sampleville",
+    )
+
+    path = tmp_path / f"{FRIDAY.isoformat()}.jsonl"
+    assert not path.exists() or "booked" not in path.read_text("utf-8")
+
+
+def test_a_b1_booking_s_event_names_b1(mysys, capsys, tmp_path):
+    mysys({"300002": FakeNote("2600001B")})  # PROCEED -> booked
+
+    assert book_run() == 0
+
+    stdout_of(capsys)
+    (event,) = [e for e in events_of(tmp_path) if e["name"] == "booked"]
+    assert event["client"] == "b1"
+
+
+def test_a_b1_run_does_not_recheck_summit_s_bookings(mysys, capsys, tmp_path):
+    seed(tmp_path, FRIDAY, booked(1), client="summit")
+    seed(tmp_path, FRIDAY, booked(2), client="b1")
+    fake = mysys({"300002": FakeNote("2600001B", names=())})  # NO_PDF
+
+    assert decide_only() == 0
+
+    stdout_of(capsys)
+    assert rechecked(fake) == ["tsk_200002"]
 
 
 # --- the re-check in a run -------------------------------------------------------
