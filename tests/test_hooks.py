@@ -598,6 +598,7 @@ OUTSIDE_BLOCKED = {
     "the app's data folder itself": f"{APP_DATA}/claude_abc/config.json",
     "the notes folder as a file": NOTES,
     "escape out of the notes folder": f"{NOTES}/../../config.json",
+    "lookalike app data folder": f"{APP_DATA}-evil/claude_abc/side-session-notes/n.md",
 }
 
 
@@ -626,6 +627,40 @@ def test_protect_paths_follows_a_symlink_out_of_the_plans_folder(places):
     plans.mkdir(parents=True)
     target.write_text("{}")
     link = plans / "link.md"
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        pytest.skip(f"this account can't create symlinks: {exc}")
+    assert_blocked(protect(link, places), "protect_paths")
+
+
+# The side-session notes rule, pinned beyond the PR 172 cases (its
+# second-model review, finding F2).
+
+
+def test_protect_paths_matches_the_notes_folder_in_the_os_case_rules(places):
+    # Windows paths ignore case, so this is the same folder there; on
+    # Linux and macOS (case-sensitive here) it's a different, blocked one.
+    rel = "appdata/local/claude-data/claude_abc/Side-Session-Notes/n.md"
+    result = protect(places["home"] / rel, places)
+    if os.name == "nt":
+        assert_allowed(result)
+    else:
+        assert_blocked(result, "protect_paths")
+
+
+def test_protect_paths_blocks_the_notes_folder_under_another_home(places):
+    other = places["home"].parent / "other-user"
+    assert_blocked(protect(other / NOTES / "n.md", places), "protect_paths")
+
+
+def test_protect_paths_follows_a_symlink_out_of_the_notes_folder(places):
+    target = places["home"] / ".claude" / "settings.json"
+    notes = places["home"] / NOTES
+    notes.mkdir(parents=True)
+    target.parent.mkdir(parents=True)
+    target.write_text("{}")
+    link = notes / "link.md"
     try:
         link.symlink_to(target)
     except OSError as exc:
