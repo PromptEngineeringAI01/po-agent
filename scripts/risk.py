@@ -6,6 +6,7 @@ The table is docs/workflow.md, Production build loop step 5 (decisions,
 - high: `src/po_agent/mysys/` (the guard and every MySys write), the booker,
   the readers and decision engine, the address rules, all of
   `src/po_agent/summit/` and `config/clients/` (company table, creators),
+  `core/secrets.py` and `core/config.py`,
   `scripts/guard_check.py`, `scripts/check.py` (= CI), `scripts/risk.py` and
   `scripts/verify_pr.py` (the scripts that grade a PR, so a PR can't loosen
   them unseen), `.claude/hooks/`,
@@ -41,6 +42,8 @@ HIGH_FILES = (
     "src/po_agent/b1/readers.py",
     "src/po_agent/b1/decision.py",
     "src/po_agent/b1/address.py",
+    "src/po_agent/core/secrets.py",  # secret names and lookup
+    "src/po_agent/core/config.py",  # site and client config, kill switch, caps
     "scripts/guard_check.py",
     "scripts/check.py",
     "scripts/risk.py",
