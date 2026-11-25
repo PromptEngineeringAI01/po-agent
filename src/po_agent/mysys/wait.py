@@ -34,6 +34,9 @@ LINK_TIMEOUT_MS = 60_000
 # The Projects search: Joey saw pauses of about 10 s (28 Oct 2026).
 SEARCH_TIMEOUT_MS = 60_000
 EMPTY_SETTLE_MS = 3000  # My Notes: how long an empty list must stay empty
+# Summit's email body: the same on this many reads in a row (a second at
+# POLL_MS), so a body still arriving is never read cut short (9.12 review).
+BODY_SETTLE_READS = 3
 OPEN_TRIES = 4  # x the page's 15 s
 MENU_TRIES = 3
 MENU_ITEM_MS = 2000  # a Project menu item, after each Project click

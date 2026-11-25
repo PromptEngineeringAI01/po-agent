@@ -998,23 +998,33 @@ def _one_iframe_body(window: Locator) -> str:
     """Summit's rule (task 9.12; SPEC.md -> Client 2, Email body): the text
     of the one iframe in the window whose document body is not empty, its
     line breaks kept. Read once the window holds an iframe and every iframe
-    has its text, or when the load wait (15 s) runs out; then none, or more
-    than one, non-empty -> UnexpectedScreen. A <pre> is never the body."""
+    has its text, the same on BODY_SETTLE_READS reads in a row (about a
+    second: a body still arriving is never read cut short, as it becomes
+    the task Note), or when the load wait
+    (15 s) runs out; then none, or more than one, non-empty ->
+    UnexpectedScreen. A <pre> is never the body."""
     frames = window.locator("iframe")
 
-    def texts() -> list[str]:
-        return [
+    def texts() -> tuple[str, ...]:
+        return tuple(
             frame.content_frame.locator("body").inner_text().strip()
             for frame in frames.all()
-        ]
+        )
 
-    def loaded() -> bool:
-        found = texts()
+    def read() -> tuple[str, ...] | None:
+        try:
+            return texts()
+        except PlaywrightError:
+            return None  # a frame re-rendering: read again
+
+    def loaded(found: tuple[str, ...]) -> bool:
         return bool(found) and all(found)
 
     try:
-        wait.until(wait.within(window.page), loaded)
-        found = [text for text in texts() if text]
+        settled = wait.settled(
+            wait.within(window.page), read, loaded, reads=wait.BODY_SETTLE_READS
+        )
+        found = [text for text in (settled or texts()) if text]
     except PlaywrightError:
         raise UnexpectedScreen("Note body not readable") from None
     if len(found) != 1:
