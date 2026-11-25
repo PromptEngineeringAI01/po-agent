@@ -13,6 +13,13 @@ would be booked. Business skips never alert; an UNEXPECTED_SCREEN stops the
 run with its ALERT (7.2). The run cap (`max_notes_per_run`) counts bookings
 only. Values are fake; expected values are written out from SPEC.md and the
 plan.
+
+What the guard-history test proves: the run loop's peek calls only the
+driver's read steps. The fake records, for each step, the actions the real
+step takes (`record_actions`), and its take and return record
+their write actions and a call (`writes`), so a peek that reached either
+fails. That the real read steps act with only those names is pinned by the
+driver's own page tests and B1's seam 2 (9.12 second-model review).
 """
 
 import json

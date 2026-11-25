@@ -29,7 +29,7 @@ from playwright.sync_api import Browser, Page
 from po_agent.core import runlog
 from po_agent.core.config import CONFIG_DIR, load_client, load_config
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.mysys import driver
+from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 from po_agent.summit.client import SummitClient
 
@@ -170,6 +170,22 @@ def test_a_second_iframe_that_fills_during_the_wait_is_unexpected_screen(page):
 def test_one_non_empty_iframe_beside_one_that_stays_empty_is_the_body(page):
     # "Exactly one iframe whose body text is not empty" (SPEC).
     note = window(page, summit_note_page(body=iframe(EMAIL) + iframe("")))
+
+    assert driver.note_body(note, body_rule()) == EMAIL_TEXT
+
+
+def test_a_body_still_growing_is_read_once_it_stops_changing(page, monkeypatch):
+    # 9.12 second-model review: the body becomes the task Note (9.14), so a
+    # body still arriving must not be read cut short. Its Disclaimer lands
+    # 700 ms after its first lines; reads at the live 500 ms poll.
+    monkeypatch.setattr(wait, "POLL_MS", 500)
+    growing = (
+        EMAIL.removesuffix("<div>Disclaimer: fake disclaimer text.</div>")
+        + "<script>setTimeout(() => { document.body.insertAdjacentHTML("
+        "'beforeend', '<div>Disclaimer: fake disclaimer text.</div>'); }, 700);"
+        "</script>"
+    )
+    note = window(page, summit_note_page(body=iframe(growing)))
 
     assert driver.note_body(note, body_rule()) == EMAIL_TEXT
 
