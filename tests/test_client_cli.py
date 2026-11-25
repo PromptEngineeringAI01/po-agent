@@ -149,7 +149,14 @@ def test_summit_on_the_test_site_is_alert_config_exit_2(
     code, lines, err = run_cli(capsys, [*mode, "--site", "test", "--client", "summit"])
 
     assert code == 2
-    assert alert_of(lines)[0] == "CONFIG"
+    assert alert_of(lines) == (
+        "CONFIG",
+        {
+            "note_id": None,
+            "step": None,
+            "detail": "the client does not run on that site",
+        },
+    )
     assert summary_of(lines)["exit_code"] == 2
     assert not any(line.startswith("SECRET") for line in lines)
     assert started == []
@@ -167,7 +174,15 @@ def test_summit_modes_are_refused_with_exit_2_until_built(
     code, lines, err = run_cli(capsys, [*mode, "--site", "live", "--client", "summit"])
 
     assert code == 2
-    assert alert_of(lines)[0] == "CONFIG"
+    # The plan's temporary refusal: 9.11, 9.12 and 9.14 remove it.
+    assert alert_of(lines) == (
+        "CONFIG",
+        {
+            "note_id": None,
+            "step": None,
+            "detail": "mode not built for this client yet",
+        },
+    )
     assert summary_of(lines)["exit_code"] == 2
     assert started == []
     assert fake_keyring.asked == []

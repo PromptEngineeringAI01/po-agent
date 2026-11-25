@@ -94,9 +94,9 @@ def test_the_committed_creator_table_is_specs():
     assert rows == SPEC_CREATOR_TABLE
 
 
-def test_the_old_name_and_struck_aliases_are_not_in_the_table():
-    # Summit Home Improvement is now Summit Renovations; Summit Project has
-    # Summit Developments only (decisions, 24 Nov 2026).
+def test_the_old_company_name_is_not_in_the_file():
+    # Summit Home Improvement is now Summit Renovations (decisions, 24 Nov
+    # 2026); the aliases are pinned row by row above.
     text = SUMMIT_TOML.read_text(encoding="utf-8")
 
     assert "Home Improvement" not in text
@@ -163,6 +163,15 @@ def test_names_and_aliases_must_be_unique_after_trim_and_case_fold(index, change
 def test_a_blank_name_or_alias_is_refused(value):
     refused(with_company(2, name=value))
     refused(with_company(2, aliases=[value]))
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_a_blank_creator_is_refused(value):
+    # A blank creator would only stop at W1 (CREATOR_UNKNOWN); the file is
+    # refused at load instead (9.3 review nit 2).
+    error = refused(with_company(2, creator=value))
+
+    assert "company" in str(error)
 
 
 @pytest.mark.parametrize("sites", [["test"], ["live", "test"], [], ["LIVE"], "live"])
