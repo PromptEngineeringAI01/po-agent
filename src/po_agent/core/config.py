@@ -167,6 +167,11 @@ class Company(_Section):
     def _name_not_blank(cls, name: str) -> str:
         return _not_blank(name)
 
+    @field_validator("creator", mode="after")
+    @classmethod
+    def _creator_not_blank(cls, creator: str | None) -> str | None:
+        return None if creator is None else _not_blank(creator)
+
     @field_validator("aliases", mode="after")
     @classmethod
     def _aliases_not_blank(cls, aliases: tuple[str, ...]) -> tuple[str, ...]:
