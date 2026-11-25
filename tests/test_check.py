@@ -721,6 +721,7 @@ def test_failed_tests_reads_a_real_parallel_pytest_report(tmp_path, check_script
     report = tmp_path / "junit.xml"
     subprocess.run(
         [sys.executable, "-m", "pytest", "tests", "-p", "no:cacheprovider"]
+        + ["--rootdir", str(tmp_path)]  # no config above tmp_path changes node ids
         + ["-n", "2", "--junitxml", str(report), "-o", "junit_family=xunit1"],
         cwd=tmp_path,
         capture_output=True,
