@@ -175,6 +175,7 @@ def test_steps_are_in_spec_order(check_script):
         "mypy",
         "guard check",
         "repo data",
+        "conflict markers",
         f'pytest tests -m "{PYTEST_MARKERS}" {" ".join(PARALLEL)}',
     ]
 
@@ -187,12 +188,13 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
         return subprocess.CompletedProcess(args, 0)
 
     monkeypatch.setattr(check_script.subprocess, "run", fake_run)
-    command_steps = [run for name, run in check_script.STEPS if name != "repo data"]
+    in_process = ("repo data", "conflict markers")
+    command_steps = [run for name, run in check_script.STEPS if name not in in_process]
     for run in command_steps:
         assert run() is True
 
     python_m = [sys.executable, "-m"]
-    assert calls == [
+    assert calls[:-1] == [
         (
             [*python_m, "ruff", "format", "--check", "--no-cache", "."],
             check_script.ROOT,
@@ -200,11 +202,14 @@ def test_steps_run_the_spec_commands(monkeypatch, check_script):
         ([*python_m, "ruff", "check", "--no-cache", "."], check_script.ROOT),
         ([*python_m, "mypy"], check_script.ROOT),
         ([sys.executable, "scripts/guard_check.py"], check_script.ROOT),
-        (
-            [*python_m, "pytest", "tests", "-m", PYTEST_MARKERS, *PARALLEL],
-            check_script.ROOT,
-        ),
     ]
+    # The offline tests also write a junit report, read only after a failure
+    # (decisions, 25 Nov 2026, Checkpoint S-A friction decisions).
+    args, cwd = calls[-1]
+    assert cwd == check_script.ROOT
+    assert args[:-4] == [*python_m, "pytest", "tests", "-m", PYTEST_MARKERS, *PARALLEL]
+    assert args[-4] == "--junitxml"
+    assert args[-2:] == ["-o", "junit_family=xunit1"]
 
 
 def test_command_step_fails_on_nonzero_exit(monkeypatch, check_script):
@@ -462,3 +467,268 @@ def test_quick_and_repo_data_only_are_exclusive(check_script):
     with pytest.raises(SystemExit) as exit_info:
         check_script.main(["--quick", "tests", "--repo-data-only"])
     assert exit_info.value.code != 0
+
+
+# --- conflict markers (friction log, 25 Nov 2026; decisions, 25 Nov 2026,
+# Checkpoint S-A friction decisions) ---
+
+LT, EQ, GT = "<" * 7, "=" * 7, ">" * 7  # never at the start of a line here
+
+
+def repo_with(root: Path, files: dict[str, bytes]) -> Path:
+    """A temp git repo with `files` (path -> bytes) staged."""
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    subprocess.run(["git", "-C", str(root), "add", "--", *files], check=True)
+    return root
+
+
+CONFLICT = f"a\n{LT} HEAD\nours\n{EQ}\ntheirs\n{GT} origin/main\nb\n".encode()
+
+
+def test_conflict_markers_are_named_by_line(tmp_path, check_script):
+    repo = repo_with(tmp_path, {"docs/decisions.md": CONFLICT, "src/x.py": b"x = 1\n"})
+    assert check_script.conflict_markers(repo) == [
+        "docs/decisions.md:2: conflict marker",
+        "docs/decisions.md:4: conflict marker",
+        "docs/decisions.md:6: conflict marker",
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"{LT}\n",  # a bare start marker
+        f"{GT}\n",
+        f"x\r\n{LT} HEAD\r\n",  # CRLF
+    ],
+)
+def test_each_start_or_end_marker_is_found(tmp_path, check_script, text):
+    repo = repo_with(tmp_path, {"a.txt": text.encode()})
+    assert len(check_script.conflict_markers(repo)) == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"Title\n{EQ}\n",  # a Markdown heading underline, outside a conflict
+        f"x = '{LT} HEAD'\n    {GT} indented\n",  # not at the line start
+        f"{LT}{LT}\n",  # 14 in a row is not git's marker
+        "plain text\n",
+    ],
+)
+def test_text_that_only_looks_like_a_marker_passes(tmp_path, check_script, text):
+    repo = repo_with(tmp_path, {"a.md": text.encode()})
+    assert check_script.conflict_markers(repo) == []
+
+
+def test_binary_and_untracked_files_are_skipped(tmp_path, check_script):
+    repo = repo_with(tmp_path, {"a.bin": b"\0" + CONFLICT})
+    (repo / "untracked.md").write_bytes(CONFLICT)
+    assert check_script.conflict_markers(repo) == []
+
+
+def test_conflict_markers_outside_a_git_repo_fail(tmp_path, check_script):
+    assert check_script.conflict_markers(tmp_path) != []
+
+
+def test_conflict_marker_step_fails_and_names_the_line(
+    tmp_path, monkeypatch, capsys, check_script
+):
+    repo = repo_with(tmp_path, {"a.md": CONFLICT})
+    monkeypatch.setattr(check_script, "ROOT", repo)
+    step = dict(check_script.STEPS)["conflict markers"]
+
+    assert step() is False
+    assert "conflict-markers: a.md:2: conflict marker" in capsys.readouterr().out
+
+
+def test_conflict_marker_step_passes_on_a_clean_repo(
+    tmp_path, monkeypatch, capsys, check_script
+):
+    repo = repo_with(tmp_path, {"a.md": b"x\n"})
+    monkeypatch.setattr(check_script, "ROOT", repo)
+    step = dict(check_script.STEPS)["conflict markers"]
+
+    assert step() is True
+    assert "conflict-markers:" not in capsys.readouterr().out
+
+
+# --- rerun after timeout (friction log, 24 Nov 2026; decisions, 25 Nov 2026,
+# Checkpoint S-A friction decisions): only failed tests whose failure is a
+# Playwright timeout are rerun, once, serially; anything else still fails. ---
+
+PW_TIMEOUT = "playwright._impl._errors.TimeoutError: Locator.click: Timeout 2000ms"
+
+
+def case(file: str, classname: str, name: str, problem: str = "", text: str = ""):
+    """One xunit1 <testcase>, as pytest writes it on Windows (backslashes)."""
+    body = f'<{problem} message="{text[:40]}">{text}</{problem}>' if problem else ""
+    return (
+        f'<testcase classname="{classname}" name="{name}" '
+        f'file="{file}" line="1" time="0.1">{body}</testcase>'
+    )
+
+
+def junit(*cases: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest">'
+        + "".join(cases)
+        + "</testsuite></testsuites>"
+    )
+
+
+TIMEOUT_A = case(
+    "tests\\test_a.py", "tests.test_a", "test_one", "failure", f"E   {PW_TIMEOUT}"
+)
+TIMEOUT_B = case(
+    "tests\\sub\\test_b.py",
+    "tests.sub.test_b.TestB",
+    "test_two[p.1-x y]",
+    "error",
+    f"failed on setup with {PW_TIMEOUT}",
+)
+ASSERTION = case(
+    "tests\\test_c.py", "tests.test_c", "test_three", "failure", "assert 1 == 2"
+)
+PASSED = case("tests\\test_c.py", "tests.test_c", "test_four")
+NODE_A = "tests/test_a.py::test_one"
+NODE_B = "tests/sub/test_b.py::TestB::test_two[p.1-x y]"
+
+
+def fake_pytest(monkeypatch, check_script, runs: list[tuple[int, str | None]]):
+    """Each pytest call takes the next (exit code, junit report or None) and
+    writes the report where --junitxml says; returns the calls made."""
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        code, report = runs[len(calls)]
+        calls.append(args)
+        if report is not None and "--junitxml" in args:
+            target = Path(args[args.index("--junitxml") + 1])
+            target.write_text(report, encoding="utf-8")
+        return subprocess.CompletedProcess(args, code)
+
+    monkeypatch.setattr(check_script.subprocess, "run", fake_run)
+    return calls
+
+
+def offline_tests_step(check_script):
+    return check_script.STEPS[-1][1]
+
+
+def test_a_green_run_is_not_rerun(monkeypatch, check_script):
+    calls = fake_pytest(monkeypatch, check_script, [(0, junit(PASSED))])
+    assert offline_tests_step(check_script)() is True
+    assert len(calls) == 1
+
+
+def test_timeouts_rerun_once_serially_and_pass(monkeypatch, capsys, check_script):
+    calls = fake_pytest(
+        monkeypatch,
+        check_script,
+        [(1, junit(TIMEOUT_A, PASSED, TIMEOUT_B)), (0, None)],
+    )
+
+    assert offline_tests_step(check_script)() is True
+
+    assert len(calls) == 2
+    assert calls[1] == [
+        sys.executable,
+        "-m",
+        "pytest",
+        NODE_A,
+        NODE_B,
+        "-m",
+        PYTEST_MARKERS,
+    ]
+    out = capsys.readouterr().out
+    assert "rerun after timeout" in out
+    assert NODE_A in out and NODE_B in out
+
+
+def test_a_timeout_that_fails_again_fails_the_check(monkeypatch, capsys, check_script):
+    calls = fake_pytest(monkeypatch, check_script, [(1, junit(TIMEOUT_A)), (1, None)])
+
+    assert offline_tests_step(check_script)() is False
+    assert len(calls) == 2
+    assert "rerun after timeout" in capsys.readouterr().out
+
+
+def test_any_other_failure_is_never_rerun(monkeypatch, check_script):
+    calls = fake_pytest(
+        monkeypatch, check_script, [(1, junit(TIMEOUT_A, ASSERTION)), (0, None)]
+    )
+
+    assert offline_tests_step(check_script)() is False
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("code", "report"),
+    [
+        (2, junit(TIMEOUT_A)),  # interrupted
+        (3, junit(TIMEOUT_A)),  # pytest internal error
+        (4, None),  # usage error, no report
+        (5, junit()),  # no tests collected
+        (1, None),  # no report written
+        (1, "not xml"),
+        (1, junit(PASSED)),  # failed, but the report names no failure
+    ],
+)
+def test_a_failed_run_without_timeouts_to_rerun_fails(
+    monkeypatch, check_script, code, report
+):
+    calls = fake_pytest(monkeypatch, check_script, [(code, report), (0, None)])
+
+    assert offline_tests_step(check_script)() is False
+    assert len(calls) == 1
+
+
+def test_a_case_whose_node_id_cant_be_rebuilt_is_not_rerun(monkeypatch, check_script):
+    odd = case(
+        "tests\\test_a.py", "elsewhere.test_a", "test_one", "failure", PW_TIMEOUT
+    )
+    calls = fake_pytest(monkeypatch, check_script, [(1, junit(odd)), (0, None)])
+
+    assert offline_tests_step(check_script)() is False
+    assert len(calls) == 1
+
+
+PROBE = """\
+import pytest
+from playwright._impl._errors import TimeoutError
+
+
+class TestA:
+    @pytest.mark.parametrize("v", ["p.1", "x y"])
+    def test_b(self, v):
+        raise TimeoutError("Locator.click: Timeout 2000ms exceeded.")
+
+
+def test_plain():
+    assert 1 == 2
+"""
+
+
+def test_failed_tests_reads_a_real_parallel_pytest_report(tmp_path, check_script):
+    # The node ids come from pytest's own report format, so pin it on a real run.
+    (tmp_path / "tests" / "sub").mkdir(parents=True)
+    (tmp_path / "tests" / "sub" / "test_probe.py").write_text(PROBE, encoding="utf-8")
+    report = tmp_path / "junit.xml"
+    subprocess.run(
+        [sys.executable, "-m", "pytest", "tests", "-p", "no:cacheprovider"]
+        + ["--rootdir", str(tmp_path)]  # no config above tmp_path changes node ids
+        + ["-n", "2", "--junitxml", str(report), "-o", "junit_family=xunit1"],
+        cwd=tmp_path,
+        capture_output=True,
+    )
+
+    assert sorted(check_script.failed_tests(report)) == [
+        ("tests/sub/test_probe.py::TestA::test_b[p.1]", True),
+        ("tests/sub/test_probe.py::TestA::test_b[x y]", True),
+        ("tests/sub/test_probe.py::test_plain", False),
+    ]

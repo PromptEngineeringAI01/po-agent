@@ -17,6 +17,11 @@ Before the first run:
   one Pending, unlinked Note per trial PO in the Agent Pool, nothing assigned
   to the agent account.
 
+After every reset, run `uv run po-agent run --site test --decide-only` first
+and read the skip reasons: a seam-2 failure report shows only the test name
+and the exception type, so a leftover state (a `DUPLICATE_TASK`, say) shows
+only there.
+
 A reset follows every W-step or booking run. The read-only and take-and-return
 runs leave the reset state as they found it, so they run back to back.
 
