@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.67 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.68 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -548,7 +548,11 @@ In this order (cheap first, so a non-compaction PDF costs no project search):
 
 **No address check for Summit** (Joey, 23 Nov 2026; decisions, 23 Nov 2026, Client Internal No. check): `b1/address.py` and the Job Address agreement are not used. The identity link is instead: two readers agree on the PO, the PDF's PO equals the title's, exactly one project with that Client Ref No. and a Summit Company, its Client Internal No. equal again, and the company agreeing three ways.
 
-**PDF patterns** (the company line, the `Purchase Order No:` value, `COMPACTION TEST` under Description) are pinned in the readers task from Joey's real Summit PDFs (open question S1); no Summit PDF is in `private/` yet. The readers task is a review-stop task, as B1's 2.2-2.5.
+**PDF patterns** (task 9.7, `summit/reader_rules.py`; pinned on Joey's 11 real Summit PDFs in `private/summit/pdfs/`, looked at as masked shapes; decisions, 25 Nov 2026, Summit PDF patterns), read the same way on both readers' text:
+- **Company line:** the first non-empty line, trimmed (the table lookup is the decision engine's).
+- **PO:** the `Purchase Order No:` value, three groups of digits joined by `/`; a later page may repeat the same value. No value, a malformed one, or two different ones is `PO_MISMATCH` (open question 3: Joey will resolve different ones by the site address, suburb + street name, one project only; after phase 1, decisions, 25 Nov 2026).
+- **Compaction:** `COMPACTION TEST` in capitals as the **item row's description only** (Joey, 25 Nov 2026), between the first line starting `DESCRIPTION` and the first totals line (`Total:` or `GST:`). An item row is a line that is exactly `COMPACTION TEST`, starts with it followed by the quantity (pdfplumber), or ends with a price and the unit glued onto it (pypdf, `99.00EACOMPACTION TEST`). The phrase inside any other line (a note such as "NO COMPACTION TEST REQUIRED", "RECOMPACTION TEST", "COMPACTION TESTING") never counts; an odd layout reads as not found. Neither reader finds it -> `NOT_COMPACTION`; one only -> `READERS_DISAGREE`.
+- A reader that reads no text is `PDF_UNREADABLE`.
 
 ### Creator table
 
