@@ -24,7 +24,7 @@
 plumber = """
 Summit Homes Group
 Purchase Order No: 123456/020/01
-Please quote this Purchase Order number on every invoice
+Fake heading words around a Purchase Order phrase
 Fake Supplier Order To
 PO Date 01/01/2026 Order Date:
 Supplier No 100 Account No 10
@@ -35,17 +35,17 @@ SAMPLE NEW HOMES
 DESCRIPTION Supplier Code Quantity Unit Unit Price Total
 ITEM DESCRIPTION
 COMPACTION TEST 1.000 EA 99.00 99.00
-Please read the attached notes
-Please call before attending Site to book Sub Total: $99.00
+Fake note line one
+Fake note line two Sub Total: $99.00
 Plus GST: $9.90
 Summit Homes 10 / 2 Fake Street Fakeville - 0000 0000 Order Total: $108.90
 Site Contact: Summit Homes Group Job: Lot 100000
-Fake terms apply. Summit Homes Group. Purchase Order terms bind the Supplier
+Fake terms apply. Summit Homes Group. Purchase Order fake terms
 """
 pypdf = """
 Summit Homes Group
 Purchase Order No: 123456/020/01
-Please quote this Purchase Order number on every invoice
+Fake heading words around a Purchase Order phrase
 Order To
 Order Date:
 Supplier No 100 Account No 10
@@ -60,17 +60,17 @@ Fake Road Fakeville 6999
 DESCRIPTION Quantity Unit Price Total Supplier Code
 ITEM DESCRIPTION
 1.000 99.00 99.00EACOMPACTION TEST
-Please read the attached notes
+Fake note line one
 Plus GST:
 Order Total:
 $9.90
 $108.90
-Please call before attending Site to book
+Fake note line two
 Sub Total: $99.00
 Summit Homes 10 / 2 Fake Street Fakeville - 0000 0000
 Site Contact: Summit Homes Group
 Job: Lot 100000
-Fake terms apply. Summit Homes Group. Purchase Order terms bind the Supplier
+Fake terms apply. Summit Homes Group. Purchase Order fake terms
 """
 
 # --- each field read ---
@@ -139,6 +139,33 @@ expect_skip = "NOT_COMPACTION"
 [[case]]
 id = "compaction-without-test"
 pdf_replace = [["COMPACTION TEST", "COMPACTION"]]
+expect_skip = "NOT_COMPACTION"
+
+# A notes line between DESCRIPTION and the totals naming the phrase inside
+# other words is not the item (review, 9.7).
+
+[[case]]
+id = "notes-say-no-compaction-test-required"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "NO COMPACTION TEST REQUIRED"],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "notes-say-not-a-compaction-test"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "NOT A COMPACTION TEST"],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "notes-say-recompaction-test"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "RECOMPACTION TEST"],
+]
 expect_skip = "NOT_COMPACTION"
 
 # --- the Purchase Order No: value (open question 3: anything uncertain -> PO_MISMATCH) ---
