@@ -31,7 +31,7 @@ def risk():
         "src/po_agent/b1/readers.py",
         "src/po_agent/b1/decision.py",
         "src/po_agent/b1/address.py",
-        "src/po_agent/summit/readers.py",  # SPEC Client 2: readers, rules, decision engine
+        "src/po_agent/summit/readers.py",  # SPEC Client 2: all decision logic
         "src/po_agent/summit/decision.py",
         "src/po_agent/summit/companies.py",
         "scripts/guard_check.py",
