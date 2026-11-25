@@ -26,7 +26,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.5** Per-client run lock, kill switch (site and client), caps (bookings, peeks), Agent 2 stale read, hold re-check by client; `"client"` in `RUN_SUMMARY` and the `booked` event · step · high
 - [x] **9.6** Guard: `set_source_filter` on the Note Pool Source select, tests on local HTML · step · high · **Joey merges**
 
-**Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; first B1 hourly run watched after any tag move past here.
+**Checkpoint S-A:** check green; import test green; B1 seam 2 full sequence green; 9.6 merged; friction log's "Proposed" rows decided (`docs/factory-handbook.md` §11); release summary read before the tag moves (`docs/macmini-setup.md`); first B1 hourly run watched after any tag move past here.
 
 **S-B Decide, offline**
 - [ ] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers · step · **review stop** · high
@@ -34,7 +34,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.9** Summit decision engine: SPEC's decision table in order, three-way company match with aliases, Client Internal No., strict duplicate, previous-task creator; `COMPANY_UNKNOWN`, `COMPANY_MISMATCH`, `CREATOR_UNKNOWN`; seam 1 `false PROCEED: 0` · step · high
 - [ ] **9.10** Summit real-PO seam on the 11 POs with `private/summit/fixtures/cases.toml` (needs S.0) · step · pauses: laptop runs
 
-**Checkpoint S-B:** Summit seam 1 `false PROCEED: 0` in CI; real-PO `false PROCEED: 0` on the laptop, clean-PO skips reviewed with Joey.
+**Checkpoint S-B:** Summit seam 1 `false PROCEED: 0` in CI; friction log's "Proposed" rows decided; real-PO `false PROCEED: 0` on the laptop, clean-PO skips reviewed with Joey.
 
 **S-C Run, offline**
 - [ ] **9.11** Note Pool for Summit: Source and Unlocked filters read back, Source column read, list eligibility (sender, `---`, not an agent, title shape); `spike --client summit` · step · high
@@ -43,7 +43,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **9.14** Summit booking W1-W5: decided Creator (missing option -> `WRITE_NOT_STARTED`), full PO, body, previous-task recheck at W1, Documents name per S.0; `run --client summit` books (needs S.0 screens) · step · high
 - [ ] **9.15** Mac Mini: `macmini-run.sh <mode> live summit`, second plist at :30 (07:30-17:30 Mon-Fri Perth; Joey, 24 Nov 2026), Healthchecks `healthchecks_ping_url_summit`, alert issues `po-agent alert summit <run_id>`, `docs/macmini-setup.md` and `docs/ops-runbook.md` · step · medium · ask-first files
 
-**Checkpoint S-C:** SPEC's offline Summit tests green; B1 seam 2 booking cases green; the client file still `enabled = false`.
+**Checkpoint S-C:** SPEC's offline Summit tests green; friction log's "Proposed" rows decided; B1 seam 2 booking cases green; the client file still `enabled = false`.
 
 **S-D Live (Joey, Mac Mini; each step its own dated decisions entry first; Claude never runs anything on live)**
 - [ ] **S.0** (from now, beside the build) By-hand live screenshots into `private/summit/` (Creator options, a Summit Documents row, Locked/Unlocked and My Notes after one by-hand Assign, assigned back before S.1, Note Pool count); `cases.toml` and expected compaction per PDF; the MySys admin's answer on Agent 2's password expiry and MFA; Claude writes the screens into `docs/screen-map.md` redacted · by hand
