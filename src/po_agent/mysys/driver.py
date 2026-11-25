@@ -37,17 +37,17 @@ from pydantic import ValidationError
 
 from po_agent.core.errors import (
     LoginFailed,
-    PartialWrite,
     UnexpectedScreen,
     WriteNotStarted,
 )
 from po_agent.core.models import (
-    CompactionTask,
+    COMPACTION_TEST,
     MySysLookup,
     NotePoolFilters,
     NotePoolRow,
     Proceed,
     ProjectRule,
+    ProjectTask,
     SearchRow,
     Skip,
 )
@@ -1086,33 +1086,53 @@ def _task_options(window: Locator) -> set[str]:
 
 
 def settled_tasks(window: Locator) -> dict[str, str]:
-    """Task number -> Status of every Compaction Test task, from a settled
-    table: the window shows before its task rows render (row 10, live S6),
-    so an empty read can't be told from "no tasks". Tasks count once two
-    reads in a row are equal and match the select's options (decisions, 3
-    Nov 2026, M4 gate). The rows and the options render together and an
-    empty project shows nothing else (probe, 4 Nov 2026), so "no tasks"
-    counts only when every read for the full 15 s is empty. Otherwise after
-    15 s UnexpectedScreen."""
-    empty_throughout = True
+    """Task number -> Status of every Compaction Test task, from the settled
+    table (settled_project_tasks)."""
+    return {
+        task.task_no: task.status
+        for task in settled_project_tasks(window)
+        if task.name == COMPACTION_TEST
+    }
 
-    def read() -> dict[str, str] | None:
+
+def settled_project_tasks(window: Locator) -> tuple[ProjectTask, ...]:
+    """Every task (task 9.8), from a settled table: the window shows before
+    its task rows render (row 10, live S6), so an empty read can't be told
+    from "no tasks". Tasks count once two reads in a row are equal and their
+    Compaction Test numbers match the select's options (decisions, 3 Nov
+    2026, M4 gate). The rows and the options render together and an empty
+    project shows nothing else (probe, 4 Nov 2026), so "no Compaction Test
+    task" counts only when every read for the full 15 s shows none and
+    matches the select; the last two of those reads must then be equal, and
+    are the answer. Otherwise after 15 s UnexpectedScreen."""
+    whole_reads: list[tuple[ProjectTask, ...]] = []
+    none_throughout = True
+
+    def read() -> tuple[ProjectTask, ...] | None:
         """The tasks once the table is whole, else None."""
-        nonlocal empty_throughout
+        nonlocal none_throughout
         try:
-            tasks = task_table.compaction_tasks(task_rows(window))
-            whole = set(tasks) == _task_options(window)
-        except (PartialWrite, UnexpectedScreen, PlaywrightError):
-            tasks, whole = None, False  # a half-rendered row
-        if not (whole and not tasks):
-            empty_throughout = False
+            tasks = task_table.project_tasks(task_rows(window))
+            compaction = {t.task_no for t in tasks if t.name == COMPACTION_TEST}
+            whole = compaction == _task_options(window)
+        except (UnexpectedScreen, PlaywrightError):
+            tasks, compaction, whole = (), set(), False  # a half-rendered row
+        if not (whole and not compaction):
+            none_throughout = False
+        else:
+            whole_reads.append(tasks)
         return tasks if whole else None
 
-    tasks = wait.settled(wait.within(window.page), read, bool)
+    def has_compaction(tasks: tuple[ProjectTask, ...]) -> bool:
+        return any(task.name == COMPACTION_TEST for task in tasks)
+
+    tasks = wait.settled(wait.within(window.page), read, has_compaction)
     if tasks is not None:
         return tasks
-    if empty_throughout:
-        return {}
+    if none_throughout and (
+        len(whole_reads) == 1 or whole_reads[-1] == whole_reads[-2]
+    ):
+        return whole_reads[-1]
     raise UnexpectedScreen("task table did not settle")
 
 
@@ -1207,9 +1227,10 @@ def _lookup_and_window(
     """Steps 8-10's reads: reload (the Note window would cover the results,
     row 25), Project -> Projects, the demo's search (Enter), every row on
     page 1; the client's `rule.match` chooses the row, opened by its pln
-    link; then its Client Internal No., Address and settled Compaction Test
-    tasks. With no single match nothing is opened, the project fields stay
-    empty and the window is None. With `decided_pln` (W1's reopen), a match
+    link; then its Client Internal No., Address and settled tasks (every
+    name; B1's Compaction Test ones in `tasks`). With no single match
+    nothing is opened, the project fields stay empty and the window is
+    None. With `decided_pln` (W1's reopen), a match
     that isn't it is WriteNotStarted before anything is opened."""
     from po_agent.mysys import booking  # booking imports this module
 
@@ -1234,15 +1255,12 @@ def _lookup_and_window(
     if decided_pln is not None and pln != decided_pln:
         raise WriteNotStarted("project not as decided", step="W1")
     project = booking.open_project(guard, page, panel, pln)
-    tasks = settled_tasks(project)
+    project_tasks = settled_project_tasks(project)
     lookup = MySysLookup(
         search_rows=search_rows,
         more_pages=more_pages,
         project_internal_no=booking.client_internal_no(project),
         address=_labelled(project, "Address:"),
-        tasks=tuple(
-            CompactionTask(task_no=task_no, status=status)
-            for task_no, status in tasks.items()
-        ),
+        project_tasks=project_tasks,
     )
     return lookup, project
