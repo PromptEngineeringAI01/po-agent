@@ -75,11 +75,12 @@ def test_buttons_run_on_without_a_break_stay_out_of_the_name():
     )
 
 
-def test_unmapped_header_buttons_stay_in_the_name_as_shown():
+def test_header_buttons_on_their_own_lines_stay_out_of_the_name():
     # Joey's live screenshot of a Summit project (24 Nov 2026): header rows
-    # can carry buttons beyond the four the test site showed. Their labels
-    # stay in the name, so such a header is never read as "Compaction Test"
-    # (B1's duplicate read unchanged), and its task is still read.
+    # carry buttons beyond the four the test site showed, on lines of their
+    # own. The name is the header's first line, whatever buttons follow it
+    # (Joey, 25 Nov 2026: such a Compaction Test header counts for the
+    # duplicate check, a quiet DUPLICATE_TASK skip).
     rows = [
         ["(tsk_300008) | Compaction Test\nVariation\nUnassign"],
         details("Fake Creator D", "Certification Passed"),
@@ -88,30 +89,35 @@ def test_unmapped_header_buttons_stay_in_the_name_as_shown():
     ]
 
     assert tasks.project_tasks(rows) == (
-        task(
-            "tsk_300008",
-            "Compaction Test\nVariation\nUnassign",
-            "Certification Passed",
-            "Fake Creator D",
-        ),
+        task("tsk_300008", "Compaction Test", "Certification Passed", "Fake Creator D"),
         task(
             "tsk_300009",
-            "1.Single Storey Engineering & Footing\nVariation",
+            "1.Single Storey Engineering & Footing",
             "Certification Passed",
             "Fake Creator E",
         ),
     )
 
 
+def test_an_unmapped_button_run_on_stays_in_the_name():
+    # Never read as "Compaction Test": the select then lists a Compaction
+    # Test the table doesn't, and the settled read stops (UNEXPECTED_SCREEN).
+    rows = [["(tsk_300010) | Compaction TestVariation"], details("X", "New Project")]
+
+    assert tasks.project_tasks(rows) == (
+        task("tsk_300010", "Compaction TestVariation", "New Project", "X"),
+    )
+
+
 @pytest.mark.parametrize(
     "rows",
     [
-        pytest.param([["(tsk_300001) | Site Classification\nCancel\nHold"]], id="last"),
+        pytest.param([["(tsk_300003) | Compaction Test\nCancel\nHold"]], id="last"),
         pytest.param(
             [
-                ["(tsk_300001) | Site Classification\nCancel\nHold"],
                 ["(tsk_300003) | Compaction Test\nCancel\nHold"],
-                details("Fake Creator C", "New Project"),
+                ["(tsk_300001) | Site Classification\nCancel\nHold"],
+                details("Fake Creator A", "New Project"),
             ],
             id="another-header-next",
         ),
@@ -121,18 +127,48 @@ def test_unmapped_header_buttons_stay_in_the_name_as_shown():
         ),
     ],
 )
-def test_a_header_without_its_details_row_is_an_unexpected_screen(rows):
+def test_a_compaction_header_without_its_details_row_is_an_unexpected_screen(rows):
     with pytest.raises(UnexpectedScreen):
         tasks.project_tasks(rows)
+
+
+def test_another_tasks_header_without_its_details_row_is_kept_unknown():
+    # As B1 before 9.8, such a row never stops a run. Its status and Task
+    # Creator read as empty (unknown), so Summit's previous-task rule skips
+    # CREATOR_UNKNOWN on it rather than passing over it.
+    rows = [
+        ["(tsk_300001) | Site Classification\nCancel\nHold"],
+        ["(tsk_300003) | Compaction Test\nCancel\nHold"],
+        details("Fake Creator C", "New Project"),
+        ["(tsk_300004) | Footing Details\nCancel\nHold"],
+        [""],
+    ]
+
+    assert tasks.project_tasks(rows) == (
+        task("tsk_300001", "Site Classification", "", ""),
+        task("tsk_300003", "Compaction Test", "New Project", "Fake Creator C"),
+        task("tsk_300004", "Footing Details", "", ""),
+    )
 
 
 def test_compaction_tasks_are_the_same_rows_filtered():
     assert tasks.compaction_tasks(ROWS) == {"tsk_300003": "On-hold\nNotes:"}
 
 
+def test_a_compaction_header_with_other_buttons_counts_for_the_duplicate_check():
+    # Joey, 25 Nov 2026: before 9.8 such a header was passed over and the
+    # settled read stopped (ALERT UNEXPECTED_SCREEN); now DUPLICATE_TASK.
+    rows = [
+        ["(tsk_300008) | Compaction Test\nVariation\nUnassign"],
+        details("Fake Creator D", "Certification Passed"),
+    ]
+
+    assert tasks.compaction_tasks(rows) == {"tsk_300008": "Certification Passed"}
+
+
 def test_compaction_tasks_need_only_their_own_details_rows():
     # As before 9.8: another task's header without its details row is
-    # outside the Compaction Test read (W2, the hold read, demo).
+    # outside the Compaction Test read (W2, W3, the hold read, demo).
     rows = [
         ["(tsk_300003) | Compaction Test\nCancel\nHold"],
         details("Fake Creator C", "New Project"),
@@ -143,7 +179,7 @@ def test_compaction_tasks_need_only_their_own_details_rows():
 
 
 def test_compaction_tasks_keep_their_partial_write_for_a_missing_details_row():
-    # W2's read-back runs after Submit: a broken table there is PARTIAL_WRITE.
+    # W2 and W3 read it after Submit: a broken table there is PARTIAL_WRITE.
     with pytest.raises(PartialWrite):
         tasks.compaction_tasks([["(tsk_300003) | Compaction Test\nCancel\nHold"]])
 

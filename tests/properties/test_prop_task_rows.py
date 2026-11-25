@@ -1,7 +1,10 @@
 """The Tasks read of every task (task 9.8) against B1's Compaction Test read
-frozen in tests/oracle (main be84448): on any rows, B1's duplicate read is
-unchanged, both through `compaction_tasks` (W2, the hold read, demo) and
-through the lookup's `tasks` (step 10's duplicate check, W1's reopen).
+frozen in tests/oracle (main be84448): on rows whose headers carry only the
+mapped buttons, B1's duplicate read is unchanged, both through
+`compaction_tasks` (W2, W3, the hold read, demo) and through the lookup's
+`tasks` (step 10's duplicate check, W1's reopen). A header with other
+buttons on lines of their own is the one intended change (Joey, 25 Nov
+2026; tests/test_project_tasks.py).
 
 Rows are built from header, details, spacer and other cells in the shape
 `driver.task_rows` returns. Values are fake.
@@ -27,9 +30,7 @@ NAMES = st.sampled_from(
     ]
 )
 BUTTONS = st.lists(
-    st.sampled_from(
-        ["Undo Cancellation", "Cancel", "Un-Hold", "Hold", "Variation", "Unassign"]
-    ),
+    st.sampled_from(["Undo Cancellation", "Cancel", "Un-Hold", "Hold"]),
     max_size=3,
 )
 GAPS = st.sampled_from(["\n", "", " ", "\t", "  \n"])
@@ -77,7 +78,8 @@ def test_the_lookups_compaction_tasks_match_the_frozen_b1_read(rows):
     try:
         every = tasks.project_tasks(rows)
     except UnexpectedScreen:
-        return  # not settled: no lookup is built (a skip before any write)
+        assert old is None  # only where B1 stopped too
+        return
 
     lookup = MySysLookup(search_rows=(), more_pages=False, project_tasks=every)
 
