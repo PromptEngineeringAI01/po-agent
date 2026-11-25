@@ -38,6 +38,9 @@ def risk():
         "config/clients/b1.toml",
         "src/po_agent/core/secrets.py",  # 9.3 review friction row
         "src/po_agent/core/config.py",
+        "src/po_agent/core/controls.py",  # 9.5 review friction row: kill switch, caps
+        "src/po_agent/core/runlock.py",  # the run lock
+        "src/po_agent/core/run.py",  # where the controls are enforced
         "scripts/guard_check.py",
         "scripts/check.py",
         "scripts/risk.py",
@@ -57,7 +60,7 @@ def test_high_paths(risk, path):
 @pytest.mark.parametrize(
     "path",
     (
-        "src/po_agent/core/run.py",
+        "src/po_agent/core/runlog.py",  # near miss of run.py and runlock.py
         "src/po_agent/core/output.py",
         "src/po_agent/b1/models.py",
         "src/po_agent/cli.py",

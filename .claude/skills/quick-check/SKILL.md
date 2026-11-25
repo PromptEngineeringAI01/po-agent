@@ -30,7 +30,7 @@ uv run python scripts/guard_check.py
 uv run pytest <test files> -q -x -m "not live_claude and not testsite and not real_data"
 ```
 
-`guard_check.py` is an AST scan of the repo (seconds): run it whenever a `.py` under `src/`, `scripts/` or `tests/` changed, and always when `src/po_agent/mysys/guard.py`, `src/po_agent/mysys/driver.py` or `scripts/guard_check.py` did.
+`guard_check.py` is an AST scan of the repo (seconds; it takes no file list): run it every time, with either path (`--quick` runs it as its "guard check" step). It fails a method of ours named like a page action (`.check(`, `.fill(`), which the tests alone never show; report its lines that name a changed file first (decisions, 25 Nov 2026, Checkpoint S-A friction decisions).
 
 **Which tests:**
 
@@ -47,4 +47,4 @@ The marker filter is never dropped. Never pass a `tests/seam2` file without it: 
 
 ## 3. Report
 
-Two or three lines: files linted, test files run, pass/fail (the first failure's test id and one line of why), seconds taken. End with: "quick-check is not the gate: run `uv run scripts/check.py` before opening a PR."
+Two or three lines: files linted, the guard check's result, test files run, pass/fail (the first failure's test id and one line of why), seconds taken. End with: "quick-check is not the gate: run `uv run scripts/check.py` before opening a PR."
