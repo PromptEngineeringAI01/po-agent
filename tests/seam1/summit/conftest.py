@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from real_pos import PRIVATE_DIR_ENV, _selected_explicitly
-from summit_real_pos import REPORT, Counts, evaluate, find_summit_dir, report_lines
+from summit_real_pos import REPORT, Counts, find_summit_dir, report_lines, tally_folder
 
 
 @pytest.fixture(scope="session")
@@ -19,7 +19,7 @@ def summit_real_counts(request: pytest.FixtureRequest) -> Counts:
         if _selected_explicitly(request.config.option.markexpr or ""):
             raise FileNotFoundError(message)
         pytest.skip(message)
-    counts = evaluate(folder)
+    counts = tally_folder(folder)
     request.config.stash[REPORT] = report_lines(counts)
     return counts
 

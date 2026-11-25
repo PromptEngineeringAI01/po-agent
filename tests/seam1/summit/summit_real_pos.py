@@ -62,7 +62,7 @@ class Counts:
     outcomes: dict[str, int] = field(default_factory=dict)
 
 
-def evaluate(folder: Path) -> Counts:
+def tally_folder(folder: Path) -> Counts:
     expected = expected_compaction(folder)
     counts = Counts(expected_given=None if expected is None else 0)
     for pdf in sorted((folder / "pdfs").glob("*.pdf")):

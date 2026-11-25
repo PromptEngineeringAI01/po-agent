@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 from seam1_cases import text_pdf
-from summit_real_pos import Counts, evaluate, report_lines
+from summit_real_pos import Counts, report_lines, tally_folder
 
 SUMMIT = Path(__file__).resolve().parent
 
@@ -81,7 +81,7 @@ def test_the_report_holds_counts_and_no_value(tmp_path: Path) -> None:
     folder = _fake_private(
         tmp_path, f'[[case]]\npdf = "{FAKE_NAME}"\nexpect_compaction = true\n'
     )
-    counts = evaluate(folder)
+    counts = tally_folder(folder)
     assert (
         counts.pdfs,
         counts.po_as_file,
@@ -99,7 +99,7 @@ def test_the_report_holds_counts_and_no_value(tmp_path: Path) -> None:
 
 
 def test_no_cases_file_is_not_a_compaction_pass(tmp_path: Path) -> None:
-    counts = evaluate(_fake_private(tmp_path, None))
+    counts = tally_folder(_fake_private(tmp_path, None))
     assert counts.expected_given is None
     assert "no cases.toml yet" in "\n".join(report_lines(counts))
 
