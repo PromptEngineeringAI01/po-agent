@@ -128,7 +128,10 @@ def spike(
     options: argparse.Namespace,
     summary: output.RunSummary,
 ) -> int:
-    """Log in, filter and read the Note Pool once, print counts. Read-only."""
+    """Log in, filter and read the Note Pool once, print counts. Read-only.
+    The client's filters are asked before the browser opens, so a client
+    that refuses stops before any login (9.4 review)."""
+    filters = client.filters()
     guard = ActionGuard()
     with driver.open_browser(headed=options.headed, slow_mo=options.slow_mo) as page:
         driver.go_home(page, str(config.base_url))
@@ -136,7 +139,7 @@ def spike(
         driver.login(guard, page, credentials[username], credentials[password])
         output.info("logged in")
         panel = driver.open_note_pool(guard, page)
-        driver.set_note_pool_filters(guard, panel, client.filters())
+        driver.set_note_pool_filters(guard, panel, filters)
         output.info("note pool filters set")
         _read_eligible(guard, panel, client, summary)
     return 0
@@ -256,7 +259,9 @@ def _note_loop(
     config_dir: Path | None,
     trace: Trace | None,
 ) -> int:
-    """`config_dir` None: decide-only, nothing booked."""
+    """`config_dir` None: decide-only, nothing booked. The client's filters
+    are asked first, so a client that refuses stops before any login."""
+    filters = client.filters()
     guard = ActionGuard()
     log = RunLog(summary.run_id, guard, logs, trace)
     username, password = mysys_names(config.site)
@@ -284,7 +289,7 @@ def _note_loop(
             driver.leave_menu(guard, page)
             if config.stale_read == "note_pool":
                 controls.stale_note_stop(guard, panel, config.agent_user_name)
-            driver.set_note_pool_filters(guard, panel, client.filters())
+            driver.set_note_pool_filters(guard, panel, filters)
             output.info("note pool filters set")
             found = _read_eligible(guard, panel, client, summary)
             try:
