@@ -29,7 +29,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 **Checkpoint S-A:** check green; import test green; B1 seam 2 green (done 25 Nov: Joey ran runs 1-10a only, all passed on a00cfb7; runs 11 and 12 skipped, since 9.1-9.5 didn't change their code; decisions, 25 Nov 2026); 9.6 merged; friction log's "Proposed" rows decided (`docs/factory-handbook.md` §11; done 25 Nov, PR 186); release summary read before the tag moves (`docs/macmini-setup.md`); first B1 hourly run watched after any tag move past here.
 
 **S-B Decide, offline**
-- [ ] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers · step · **review stop** · high
+- [x] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers (S.0 expected compaction values pending: the real-PDF check skips until `cases.toml` gives them) · step · **review stop** · high
 - [x] **9.8** Tasks read: every task's number, name, status and Task Creator in `MySysLookup`; B1's duplicate check unchanged · step · high
 - [ ] **9.9** Summit decision engine: SPEC's decision table in order, three-way company match with aliases, Client Internal No., strict duplicate, previous-task creator; `COMPANY_UNKNOWN`, `COMPANY_MISMATCH`, `CREATOR_UNKNOWN`; seam 1 `false PROCEED: 0` · step · high
 - [ ] **9.10** Summit real-PO seam on the 11 POs with `private/summit/fixtures/cases.toml` (needs S.0) · step · pauses: laptop runs
@@ -52,6 +52,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [ ] **S.3** `decide-only live summit`: NOTE lines read against the Notes; a peeked Note's log unchanged; its duration sets `max_peeks_per_run` · by hand
 - [ ] **S.4** Admins told the agent may take and return their Summit Notes; `run live summit`, cap 1, watched; 5.2's trace check on the first · by hand
 - [ ] **S.5** Healthchecks check `po-agent summit` (cron `30 7-17 * * 1-5`, Perth, 40 min grace); cap raised by its own PR; Summit launchd job loaded (:30); first hourly run watched · by hand
+- [ ] **After phase 1** (Joey, 25 Nov 2026; decisions, Summit PDF patterns): open question 3's address fallback. A PDF whose PO differs between pages is decided by the site address (suburb + street name, street number ignored), exactly one project, else skip. It needs the PDF address read on both readers, a Projects search by address (a `mysys/` read, B1 seam 2) and the decide branch. The PO written is the page PO equal to the Note title's whose part before the first `/` equals the found project's Client Ref No. and Client Internal No.; none or both -> skip `PO_MISMATCH`. Phase 1 skips it `PO_MISMATCH` · step · high
 
 ## Production order (from 29 Oct 2026; plan -> Phase P, `SPEC.md` -> Production)
 

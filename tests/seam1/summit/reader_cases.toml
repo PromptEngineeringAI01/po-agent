@@ -1,0 +1,262 @@
+# Summit seam-1 reader cases (task 9.7; SPEC.md -> Client 2: Summit Home,
+# Decision checks). Fake values only: the PO 123456/020/01 (and 654321/030/02
+# for a second one), fake supplier, street and phone lines. Never a real
+# Summit PO, address, title or body (SPEC.md -> Summit real data).
+#
+# [po] is one fake Summit PO as each reader reads it. The layouts follow the
+# 11 real Summit PDFs, looked at as masked shapes only: the company line on
+# top, "Purchase Order No: <PO>" under it, a DESCRIPTION header over the
+# items and the totals under them. pdfplumber keeps the rows together;
+# pypdf reads the columns apart, so the item row ends "EACOMPACTION TEST"
+# and GST comes before the Total lines.
+#
+# A [[case]] changes only what it mutates. Each list holds [old, new] pairs
+# and each old must occur in the text it changes: pdf_replace changes both
+# texts (a change to the PDF itself), plumber_replace only pdfplumber's,
+# pypdf_replace only pypdf's (one reader reading the PDF differently);
+# empty names the reader that reads no text at all.
+#
+# expect_skip is check_pdf()'s skip reason; without it, the case expects the
+# reading: expect_company, expect_po and expect_compaction (written out from
+# SPEC, never computed).
+
+[po]
+plumber = """
+Summit Homes Group
+Purchase Order No: 123456/020/01
+Fake heading words around a Purchase Order phrase
+Fake Supplier Order To
+PO Date 01/01/2026 Order Date:
+Supplier No 100 Account No 10
+Fake Compaction Pty Ltd
+Phone 00-000-000-000 Fake Road Fakeville 6999
+Lot 1 Fake Street Fakeville 6999 Job 100000
+SAMPLE NEW HOMES
+DESCRIPTION Supplier Code Quantity Unit Unit Price Total
+ITEM DESCRIPTION
+COMPACTION TEST 1.000 EA 99.00 99.00
+Fake note line one
+Fake note line two Sub Total: $99.00
+Plus GST: $9.90
+Summit Homes 10 / 2 Fake Street Fakeville - 0000 0000 Order Total: $108.90
+Site Contact: Summit Homes Group Job: Lot 100000
+Fake terms apply. Summit Homes Group. Purchase Order fake terms
+"""
+pypdf = """
+Summit Homes Group
+Purchase Order No: 123456/020/01
+Fake heading words around a Purchase Order phrase
+Order To
+Order Date:
+Supplier No 100 Account No 10
+Fake Supplier
+Fake Compaction Pty Ltd
+SAMPLE NEW HOMES
+Lot 1 Fake Street Fakeville 6999
+PO Date 01/01/2026
+Job 100000
+Phone 00-000-000-000
+Fake Road Fakeville 6999
+DESCRIPTION Quantity Unit Price Total Supplier Code
+ITEM DESCRIPTION
+1.000 99.00 99.00EACOMPACTION TEST
+Fake note line one
+Plus GST:
+Order Total:
+$9.90
+$108.90
+Fake note line two
+Sub Total: $99.00
+Summit Homes 10 / 2 Fake Street Fakeville - 0000 0000
+Site Contact: Summit Homes Group
+Job: Lot 100000
+Fake terms apply. Summit Homes Group. Purchase Order fake terms
+"""
+
+# --- each field read ---
+
+[[case]]
+id = "clean"
+expect_company = "Summit Homes Group"
+expect_po = "123456/020/01"
+expect_compaction = true
+
+[[case]]
+id = "company-alias-line"
+pdf_replace = [["Summit Homes Group\nPurchase", "New Gen and EasyStart\nPurchase"]]
+expect_company = "New Gen and EasyStart"
+expect_po = "123456/020/01"
+expect_compaction = true
+
+[[case]]
+id = "company-line-padded"
+pdf_replace = [["Summit Homes Group\nPurchase", "  Summit Granny Flats  \nPurchase"]]
+expect_company = "Summit Granny Flats"
+expect_po = "123456/020/01"
+expect_compaction = true
+
+[[case]]
+id = "second-page-repeats-same-po"
+pdf_replace = [["Fake terms apply.", "Summit Homes Group\nPurchase Order No: 123456/020/01\nFake terms apply."]]
+expect_company = "Summit Homes Group"
+expect_po = "123456/020/01"
+expect_compaction = true
+
+[[case]]
+id = "non-compaction-po"
+pdf_replace = [["COMPACTION TEST", "SITE CLEAN"]]
+expect_skip = "NOT_COMPACTION"
+
+# --- COMPACTION TEST must stand under Description ---
+
+[[case]]
+id = "compaction-above-description"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["SAMPLE NEW HOMES", "SAMPLE NEW HOMES COMPACTION TEST"],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "compaction-under-the-totals"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake terms apply.", "COMPACTION TEST\nFake terms apply."],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "no-description-header"
+plumber_replace = [["DESCRIPTION Supplier Code", "ITEMS Supplier Code"]]
+pypdf_replace = [["DESCRIPTION Quantity", "ITEMS Quantity"]]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "compaction-test-not-in-capitals"
+pdf_replace = [["COMPACTION TEST", "Compaction Test"]]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "compaction-without-test"
+pdf_replace = [["COMPACTION TEST", "COMPACTION"]]
+expect_skip = "NOT_COMPACTION"
+
+# A notes line between DESCRIPTION and the totals naming the phrase inside
+# other words is not the item (review, 9.7).
+
+[[case]]
+id = "notes-say-no-compaction-test-required"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "NO COMPACTION TEST REQUIRED"],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "notes-say-not-a-compaction-test"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "NOT A COMPACTION TEST"],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "notes-say-recompaction-test"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "RECOMPACTION TEST"],
+]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "notes-say-compaction-testing"
+pdf_replace = [
+  ["COMPACTION TEST", "SITE CLEAN"],
+  ["Fake note line one", "COMPACTION TESTING"],
+]
+expect_skip = "NOT_COMPACTION"
+
+# The item row itself (Joey, 25 Nov 2026: item line only).
+
+[[case]]
+id = "item-row-compaction-testing"
+pdf_replace = [["COMPACTION TEST", "COMPACTION TESTING"]]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "item-description-on-a-line-of-its-own"
+plumber_replace = [["COMPACTION TEST 1.000 EA 99.00 99.00", "1.000 EA 99.00 99.00\nCOMPACTION TEST"]]
+expect_company = "Summit Homes Group"
+expect_po = "123456/020/01"
+expect_compaction = true
+
+# --- the Purchase Order No: value (open question 3: anything uncertain -> PO_MISMATCH) ---
+
+[[case]]
+id = "po-missing"
+pdf_replace = [["Purchase Order No: 123456/020/01\n", ""]]
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "po-label-without-value"
+pdf_replace = [["Purchase Order No: 123456/020/01", "Purchase Order No:"]]
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "po-two-groups"
+pdf_replace = [["123456/020/01", "123456/020"]]
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "po-four-groups"
+pdf_replace = [["123456/020/01", "123456/020/01/1"]]
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "po-with-a-letter"
+pdf_replace = [["123456/020/01", "123456/020/01A"]]
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "po-twice-different-values"
+pdf_replace = [["Fake terms apply.", "Summit Homes Group\nPurchase Order No: 654321/030/02\nFake terms apply."]]
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "po-twice-one-malformed"
+pdf_replace = [["Fake terms apply.", "Purchase Order No: 123456/020\nFake terms apply."]]
+expect_skip = "PO_MISMATCH"
+
+# --- the readers disagree on one field ---
+
+[[case]]
+id = "readers-disagree-company"
+pypdf_replace = [["Summit Homes Group\nPurchase", "Summit New Homes\nPurchase"]]
+expect_skip = "READERS_DISAGREE"
+
+[[case]]
+id = "readers-disagree-po"
+pypdf_replace = [["123456/020/01", "123456/020/02"]]
+expect_skip = "READERS_DISAGREE"
+
+[[case]]
+id = "readers-disagree-po-one-reads-none"
+pypdf_replace = [["Purchase Order No: 123456/020/01\n", ""]]
+expect_skip = "READERS_DISAGREE"
+
+[[case]]
+id = "readers-disagree-compaction"
+pypdf_replace = [["EACOMPACTION TEST", "EASITE CLEAN"]]
+expect_skip = "READERS_DISAGREE"
+
+# --- a reader reads no text ---
+
+[[case]]
+id = "plumber-reads-no-text"
+empty = "plumber"
+expect_skip = "PDF_UNREADABLE"
+
+[[case]]
+id = "pypdf-reads-no-text"
+empty = "pypdf"
+expect_skip = "PDF_UNREADABLE"
