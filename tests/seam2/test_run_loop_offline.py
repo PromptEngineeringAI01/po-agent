@@ -46,7 +46,13 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
-from po_agent.core.models import NotePoolFilters
+from po_agent.core.models import (
+    CompactionTask,
+    NotePoolFilters,
+    SearchRow,
+    Skip,
+    SkipReason,
+)
 
 
 def decide_only(*extra: str) -> int:
@@ -1119,3 +1125,67 @@ def test_more_pages_in_the_eligible_read_alerts_before_any_note(mysys, capsys, c
     assert notes_of(lines) == []
     summary = summary_of(lines)
     assert (summary["seen"], summary["eligible"], summary["exit_code"]) == (1, 1, 1)
+
+
+# --- the client's values reach MySys (task 9.4, mutant rows) -----------------
+
+# B1's project rule (SPEC.md -> Project search): the one B1 Homes row whose
+# Client Ref No. is the internal number; another builder's row never matches.
+B1_ROW = SearchRow(pln="pln_10001", client_ref_no="2600001B", company="B1 Homes")
+OTHER_ROW = SearchRow(
+    pln="pln_10009", client_ref_no="2600001B", company="Another Builder"
+)
+
+
+def is_b1_rule(rule) -> bool:
+    return rule.match((OTHER_ROW, B1_ROW), False, "2600001B") == "pln_10001" and (
+        rule.match((OTHER_ROW,), False, "2600001B")
+        == Skip(reason=SkipReason.PROJECT_NOT_FOUND)
+    )
+
+
+def set_profile(fake: FakeMySys, old: str, new: str) -> None:
+    toml = fake.config_dir / "test.toml"
+    text = toml.read_text("utf-8")
+    assert old in text
+    toml.write_text(text.replace(old, new), "utf-8")
+
+
+def test_the_project_read_and_w1_s_reopen_use_b1_s_project_rule(mysys, capsys):
+    fake = mysys({"300001": FakeNote("2600001B")})
+
+    assert book_run() == 0
+
+    assert [step for step, _ in fake.rules] == ["lookup", "reopen"]
+    assert all(is_b1_rule(rule) for _, rule in fake.rules)
+
+
+def test_w2_reads_back_the_profile_s_documents_type(mysys, capsys):
+    fake = mysys({"300001": FakeNote("2600001B")})
+    set_profile(
+        fake,
+        'project_document_type = "Client Documents"',
+        'project_document_type = "Fake Documents Type"',
+    )
+
+    assert book_run() == 0
+
+    assert fake.document_types == ["Fake Documents Type"]
+
+
+def test_a_profile_counting_cancelled_tasks_skips_a_cancelled_duplicate(mysys, capsys):
+    # duplicate_ignores_cancelled = false (live's value): a Cancelled
+    # Compaction Test task still counts (SPEC.md -> Duplicate check).
+    cancelled = (CompactionTask(task_no="tsk_100001", status="Cancelled"),)
+    lookup = CLEAN.lookup.model_copy(update={"tasks": cancelled})
+    fake = mysys({"300001": FakeNote("2600001B", lookup=lookup)})
+    set_profile(
+        fake,
+        "duplicate_ignores_cancelled = true",
+        "duplicate_ignores_cancelled = false",
+    )
+
+    assert decide_only() == 0
+
+    ((note),) = notes_of(output(capsys))
+    assert (note["outcome"], note["reason"]) == ("skipped", "DUPLICATE_TASK")

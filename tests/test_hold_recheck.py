@@ -102,6 +102,7 @@ def mysys(env, tmp_path):
 
         def recheck_hold(guard, page, base_url, username, password, booked, rule):
             fake.calls.append(f"recheck {booked.task_id}")
+            fake.rules.append(("recheck", rule))
             guard.history.append(("search_project", "done"))
             answer = answers.get(booked.task_id, "on_hold")
             if isinstance(answer, BaseException):
@@ -315,6 +316,22 @@ def test_a_held_task_is_rechecked_before_any_note_and_the_run_goes_on(
     assert "INFO  hold re-check: 1 checked, 0 not on hold" in lines
     assert alerts_of(lines) == []
     assert summary_of(lines)["exit_code"] == 0
+
+
+def test_the_recheck_reads_the_project_by_b1_s_project_rule(mysys, tmp_path):
+    # Task 9.4 mutant row: the run's client gives the rule; B1's matches the
+    # one B1 Homes row with the internal number (SPEC.md -> Project search).
+    seed(tmp_path, FRIDAY, booked(9))
+    fake = mysys({"300002": FakeNote("2600001B", names=())})  # NO_PDF
+    b1_row = SearchRow(pln="pln_10009", client_ref_no="2600009B", company="B1 Homes")
+    other = SearchRow(pln="pln_10010", client_ref_no="2600009B", company="Another")
+
+    assert decide_only() == 0
+
+    ((step, rule),) = fake.rules
+    assert step == "recheck"
+    assert rule.match((other, b1_row), False, "2600009B") == "pln_10009"
+    assert rule.match((other,), False, "2600009B").reason.value == "PROJECT_NOT_FOUND"
 
 
 @pytest.mark.parametrize(

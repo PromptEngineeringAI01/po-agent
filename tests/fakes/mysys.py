@@ -87,9 +87,12 @@ class FakeMySys:
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
     counts: Counter = field(default_factory=Counter)  # (Note ID, call name)
-    # What the run passed in: the Note Pool filters, (Note ID, body rule).
+    # What the run passed in: the Note Pool filters, (Note ID, body rule),
+    # (step, project rule) and W2's Documents Type (task 9.4: the client's).
     filters: list = field(default_factory=list)
     body_rules: list = field(default_factory=list)
+    rules: list = field(default_factory=list)
+    document_types: list = field(default_factory=list)
 
     def _note(self, window: str) -> tuple[str, FakeNote]:
         note_id = window.removeprefix("window-")
@@ -246,6 +249,7 @@ class FakeMySys:
         # (screen-map rows 25, 27).
         (note_id,) = [n for n, v in self.notes.items() if v.internal_no == internal_no]
         self._call("lookup", note_id)
+        self.rules.append(("lookup", rule))
         return self.notes[note_id].lookup
 
     def return_note(self, guard, window, agent, pool, log, note_id):
@@ -275,6 +279,7 @@ class FakeMySys:
     def reopen_project(self, guard, page, base_url, username, password, proceed, rule):
         # The project window (screen-map row 07).
         self._call("reopen", proceed.note_id)
+        self.rules.append(("reopen", rule))
         return "project"
 
     def open_task_form(self, guard, page, project):
@@ -313,6 +318,7 @@ class FakeMySys:
         # The new task's section of the project's Documents tab (screen-map
         # row 19).
         self._step("document")
+        self.document_types.append(document_type)
 
     def project_window(self, page, pln):
         self._step("project_window")  # the project window (screen-map row 07)
