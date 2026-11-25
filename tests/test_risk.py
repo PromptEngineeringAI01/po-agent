@@ -36,6 +36,8 @@ def risk():
         "src/po_agent/summit/companies.py",
         "config/clients/summit.toml",  # company table, creators, aliases
         "config/clients/b1.toml",
+        "src/po_agent/core/secrets.py",  # 9.3 review friction row
+        "src/po_agent/core/config.py",
         "scripts/guard_check.py",
         "scripts/check.py",
         "scripts/risk.py",
