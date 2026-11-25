@@ -1199,3 +1199,14 @@ def test_every_read_back_naming_the_agent_gets_the_profile_s_agent(mysys, capsys
     assert book_run() == 0
 
     assert fake.agents == [("task_row", AGENT), ("detail", AGENT), ("solved", AGENT)]
+
+
+def test_an_untouched_note_s_line_shows_its_po_number(mysys, capsys):
+    # The NOTE line of a Note left with a person names its PO, as every NOTE
+    # line does (SPEC.md -> Output contract).
+    mysys({"300001": FakeNote("2600001B", assignee=PERSON)})
+
+    assert decide_only() == 0
+
+    (note,) = notes_of(output(capsys))
+    assert (note["outcome"], note["po_number"]) == ("untouched", "2600001B/048")
