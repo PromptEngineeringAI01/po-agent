@@ -10,9 +10,14 @@ SPEC's differences and nothing more (ADR-003's rule of three), and Summit's
 implementation refuses every one of them until 9.9-9.14 fill it.
 """
 
-import pytest
+import argparse
 
+import pytest
+from fakes.mysys import FakeNote
+
+from po_agent import cli
 from po_agent.b1.client import B1Client
+from po_agent.core import output
 from po_agent.core.client import Client, EligibleNote
 from po_agent.core.config import CONFIG_DIR, load_config
 from po_agent.core.errors import ConfigError
@@ -101,3 +106,30 @@ def test_b1_s_values_come_from_its_site_profile() -> None:
     assert client.po_number(EligibleNote(note_id="300001", internal_no="2600001B")) == (
         "2600001B/048"
     )
+
+
+@pytest.mark.parametrize("mode", ["spike", "decide-only", "run"])
+def test_summit_s_stub_refuses_before_the_browser_opens(mode, mysys):
+    # 9.4 review: cli.py refuses Summit's modes today; were that gate lifted
+    # before its task lands, the stub still stops the run before any login
+    # with Summit's credentials (no MySys call at all).
+    fake = mysys({"300001": FakeNote("2600001B")})
+    options = argparse.Namespace(
+        client="summit",
+        headed=False,
+        slow_mo=0,
+        detailed_log=False,
+        decide_only=mode == "decide-only",
+    )
+    credentials = {
+        "mysys_test_username": "fake-user",
+        "mysys_test_password": "fake-password",
+    }
+    summary = output.RunSummary(run_id="20261125T000000Z-0000")
+
+    with pytest.raises(ConfigError):
+        cli.start(
+            mode, load_config("test", fake.config_dir), credentials, options, summary
+        )
+
+    assert fake.calls == []
