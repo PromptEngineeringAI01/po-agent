@@ -1,0 +1,433 @@
+# Summit seam-1 decision cases (task 9.9; SPEC.md -> Client 2: Summit Home,
+# Decision checks, Creator table). Fake values only: the PO 123456/020/01,
+# fake plns, fake staff names, a fake street. Company names and creators
+# come from the committed creator table (config/clients/summit.toml), which
+# SPEC allows. Never a real Summit PO, address, title or body.
+#
+# [note] and [lookup] are one fake Note and its MySys lookup that PROCEED
+# (Summit Homes Group -> Compactions). The PDF text is reader_cases.toml's
+# [po], as both readers read it.
+#
+# A [[case]] changes only what it mutates:
+# - title, attachments, linked replace the Note's;
+# - pdf_replace / plumber_replace / pypdf_replace / empty change the PDF
+#   text as in reader_cases.toml;
+# - search_rows, more_pages, internal_no, project_tasks replace the lookup's.
+#
+# expect_skip is decide()'s skip reason. Without it, the case PROCEEDs with
+# expect_pln, expect_po, expect_creator, expect_previous_task (only on a
+# previous-task row) and expect_task_nos (the Compaction Test task numbers
+# W2 needs; [] when left out). All written out from SPEC, never computed.
+
+[note]
+title = "Summit Homes Group - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+body = "Fake order table line\nFake line of text\nFake Disclaimer"
+attachments = ["fake-123456_020_01.pdf"]
+linked = false
+
+[lookup]
+more_pages = false
+internal_no = "123456"
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" }]
+project_tasks = [
+  { task_no = "tsk_300001", name = "Site Start", status = "Complete", task_creator = "Fake Staff One" },
+]
+
+# --- PROCEED ---
+
+[[case]]
+id = "clean"
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Compactions"
+
+[[case]]
+id = "company-names-trimmed-any-case"
+title = "  summit HOMES group  - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - ISSUED"
+search_rows = [{ pln = "pln_20001", client_ref_no = " 123456 ", company = " SUMMIT homes GROUP " }]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Compactions"
+
+[[case]]
+id = "same-project-row-twice"
+search_rows = [
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" },
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" },
+]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Compactions"
+
+[[case]]
+id = "non-summit-and-other-ref-rows-ignored"
+search_rows = [
+  { pln = "pln_20002", client_ref_no = "123456", company = "Fake Builders" },
+  { pln = "pln_20003", client_ref_no = "1234567", company = "Summit Homes Group" },
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" },
+]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Compactions"
+
+# --- Creator: each fixed row (SPEC creator table) ---
+
+[[case]]
+id = "creator-easystart"
+title = "Summit Easystart - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Easystart\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Easystart" }]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "NH Sub Floor"
+
+[[case]]
+id = "creator-easystart-alias-in-title"
+title = "New Gen and EasyStart - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Easystart\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "SUMMIT EASYSTART" }]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "NH Sub Floor"
+
+[[case]]
+id = "creator-new-homes"
+title = "Summit New Homes - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit New Homes\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit New Homes" }]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "NH Sub Floor"
+
+[[case]]
+id = "creator-southwest"
+title = "Summit SouthWest - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit SouthWest\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit SouthWest" }]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Compactions"
+
+[[case]]
+id = "creator-granny-flats-without-other-tasks"
+title = "Summit Granny Flats - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Granny Flats\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Granny Flats" }]
+project_tasks = []
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Allison Wells"
+
+# --- Creator: previous task (highest number, not Compaction Test, not Cancelled) ---
+
+[[case]]
+id = "previous-task-project-by-its-alias"
+title = "Summit Developments - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Developments\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Project" }]
+project_tasks = [
+  { task_no = "tsk_300001", name = "Site Start", status = "Complete", task_creator = "Fake Staff One" },
+  { task_no = "tsk_300005", name = "Frame Inspection", status = "New Project", task_creator = "Fake Staff Five" },
+  { task_no = "tsk_300003", name = "Slab Inspection", status = "Complete", task_creator = "Fake Staff Three" },
+]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Fake Staff Five"
+expect_previous_task = "tsk_300005"
+
+[[case]]
+id = "previous-task-by-number-not-text"
+title = "Summit Renovations - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Renovations\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Renovations" }]
+project_tasks = [
+  { task_no = "tsk_100000", name = "Site Start", status = "Complete", task_creator = "Fake Staff Ten" },
+  { task_no = "tsk_99999", name = "Slab Inspection", status = "Complete", task_creator = "Fake Staff Nine" },
+]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Fake Staff Ten"
+expect_previous_task = "tsk_100000"
+
+[[case]]
+id = "previous-task-skips-cancelled-and-compaction"
+title = "Summit Homes Display - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Homes Display\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Display" }]
+project_tasks = [
+  { task_no = "tsk_300004", name = "Site Start", status = "Complete", task_creator = "Fake Staff Four" },
+  { task_no = "tsk_300009", name = "Frame Inspection", status = "Cancelled", task_creator = "Fake Staff Nine" },
+  { task_no = "tsk_300010", name = "Compaction Test", status = "Cancelled", task_creator = "Compactions" },
+]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Fake Staff Four"
+expect_previous_task = "tsk_300004"
+expect_task_nos = ["tsk_300010"]
+
+[[case]]
+id = "previous-task-none"
+title = "Summit Homes Display - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Homes Display\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Display" }]
+project_tasks = []
+expect_skip = "CREATOR_UNKNOWN"
+
+[[case]]
+id = "previous-task-only-compaction-or-cancelled"
+title = "Summit Homes Display - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Homes Display\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Display" }]
+project_tasks = [
+  { task_no = "tsk_300004", name = "Site Start", status = "Cancelled", task_creator = "Fake Staff Four" },
+  { task_no = "tsk_300010", name = "Compaction Test", status = "Cancelled", task_creator = "Compactions" },
+]
+expect_skip = "CREATOR_UNKNOWN"
+
+[[case]]
+id = "previous-task-creator-empty"
+title = "Summit Homes Display - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Homes Display\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Display" }]
+project_tasks = [
+  { task_no = "tsk_300004", name = "Site Start", status = "Complete", task_creator = "Fake Staff Four" },
+  { task_no = "tsk_300009", name = "Frame Inspection", status = "", task_creator = "" },
+]
+expect_skip = "CREATOR_UNKNOWN"
+
+[[case]]
+id = "previous-task-creator-dashes"
+title = "Summit Homes Display - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Homes Display\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Display" }]
+project_tasks = [
+  { task_no = "tsk_300004", name = "Site Start", status = "Complete", task_creator = "Fake Staff Four" },
+  { task_no = "tsk_300009", name = "Frame Inspection", status = "Complete", task_creator = " --- " },
+]
+expect_skip = "CREATOR_UNKNOWN"
+
+[[case]]
+id = "previous-task-number-twice-two-creators"
+title = "Summit Homes Display - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Homes Display\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Display" }]
+project_tasks = [
+  { task_no = "tsk_300009", name = "Frame Inspection", status = "Complete", task_creator = "Fake Staff Nine" },
+  { task_no = "tsk_300009", name = "Frame Inspection", status = "Complete", task_creator = "Fake Staff Eight" },
+]
+expect_skip = "CREATOR_UNKNOWN"
+
+# --- Note checks, before the PDF is read ---
+
+[[case]]
+id = "note-already-linked"
+linked = true
+expect_skip = "NOTE_ALREADY_LINKED"
+
+[[case]]
+id = "no-attachment"
+attachments = []
+expect_skip = "NO_PDF"
+
+[[case]]
+id = "attachment-not-a-pdf"
+attachments = ["fake-123456_020_01.docx"]
+expect_skip = "NO_PDF"
+
+[[case]]
+id = "two-attachments"
+attachments = ["fake-123456_020_01.pdf", "fake-123456_020_02.pdf"]
+expect_skip = "MULTIPLE_PDFS"
+
+# --- PDF checks (9.7's readers) ---
+
+[[case]]
+id = "pdfplumber-reads-no-text"
+empty = "plumber"
+expect_skip = "PDF_UNREADABLE"
+
+[[case]]
+id = "not-compaction"
+pdf_replace = [["COMPACTION TEST", "SITE CLEAN"]]
+expect_skip = "NOT_COMPACTION"
+
+[[case]]
+id = "readers-disagree-on-the-po"
+pypdf_replace = [["Purchase Order No: 123456/020/01", "Purchase Order No: 123456/020/02"]]
+expect_skip = "READERS_DISAGREE"
+
+[[case]]
+id = "pdf-po-malformed"
+pdf_replace = [["Purchase Order No: 123456/020/01", "Purchase Order No: 123456/020"]]
+expect_skip = "PO_MISMATCH"
+
+# --- PO: the PDF's equals the title's ---
+
+[[case]]
+id = "title-po-differs-same-client-ref"
+title = "Summit Homes Group - Lot 1 Fake Street Fakeville - PO: 123456/021/01 - READY"
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "title-po-longer"
+title = "Summit Homes Group - Lot 1 Fake Street Fakeville - PO: 123456/020/011 - READY"
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "title-without-po"
+title = "Summit Homes Group - Lot 1 Fake Street Fakeville - READY"
+expect_skip = "PO_MISMATCH"
+
+[[case]]
+id = "title-po-twice"
+title = "Summit Homes Group - PO: 123456/020/01 - Lot 1 Fake Street - PO: 123456/020/01 - READY"
+expect_skip = "PO_MISMATCH"
+
+# --- Company known (title and PDF, before the search) ---
+
+[[case]]
+id = "title-company-not-in-table"
+title = "Fake Builders - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+expect_skip = "COMPANY_UNKNOWN"
+
+[[case]]
+id = "title-company-part-of-a-name"
+title = "Summit Homes - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+expect_skip = "COMPANY_UNKNOWN"
+
+[[case]]
+id = "title-company-longer-than-a-name"
+title = "Summit Homes Group Pty Ltd - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+expect_skip = "COMPANY_UNKNOWN"
+
+[[case]]
+id = "pdf-company-not-in-table"
+pdf_replace = [["Summit Homes Group\nPurchase", "Fake Builders\nPurchase"]]
+expect_skip = "COMPANY_UNKNOWN"
+
+# --- Project: Client Ref No. = the PO before its first "/", a table Company ---
+
+[[case]]
+id = "project-none"
+search_rows = []
+expect_skip = "PROJECT_NOT_FOUND"
+
+[[case]]
+id = "project-company-not-in-table"
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Fake Builders" }]
+expect_skip = "PROJECT_NOT_FOUND"
+
+[[case]]
+id = "project-ref-is-the-full-po"
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456/020/01", company = "Summit Homes Group" }]
+expect_skip = "PROJECT_NOT_FOUND"
+
+[[case]]
+id = "project-two-summit-rows"
+search_rows = [
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" },
+  { pln = "pln_20002", client_ref_no = "123456", company = "Summit New Homes" },
+]
+expect_skip = "PROJECT_AMBIGUOUS"
+
+[[case]]
+id = "project-second-page"
+more_pages = true
+expect_skip = "PROJECT_AMBIGUOUS"
+
+[[case]]
+id = "client-internal-no-differs"
+internal_no = "123457"
+expect_skip = "UNEXPECTED_SCREEN"
+
+[[case]]
+id = "client-internal-no-empty"
+internal_no = ""
+expect_skip = "UNEXPECTED_SCREEN"
+
+# --- Company agrees: each of the three names the odd one out ---
+
+[[case]]
+id = "company-title-differs"
+title = "Summit New Homes - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+expect_skip = "COMPANY_MISMATCH"
+
+[[case]]
+id = "company-pdf-differs"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit New Homes\nPurchase"]]
+expect_skip = "COMPANY_MISMATCH"
+
+[[case]]
+id = "company-project-differs"
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit New Homes" }]
+expect_skip = "COMPANY_MISMATCH"
+
+[[case]]
+id = "company-alias-of-another-row"
+title = "Summit Developments - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+expect_skip = "COMPANY_MISMATCH"
+
+# --- Duplicate: a Compaction Test task not Cancelled, whatever its PO
+# (Joey, 25 Nov 2026: a Cancelled one doesn't block a Summit booking) ---
+
+[[case]]
+id = "duplicate-only-a-cancelled-one-proceeds"
+project_tasks = [
+  { task_no = "tsk_300001", name = "Site Start", status = "Complete", task_creator = "Fake Staff One" },
+  { task_no = "tsk_300002", name = "Compaction Test", status = "Cancelled", task_creator = "Compactions" },
+]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "Compactions"
+expect_task_nos = ["tsk_300002"]
+
+[[case]]
+id = "duplicate-cancelled-and-a-live-one"
+project_tasks = [
+  { task_no = "tsk_300002", name = "Compaction Test", status = "Cancelled", task_creator = "Compactions" },
+  { task_no = "tsk_300003", name = "Compaction Test", status = "New Project", task_creator = "Compactions" },
+]
+expect_skip = "DUPLICATE_TASK"
+
+[[case]]
+id = "duplicate-live-one-only"
+project_tasks = [
+  { task_no = "tsk_300001", name = "Site Start", status = "Complete", task_creator = "Fake Staff One" },
+  { task_no = "tsk_300002", name = "Compaction Test", status = "On-hold ON HOLD UNTIL CALL UP", task_creator = "Compactions" },
+]
+expect_skip = "DUPLICATE_TASK"
+
+[[case]]
+id = "duplicate-status-only-near-cancelled"
+project_tasks = [
+  { task_no = "tsk_300002", name = "Compaction Test", status = "cancelled", task_creator = "Compactions" },
+]
+expect_skip = "DUPLICATE_TASK"
+
+[[case]]
+id = "duplicate-number-twice-live-then-cancelled"
+project_tasks = [
+  { task_no = "tsk_300002", name = "Compaction Test", status = "New Project", task_creator = "Compactions" },
+  { task_no = "tsk_300002", name = "Compaction Test", status = "Cancelled", task_creator = "Compactions" },
+]
+expect_skip = "DUPLICATE_TASK"
+
+# --- More boundaries (9.9 review) ---
+
+[[case]]
+id = "pypdf-reads-no-text"
+empty = "pypdf"
+expect_skip = "PDF_UNREADABLE"
+
+[[case]]
+id = "readers-disagree-on-the-company"
+pypdf_replace = [["Summit Homes Group\nPurchase", "Summit New Homes\nPurchase"]]
+expect_skip = "READERS_DISAGREE"
+
+[[case]]
+id = "project-one-pln-under-two-table-companies"
+search_rows = [
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit Homes Group" },
+  { pln = "pln_20001", client_ref_no = "123456", company = "Summit New Homes" },
+]
+expect_skip = "PROJECT_AMBIGUOUS"
