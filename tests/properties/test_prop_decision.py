@@ -341,7 +341,10 @@ def test_a_near_miss_proceed_is_refused(fields, change):
 
 def test_the_fault_catalog_covers_every_decide_skip_reason():
     """Every skip reason decide() can give has a fault in the catalog
-    (PARTIAL_WRITE comes after Submit, never from decide)."""
+    (PARTIAL_WRITE comes after Submit, never from decide; Summit's three
+    come only from Summit's decide, task 9.9)."""
     covered = {mutation.reason for mutation in MUTATIONS.values()}
+    summit_only = {"COMPANY_UNKNOWN", "COMPANY_MISMATCH", "CREATOR_UNKNOWN"}
     expected = {reason.value for reason in SkipReason} - {"PARTIAL_WRITE"}
+    expected -= summit_only
     assert covered == expected
