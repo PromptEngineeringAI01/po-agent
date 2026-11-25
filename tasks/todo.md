@@ -30,7 +30,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 
 **S-B Decide, offline**
 - [x] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers (S.0 expected compaction values pending: the real-PDF check skips until `cases.toml` gives them) · step · **review stop** · high
-- [ ] **9.8** Tasks read: every task's number, name, status and Task Creator in `MySysLookup`; B1's duplicate check unchanged · step · high
+- [x] **9.8** Tasks read: every task's number, name, status and Task Creator in `MySysLookup`; B1's duplicate check unchanged on mapped headers (unmapped header buttons: quiet `DUPLICATE_TASK`, Joey 25 Nov 2026) · step · high
 - [ ] **9.9** Summit decision engine: SPEC's decision table in order, three-way company match with aliases, Client Internal No., strict duplicate, previous-task creator; `COMPANY_UNKNOWN`, `COMPANY_MISMATCH`, `CREATOR_UNKNOWN`; seam 1 `false PROCEED: 0` · step · high
 - [ ] **9.10** Summit real-PO seam on the 11 POs with `private/summit/fixtures/cases.toml` (needs S.0) · step · pauses: laptop runs
 

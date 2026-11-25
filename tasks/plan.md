@@ -865,7 +865,7 @@ One task per session, in this order (workflow build loop). 9.6 and 9.7 touch onl
 
 **Description:** `driver.task_rows` already returns every row of the settled Tasks table; `b1/reader_rules.compaction_tasks` keeps Compaction Test rows only. A shared parse gives each task's number, name, status and Task Creator (details row, screen-map row 07) in `MySysLookup`; B1's duplicate check reads the same rows filtered to Compaction Test.
 **Needs:** 9.2.
-**Acceptance:** parser tests on fake tables: several tasks, a Cancelled one, Task Creator empty and `---`, header without details row (`UNEXPECTED_SCREEN`); B1's duplicate tests and seam 1 unchanged; B1 seam 2 reads green on the test site.
+**Acceptance:** parser tests on fake tables: several tasks, a Cancelled one, Task Creator empty and `---`, a Compaction Test header without details row (`UNEXPECTED_SCREEN`; another task's keeps an empty status and Task Creator, decisions 25 Nov 2026); B1's duplicate tests and seam 1 unchanged (on every mapped header; a Compaction Test header with unmapped buttons on lines of their own is a quiet `DUPLICATE_TASK`, Joey 25 Nov 2026); B1 seam 2 reads green on the test site.
 **Verify:** `uv run scripts/check.py`; B1 seam 2 reads.
 **Files:** `src/po_agent/mysys/driver.py` (or a shared table parser), `src/po_agent/core/models.py`, `src/po_agent/b1/reader_rules.py`, tests. **Scope:** S.
 

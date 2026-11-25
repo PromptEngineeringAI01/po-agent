@@ -5,9 +5,9 @@ package (`b1/models.py`)."""
 
 from collections.abc import Sequence
 from enum import StrEnum
-from typing import Annotated, Literal, Protocol
+from typing import Annotated, Any, Literal, Protocol, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 
 
 class NotePoolRow(BaseModel):
@@ -67,11 +67,26 @@ class SearchRow(Frozen):
     company: str
 
 
+COMPACTION_TEST = "Compaction Test"  # MySys's task name (row 07)
+
+
 class CompactionTask(Frozen):
     """One Compaction Test task on the project, as the task table shows it."""
 
     task_no: str
     status: str
+
+
+class ProjectTask(Frozen):
+    """One task of any name on the project, as the Tasks table shows it:
+    its header row "(tsk_<n>) | <name>" and its details row's Task Creator
+    and Status cells (row 07; task 9.8). Cells as shown ("---" or empty
+    too): a client judges them."""
+
+    task_no: str = Field(pattern=r"^tsk_[0-9]+$")
+    name: str
+    status: str
+    task_creator: str
 
 
 class MySysLookup(Frozen):
@@ -84,7 +99,31 @@ class MySysLookup(Frozen):
     more_pages: bool  # a second results page exists
     project_internal_no: str = ""  # the project's Client Internal No.
     address: str = ""  # the project's one Address string, unparsed
+    # Every task in table order (task 9.8); `tasks` are its Compaction Test
+    # ones (B1's duplicate check), derived when left out.
+    project_tasks: tuple[ProjectTask, ...] = ()
     tasks: tuple[CompactionTask, ...] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _compaction_from_every_task(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("project_tasks") and "tasks" not in data:
+            every = [ProjectTask.model_validate(t) for t in data["project_tasks"]]
+            return {**data, "tasks": _compaction(every)}
+        return data
+
+    @model_validator(mode="after")
+    def _same_rows(self) -> Self:
+        if self.project_tasks and self.tasks != _compaction(self.project_tasks):
+            raise ValueError("tasks are not the Compaction Test project_tasks")
+        return self
+
+
+def _compaction(project_tasks: Sequence[ProjectTask]) -> tuple[CompactionTask, ...]:
+    """The Compaction Test tasks, one per number (the last row's status), as
+    the task number -> status read before 9.8."""
+    statuses = {t.task_no: t.status for t in project_tasks if t.name == COMPACTION_TEST}
+    return tuple(CompactionTask(task_no=n, status=s) for n, s in statuses.items())
 
 
 class Proceed(Frozen):

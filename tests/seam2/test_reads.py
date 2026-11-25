@@ -133,6 +133,13 @@ def test_reads_each_trial_project(config, login, guard, internal_no):
     assert lookup.more_pages is False
     assert lookup.address  # read, not compared: never an address in a test
     assert all(task.task_no.startswith("tsk_") for task in lookup.tasks)
+    # Task 9.8: the Task Creator column on the real page. Every Compaction
+    # Test task on a trial project was created as "Perth Scheduling"
+    # (screen-map row 07); Summit has no seam 2, so this is its only proof.
+    creators = {
+        t.task_creator for t in lookup.project_tasks if t.name == "Compaction Test"
+    }
+    assert creators == {"Perth Scheduling"}  # each trial project has one
     assert only_reading(guard)
 
     fixtures = private_fixtures()
