@@ -23,8 +23,15 @@ from seam1.seam1_cases import CASES, text_pdf
 
 from po_agent.core import run
 from po_agent.core.errors import UnexpectedScreen
-from po_agent.core.models import MySysLookup, NotePoolRow
+from po_agent.core.models import (
+    MySysLookup,
+    NotePoolFilters,
+    NotePoolRow,
+    ProjectTask,
+    SearchRow,
+)
 from po_agent.mysys import booking, driver
+from po_agent.mysys.guard import ActionGuard
 
 # The test site's pool (screen-map "Live vs test") and the agent's user name
 # (screen-map rows 03-04).
@@ -48,6 +55,8 @@ class FakeNote:
     linked: bool = False
     names: tuple[str, ...] = (FILE,)
     lookup: MySysLookup = CLEAN.lookup
+    body: str = CLEAN.note.body  # what the body read returns
+    pdf: bytes = PDF  # the one PDF's bytes, when it downloads
     fail_at: str | None = None  # a call name that raises `fail_with`
     fail_with: type[BaseException] = UnexpectedScreen
     # A call during which a person takes it: the Note Pool list is read once
@@ -95,6 +104,16 @@ class FakeMySys:
     rules: list = field(default_factory=list)
     document_types: list = field(default_factory=list)
     agents: list = field(default_factory=list)
+    # With `record_actions`, each fake step appends to the run's guard
+    # history the actions the real step takes through guard.act (named after
+    # mysys/driver.py and mysys/booking.py), so a test can read which kinds
+    # of action a run took. Off: B1's tests see the history as before.
+    record_actions: bool = False
+    guard: ActionGuard | None = None  # the run's guard, kept at login
+
+    def _acted(self, guard: ActionGuard, *actions: str) -> None:
+        if self.record_actions:
+            guard.history.extend((action, "done") for action in actions)
 
     def _note(self, window: str) -> tuple[str, FakeNote]:
         note_id = window.removeprefix("window-")
@@ -141,18 +160,28 @@ class FakeMySys:
 
     def login(self, guard, page, username, password):
         self.calls.append("login")  # Username, Password, "Log in" (screen-map row 26)
+        self.guard = guard
+        self._acted(guard, "login_username", "login_password", "login_submit")
 
     def open_note_pool(self, guard, page):
         self.calls.append("open_note_pool")
+        self._acted(guard, "open_project_tab", "open_note_pool")
         return "panel"
 
     def leave_menu(self, guard, page):
         self.calls.append("leave_menu")
+        self._acted(guard, "move_pointer_off_menu")
 
-    def set_note_pool_filters(self, guard, panel, filters):
+    def set_note_pool_filters(self, guard, panel, filters: NotePoolFilters):
         # The list reloads by itself after a filter change (screen-map row 27).
         self.calls.append("filters")
         self.filters.append(filters)
+        chosen = (
+            ("set_pool_filter", filters.pool),
+            ("set_source_filter", filters.source),
+            ("set_locked_filter", filters.locked),
+        )
+        self._acted(guard, *(action for action, value in chosen if value))
 
     def read_note_pool(self, guard, panel, *, with_source=False):
         # Page 1 of `pool_pages`, as the footer "Page 1 of N" tells (screen-map
@@ -179,6 +208,7 @@ class FakeMySys:
         # Live's stale-Note read (screen-map row 29; decisions, 10 Nov 2026,
         # live stale-Note read from My Notes).
         self.calls.append("open_my_notes")
+        self._acted(guard, "open_project_tab", "open_my_notes")
         return "my-notes"
 
     def read_my_notes(self, panel):
@@ -196,6 +226,17 @@ class FakeMySys:
         # (decisions, 2 Nov 2026, decide-only: how each Note is opened;
         # screen-map row 25).
         self._call("find_again", note_id)
+        self._acted(
+            guard,
+            "open_project_tab",
+            "open_note_pool",
+            "move_pointer_off_menu",
+            "set_pool_filter",
+            "set_locked_filter",
+            "search_note_pool",
+            "refresh_note_pool",
+            "open_note",
+        )
         return f"window-{note_id}"
 
     def read_assignee(self, window):
@@ -210,6 +251,9 @@ class FakeMySys:
         _, note = self._note(window)
         note.taken += 1
         self._call("take", note_id)
+        self._acted(
+            guard, "untick_send_email_notification", "select_note_user", "assign_note"
+        )
         note.assignee = agent
 
     def is_unlinked(self, window, log, note_id):
@@ -236,14 +280,16 @@ class FakeMySys:
         self._call("download", note_id)
         if len(note.names) != 1 or not note.names[0].lower().endswith(".pdf"):
             return None
-        return driver.Pdf(file_name=note.names[0], data=PDF)
+        self._acted(guard, "download_attachment")
+        return driver.Pdf(file_name=note.names[0], data=note.pdf)
 
     def note_body(self, window, body):
-        # The Note body, one line ending with the file name (screen-map row 02).
-        note_id, _ = self._note(window)
+        # The Note body: B1's one line ending with the file name (screen-map
+        # row 02); a Summit Note's, the email iframe's text (SUMMIT_BODY).
+        note_id, note = self._note(window)
         self._call("body", note_id)
         self.body_rules.append((note_id, body))
-        return CLEAN.note.body
+        return note.body
 
     def project_lookup(
         self, guard, page, base_url, username, password, internal_no, rule
@@ -253,6 +299,14 @@ class FakeMySys:
         (note_id,) = [n for n, v in self.notes.items() if v.internal_no == internal_no]
         self._call("lookup", note_id)
         self.rules.append(("lookup", rule))
+        self._acted(
+            guard,
+            "open_project_tab",
+            "open_projects_subtab",
+            "search_project",
+            "submit_project_search",
+            "open_project",
+        )
         return self.notes[note_id].lookup
 
     def return_note(self, guard, window, agent, pool, log, note_id):
@@ -260,6 +314,13 @@ class FakeMySys:
         # pool (screen-map rows 15, 15b).
         _, note = self._note(window)
         self._call("return", note_id)
+        self._acted(
+            guard,
+            "untick_send_email_notification",
+            "select_note_user",
+            "select_note_pool",
+            "assign_note",
+        )
         if self.fail_return:
             raise UnexpectedScreen("fake return failure", note_id=note_id)
         note.assignee = pool
@@ -476,6 +537,89 @@ def summit_row(
         assignee=assignee,
         source=source,
     )
+
+
+# A fake Summit PO as both readers read it (SPEC.md -> Client 2, PDF
+# patterns: the company line on top, "Purchase Order No:", the item row
+# between the DESCRIPTION header and the totals). Company names and
+# creators may be committed (config/clients/summit.toml); everything else is
+# fake.
+SUMMIT_COMPANY = "Summit Homes Group"  # creator Compactions
+SUMMIT_PO = "123456/020/01"
+# A Summit email body: a header table, the PO details table, one line of
+# text and a Disclaimer (Joey's live screenshots, 25 Nov 2026; shapes only).
+SUMMIT_BODY = (
+    "Fake Builder Header\n"
+    "Purchase Order\t123456/020/01\n"
+    "Fake line of text\n"
+    "Disclaimer: fake disclaimer text"
+)
+
+
+def summit_pdf(
+    po: str = SUMMIT_PO, company: str = SUMMIT_COMPANY, item: str = "COMPACTION TEST"
+) -> bytes:
+    return text_pdf(
+        [
+            company,
+            f"Purchase Order No: {po}",
+            "Fake Supplier Order To",
+            "DESCRIPTION Quantity Unit Price Total",
+            item,
+            "Sub Total: $99.00",
+            "Plus GST: $9.90",
+            "Order Total: $108.90",
+        ]
+    )
+
+
+def summit_file(po: str = SUMMIT_PO) -> str:
+    # The attachment link's file name: the PDF's name, with "_" in the PO
+    # (Joey's live screenshots, 25 Nov 2026).
+    return f"Fake Order {po.replace('/', '_')}.pdf"
+
+
+def summit_lookup(
+    client_ref: str = "123456",
+    *,
+    company: str = SUMMIT_COMPANY,
+    pln: str = "pln_20001",
+    internal_no: str | None = None,
+) -> MySysLookup:
+    # One project by Client Ref No. under a table company, its Client
+    # Internal No. and its tasks (screen-map rows 06, 07, 10).
+    return MySysLookup(
+        search_rows=(SearchRow(pln=pln, client_ref_no=client_ref, company=company),),
+        more_pages=False,
+        project_internal_no=client_ref if internal_no is None else internal_no,
+        project_tasks=(
+            ProjectTask(
+                task_no="tsk_300001",
+                name="Site Start",
+                status="Complete",
+                task_creator="Fake Staff One",
+            ),
+        ),
+    )
+
+
+def summit_note(
+    po: str = SUMMIT_PO, *, assignee: str = UNASSIGNED, **kwargs
+) -> FakeNote:
+    """A Summit Note that PROCEEDs (Summit Homes Group, creator Compactions),
+    unless `kwargs` change it."""
+    values: dict = {
+        "names": (summit_file(po),),
+        "pdf": summit_pdf(po),
+        "body": SUMMIT_BODY,
+        "lookup": summit_lookup(po.split("/")[0]),
+    }
+    values.update(kwargs)
+    return FakeNote(po.split("/")[0], assignee=assignee, **values)
+
+
+def summit_titled(po: str = SUMMIT_PO, company: str = SUMMIT_COMPANY) -> str:
+    return f"{company} - Lot 1 Fake Street Fakeville - PO: {po} - READY"
 
 
 def install(
