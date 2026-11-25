@@ -551,7 +551,7 @@ In this order (cheap first, so a non-compaction PDF costs no project search):
 **PDF patterns** (task 9.7, `summit/reader_rules.py`; pinned on Joey's 11 real Summit PDFs in `private/summit/pdfs/`, looked at as masked shapes; decisions, 25 Nov 2026, Summit PDF patterns), read the same way on both readers' text:
 - **Company line:** the first non-empty line, trimmed (the table lookup is the decision engine's).
 - **PO:** the `Purchase Order No:` value, three groups of digits joined by `/`; a later page may repeat the same value. No value, a malformed one, or two different ones (open question 3) is `PO_MISMATCH`.
-- **Compaction:** `COMPACTION TEST` in capitals after the first line starting `DESCRIPTION` and before the first totals line (`Total:` or `GST:`); pypdf may glue the unit onto it, so it is matched inside the line. Neither reader finds it -> `NOT_COMPACTION`; one only -> `READERS_DISAGREE`.
+- **Compaction:** `COMPACTION TEST` in capitals as the **item row's description only** (Joey, 25 Nov 2026), between the first line starting `DESCRIPTION` and the first totals line (`Total:` or `GST:`). An item row is a line that is exactly `COMPACTION TEST`, starts with it followed by the quantity (pdfplumber), or ends with a price and the unit glued onto it (pypdf, `99.00EACOMPACTION TEST`). The phrase inside any other line (a note such as "NO COMPACTION TEST REQUIRED", "RECOMPACTION TEST", "COMPACTION TESTING") never counts; an odd layout reads as not found. Neither reader finds it -> `NOT_COMPACTION`; one only -> `READERS_DISAGREE`.
 - A reader that reads no text is `PDF_UNREADABLE`.
 
 ### Creator table

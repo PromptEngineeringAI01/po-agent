@@ -12,10 +12,13 @@ Patterns, pinned on the 11 real Summit PDFs as masked shapes:
 - the PO is the `Purchase Order No:` value, three digit groups joined by
   `/`; a second page repeats it. No value, a malformed one or two
   different ones read as "" (open question 3: anything uncertain skips);
-- COMPACTION TEST, in capitals, stands under Description: after the first
-  line starting `DESCRIPTION` and before the first totals line (`Total:` or
-  `GST:`). pypdf glues the unit onto it ("EACOMPACTION TEST"), so it is a
-  substring there.
+- COMPACTION TEST, in capitals, is the item row's description (Joey, 25 Nov
+  2026: item line only), between the first line starting `DESCRIPTION` and
+  the first totals line (`Total:` or `GST:`). An item row is a line that is
+  exactly `COMPACTION TEST`, starts with it followed by the quantity
+  (pdfplumber: "COMPACTION TEST 1.000 EA ..."), or ends with a price and the
+  unit glued onto it (pypdf: "... 99.00EACOMPACTION TEST"). The phrase inside
+  any other line (a note) never counts; an odd layout reads as not found.
 """
 
 import re
@@ -27,7 +30,11 @@ __all__ = ["SummitReading", "agreement", "check_pdf", "read", "read_text"]
 
 _PO_VALUE = re.compile(r"Purchase Order No:[ \t]*(\S*)")
 _PO_SHAPE = re.compile(r"[0-9]+/[0-9]+/[0-9]+")
-COMPACTION = "COMPACTION TEST"
+_ITEM_ROW = re.compile(
+    r"COMPACTION TEST"  # the description alone on its line
+    r"|COMPACTION TEST\s+[0-9].*"  # pdfplumber: then the quantity
+    r"|.*[0-9]\.[0-9]{2}[A-Z]{1,4}COMPACTION TEST"  # pypdf: price, unit, it
+)
 _DESCRIPTION = "DESCRIPTION"
 _TOTALS = ("Total:", "GST:")
 
@@ -55,7 +62,7 @@ def _compaction(lines: list[str]) -> bool:
     for line in lines[starts[0] + 1 :]:
         if any(total in line for total in _TOTALS):
             return False
-        if COMPACTION in line:
+        if _ITEM_ROW.fullmatch(line):
             return True
     return False
 
