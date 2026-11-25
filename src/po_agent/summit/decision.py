@@ -96,6 +96,20 @@ def previous_task(tasks: Sequence[ProjectTask]) -> Skip | ProjectTask:
     return at_top[0]
 
 
+def is_duplicate(found: MySysLookup) -> bool:
+    """Any Compaction Test task not Cancelled, whatever its PO; a Cancelled
+    one doesn't block a Summit booking (Joey, 25 Nov 2026). Every row is
+    read, not one status per number, so a number shown twice, once not
+    Cancelled, still counts (9.9 review)."""
+    rows = [
+        task.status
+        for task in found.project_tasks
+        if task.name.strip() == COMPACTION_TEST
+    ]
+    rows += [task.status for task in found.tasks]
+    return any(status.strip() != CANCELLED for status in rows)
+
+
 def decide(
     note: NoteSnapshot,
     original_assignee: str,
@@ -137,9 +151,7 @@ def decide(
         return _skip(SkipReason.UNEXPECTED_SCREEN)
     if not title_row.name == pdf_row.name == project_row.name:
         return _skip(SkipReason.COMPANY_MISMATCH)
-    # Any Compaction Test task not Cancelled, whatever its PO; a Cancelled
-    # one doesn't block a Summit booking (Joey, 25 Nov 2026).
-    if any(task.status.strip() != CANCELLED for task in found.tasks):
+    if is_duplicate(found):
         return _skip(SkipReason.DUPLICATE_TASK)
 
     previous: ProjectTask | None = None

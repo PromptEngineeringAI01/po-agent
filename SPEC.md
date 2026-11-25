@@ -158,7 +158,11 @@ src/po_agent/
     decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given); B1's values for `mysys/`: Note Pool filters (the pool, Locked), the body rule (ends with the file name), B1ProjectRule
     client.py                   B1 as the run loop's client (core/client.py): step 0 on the Note Pool rows, its values from config/<site>.toml
   summit/                       Summit Home's rules (Client 2); no browser code, as b1/
-    client.py                   Summit as the run loop's client: a stub that refuses (ALERT CONFIG, exit 2) until tasks 9.9-9.14
+    client.py                   Summit as the run loop's client: a stub that refuses (ALERT CONFIG, exit 2) until tasks 9.11-9.14
+    reader_rules.py             Summit's PDF patterns on both code readers' text (company line, PO, COMPACTION TEST item row)
+    company.py                  a company name or alias -> its creator-table row (trimmed, case-insensitive, whole name)
+    decision.py                 Summit's decision engine = seam 1; no browser code (calls the project lookup it is given)
+    models.py                   SummitProceed (the full PO, original assignee, previous task)
 config/test.toml                test-site profile; no secrets
 config/live.toml                live profile; no secrets; ask-first for Claude (protect_paths)
 config/clients/summit.toml      Summit's client values and creator table (Client 2 -> The separate run); no secrets

@@ -30,6 +30,8 @@ class SummitProceed(Proceed):
             raise ValueError("internal_no is not the PO before its first /")
         if not self.original_assignee.strip():
             raise ValueError("blank original assignee")
+        if self.creator.strip() in ("", "---"):
+            raise ValueError("creator names nobody")
         if (self.previous_task_no is None) != (self.previous_task_creator is None):
             raise ValueError("previous task number and creator go together")
         if self.previous_task_creator not in (None, self.creator):
