@@ -1,0 +1,54 @@
+# Summit Home's client profile (SPEC.md -> Client 2: Summit Home, The separate
+# run and Creator table; decisions, 23 Nov 2026, separate run, and 24 Nov 2026,
+# Summit creator table). Client values only: the live host, run window, trace
+# and stale_read stay in config/live.toml. No secrets here: Agent 2's pair
+# comes from PO_AGENT_* env vars or keyring at run time, set by Joey only.
+client = "summit"
+sites = ["live"]                    # no test-site profile
+enabled = false                     # kill switch, with the site's; flipped by its own PR before the spike
+agent_user_name = "Agent 2 (Summit Homes)"
+source_filter = "support@prompteng.com.au"         # Note Pool Source filter (receiving mailbox)
+sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
+locked_filter = "Unlocked"
+any_assignee_before = "08:00"       # Perth; a run starting earlier takes any non-agent assignee, later runs only `---`
+max_notes_per_run = 1               # bookings per run; raised by its own PR for hourly runs
+max_peeks_per_run = 10              # Notes opened per run; set from the spike and decide-only (S3)
+project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
+
+# The creator table: one [[company]] per row; exactly one of creator /
+# creator_rule. Names and aliases are compared trimmed and case-insensitive,
+# whole name only; a name not here is COMPANY_UNKNOWN.
+
+[[company]]
+name = "Summit Easystart"
+aliases = ["New Gen and EasyStart"]
+creator = "NH Sub Floor"
+
+[[company]]
+name = "Summit Homes Group"
+creator = "Compactions"
+
+[[company]]
+name = "Summit New Homes"
+creator = "NH Sub Floor"
+
+[[company]]
+name = "Summit SouthWest"
+creator = "Compactions"
+
+[[company]]
+name = "Summit Granny Flats"
+creator = "Allison Wells"
+
+[[company]]
+name = "Summit Project"
+aliases = ["Summit Developments"]   # the only one (Joey, 24 Nov 2026)
+creator_rule = "previous_task"
+
+[[company]]
+name = "Summit Renovations"         # the company's new name (Joey, 24 Nov 2026)
+creator_rule = "previous_task"
+
+[[company]]
+name = "Summit Homes Display"
+creator_rule = "previous_task"

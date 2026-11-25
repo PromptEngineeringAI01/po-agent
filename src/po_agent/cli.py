@@ -1,15 +1,19 @@
 """The po-agent command (SPEC.md -> Commands, Code style, Exit codes).
 
-    po-agent spike|run --site test|live [--decide-only] [--headed]
-             [--slow-mo N] [--detailed-log]
-    po-agent preflight --site test|live
+    po-agent spike|run --site test|live [--client b1|summit] [--decide-only]
+             [--headed] [--slow-mo N] [--detailed-log]
+    po-agent preflight --site test|live [--client b1|summit]
     po-agent demo --site test [--headed] [--slow-mo N] [--until-check]
              [--probe-link]
              [--detailed-log]
 
 `--site` picks config/<site>.toml and that site's MySys secrets (decisions,
 10 Nov 2026, live profile); only Joey runs a live site, on the Mac Mini.
-The demo is test site only. `preflight` (decisions, 20 Nov 2026, secrets
+`--client` (task 9.3; SPEC.md -> Client 2, The separate run) defaults to b1;
+summit is live only, with its own secret pair and config/clients/summit.toml.
+Until their tasks land, spike (9.11), run --decide-only (9.12) and run (9.14)
+refuse summit with exit 2, after its client file is validated. The demo is
+B1's and test site only. `preflight` (decisions, 20 Nov 2026, secrets
 pre-flight) checks that the site's MySys secrets are set and well-formed and
 prints their names and a status; it reads no config, opens no browser and
 makes no network call.
@@ -50,7 +54,13 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from po_agent.core import controls, demo, output, run, runlock, runlog, secrets
-from po_agent.core.config import CONFIG_DIR, Config, load_config
+from po_agent.core.config import (
+    CONFIG_DIR,
+    SITE_HOSTS,
+    Config,
+    load_client,
+    load_config,
+)
 from po_agent.core.errors import ConfigError, PoAgentError, RunLockStuck, identifier
 from po_agent.core.secrets import SecretName
 from po_agent.core.trace import Trace
@@ -63,6 +73,8 @@ DOWNLOAD_PREFIX = "po-agent-dl-"
 _TRACES: dict[str, Trace] = {}
 UNEXPECTED_DETAIL = "unexpected error"
 
+# --client (task 9.3); b1 is the default.
+CLIENTS = ("b1", "summit")
 # The Perth window (3.5): spike and demo are laptop work and ignore it.
 WINDOW_MODES: tuple[output.Mode, ...] = ("run", "decide-only")
 
@@ -94,9 +106,12 @@ def _parser() -> _Parser:
     commands = parser.add_subparsers(dest="command", required=True)
     preflight = commands.add_parser("preflight", add_help=False, allow_abbrev=False)
     preflight.add_argument("--site", required=True)
+    preflight.add_argument("--client", choices=CLIENTS, default="b1")
     for name in ("spike", "run", "demo"):
         command = commands.add_parser(name, add_help=False, allow_abbrev=False)
         command.add_argument("--site", required=True)
+        if name != "demo":  # the demo stays B1's
+            command.add_argument("--client", choices=CLIENTS, default="b1")
         command.add_argument("--headed", action="store_true")
         command.add_argument("--slow-mo", type=_slow_mo, default=0)
         command.add_argument("--detailed-log", action="store_true")
@@ -108,14 +123,19 @@ def _parser() -> _Parser:
     return parser
 
 
-def secret_names(mode: output.Mode, site: str) -> tuple[SecretName, ...]:
-    """The MySys secrets the mode needs on that site: its own pair. The demo
-    (Joey's Enter before each write, from the laptop) is test site only."""
+def secret_names(
+    mode: output.Mode, site: str, client: str = "b1"
+) -> tuple[SecretName, ...]:
+    """The MySys secrets the mode needs on that site for that client: their
+    own pair. The demo (Joey's Enter before each write, from the laptop) is
+    test site only; Summit is live only."""
     if mode == "demo" and site != "test":
         raise ConfigError("the demo is test site only")
     try:
-        return secrets.mysys_names(site)
+        return secrets.mysys_names(site, client)
     except ValueError:
+        if site in SITE_HOSTS:
+            raise ConfigError("the client does not run on that site") from None
         raise ConfigError("unknown site") from None
 
 
@@ -181,12 +201,12 @@ def _start_trace(trace: Trace, config: Config) -> None:
     trace.start(directory, today)
 
 
-def _preflight(site: str) -> int:
+def _preflight(site: str, client: str) -> int:
     """Each secret's status, then exit 2 if any is not ok. Reads only the
     secrets' presence and shape; their values are never kept."""
     checks = [
         output.SecretCheck(name=name, status=secrets.inspect(name))
-        for name in secret_names("preflight", site)
+        for name in secret_names("preflight", site, client)
     ]
     for check in checks:
         output.secret_check(check)
@@ -205,11 +225,18 @@ def _run(
     if mode == "preflight":
         # Before the run lock: it reads nothing but the secrets, so it neither
         # takes nor needs the lock.
-        return _preflight(options.site)
+        return _preflight(options.site, options.client)
     if mode == "demo" and not _demo_read_only(options) and not options.headed:
         # Joey approves each write at a prompt: he must see the page.
         raise ConfigError("a demo that writes needs --headed")
-    names = secret_names(mode, options.site)  # before any file is read
+    client = getattr(options, "client", "b1")  # the demo has no --client
+    names = secret_names(mode, options.site, client)  # before any file is read
+    if client == "summit":
+        # Its client file is checked (ALERT CONFIG on any breach), then the
+        # mode is refused until its task lands: spike 9.11, decide-only 9.12,
+        # run 9.14.
+        load_client(client, options.site, CONFIG_DIR)
+        raise ConfigError("mode not built for this client yet")
     # The run lock (core/runlock.py), per site, before anything else touches
     # disk or MySys: the sweep below deletes another run's download folder.
     try:
