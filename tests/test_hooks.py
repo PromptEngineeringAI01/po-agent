@@ -12,6 +12,7 @@ never #3; decisions, 10 Nov 2026, live profile), and this file is the only
 place the fake Anthropic key may appear (decisions, 16 Oct 2026, D4).
 """
 
+import importlib.util
 import json
 import os
 import re
@@ -324,6 +325,63 @@ def test_guard_bash_blocks(command):
 @pytest.mark.parametrize("command", BASH_ALLOWED.values(), ids=BASH_ALLOWED.keys())
 def test_guard_bash_allows(command):
     assert_allowed(run_hook("guard_bash", bash(command)))
+
+
+# Ask-first files written from Bash (friction log, 25 Nov 2026): asks, as an
+# Edit would; a read, or a write elsewhere, passes.
+BASH_ASKS = {
+    "python open(... 'w')": (
+        "python -c \"open('docs/macmini-setup.md', 'w').write('x')\""
+    ),
+    "write_text in a script": "python fix.py docs/macmini-setup.md  # write_text",
+    "sed --in-place": "sed --in-place 's/a/b/' docs/macmini-setup.md",
+    "tee": "echo x | tee config/live.toml",
+    "cp": "cp new.md docs/macmini-setup.md",
+    "mv": "mv new.sh scripts/macmini-run.sh",
+    "sed -i": "sed -i 's/a/b/' scripts/macmini-run.sh",
+    "sed -E -i": "sed -E -i 's/a/b/' scripts/macmini-run.sh",
+    "sed -Ei": "sed -Ei 's/a/b/' docs/macmini-setup.md",
+    "redirect": "echo x > config/live.toml",
+    "append": "echo x >> config/live.toml",
+    "Windows path, any case": "echo x > Docs\\MacMini-Setup.md",
+}
+BASH_ASK_FILE_READS = {
+    "cat": "cat docs/macmini-setup.md",
+    "grep": "grep -n tag docs/macmini-setup.md",
+    "git diff": "git diff docs/macmini-setup.md",
+    "sed -n": "sed -n 1,20p scripts/macmini-run.sh",
+    "write elsewhere": "echo x > notes.md",
+}
+
+
+@pytest.mark.parametrize("command", BASH_ASKS.values(), ids=BASH_ASKS.keys())
+def test_guard_bash_asks_before_writing_an_ask_first_file(command):
+    assert_asks(run_hook("guard_bash", bash(command)))
+
+
+@pytest.mark.parametrize(
+    "command", BASH_ASK_FILE_READS.values(), ids=BASH_ASK_FILE_READS.keys()
+)
+def test_guard_bash_allows_reading_an_ask_first_file(command):
+    assert_allowed(run_hook("guard_bash", bash(command)))
+
+
+def test_guard_bash_still_blocks_a_blocked_write_to_an_ask_first_file():
+    command = "rm -rf state > docs/macmini-setup.md"
+    assert_blocked(run_hook("guard_bash", bash(command)), "guard_bash")
+
+
+def hook_module(name: str):
+    spec = importlib.util.spec_from_file_location(name, HOOKS / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_guard_bash_and_protect_paths_share_the_ask_first_files():
+    guard_bash = hook_module("guard_bash")
+    protect_paths = hook_module("protect_paths")
+    assert guard_bash.ASK_FILES == protect_paths.ASK_FILES
 
 
 def git_repo_on(branch: str, root: Path) -> Path:

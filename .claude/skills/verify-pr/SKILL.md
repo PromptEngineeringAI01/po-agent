@@ -89,6 +89,8 @@ The `check` job passes and its run is for `headRefOid` (not an older push), and 
 
 Merge only if all of these hold; otherwise report and ask Joey:
 
+- The merge is offered or made only once `check` is green on `headRefOid`: if it is still running, say so and merge on Joey's next message after it is green (decisions, 25 Nov 2026, Checkpoint S-A friction decisions).
+
 - Steps 2-6 found nothing Important, and CI passed on `headRefOid` (plus the local check when step 5 required it).
 - The `check` job passed on `headRefOid`, and `mergeable` is `MERGEABLE`.
 - The PR doesn't touch the guard (`src/po_agent/mysys/guard.py`, `scripts/guard_check.py`), the hooks (`.claude/hooks/`, `.claude/settings*.json`) or CI (`.github/workflows/`). Those PRs stay Joey's to merge; every other PR passing the steps above is merged here, including docs that loosen a rule with their decisions entry (decisions, 6 Nov 2026).

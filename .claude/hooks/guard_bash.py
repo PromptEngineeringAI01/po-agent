@@ -117,6 +117,15 @@ CONTINUATION = re.compile(r"\\\r?\n")
 HEREDOC = re.compile(r"<<-?\s*['\"]?([A-Za-z_]\w*)['\"]?")
 SHELL_WORD = re.compile(r"\b(bash|sh|zsh|dash|pwsh|powershell)\b", re.IGNORECASE)
 MAX_DEPTH = 3  # how deep `bash -c "..."` inside `bash -c "..."` is checked
+# protect_paths.ASK_FILES (tests/test_hooks.py keeps the two equal): a Bash
+# command naming one together with a write pattern asks first, as an Edit
+# of it would (friction log, 25 Nov 2026). A backstop, not complete: it
+# asks, never blocks.
+ASK_FILES = {"config/live.toml", "docs/macmini-setup.md", "scripts/macmini-run.sh"}
+WRITE_PATTERN = re.compile(
+    r">|\bsed\s+(-\w+\s+)*-\w*i|--in-place|\btee\b|\b(cp|mv)\b"
+    r"|\bwrite_|\bopen\("
+)
 
 
 class Blocked(Exception):
@@ -347,6 +356,15 @@ def check(command: str, cwd: str | None, depth: int = 0) -> None:
             check_stage(stage[1])
 
 
+def ask_first(command: str) -> str | None:
+    """Why to ask before `command`, or None."""
+    text = command.replace("\\", "/").lower()
+    named = sorted(name for name in ASK_FILES if name in text)
+    if named and WRITE_PATTERN.search(text):
+        return f"a Bash write may change ask-first {', '.join(named)}"
+    return None
+
+
 def block(message: str) -> None:
     sys.stderr.write(
         f"{HOOK}: blocked - {message}. Joey does this by hand, outside Claude Code.\n"
@@ -364,10 +382,20 @@ def main() -> None:
         if not isinstance(command, str):
             raise TypeError("tool_input.command is not text")
         check(command, payload.get("cwd"))
+        reason = ask_first(command)
     except Blocked as exc:
         block(str(exc))
     except Exception as exc:  # fail closed
         block(f"hook error ({type(exc).__name__}), so the command is not run")
+    if reason:
+        decision = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "ask",
+                "permissionDecisionReason": f"{HOOK}: {reason}",
+            }
+        }
+        sys.stdout.write(json.dumps(decision))
 
 
 if __name__ == "__main__":
