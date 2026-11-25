@@ -1189,3 +1189,13 @@ def test_a_profile_counting_cancelled_tasks_skips_a_cancelled_duplicate(mysys, c
 
     ((note),) = notes_of(output(capsys))
     assert (note["outcome"], note["reason"]) == ("skipped", "DUPLICATE_TASK")
+
+
+def test_every_read_back_naming_the_agent_gets_the_profile_s_agent(mysys, capsys):
+    # Lodged By on the new task row and the detail screen, and "Solved by"
+    # name the agent (SPEC.md -> MySys screen rules), never the pool.
+    fake = mysys({"300001": FakeNote("2600001B")})
+
+    assert book_run() == 0
+
+    assert fake.agents == [("task_row", AGENT), ("detail", AGENT), ("solved", AGENT)]
