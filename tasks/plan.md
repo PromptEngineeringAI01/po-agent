@@ -995,7 +995,7 @@ As SPEC -> Summit testing and go-live, each with its own dated `docs/decisions.m
 
 1. **Who fills `private/summit/fixtures/cases.toml`?** Recommended: Joey copies the Note side (title, body, original assignee) and states the expected result for each PO; Claude reads the project side (Projects search rows, Client Internal No., the Tasks table with Task Creator) under the 10 Nov 2026 live-lookup exception, after Joey logs in to live himself with the agent account, writing only into `private/`. The exception covers no Note Pool or Note window, so the Note side stays Joey's. Alternative: Joey copies everything by hand.
 2. **When does the `production` tag move during the build?** Recommended: after each refactor merge (9.1, 9.2, 9.4) and after Checkpoints S-A and S-C, each with one watched B1 hourly run, so a B1 break shows on one small PR; alternatives: after every shared-code merge (the other session's suggestion: safest, about ten tag moves), or once at S.1 (one big diff under B1's live run).
-3. **A PDF whose `Purchase Order No:` values differ between pages** (none of the 11 does): recommended `PO_MISMATCH`; asked at 9.7's review stop.
+3. **A PDF whose `Purchase Order No:` values differ between pages** (none of the 11 does): `PO_MISMATCH` (decisions, 25 Nov 2026, Summit PDF patterns; by the core rule, in 9.7).
 4. **The GitHub backup heartbeat** (18 Nov 2026) for the Summit job: recommended Healthchecks only, as SPEC says; Summit runs don't rewrite B1's heartbeat issue, so the backup keeps meaning "B1 ran"; asked at 9.15.
 
 Settled since the first draft: the Summit run minute is **:30** (Joey, 24 Nov 2026, in the other planning session; its decisions entry lands with SPEC or in 9.15).
