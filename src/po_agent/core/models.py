@@ -22,6 +22,9 @@ class NotePoolRow(BaseModel):
     subject_note: StrictStr  # title and body joined (row 01)
     project: StrictStr  # "---" when not linked
     assignee: StrictStr
+    # The Source cell, the sender's bare address (row 01); None when the
+    # read didn't ask for it (B1's reads; Summit's eligible read does, 9.11).
+    source: StrictStr | None = None
 
 
 class SkipReason(StrEnum):
@@ -155,9 +158,12 @@ class Proceed(Frozen):
 class NotePoolFilters(Frozen):
     """The Note Pool filters a client's run sets, each read back; every
     other filter stays at its default (screen-map rows 01, 27). A client
-    value (ADR-003 decision 3): `mysys/` holds none."""
+    value (ADR-003 decision 3): `mysys/` holds none. B1 sets its pool;
+    Summit sets Source and leaves Assigned Pool at its default (task 9.11).
+    With `source` set, the run's read takes the Source column too."""
 
-    pool: str = Field(min_length=1)  # Assigned Pool
+    pool: str | None = Field(None, min_length=1)  # Assigned Pool; None: default
+    source: str | None = Field(None, min_length=1)  # Source; None: default
     locked: Literal["Locked", "Unlocked"]  # Locked/Unlocked
 
 

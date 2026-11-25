@@ -1,13 +1,17 @@
 """Summit Home as the run loop's client (task 9.4; `core/client.py`; SPEC.md
--> Client 2: Summit Home). A stub: every member refuses with ConfigError
-(ALERT CONFIG, exit 2), as `cli.py` refuses Summit's modes, until tasks
-9.9-9.14 fill it. Pure, no browser code, as `b1/`."""
+-> Client 2: Summit Home). Its Note Pool filters and list eligibility are
+built (task 9.11, `summit/eligibility.py`); every other member refuses with
+ConfigError (ALERT CONFIG, exit 2), as `cli.py` refuses Summit's Note-loop
+modes, until tasks 9.12-9.14 fill it. Pure, no browser code, as `b1/`."""
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from re import Pattern
 from typing import NoReturn
 
 from po_agent.core.client import EligibleNote
+from po_agent.core.config import ClientProfile, Config
 from po_agent.core.errors import ConfigError
 from po_agent.core.models import (
     MySysLookup,
@@ -18,20 +22,41 @@ from po_agent.core.models import (
     ProjectRule,
     Skip,
 )
+from po_agent.summit import eligibility
 
 
 def _refuse() -> NoReturn:
     raise ConfigError("mode not built for this client yet")
 
 
+@dataclass(frozen=True)
 class SummitClient:
-    """Summit's answers to `core.client.Client`: none yet."""
+    """Summit's answers to `core.client.Client`, from its client file
+    (`profile`) and the site's profile (`config`: the other agent account's
+    user name and the time zone). `started`: the run's start, from
+    `controls.now`, for the assignee rule."""
+
+    config: Config
+    profile: ClientProfile
+    started: datetime
 
     def filters(self) -> NotePoolFilters:
-        _refuse()
+        # Assigned Pool stays at its default: Summit has no pool.
+        return NotePoolFilters(
+            source=self.profile.source_filter, locked=self.profile.locked_filter
+        )
 
     def eligible(self, rows: Sequence[NotePoolRow]) -> tuple[EligibleNote, ...]:
-        _refuse()
+        first_run = eligibility.first_run(
+            self.started, self.profile.any_assignee_before, self.config.run_window.tz
+        )
+        return eligibility.eligible_notes(
+            rows,
+            sender=self.profile.sender,
+            # Agent 2 (this client's) and Agent 1 (B1's, the site's).
+            agents=(self.profile.agent_user_name, self.config.agent_user_name),
+            any_assignee=first_run,
+        )
 
     def po_number(self, note: EligibleNote) -> str:
         _refuse()

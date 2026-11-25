@@ -203,7 +203,7 @@ def start(
     downloads = download_dir(name, summary.run_id)
     if mode == "demo":
         return demo.run(config, credentials, options, summary, downloads)
-    client = client_for(name, config)
+    client = client_for(name, config, profile)
     if mode == "spike":
         return run.spike(config, client, credentials, options, summary, profile)
     logs = LOGS_DIR if options.detailed_log else None
@@ -225,11 +225,14 @@ def start(
     )
 
 
-def client_for(name: str, config: Config) -> Client:
-    """The run loop's client (task 9.4; core/client.py). Summit's is a stub
-    that refuses; `_run` refuses its modes before this until 9.11-9.14."""
+def client_for(name: str, config: Config, profile: ClientProfile | None) -> Client:
+    """The run loop's client (task 9.4; core/client.py). Summit's reads its
+    client file and the run's start time (its assignee rule, task 9.11);
+    `_run` refuses its Note-loop modes before this until 9.12-9.14."""
     if name == "summit":
-        return SummitClient()
+        if profile is None:
+            raise ConfigError("client file not loaded")
+        return SummitClient(config, profile, controls.now())
     return B1Client(config)
 
 
@@ -307,9 +310,9 @@ def _run_locked(
     client: str,
     profile: ClientProfile | None,
 ) -> int:
-    if client == "summit":
-        # Refused until its task lands (spike 9.11, decide-only 9.12, run
-        # 9.14): before any secret is read, any login or any browser.
+    if client == "summit" and mode != "spike":
+        # Refused until its task lands (decide-only 9.12, run 9.14): before
+        # any secret is read, any login or any browser. The spike: 9.11.
         raise ConfigError("mode not built for this client yet")
     if profile is None:  # B1: the sweep's call as before there were two clients
         sweep_download_dirs()

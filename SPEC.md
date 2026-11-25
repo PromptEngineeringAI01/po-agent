@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.71 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.72 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -158,7 +158,8 @@ src/po_agent/
     decision.py                 decision engine = seam 1; no browser code (calls the project lookup it is given); B1's values for `mysys/`: Note Pool filters (the pool, Locked), the body rule (ends with the file name), B1ProjectRule
     client.py                   B1 as the run loop's client (core/client.py): step 0 on the Note Pool rows, its values from config/<site>.toml
   summit/                       Summit Home's rules (Client 2); no browser code, as b1/
-    client.py                   Summit as the run loop's client: a stub that refuses (ALERT CONFIG, exit 2) until tasks 9.11-9.14
+    client.py                   Summit as the run loop's client: its Note Pool filters and list eligibility (task 9.11); every other member refuses (ALERT CONFIG, exit 2) until tasks 9.12-9.14
+    eligibility.py              Summit's list eligibility on the Note Pool rows: sender, `---`, the assignee rule, the title shape
     reader_rules.py             Summit's PDF patterns on both code readers' text (company line, PO, COMPACTION TEST item row)
     company.py                  a company name or alias -> its creator-table row (trimmed, case-insensitive, whole name)
     decision.py                 Summit's decision engine = seam 1; no browser code (calls the project lookup it is given)
@@ -513,10 +514,10 @@ There is **no test-site phase** for Summit (Joey, 23 Nov 2026: "forget about the
 ### Which Notes (list level, no click)
 
 In `run`, `run --decide-only` and `spike`, logged in as Agent 2:
-- **Note Pool filters:** Source = `source_filter` (the receiving mailbox; new guard action), Locked/Unlocked = **Unlocked**, Assigned Pool and Assigned User at their defaults (Summit has no pool), Status Pending (never set), Search/filter empty. Each read back, as B1's.
-- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee passes the **assignee rule** below, and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026).
+- **Note Pool filters:** Source = `source_filter` (the receiving mailbox; new guard action), Locked/Unlocked = **Unlocked**, Assigned Pool and Assigned User at their defaults (Summit has no pool), Status Pending (never set), Search/filter empty. Each read back, as B1's: a filter that doesn't read back as set is `UNEXPECTED_SCREEN`, exit 1, before the list is read.
+- **Eligible row:** the **Source** column equals the client's `sender` exactly (the bare address; the list shows no display name), the Project cell reads `---`, the Assignee passes the **assignee rule** below, and the Subject/Note title has the Summit shape: `<company> - <any text> - PO: <PO> - <any word>`, where `<company>` is the text before the first ` - ` and `<PO>` is three groups of digits joined by `/` (fake example `123456/020/01`), exactly once. READY or ISSUED in the title doesn't matter: the PDF decides (Joey, 23 Nov 2026). As built (task 9.11; decisions, 25 Nov 2026, Summit Note Pool list): the shape is matched on the whole Subject/Note cell (live shows a Summit email Note's title alone there), each part non-empty and `<any word>` without a space, so a cell with more after the word is untouched; "exactly once" is one `PO:` label and the PO's value once in the cell. Summit's read takes the Source column too: a list without one is `UNEXPECTED_SCREEN` (B1's reads don't take it).
 - Anything else is untouched, with no NOTE line (as B1's step 0). Order newest first by Note ID; page 1 only, and a second page is `ALERT MORE_PAGES` as for B1 (the spike shows whether the filtered list fits one page; open question S3).
-- **Assignee rule** (Joey, 24 Nov 2026; replaces 23 Nov's "any assignee"): Summit Notes arrive in the Note Pool unassigned (`---`). The **first run of the day** (a run that starts before `any_assignee_before`, 08:00 Perth, so the 07:30 run) takes a Note whatever its assignee, except an agent account (`Agent 1 (MySys Only)`, `Agent 2 (Summit Homes)`), to catch Notes an admin picked up overnight. **Every later run** takes only Assignee `---`. The run decides from its own start time (no state between runs). B1's "the Assignee must be the pool" stays B1's.
+- **Assignee rule** (Joey, 24 Nov 2026; replaces 23 Nov's "any assignee"): Summit Notes arrive in the Note Pool unassigned (`---`). The **first run of the day** (a run that starts before `any_assignee_before`, 08:00 Perth, so the 07:30 run) takes a Note whatever its assignee, except an agent account (`Agent 1 (MySys Only)`, `Agent 2 (Summit Homes)`), to catch Notes an admin picked up overnight. **Every later run** takes only Assignee `---`. The run decides from its own start time (no state between runs). B1's "the Assignee must be the pool" stays B1's. As built (task 9.11): the agent accounts are the client file's `agent_user_name` and the site file's (Agent 1), compared trimmed and case-insensitive; 08:00 is in the site's run-window time zone (Perth); a blank Assignee cell is never eligible.
 
 ### The peek: every check before the take
 

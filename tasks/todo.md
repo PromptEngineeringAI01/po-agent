@@ -37,7 +37,7 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 **Checkpoint S-B:** Summit seam 1 `false PROCEED: 0` in CI; friction log's "Proposed" rows decided; real-PO `false PROCEED: 0` on the laptop, clean-PO skips reviewed with Joey.
 
 **S-C Run, offline**
-- [ ] **9.11** Note Pool for Summit: Source and Unlocked filters read back, Source column read, list eligibility (sender, `---`, not an agent, title shape); `spike --client summit`; from 9.4: `NotePoolRow` gains the Source cell, `NotePoolFilters` gains `source` and its `pool` becomes optional, `SummitClient.filters`/`eligible` filled · step · high
+- [x] **9.11** Note Pool for Summit: Source and Unlocked filters read back, Source column read, list eligibility (sender, `---`, not an agent, title shape); `spike --client summit`; from 9.4: `NotePoolRow` gains the Source cell, `NotePoolFilters` gains `source` and its `pool` becomes optional, `SummitClient.filters`/`eligible` filled · step · high
 - [ ] **9.12** The peek (read-only open, iframe body rule, download, readers, lookup, decide) and `run --decide-only --client summit`; guard history read-only for untouched Notes · step · high
 - [ ] **9.13** Take (assignee re-check, `NOTE_TAKEN`) and return to the original assignee (user, pool, `---` -> `---` once S.0 confirms it, else ALERT); from 9.4: `Client.return_target()` takes the original assignee read in the peek · step · high
 - [ ] **9.14** Summit booking W1-W5: decided Creator (missing option -> `WRITE_NOT_STARTED`), full PO, body, previous-task recheck at W1, Documents name per S.0; `run --client summit` books (needs S.0 screens) · step · high

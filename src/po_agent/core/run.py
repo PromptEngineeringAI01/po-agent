@@ -62,7 +62,13 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     identifier,
 )
-from po_agent.core.models import NoteSnapshot, Proceed, Skip, SkipReason
+from po_agent.core.models import (
+    NotePoolFilters,
+    NoteSnapshot,
+    Proceed,
+    Skip,
+    SkipReason,
+)
 from po_agent.core.runlog import RunLog
 from po_agent.core.secrets import SecretName, mysys_names
 from po_agent.core.trace import Booking, Trace
@@ -124,13 +130,21 @@ def newest_first(found: Sequence[EligibleNote], cap: int) -> tuple[EligibleNote,
 
 
 def _read_eligible(
-    guard: ActionGuard, panel: Locator, client: Client, summary: output.RunSummary
+    guard: ActionGuard,
+    panel: Locator,
+    client: Client,
+    filters: NotePoolFilters,
+    summary: output.RunSummary,
 ) -> tuple[EligibleNote, ...]:
     """The run's one Note Pool read: the client's step 0 on every row,
     counts printed. A second page is never read, so it stops the run before
     any Note is taken: MorePages, ALERT MORE_PAGES, exit 1 (7.2; decisions,
-    5 Nov 2026). In run modes the stale-Note read, a superset, stops first."""
-    listing = driver.read_note_pool(guard, panel)
+    5 Nov 2026). In run modes the stale-Note read, a superset, stops first.
+    A client that filters by Source reads the Source column too (9.11)."""
+    if filters.source is None:  # B1: the read as before there were two clients
+        listing = driver.read_note_pool(guard, panel)
+    else:
+        listing = driver.read_note_pool(guard, panel, with_source=True)
     found = client.eligible(listing.rows)
     summary.seen = len(listing.rows)
     summary.eligible = len(found)
@@ -166,7 +180,7 @@ def spike(
         panel = driver.open_note_pool(guard, page)
         driver.set_note_pool_filters(guard, panel, filters)
         output.info("note pool filters set")
-        _read_eligible(guard, panel, client, summary)
+        _read_eligible(guard, panel, client, filters, summary)
     return 0
 
 
@@ -299,10 +313,12 @@ def _note_loop(
     profile: ClientProfile | None,
 ) -> int:
     """`config_dir` None: decide-only, nothing booked. The client's filters
-    are asked first, so a client that refuses stops before any login. The
+    and project rule are asked first, so a client that refuses stops before
+    any login (Summit's Note loop until 9.12; 9.11 built its filters). The
     run's account, caps, kill switch and hold re-check are its client's
     (`profile`, None for B1; task 9.5)."""
     filters = client.filters()
+    client.project_rule()
     guard = ActionGuard()
     log = RunLog(summary.run_id, guard, logs, trace)
     run_as = account(config, profile)
@@ -338,7 +354,7 @@ def _note_loop(
                 controls.stale_note_stop(guard, panel, agent)
             driver.set_note_pool_filters(guard, panel, filters)
             output.info("note pool filters set")
-            found = _read_eligible(guard, panel, client, summary)
+            found = _read_eligible(guard, panel, client, filters, summary)
             try:
                 # The opening guard actions (login, Note Pool, filters):
                 # step 0, no Note, even when no Note follows (7.3 review).
