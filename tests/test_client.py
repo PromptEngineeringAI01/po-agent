@@ -7,10 +7,13 @@ pinned through the run loop's offline tests (tests/seam2/
 test_run_loop_offline.py, tests/test_run_spike.py, tests/test_exit_codes.py,
 tests/test_hold_recheck.py), which pass unchanged; here: the interface holds
 SPEC's differences and nothing more (ADR-003's rule of three), and Summit's
-implementation refuses every one of them until 9.9-9.14 fill it.
+implementation refuses every one not built yet: 9.11 fills `filters` and
+`eligible` (tests/test_summit_eligibility.py), 9.12-9.14 the rest.
 """
 
 import argparse
+import tomllib
+from datetime import UTC, datetime
 
 import pytest
 from fakes.mysys import FakeNote
@@ -19,7 +22,7 @@ from po_agent import cli
 from po_agent.b1.client import B1Client
 from po_agent.core import output
 from po_agent.core.client import Client, EligibleNote
-from po_agent.core.config import CONFIG_DIR, load_config
+from po_agent.core.config import CONFIG_DIR, load_config, parse_client
 from po_agent.core.errors import ConfigError
 from po_agent.core.models import MySysLookup, NoteSnapshot
 from po_agent.summit.client import SummitClient
@@ -57,8 +60,6 @@ def lookup() -> MySysLookup:
 
 # One refusal per member: the call the run loop makes.
 SUMMIT_CALLS = {
-    "filters": (),
-    "eligible": ((),),
     "po_number": (NOTE,),
     "body_rule": ("123456_020_01.pdf",),
     "project_rule": (),
@@ -81,8 +82,22 @@ def test_each_client_implements_every_member(implementation: type) -> None:
     assert MEMBERS <= members(implementation)
 
 
-def test_every_member_has_a_summit_refusal_row() -> None:
-    assert set(SUMMIT_CALLS) == MEMBERS
+# Built in 9.11 (tests/test_summit_eligibility.py).
+SUMMIT_BUILT = {"filters", "eligible"}
+
+
+def summit_profile():
+    with open(CONFIG_DIR / "clients" / "summit.toml", "rb") as file:
+        return parse_client(tomllib.load(file))
+
+
+def summit() -> SummitClient:
+    started = datetime(2026, 11, 25, 2, 0, tzinfo=UTC)
+    return SummitClient(load_config("live", CONFIG_DIR), summit_profile(), started)
+
+
+def test_every_member_not_built_has_a_summit_refusal_row() -> None:
+    assert set(SUMMIT_CALLS) == MEMBERS - SUMMIT_BUILT
 
 
 @pytest.mark.parametrize(("member", "args"), sorted(SUMMIT_CALLS.items()))
@@ -90,7 +105,7 @@ def test_summit_s_stub_refuses_every_member(member: str, args: tuple) -> None:
     # As 9.3's refusal of Summit's modes: ALERT CONFIG, exit 2, before any
     # MySys read (the lookup is never called).
     with pytest.raises(ConfigError) as refused:
-        getattr(SummitClient(), member)(*args)
+        getattr(summit(), member)(*args)
 
     assert refused.value.exit_code == 2
     assert str(refused.value) == "mode not built for this client yet"
@@ -108,11 +123,12 @@ def test_b1_s_values_come_from_its_site_profile() -> None:
     )
 
 
-@pytest.mark.parametrize("mode", ["spike", "decide-only", "run"])
+@pytest.mark.parametrize("mode", ["decide-only", "run"])
 def test_summit_s_stub_refuses_before_the_browser_opens(mode, mysys):
-    # 9.4 review: cli.py refuses Summit's modes today; were that gate lifted
-    # before its task lands, the stub still stops the run before any login
-    # with Summit's credentials (no MySys call at all).
+    # 9.4 review: cli.py refuses Summit's Note-loop modes today; were that
+    # gate lifted before their tasks land, the stub still stops the run
+    # before any login with Summit's credentials (no MySys call at all).
+    # The spike is built (9.11): tests/test_summit_spike.py.
     fake = mysys({"300001": FakeNote("2600001B")})
     options = argparse.Namespace(
         client="summit",
@@ -129,7 +145,12 @@ def test_summit_s_stub_refuses_before_the_browser_opens(mode, mysys):
 
     with pytest.raises(ConfigError):
         cli.start(
-            mode, load_config("test", fake.config_dir), credentials, options, summary
+            mode,
+            load_config("test", fake.config_dir),
+            credentials,
+            options,
+            summary,
+            summit_profile(),
         )
 
     assert fake.calls == []

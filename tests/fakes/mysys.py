@@ -154,12 +154,13 @@ class FakeMySys:
         self.calls.append("filters")
         self.filters.append(filters)
 
-    def read_note_pool(self, guard, panel):
+    def read_note_pool(self, guard, panel, *, with_source=False):
         # Page 1 of `pool_pages`, as the footer "Page 1 of N" tells (screen-map
         # row 01); more than one page stops the run (decisions, 5 Nov 2026,
-        # silent-skip alert and more pages).
+        # silent-skip alert and more pages). `with_source`: the Source column
+        # is read too (screen-map row 01's columns; Summit, task 9.11).
         self.reads += 1
-        self.calls.append("read")
+        self.calls.append("read with source" if with_source else "read")
         return driver.NotePoolList(
             rows=self.rows, total=len(self.rows), pages=self.pool_pages
         )
@@ -443,6 +444,37 @@ def row(note_id: str, internal_no: str, *, assignee=POOL) -> NotePoolRow:
         subject_note=f"Please find attached file {internal_no}_048_1.pdf",
         project="---",
         assignee=assignee,
+    )
+
+
+# Summit-shaped Note Pool rows (SPEC.md -> Client 2, Which Notes). Live's
+# Note Pool shows a Summit email Note's title alone in Subject/Note and the
+# bare sender address in Source (Joey's 23 Nov 2026 screenshot, kept in
+# private/summit/). Fake mailbox, sender domain and companies.
+SUMMIT_MAILBOX = "support@fake-mailbox.test"  # the Source filter's value
+SUMMIT_SENDER = "noreply@fake-builder.test"  # the Source column's value
+SUMMIT_AGENT = "Agent 2 (Summit Homes)"  # config/clients/summit.toml
+UNASSIGNED = "---"  # an empty Assignee cell (screen-map row 01)
+
+
+def summit_title(po: str = "123456/020/01", word: str = "READY") -> str:
+    return f"Fake Builder Homes - Lot 1 St No 2 Sample Street - PO: {po} - {word}"
+
+
+def summit_row(
+    note_id: str,
+    *,
+    title: str | None = None,
+    source: str = SUMMIT_SENDER,
+    project: str = UNASSIGNED,
+    assignee: str = UNASSIGNED,
+) -> NotePoolRow:
+    return NotePoolRow(
+        note_id=note_id,
+        subject_note=summit_title() if title is None else title,
+        project=project,
+        assignee=assignee,
+        source=source,
     )
 
 

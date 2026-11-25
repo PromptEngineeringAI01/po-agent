@@ -3,8 +3,9 @@
 
 `--client` defaults to b1 and sits beside `--site` on run, spike and
 preflight; demo stays B1's. Summit is live only: `--site test --client
-summit` is ALERT CONFIG, exit 2. Until their tasks land, spike (9.11), run
---decide-only (9.12) and run (9.14) refuse `--client summit` with exit 2.
+summit` is ALERT CONFIG, exit 2. Until their tasks land, run --decide-only
+(9.12) and run (9.14) refuse `--client summit` with exit 2; the spike is
+built (9.11, tests/test_summit_spike.py).
 
 Nothing here opens a browser or reads a real secret: the mode entry point
 (`cli.start`) is replaced, secrets are fake values in the test environment
@@ -167,14 +168,14 @@ def test_summit_on_the_test_site_is_alert_config_exit_2(
 # --- Summit modes refused until their tasks land ----------------------------------
 
 
-@pytest.mark.parametrize("mode", SUMMIT_MODES)
+@pytest.mark.parametrize("mode", [["run", "--decide-only"], ["run"]])
 def test_summit_modes_are_refused_with_exit_2_until_built(
     mode, fake_keyring, started, capsys
 ):
     code, lines, err = run_cli(capsys, [*mode, "--site", "live", "--client", "summit"])
 
     assert code == 2
-    # The plan's temporary refusal: 9.11, 9.12 and 9.14 remove it.
+    # The plan's temporary refusal: 9.12 and 9.14 remove it.
     assert alert_of(lines) == (
         "CONFIG",
         {
