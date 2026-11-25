@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.72 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.73 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -529,7 +529,9 @@ ADR-003 decision 4, widened (Joey, 23 Nov 2026: "全部檢查完才 Assign"): fo
 
 A Note that fails any check is **untouched**: no Assign, no status change, nothing written. It prints a NOTE line `"outcome": "untouched", "reason": "<skip reason>"` so Joey can read the run against the Notes; business skips never alert. Because nothing is stored between runs, the same Notes are peeked again every run.
 
-`run --decide-only` for Summit therefore **never assigns or writes anything**: it peeks, decides and prints `"outcome": "untouched", "reason": "DECIDE_ONLY"` for a Note that would be booked.
+`run --decide-only` for Summit therefore **never assigns or writes anything**: it peeks, decides and prints `"outcome": "untouched", "reason": "DECIDE_ONLY"` (with the pln) for a Note that would be booked.
+
+As built (task 9.12; decisions, 25 Nov 2026, Summit peek and decide-only): the original assignee is kept exactly as "Assignee:" reads it (a user, a pool or `---`); the decision reads the title from the Note Pool cell; the peek cap is `max_peeks_per_run` (Notes opened, newest first) and the run cap counts bookings only; an `UNEXPECTED_SCREEN` (the body rule, the Client Internal No.) stops the run with its ALERT, as B1's (7.2). Until the take and booking land (9.13-9.14), `run --client summit` is refused before any secret or login.
 
 **Why opening is allowed:** open question 8 showed on the test site that opening a Note and downloading its PDF adds no log line and changes no assignee or status. It was never checked on live: the first live decide-only run checks it (go-live step S.3).
 
@@ -587,7 +589,7 @@ The creator travels in the `Proceed` (ADR-003 decision 3), with the full PO, the
 On PROCEED in `run`:
 - **Take:** `before_write` (kill switch), find the Note again; its "Assignee:" must still read the original assignee, else `"outcome": "untouched", "reason": "NOTE_TAKEN"`. Untick Send Email and read it back (the shared control; unchanged by Joey's "doesn't matter": CLAUDE.md Must never #4), user list = `Agent 2 (Summit Homes)`, pool list `--Select Pool--`, **Assign**, read back as B1 (Assignee reads the agent, a new "User Assigned" log line). The window must still show Link to Project.
 - **W1-W5 as B1** ([MySys screen rules](#mysys-screen-rules)), with these values: Creator = the decided creator (if the option is not in the Creator select: close the browser context, `WRITE_NOT_STARTED`, reason `CREATOR_UNKNOWN`, Note returned); PO Number = the full PO; Documents = the PDF; Note = the email body; Hold note `ON HOLD UNTIL CALL UP`; Link to the pln; Solved. W1's recheck of the project also requires, for a previous-task row, the same previous task and Task Creator as decided, else `WRITE_NOT_STARTED`. Read-backs as B1, with Lodged By and "Solved by" = Agent 2, and Task Creator = the decided creator.
-- **Email body:** the Note window's email body is one `iframe` (an HTML table, a line of text and a Disclaimer; Joey copies all of it). Rule: exactly one `iframe` in the Note window whose body text is not empty, still empty after 15 s or more than one → `UNEXPECTED_SCREEN`. Its text, line breaks kept, is the task Note; read back whitespace-collapsed as B1. B1 keeps its "ends with the file name" rule.
+- **Email body:** the Note window's email body is one `iframe` (an HTML table, a line of text and a Disclaimer; Joey copies all of it). Rule: exactly one `iframe` in the Note window whose body text is not empty, still empty after 15 s or more than one → `UNEXPECTED_SCREEN`. Its text, line breaks kept, is the task Note; read back whitespace-collapsed as B1. B1 keeps its "ends with the file name" rule. As built (task 9.12): read once the window holds an iframe and every iframe has its text, or after 15 s; a `<pre>` is never Summit's body; table cells read tab-separated.
 - **Documents file name:** the Documents row's name is compared to the PDF's file name after MySys's own renaming, if it has one (open question S4: one screenshot showed `-` uploaded as `_`). Until that is pinned, a mismatch stops before Submit as `WRITE_NOT_STARTED`, which is safe.
 
 ### Return to the original assignee

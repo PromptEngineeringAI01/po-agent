@@ -3,6 +3,7 @@ client (ADR-003 decisions 2-3; SPEC.md -> Code style: pydantic at every
 boundary). A client's own rules (B1's /048 PO, its readings) stay in its
 package (`b1/models.py`)."""
 
+import re
 from collections.abc import Sequence
 from enum import StrEnum
 from typing import Annotated, Any, Literal, Protocol, Self
@@ -64,6 +65,21 @@ class NoteSnapshot(Frozen):
     body: str
     attachment_names: tuple[str, ...]
     project_linked: bool  # False only when the window shows Link to Project
+    # "Assignee:" as read on opening: the original assignee Summit's peek
+    # keeps (task 9.12); "" where the run doesn't keep it (B1's).
+    assignee: str = ""
+
+
+class OneIframeBody(Frozen):
+    """A body rule (Summit's; SPEC.md -> Client 2, The take and the booking:
+    Email body): the Note's body is the one iframe in its window whose
+    body text is not empty, waited for up to the load wait; none, still
+    empty after it, or more than one -> UNEXPECTED_SCREEN. B1's rule is a
+    pattern its body ends with (`b1/decision.body_rule`)."""
+
+
+# Which text in the Note window is its body: B1's pattern or Summit's iframe.
+BodyRule = re.Pattern[str] | OneIframeBody
 
 
 class SearchRow(Frozen):

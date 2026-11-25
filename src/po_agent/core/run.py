@@ -30,6 +30,16 @@ Note is never returned to the pool, where it would look unbooked: its ALERT
 names it, RUN_SUMMARY counts it as partial and the run stops; the stale-Note
 stop holds every later run until Joey clears it (D6).
 
+The peek (task 9.12; SPEC.md -> Client 2, The peek): a client with a client
+file (Summit) decides every Note read-only before any take. Per Note: find
+it again, read "Assignee:" (the original assignee, kept as read), then the
+same reads and decision as above, with no take, no return, no Send Email
+click and no write; the NOTE line is "untouched" with the skip reason, or
+DECIDE_ONLY for a Note that would be booked. Its run cap counts Notes
+opened (`max_peeks_per_run`) and bookings (`max_notes_per_run`). Until its
+take and booking land (9.13-9.14) such a client's run that books is
+refused before login.
+
 Hold re-check (decisions, 11 Nov 2026, hold re-check): right after login,
 before the stale-Note read and before any Note, both modes re-read the
 tasks the safe trace says were booked on this site today and on the
@@ -55,6 +65,7 @@ from po_agent.core.client import Client, EligibleNote
 from po_agent.core.config import ClientProfile, Config
 from po_agent.core.errors import (
     AccuracyBreach,
+    ConfigError,
     GuardRefusal,
     MorePages,
     PartialWrite,
@@ -314,9 +325,12 @@ def _note_loop(
 ) -> int:
     """`config_dir` None: decide-only, nothing booked. The client's filters
     and project rule are asked first, so a client that refuses stops before
-    any login (Summit's Note loop until 9.12; 9.11 built its filters). The
+    any login (the 9.4 review's guard). The
     run's account, caps, kill switch and hold re-check are its client's
-    (`profile`, None for B1; task 9.5)."""
+    (`profile`, None for B1; task 9.5). A client file's client peeks
+    (`_peek_note`, 9.12); its run that books waits for 9.13-9.14."""
+    if profile is not None and config_dir is not None:
+        raise ConfigError("mode not built for this client yet")
     filters = client.filters()
     client.project_rule()
     guard = ActionGuard()
@@ -373,18 +387,23 @@ def _note_loop(
                     break
                 try:
                     with driver.note_downloads(page, downloads):
-                        line = _one_note(
-                            guard,
-                            page,
-                            config,
-                            client,
-                            login,
-                            log,
-                            note,
-                            progress,
-                            config_dir,
-                            profile,
-                        )
+                        if profile is not None:
+                            line = _peek_note(
+                                guard, page, client, login, log, note, progress
+                            )
+                        else:
+                            line = _one_note(
+                                guard,
+                                page,
+                                config,
+                                client,
+                                login,
+                                log,
+                                note,
+                                progress,
+                                config_dir,
+                                profile,
+                            )
                 except controls.NoteTaken:
                     # At the W1 check, nothing written: the Note stays with
                     # the person, and the next Note gets a fresh browser.
@@ -608,6 +627,41 @@ def _one_note(
     )
 
 
+def _peek_note(
+    guard: ActionGuard,
+    page: Page,
+    client: Client,
+    login: tuple[str, str, str],
+    log: RunLog,
+    note: EligibleNote,
+    progress: _Progress,
+) -> output.Note:
+    """SPEC's peek, steps 1-4: found again (All Pools, the exact ID) and
+    opened, "Assignee:" read as the original assignee, then _decide's reads
+    (link, attachments, download, body, project lookup) and the decision.
+    Only read-only actions: the Note is never taken, so it is never
+    returned. A Client Internal No. that differs stops the run, as B1's."""
+    note_id = progress.note_id = note.note_id
+    progress.taken = False
+    window = driver.find_note_again(guard, page, *login, note_id)
+    original = driver.read_assignee(window)
+    decision = _decide(guard, page, client, login, log, note, window, original)
+    if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
+        raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
+    if isinstance(decision, Proceed):
+        reason, pln = DECIDE_ONLY, decision.pln
+    else:
+        reason, pln = decision.reason.value, None
+    log.event("skip", note_id=note_id, step="decide", ok=True, reason=reason)
+    return output.Note(
+        note_id=note_id,
+        outcome="untouched",
+        reason=reason,
+        po_number=client.po_number(note),
+        pln=pln,
+    )
+
+
 def _book(
     guard: ActionGuard,
     page: Page,
@@ -655,11 +709,12 @@ def _decide(
     log: RunLog,
     note: EligibleNote,
     window: Locator,
+    assignee: str = "",
 ) -> Skip | Proceed:
     """Steps 2a-11 on what the Note window and MySys show: the driver reads,
     the client decides. The client calls the project lookup only once the
     Note and PDF checks pass (that read reloads, so the window is gone after
-    it)."""
+    it). `assignee`: "Assignee:" as the peek read it ("" for B1)."""
     note_id = note.note_id
     linked = not driver.is_unlinked(window, log, note_id)
     names: tuple[str, ...] = ()
@@ -669,10 +724,13 @@ def _decide(
         pdf = driver.download_pdf(guard, page, window)
     snapshot = NoteSnapshot(
         note_id=note_id,
-        title="",  # step 0 read the title rule on the Note Pool cell
+        # The Note Pool cell's title: B1's step 0 read its rule there and
+        # keeps ""; Summit's decision reads its company and PO.
+        title=note.title,
         body=driver.note_body(window, client.body_rule(pdf.file_name)) if pdf else "",
         attachment_names=names,
         project_linked=linked,
+        assignee=assignee,
     )
     return client.decide(
         snapshot,

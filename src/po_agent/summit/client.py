@@ -1,15 +1,18 @@
 """Summit Home as the run loop's client (task 9.4; `core/client.py`; SPEC.md
--> Client 2: Summit Home). Its Note Pool filters and list eligibility are
-built (task 9.11, `summit/eligibility.py`); every other member refuses with
-ConfigError (ALERT CONFIG, exit 2), as `cli.py` refuses Summit's Note-loop
-modes, until tasks 9.12-9.14 fill it. Pure, no browser code, as `b1/`."""
+-> Client 2: Summit Home). Built: its Note Pool filters and list eligibility
+(task 9.11, `summit/eligibility.py`); what the peek needs (task 9.12): the PO
+a NOTE line shows, the one-iframe body rule, the project rule and the
+decision (`summit/decision.py`) on what the peek read, with the Note's
+original assignee. The W2 Documents Type and the return target refuse with
+ConfigError (ALERT CONFIG, exit 2), as `cli.py` refuses Summit's run, until
+tasks 9.13-9.14 fill them. Pure, no browser code, as `b1/`."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from re import Pattern
 from typing import NoReturn
 
+from po_agent.b1 import readers
 from po_agent.core.client import EligibleNote
 from po_agent.core.config import ClientProfile, Config
 from po_agent.core.errors import ConfigError
@@ -18,11 +21,12 @@ from po_agent.core.models import (
     NotePoolFilters,
     NotePoolRow,
     NoteSnapshot,
+    OneIframeBody,
     Proceed,
     ProjectRule,
     Skip,
 )
-from po_agent.summit import eligibility
+from po_agent.summit import decision, eligibility
 
 
 def _refuse() -> NoReturn:
@@ -59,13 +63,15 @@ class SummitClient:
         )
 
     def po_number(self, note: EligibleNote) -> str:
-        _refuse()
+        # The title's full PO; its list eligibility kept only titles with one.
+        return eligibility.title_po(note.title) or note.internal_no
 
-    def body_rule(self, file_name: str) -> Pattern[str]:
-        _refuse()
+    def body_rule(self, file_name: str) -> OneIframeBody:
+        # The email iframe, whatever the PDF's name (SPEC: Email body).
+        return OneIframeBody()
 
     def project_rule(self) -> ProjectRule:
-        _refuse()
+        return decision.SummitProjectRule(self.profile.company)
 
     def decide(
         self,
@@ -74,7 +80,22 @@ class SummitClient:
         pdf: bytes | None,
         lookup: Callable[[], MySysLookup],
     ) -> Skip | Proceed:
-        _refuse()
+        """SPEC's Summit table on the peek's reads: the snapshot holds the
+        Note Pool row's title and "Assignee:" as read (the original
+        assignee). No PDF downloaded: no text, and the attachment checks
+        decide before any reader result is used."""
+        texts = (
+            readers.read(pdf)
+            if pdf is not None
+            else readers.PdfTexts(plumber="", pypdf="", data=b"")
+        )
+        return decision.decide(
+            snapshot,
+            snapshot.assignee,
+            texts,
+            lookup,
+            companies=self.profile.company,
+        )
 
     def document_type(self) -> str:
         _refuse()

@@ -11,8 +11,9 @@
 10 Nov 2026, live profile); only Joey runs a live site, on the Mac Mini.
 `--client` (task 9.3; SPEC.md -> Client 2, The separate run) defaults to b1;
 summit is live only, with its own secret pair and config/clients/summit.toml.
-Until their tasks land, spike (9.11), run --decide-only (9.12) and run (9.14)
-refuse summit with exit 2, after its client file is validated. The demo is
+Until its task lands, run (9.14) refuses summit with exit 2, after its
+client file is validated; spike (9.11) and run --decide-only (9.12) are
+built. The demo is
 B1's and test site only. `preflight` (decisions, 20 Nov 2026, secrets
 pre-flight) checks that the site's MySys secrets are set and well-formed and
 prints their names and a status; it reads no config, opens no browser and
@@ -228,7 +229,7 @@ def start(
 def client_for(name: str, config: Config, profile: ClientProfile | None) -> Client:
     """The run loop's client (task 9.4; core/client.py). Summit's reads its
     client file and the run's start time (its assignee rule, task 9.11);
-    `_run` refuses its Note-loop modes before this until 9.12-9.14."""
+    `_run` refuses its run that books before this until 9.14."""
     if name == "summit":
         if profile is None:
             raise ConfigError("client file not loaded")
@@ -310,9 +311,9 @@ def _run_locked(
     client: str,
     profile: ClientProfile | None,
 ) -> int:
-    if client == "summit" and mode != "spike":
-        # Refused until its task lands (decide-only 9.12, run 9.14): before
-        # any secret is read, any login or any browser. The spike: 9.11.
+    if client == "summit" and mode == "run":
+        # Refused until its task lands (run 9.14): before any secret is
+        # read, any login or any browser. The spike: 9.11; decide-only: 9.12.
         raise ConfigError("mode not built for this client yet")
     if profile is None:  # B1: the sweep's call as before there were two clients
         sweep_download_dirs()
