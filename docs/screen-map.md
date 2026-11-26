@@ -1,6 +1,6 @@
 # MySys screen map (test site)
 
-**Version:** 1.6 · 25 Nov 2026 (1.6: row 02, a live Summit email Note's window, from Joey's 25 Nov 2026 live screenshots (task 9.12); 1.5: row 01's live Subject/Note and Source cells for email Notes, from Joey's 23 Nov 2026 live screenshot (task 9.11 review); 1.4: the Documents upload block after an upload (row 09) and where its PDF lands (row 19): the agent uploads to Documents, not PO Documents (decisions, 12 Nov 2026, upload to Documents); 1.3: slice M0b.2, rows 19, 20, 23 and 24, the label anchors for every weak Create New Task field and the Hold confirm button, the upload saved only by Submit; open items 2, 4, 5, 8 and 10 closed (decisions, 3 Nov 2026); 1.2: slice M0b.1, rows 25–28, 15b and the row-26 anchors; rows 21–22 not mapped and row 23 moved to M0b.2 (decisions, 25 Oct 2026); 1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026, slice M0b.1 (rows 15b, 25–28) on 25 Oct 2026, and slice M0b.2 (rows 19, 20, 23, 24) on 3 Nov 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
+**Version:** 1.8 · 26 Nov 2026 (1.8: row 32's Creator note, the creator table now says Alison Wells (decisions, 26 Nov 2026, Summit names from MySys); 1.7: Live: Summit S.0, rows 30-34, Joey's by-hand look for SPEC open questions S3-S6 and the Creator select (decisions, 26 Nov 2026, S.0 live findings); 1.6: row 02, a live Summit email Note's window, from Joey's 25 Nov 2026 live screenshots (task 9.12); 1.5: row 01's live Subject/Note and Source cells for email Notes, from Joey's 23 Nov 2026 live screenshot (task 9.11 review); 1.4: the Documents upload block after an upload (row 09) and where its PDF lands (row 19): the agent uploads to Documents, not PO Documents (decisions, 12 Nov 2026, upload to Documents); 1.3: slice M0b.2, rows 19, 20, 23 and 24, the label anchors for every weak Create New Task field and the Hold confirm button, the upload saved only by Submit; open items 2, 4, 5, 8 and 10 closed (decisions, 3 Nov 2026); 1.2: slice M0b.1, rows 25–28, 15b and the row-26 anchors; rows 21–22 not mapped and row 23 moved to M0b.2 (decisions, 25 Oct 2026); 1.1: corrections from the captures: one Creator field, the Note body is one line, the Note Pool joins title and body and sorts newest first; denylist note; open items moved to `SPEC.md` → MySys screen rules and slice M0b) · **Source:** the Stage 3A walkthrough (`docs/workflow.md`), rows 01–16, captured with Playwright CLI on 16 Oct 2026, slice M0b.1 (rows 15b, 25–28) on 25 Oct 2026, and slice M0b.2 (rows 19, 20, 23, 24) on 3 Nov 2026 (snapshots and screenshots in `private/captures/test/`, laptop only). No live captures yet (Stage 3B is view-only and optional for the MVP).
 
 Every value below is **fake**. The real captures stay in `private/`. **The test site's 3 trial POs are real B1 POs** (16 Oct 2026), so test-site captures and screenshots are real data too: never commit them.
 
@@ -99,7 +99,7 @@ Opens from a Note Pool row. Heading **"Note 300001 - created on 12 Oct 2026"**; 
 **Read:** title, body, file name, assignee, status.
 **Opening a Note changes nothing visible:** no log line, no status change (check 3.5).
 
-**Live Summit email Note** (Joey's live screenshots, 25 Nov 2026, kept in `private/summit/`; shapes only): "Assignee:" reads a staff user, a pool (e.g. **PO Allocation Pool**) or **---**, with a red **Unlink** (trash) button beside it even on an unlinked Note (**danger**, never targeted); both lists open at **--Select User--** / **--Select Pool--** (no Agent 1 pre-select, unlike the test site); **Send Email Notification** ticked on open; **Link to Project** shown; one "Download document" link whose file name is the PDF's, with `_` in the PO; the email body is one `iframe` holding a header table, the PO details table, one line of text and a Disclaimer (task 9.12's body rule: SPEC.md -> Client 2, Email body).
+**Live Summit email Note** (Joey's live screenshots, 25 Nov 2026, kept in `private/summit/`; shapes only): "Assignee:" reads a staff user, a pool (e.g. **PO Allocation Pool**) or **---**, with a red **Unlink** (trash) button beside a user or a pool, none beside `---` (row 30; **danger**, never targeted); both lists open at **--Select User--** / **--Select Pool--** (no Agent 1 pre-select, unlike the test site); **Send Email Notification** ticked on open; **Link to Project** shown; one "Download document" link whose file name is the PDF's, with `_` in the PO; the email body is one `iframe` holding a header table, the PO details table, one line of text and a Disclaimer (task 9.12's body rule: SPEC.md -> Client 2, Email body).
 
 ### Rows 03–04 · Assign the Note to the agent
 
@@ -404,6 +404,50 @@ Joey looked at live with the agent account and sent screenshots; Claude saw no l
 | What it lists | A `/048` Note Joey assigned to Agent 1 by hand showed there with Assignee "Agent 1 (MySys Only)", Status Pending | The Notes assigned to the logged-in user |
 
 **Danger:** Company's "close" (clears the filter) and Reset Filter are never targeted; nothing on My Notes is clicked.
+
+---
+
+## Live: Summit S.0 (Joey's by-hand look, 25-26 Nov 2026)
+
+Joey looked on live with Agent 2 and on the test site and sent screenshots (kept in `private/summit/s0-screens/`); Claude read Summit project pages under the 10 Nov 2026 live-lookup exception. Shapes only; names below are company, creator and staff user names (committable, decisions 23 Nov 2026), every other value is fake.
+
+### Row 30 · The Note window's Assignee block and its Unlink
+
+| Assignee | What the block shows (Knockout branches in the DOM) |
+|---|---|
+| A user (e.g. `Agent 2 (Summit Homes)`) | `ko if: assigned_user()`: the name, and `<button class="btn btn-danger btn-mini pull-right" data-bind="click: unlinkUser, disable: !can_assign_note()">` Unlink |
+| A pool (e.g. Agent Pool) | `ko if: !assigned_user() && assigned_pool()`: the pool, and the same button bound to `click: unlinkPool` |
+| `---` | `ko if: !assigned_user() && !assigned_pool()`: no button |
+
+- The block is the "Current Assignee Section" (an HTML comment) inside a `well well-small`. The project's own Unlink, beside Change Project, is a different button (Must never #2).
+- **Pressed by hand on the test site** (one test Note; nothing else changed): no confirm dialog; "Assignee:" reads `---` and the button goes. `unlinkUser`: toast "Notes reassigned successfully", log "User Assigned: (By Agent 2 (Summit Homes)) Unassigned from Agent 2 (Summit Homes) to". `unlinkPool`: toast "Note assigned to pool successfully", log "User Assigned: (By <user>) Unassigned from to". Whether either sends email: not checked (Send Email was ticked).
+- **After the Unlink, the open window's user list still shows the old user** and Status still reads "Pending by <that user>": only the "Assignee:" text is the assignee (as row 23).
+- **Assign with `--Select User--` and `--Select Pool--`** does nothing at all, even after a reload (SPEC open question S6).
+- Send Email Notification is ticked again on every reopen.
+
+### Row 31 · Locked, Unlocked and My Notes after an Assign to Agent 2 (test site)
+
+A Note assigned to Agent 2 by hand is listed under the Note Pool's **Locked** filter, not under **Unlocked**, and on Agent 2's **My Notes** (SPEC open question S5). So a Summit Note the agent took drops out of its own Unlocked list, and the stale-Note read (row 29) sees it.
+
+### Row 32 · The Creator select on Summit projects (live, Create New Task, abandoned by a reload)
+
+- First option "Choose...", then a per-company list of staff users and group accounts. The select opens at the **Project Creator** when that user is an option, else (seen on a Summit Projects project) at "Choose...".
+- Fixed creators seen as options: **NH Sub Floor** (Summit Easystart, Summit New Homes), **Compactions** (Summit Easystart, Summit Homes Group, Summit South West), **Alison Wells** (Summit Granny Flats; one L, as the creator table now says: decisions, 26 Nov 2026, Summit names from MySys). On a Summit Projects project, the creator the previous-task rule picks was an option.
+- Other group accounts in the lists: Summit Sales, Summit Sales only, Summit SIR, NH Engineering, NH Clerical, NH Maintenance, SW DRAFTING, Renovations Admin (REN), test users.
+- Option text quirks: some labels repeat (e.g. "Renovations Admin (REN) Renovations Admin (REN)", "<name> (left) <name> (left)"); one shows a mangled apostrophe. A Task Creator cell may then not equal its option exactly: `CREATOR_UNKNOWN` at W1, safe.
+- **Sale Office** (in the Compaction Test sub-form, row 09) defaults to **Prompt Engineering Pty Ltd**.
+
+### Row 33 · A past Summit Compaction Test's documents (live)
+
+- The project's **Documents** tab, section `tsk_<n>`: a row Type **Client Documents**, File `PROMPT_ENGINEERING_<6 digits>_020_<nn>.pdf`, Document "Client Documents", Creator "Plans System", for a PDF that arrived as `PROMPT_ENGINEERING-<6 digits>_020_<nn>.pdf`: MySys files the `-` as `_` (SPEC open question S4; seen on staff uploads). A completed task's section also holds its Result row.
+- The task detail (row 19): Client Documents (1) with the same `_` name; Office Prompt Engineering Pty Ltd; Delivery Office and PO Contact `---`; PO Number `<6 digits>/020/<nn>`; Notes = the email body.
+
+### Row 34 · A Summit project page (live, read-only)
+
+- The Projects search on a Summit internal number gave one row; Company reads MySys's spelling (Summit Easystart, Summit Granny Flats, Summit Projects).
+- The **Notes** section under the Tasks table lists every Note linked to the project with its full title (Poster "Summit Homes", e.g. `New Gen and EasyStart - Lot No 1 St No 2 EXAMPLE STREET SUBURB WA 6000 - PO: 100001/020/03 - READY`), so a Solved Note's title can be read there. Older Summit titles also use "New Generation and EasyStart", one with no READY/ISSUED word.
+- Variation rows (`↳ Variation (tsk_<n> Variation)`) sit under their task; the Tasks read takes only `(tsk_<n>) | <name>` headers (SPEC step 10).
+- Each project window covers the Projects search; its close (X) is outside the live-lookup exception, so Joey closed each one.
 
 ---
 
