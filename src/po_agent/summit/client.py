@@ -3,9 +3,10 @@
 (task 9.11, `summit/eligibility.py`); what the peek needs (task 9.12): the PO
 a NOTE line shows, the one-iframe body rule, the project rule and the
 decision (`summit/decision.py`) on what the peek read, with the Note's
-original assignee. The W2 Documents Type and the return target refuse with
+original assignee; where a Note taken and stopped before Submit goes back
+(task 9.13: its original assignee). The W2 Documents Type refuses with
 ConfigError (ALERT CONFIG, exit 2), as `cli.py` refuses Summit's run, until
-tasks 9.13-9.14 fill them. Pure, no browser code, as `b1/`."""
+task 9.14 fills it. Pure, no browser code, as `b1/`."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -100,5 +101,8 @@ class SummitClient:
     def document_type(self) -> str:
         _refuse()
 
-    def return_target(self) -> str:
-        _refuse()
+    def return_target(self, original: str) -> str:
+        # SPEC: Return to the original assignee, as the peek read it; the
+        # driver strips it and finds it in exactly one of the Note window's
+        # lists, else the Note stays with Agent 2 (task 9.13).
+        return original

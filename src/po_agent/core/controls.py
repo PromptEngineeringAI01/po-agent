@@ -221,20 +221,32 @@ class Controls:
         self.assignee_check = assignee_check
         self.client = client
 
+    def _enabled(self) -> bool:
+        """The kill switch, re-read now; ConfigError if a file can't be."""
+        config = load_config(self.site, self.config_dir)
+        # Any client but B1 must have its client file (load_client
+        # refuses an unknown one): never treated as B1 (9.5 review).
+        profile = (
+            None
+            if self.client == "b1"
+            else load_client(self.client, self.site, self.config_dir)
+        )
+        return run_enabled(config, profile)
+
+    def before_take(self, note_id: str) -> None:
+        """Before Summit's take (task 9.13; SPEC.md -> The take and the
+        booking): the kill switch re-read with nothing taken or written
+        yet. Off -> KillSwitch (the run stops, exit 0); a file that can't
+        be read -> ConfigError."""
+        if not self._enabled():
+            raise KillSwitch(note_id=note_id, step="2")
+
     def before_write(self, note_id: str, step: str) -> None:
         if step not in STEPS:
             raise ValueError("not a write step")
         submitted = step not in NOT_SUBMITTED
         try:
-            config = load_config(self.site, self.config_dir)
-            # Any client but B1 must have its client file (load_client
-            # refuses an unknown one): never treated as B1 (9.5 review).
-            profile = (
-                None
-                if self.client == "b1"
-                else load_client(self.client, self.site, self.config_dir)
-            )
-            enabled = run_enabled(config, profile)
+            enabled = self._enabled()
         except ConfigError:
             if submitted:
                 raise PartialWrite(
