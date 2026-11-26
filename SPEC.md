@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.77 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.78 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -90,7 +90,7 @@ As `docs/specs/tech-stack.md`: Python 3.12 (uv, locked), Playwright for Python w
 | MySys test username | `PO_AGENT_MYSYS_TEST_USERNAME` | `mysys_test_username` |
 | MySys test password | `PO_AGENT_MYSYS_TEST_PASSWORD` | `mysys_test_password` |
 
-The Mac Mini wrapper (not the agent) reads one more: the Healthchecks.io ping URL, `PO_AGENT_HEALTHCHECKS_PING_URL` (tests only), else keychain item `healthchecks_ping_url` of service `po-agent` (decisions, 19 Nov 2026).
+The Mac Mini wrapper (not the agent) reads one more: the Healthchecks.io ping URL, `PO_AGENT_HEALTHCHECKS_PING_URL` (tests only), else keychain item `healthchecks_ping_url` of service `po-agent` (decisions, 19 Nov 2026). A Summit run reads its own instead, `PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT` (tests only), else keychain item `healthchecks_ping_url_summit`, never B1's (task 9.15).
 
 No Anthropic key: the Claude reader was dropped (decisions, 2 Nov 2026). `ANTHROPIC_API_KEY` is never read.
 
@@ -111,9 +111,9 @@ Supervised demo:     uv run po-agent demo --site test --headed [--until-check]  
 Secrets pre-flight:  uv run po-agent preflight --site test|live [--client b1|summit]   secret names and ok / not set / malformed / store unavailable, never values; no login, no network; exit 2 if any is not ok (decisions, 20 Nov 2026, secrets pre-flight)
 Link probe:          uv run po-agent demo --site test --probe-link   opens Choose Project, searches, snapshots, selects nothing (decisions, 28 Oct 2026)
 Laptop extras:       --headed (watch the browser), --slow-mo 500, --detailed-log (JSON lines in logs/)
-Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only test|live   site required; fetch, enabled from config/<site>.toml on main, production tag, sync, run, log, alert
+Mac Mini (poagent):  scripts/macmini-run.sh run|spike|decide-only test|live [summit]   site required; fetch, enabled from config/<site>.toml (and Summit's client file) on main, production tag, sync, run, log, alert
 Live (Joey only):    on the Mac Mini, through the wrapper or launchd (`run live`); never from the laptop, never by Claude (Must never #3)
-Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent
+Mac Mini run now:    launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent   (Summit's job: au.com.prompteng.po-agent.summit)
 ```
 
 `scripts/check.py` runs, in order, stopping on the first failure: `ruff format --check --no-cache .` → `ruff check --no-cache .` (no cache, so a stale local result can't pass what CI fails; decisions, 24 Nov 2026) → `mypy` (files and flags in pyproject `[tool.mypy]`; decisions, 20 Nov 2026) → `python scripts/guard_check.py` → repo data check (nothing tracked in a folder named `private/`, `logs/`, `state/`, `.state/`, `traces/`, `secrets/`, `.env/` or `.playwright-cli/`, at any depth; no `.env` or `.env.*` file and no `config/live*.toml` other than the committed `config/live.toml`, at any depth; no `.pdf` outside `tests/seam1/fixtures/pdfs/`; no image (`*.png`, `*.jpg`, `*.jpeg`, `*.webp`, `*.gif`); no trace or capture file (`*trace*.zip`, `*.har`, `*.webm`); folder names and extensions in any case) → conflict markers (no tracked text file with a line starting `<<<<<<<` or `>>>>>>>`, or `=======` between them) → `pytest tests -m "not live_claude and not testsite and not real_data" -n auto --maxprocesses 12 --dist load` (pytest-xdist, at most 12 workers; decisions, 19 Nov 2026). If that run fails and every failed test failed on a Playwright `TimeoutError`, just those tests run once more, serially, and the step passes only if they all pass ("rerun after timeout"); any other failure is never rerun (decisions, 25 Nov 2026, Checkpoint S-A friction decisions). `--quick <test paths>` runs the same first five steps, then pytest on only those paths with the same marker filter (in parallel past 50 selected tests); it is an inner-loop check, not the gate. `-n` is never in pyproject `addopts`, so a plain `uv run pytest` stays serial, and `tests/xdist_guard.py` (registered by `tests/conftest.py`) fails every `testsite` test in setup, before any fixture, inside any xdist worker, and stops a `-n`/`--tx` run that selects one at collection (incl. `--collect-only`).
@@ -622,7 +622,7 @@ From Submit on, B1's partial-write rule holds unchanged: the Note stays with Age
 | Stale-Note stop | Agent 1's My Notes | **Agent 2's My Notes** (`stale_read = "my_notes"`): any Pending row is stale. So from go-live step S.1 on, no person assigns Notes to Agent 2 by hand |
 | Hold re-check | its own site's `booked` events | its own site's **and client's** `booked` events (the event gains `client`; an event without one is B1's) |
 | Caps | `max_notes_per_run = 10` | `max_notes_per_run` (bookings; 1 for the watched runs) and `max_peeks_per_run` (Notes opened; open question S3) in the client file; `max_run_minutes` as the site's |
-| Mac Mini | `au.com.prompteng.po-agent`, wrapper `run live` | its own launchd job and wrapper argument (`macmini-run.sh <mode> live summit`), its own Healthchecks check (keychain `healthchecks_ping_url_summit`), at another minute past the hour (Joey's choice). All Joey's (`scripts/macmini-run.sh`, the plist and `docs/macmini-setup.md` are ask-first) |
+| Mac Mini | `au.com.prompteng.po-agent`, wrapper `run live`, at :07 | its own launchd job `au.com.prompteng.po-agent.summit` (`scripts/au.com.prompteng.po-agent.summit.plist`) and wrapper argument (`macmini-run.sh <mode> live summit`) at **:30**, 07:30-17:30 Monday-Friday Perth (Joey, 24 Nov 2026); its own Healthchecks check `po-agent summit` (cron `30 7-17 * * 1-5`, keychain `healthchecks_ping_url_summit`); alert issues `po-agent alert summit <run_id>`; no GitHub heartbeat (it stays B1's); its own Playwright browsers (`~/Library/Caches/ms-playwright-summit`), so neither run kills the other's (task 9.15). All Joey's (`scripts/macmini-run.sh`, the plists and `docs/macmini-setup.md` are ask-first); his steps: `docs/macmini-setup.md` section 13 |
 | Run output | as today | `RUN_SUMMARY` gains `"client": "b1|summit"` (B1's too); NOTE lines unchanged in shape, `po_number` is the full Summit PO |
 
 Commands (once built; on live only Joey runs them, on the Mac Mini):
