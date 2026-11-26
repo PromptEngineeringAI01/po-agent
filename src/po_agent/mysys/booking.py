@@ -651,7 +651,9 @@ def creator_option(select: Locator, creator: str) -> str:
     found = [text for text in texts if text.strip() == wanted]
     if len(found) != 1:
         raise WriteNotStarted(
-            "creator not an option", reason=SkipReason.CREATOR_UNKNOWN.value
+            "creator not an option",
+            reason=SkipReason.CREATOR_UNKNOWN.value,
+            step="W1",
         )
     return found[0]
 
