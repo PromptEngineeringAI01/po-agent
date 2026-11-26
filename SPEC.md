@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.73 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.74 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -600,6 +600,8 @@ A Note is returned only when it was taken and then stopped **before Submit** (ki
 - Original assignee **`---`**: back to `---` (Joey, 24 Nov 2026: "assign to the original assignee so it can be anyone or ---"; replaces 23 Nov's Gita Valani): user list `--Select User--`, pool list `--Select Pool--`, Assign, and "Assignee:" must read `---`. Whether MySys accepts that Assign is open question S6, checked by hand in S.0; until it is confirmed, this case stays with Agent 2 with the ALERT below.
 - The name in both lists or neither: the Note stays with Agent 2, `ALERT UNEXPECTED_SCREEN` (fixed detail "Note not returned"), exit 1; the stale-Note stop holds later Summit runs until Joey moves it by hand.
 - Read back: "Assignee:" reads the target and a new "User Assigned" (or pool) log line. Every return unticks Send Email first, through the shared control.
+
+As built (task 9.13; decisions, 26 Nov 2026, Summit take and return): the take is B1's (`driver.take_note`), after the kill switch is re-read (off: nothing taken, exit 0) and the Note is found again with "Assignee:" equal to what the peek read; Link to Project is read right after it (not shown: `UNEXPECTED_SCREEN`, a stop before Submit). The return target is "Assignee:" as the peek read it, whitespace around it stripped, matched exactly and case-sensitive against the Note window's user and pool option texts, placeholders left out, never a near match; a pool goes back by B1's return (Status read back Pending). A Note not returned stops with `ALERT UNEXPECTED_SCREEN` "run stopped; Note not returned" and its `note_id`. `---` is in neither list, so a taken `---` Note always stays with Agent 2 with that ALERT (Joey, 26 Nov 2026: "好，先留給 Agent 2"; final for phase 1, no both-defaults Assign is ever tried). The return reuses B1's stop path: a fresh browser context, none on Ctrl+C. `cli.py` still refuses `run --client summit` until 9.14.
 
 From Submit on, B1's partial-write rule holds unchanged: the Note stays with Agent 2, the run stops.
 

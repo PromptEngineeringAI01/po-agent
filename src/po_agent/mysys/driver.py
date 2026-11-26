@@ -947,6 +947,51 @@ def return_note(
     log.flush(note_id=note_id, step=step)
 
 
+def _option_names(select: Locator, placeholder: str) -> set[str]:
+    """The list's option texts as they are (the guard selects an option
+    only by its exact text), its placeholder left out (a placeholder is no
+    name: S6)."""
+    try:
+        texts = select.locator("option").all_text_contents()
+    except PlaywrightError:
+        raise UnexpectedScreen("Note window list not readable") from None
+    return set(texts) - {placeholder}
+
+
+def return_to_assignee(
+    guard: ActionGuard,
+    window: Locator,
+    agent: str,
+    assignee: str,
+    log: RunLog,
+    note_id: str,
+) -> None:
+    """Summit's return (task 9.13; SPEC.md -> Return to the original
+    assignee): one Assign back to `assignee`, "Assignee:" as the peek read
+    it. Whitespace around it is stripped, then it is matched exactly,
+    case-sensitive, against the option texts: never a near match. Only in the user
+    list: user list = that user, pool list --Select Pool--, Assign, then
+    "Assignee:" and a new "User Assigned" log line read back. Only in the
+    pool list: B1's return (`return_note`). In both lists or neither (`---`
+    among them: decisions, 26 Nov 2026) nothing is pressed: UnexpectedScreen
+    "Note not returned", and the Note stays with the agent. Never Unassign
+    or Unlink (Must never #2)."""
+    step = "return"
+    name = assignee.strip()
+    users = _option_names(_list(window, SELECT_USER), SELECT_USER)
+    pools = _option_names(_list(window, SELECT_POOL), SELECT_POOL)
+    if (name in users) == (name in pools):
+        raise UnexpectedScreen("Note not returned", note_id=note_id, step=step)
+    if name in pools:
+        return_note(guard, window, agent, name, log, note_id)
+        return
+    untick_send_email(guard, window)
+    guard.act("select_note_user", window, _list(window, SELECT_USER), name)
+    guard.act("select_note_pool", window, _list(window, SELECT_POOL), SELECT_POOL)
+    _assign(guard, window, log, note_id, step, was=agent, now=name)
+    log.flush(note_id=note_id, step=step)
+
+
 # Attachment and download (rows 02, 05)
 
 

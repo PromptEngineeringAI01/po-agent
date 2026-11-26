@@ -16,7 +16,8 @@ SPEC lists, nothing for a client not yet known (ADR-003's rule of three):
   Tasks, the client judges them (`project_rule`);
 - the decision, pure: its `Proceed` carries the Creator and the Documents
   file name (`decide`); the W2 Documents Type (`document_type`);
-- where a Note taken and stopped before Submit goes back (`return_target`).
+- where a Note taken and stopped before Submit goes back, given the
+  assignee read before the take (`return_target`).
 """
 
 from collections.abc import Callable, Sequence
@@ -88,8 +89,9 @@ class Client(Protocol):
         """W2's read-back: the Type of the new task's Documents row."""
         ...
 
-    def return_target(self) -> str:
+    def return_target(self, original: str) -> str:
         """Where a Note taken and then skipped or stopped before Submit goes
-        back: B1's pool. Summit's return to the original assignee comes with
-        its take (9.13)."""
+        back, given `original`, "Assignee:" as read before the take: B1's
+        pool whatever it read; Summit's original assignee as read (task
+        9.13; the driver matches it against the Note window's lists)."""
         ...

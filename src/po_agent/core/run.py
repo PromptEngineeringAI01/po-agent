@@ -36,9 +36,18 @@ it again, read "Assignee:" (the original assignee, kept as read), then the
 same reads and decision as above, with no take, no return, no Send Email
 click and no write; the NOTE line is "untouched" with the skip reason, or
 DECIDE_ONLY for a Note that would be booked. Its run cap counts Notes
-opened (`max_peeks_per_run`) and bookings (`max_notes_per_run`). Until its
-take and booking land (9.13-9.14) such a client's run that books is
-refused before login.
+opened (`max_peeks_per_run`) and bookings (`max_notes_per_run`).
+
+The take (task 9.13; SPEC.md -> The take and the booking): in the run that
+books, a peeked PROCEED is taken only now. The kill switch is re-read, the
+Note found again, and its "Assignee:" must still read the original
+assignee (else "untouched" NOTE_TAKEN, never taken); Agent 2 takes it as
+B1's take does, and the window must still show Link to Project; then the
+booker. A Note taken and stopped before Submit goes back, by the same stop
+path as B1's, to its original assignee (`driver.return_to_assignee`); a
+name in both of the Note window's lists or neither (`---` among them:
+decisions, 26 Nov 2026) stays with the agent, ALERT "Note not returned".
+`cli.py` refuses Summit's run until its booking lands (9.14).
 
 Hold re-check (decisions, 11 Nov 2026, hold re-check): right after login,
 before the stale-Note read and before any Note, both modes re-read the
@@ -65,7 +74,6 @@ from po_agent.core.client import Client, EligibleNote
 from po_agent.core.config import ClientProfile, Config
 from po_agent.core.errors import (
     AccuracyBreach,
-    ConfigError,
     GuardRefusal,
     MorePages,
     PartialWrite,
@@ -199,6 +207,7 @@ def spike(
 class _Progress:
     note_id: str | None = None  # the Note being worked on
     taken: bool = False  # it may be assigned to the agent
+    original: str = ""  # its "Assignee:" as read before the take
     # The booker's own error once it is past the Submit click, kept where it
     # was raised: a later cleanup error must not hide it (4.5 review).
     submitted: BaseException | None = None
@@ -328,9 +337,8 @@ def _note_loop(
     any login (the 9.4 review's guard). The
     run's account, caps, kill switch and hold re-check are its client's
     (`profile`, None for B1; task 9.5). A client file's client peeks
-    (`_peek_note`, 9.12); its run that books waits for 9.13-9.14."""
-    if profile is not None and config_dir is not None:
-        raise ConfigError("mode not built for this client yet")
+    (`_peek_note`, 9.12) and, in the run that books, takes a PROCEED only
+    after it (9.13)."""
     filters = client.filters()
     client.project_rule()
     guard = ActionGuard()
@@ -389,7 +397,16 @@ def _note_loop(
                     with driver.note_downloads(page, downloads):
                         if profile is not None:
                             line = _peek_note(
-                                guard, page, client, login, log, note, progress
+                                guard,
+                                page,
+                                config,
+                                client,
+                                login,
+                                log,
+                                note,
+                                progress,
+                                config_dir,
+                                profile,
                             )
                         else:
                             line = _one_note(
@@ -433,7 +450,15 @@ def _note_loop(
             not submitted
             and isinstance(error, Exception)
             and _return_after_stop(
-                guard, agent, client, options, login, log, progress.note_id
+                guard,
+                agent,
+                client,
+                options,
+                login,
+                log,
+                progress.note_id,
+                progress.original,
+                profile,
             )
         )
         try:
@@ -462,10 +487,14 @@ def _note_loop(
             output.info("kill switch on: run stopped")
             return 0
         # The original error stays in the traceback as the cause.
-        if not returned:
+        if not returned and profile is None:  # B1's goes back to its pool
             raise UnexpectedScreen(
                 "run stopped; Note not returned to the pool",
                 note_id=progress.note_id,
+            ) from error
+        if not returned:  # to its original assignee: a user, a pool or ---
+            raise UnexpectedScreen(
+                "run stopped; Note not returned", note_id=progress.note_id
             ) from error
         if progress.note_id is None:
             raise
@@ -555,7 +584,8 @@ def _one_note(
     progress.taken = False
     po_number = client.po_number(note)
     window = driver.find_note_again(guard, page, *login, note_id)
-    in_pool = driver.read_assignee(window) == config.pool_name
+    assignee = progress.original = driver.read_assignee(window)
+    in_pool = assignee == config.pool_name
     log.event("assignee_check", note_id=note_id, step="2", ok=in_pool)
     if not in_pool:  # a person has it: never taken
         return _untouched(client, note)
@@ -565,43 +595,18 @@ def _one_note(
     if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
     if config_dir is not None and isinstance(decision, Proceed):
-        try:
-            task_no = _book(
-                guard,
-                page,
-                config,
-                client,
-                login,
-                decision,
-                config_dir,
-                note_id=note_id,
-                log=log,
-                profile=profile,
-            )
-        except BaseException as error:
-            if _submitted(error):
-                progress.submitted = error
-            raise
-        progress.taken = False  # booked: linked and Solved, never returned
-        try:
-            # Flushes W5's guard actions, then the trace's booked event for
-            # the next runs' hold re-check.
-            log.booked(
-                note_id=note_id,
-                pln=decision.pln,
-                task_id=task_no,
-                internal_no=note.internal_no,
-                site=config.site,
-                client=client_name(profile),
-            )
-        except OSError:
-            pass  # the NOTE line still goes out
-        return output.Note(
-            note_id=note_id,
-            outcome="booked",
-            po_number=po_number,
-            pln=decision.pln,
-            task_id=task_no,
+        return _book_note(
+            guard,
+            page,
+            config,
+            client,
+            login,
+            log,
+            note,
+            progress,
+            decision,
+            config_dir,
+            profile,
         )
     # Found again and read before it goes back: the open window can be
     # minutes old, and a person may have taken the Note meanwhile.
@@ -611,7 +616,9 @@ def _one_note(
     if not still_ours:  # a person has it now: left with them
         progress.taken = False
         return _untouched(client, note)
-    driver.return_note(guard, window, agent, client.return_target(), log, note_id)
+    driver.return_note(
+        guard, window, agent, client.return_target(assignee), log, note_id
+    )
     progress.taken = False
     if isinstance(decision, Proceed):
         reason, pln = DECIDE_ONLY, decision.pln
@@ -630,24 +637,43 @@ def _one_note(
 def _peek_note(
     guard: ActionGuard,
     page: Page,
+    config: Config,
     client: Client,
     login: tuple[str, str, str],
     log: RunLog,
     note: EligibleNote,
     progress: _Progress,
+    config_dir: Path | None,
+    profile: ClientProfile,
 ) -> output.Note:
     """SPEC's peek, steps 1-4: found again (All Pools, the exact ID) and
     opened, "Assignee:" read as the original assignee, then _decide's reads
     (link, attachments, download, body, project lookup) and the decision.
-    Only read-only actions: the Note is never taken, so it is never
-    returned. A Client Internal No. that differs stops the run, as B1's."""
+    Only read-only actions: an untouched Note, and every Note in
+    decide-only (`config_dir` None), is never taken, so never returned. A
+    Client Internal No. that differs stops the run, as B1's. In the run
+    that books, a PROCEED goes on to the take (`_take_and_book`)."""
     note_id = progress.note_id = note.note_id
     progress.taken = False
     window = driver.find_note_again(guard, page, *login, note_id)
-    original = driver.read_assignee(window)
+    original = progress.original = driver.read_assignee(window)
     decision = _decide(guard, page, client, login, log, note, window, original)
     if isinstance(decision, Skip) and decision.reason is SkipReason.UNEXPECTED_SCREEN:
         raise UnexpectedScreen("project not as searched", note_id=note_id, step="8")
+    if config_dir is not None and isinstance(decision, Proceed):
+        return _take_and_book(
+            guard,
+            page,
+            config,
+            client,
+            login,
+            log,
+            note,
+            progress,
+            decision,
+            config_dir,
+            profile,
+        )
     if isinstance(decision, Proceed):
         reason, pln = DECIDE_ONLY, decision.pln
     else:
@@ -659,6 +685,117 @@ def _peek_note(
         reason=reason,
         po_number=client.po_number(note),
         pln=pln,
+    )
+
+
+def _take_and_book(
+    guard: ActionGuard,
+    page: Page,
+    config: Config,
+    client: Client,
+    login: tuple[str, str, str],
+    log: RunLog,
+    note: EligibleNote,
+    progress: _Progress,
+    proceed: Proceed,
+    config_dir: Path,
+    profile: ClientProfile,
+) -> output.Note:
+    """SPEC's take, once the peek decided PROCEED: the kill switch re-read
+    (KillSwitch: nothing taken); found again, its "Assignee:" must still
+    read the original assignee the peek read (`progress.original`), else a
+    person has it: "untouched" NOTE_TAKEN, never taken; Agent 2 takes it
+    (B1's take: Send Email unticked and read back, user = the agent, pool
+    --Select Pool--, one Assign, read back); the window must still show
+    Link to Project; then the booker. A stop from the take until the
+    Submit click returns it to the original assignee (`_return_after_stop`)."""
+    note_id = note.note_id
+    agent = account(config, profile).agent
+    check = controls.assignee_check(guard, page, login, agent, log)
+    gate = controls.Controls(
+        config.site, config_dir, check, client=client_name(profile)
+    )
+    gate.before_take(note_id)
+    window = driver.find_note_again(guard, page, *login, note_id)
+    same = driver.read_assignee(window) == progress.original
+    log.event("assignee_check", note_id=note_id, step="2", ok=same)
+    if not same:  # a person has it now: never taken
+        return _untouched(client, note)
+    progress.taken = True
+    driver.take_note(guard, window, agent, log, note_id)
+    if not driver.is_unlinked(window, log, note_id):
+        raise UnexpectedScreen(
+            "Link to Project not shown after the take", note_id=note_id, step="2a"
+        )
+    return _book_note(
+        guard,
+        page,
+        config,
+        client,
+        login,
+        log,
+        note,
+        progress,
+        proceed,
+        config_dir,
+        profile,
+    )
+
+
+def _book_note(
+    guard: ActionGuard,
+    page: Page,
+    config: Config,
+    client: Client,
+    login: tuple[str, str, str],
+    log: RunLog,
+    note: EligibleNote,
+    progress: _Progress,
+    proceed: Proceed,
+    config_dir: Path,
+    profile: ClientProfile | None,
+) -> output.Note:
+    """W1-W5 for a Note the agent holds, then the trace's booked event and
+    the NOTE line "booked". From the Submit click on, the booker's own
+    error is kept (`progress.submitted`): the Note is never returned."""
+    note_id = note.note_id
+    try:
+        task_no = _book(
+            guard,
+            page,
+            config,
+            client,
+            login,
+            proceed,
+            config_dir,
+            note_id=note_id,
+            log=log,
+            profile=profile,
+        )
+    except BaseException as error:
+        if _submitted(error):
+            progress.submitted = error
+        raise
+    progress.taken = False  # booked: linked and Solved, never returned
+    try:
+        # Flushes W5's guard actions, then the trace's booked event for the
+        # next runs' hold re-check.
+        log.booked(
+            note_id=note_id,
+            pln=proceed.pln,
+            task_id=task_no,
+            internal_no=note.internal_no,
+            site=config.site,
+            client=client_name(profile),
+        )
+    except OSError:
+        pass  # the NOTE line still goes out
+    return output.Note(
+        note_id=note_id,
+        outcome="booked",
+        po_number=client.po_number(note),
+        pln=proceed.pln,
+        task_id=task_no,
     )
 
 
@@ -750,26 +887,28 @@ def _return_after_stop(
     login: tuple[str, str, str],
     log: RunLog,
     note_id: str | None,
+    original: str,
+    profile: ClientProfile | None,
 ) -> bool:
     """One return through the normal path in a fresh browser context
-    ("Finding a Note again"). True when the Note is no longer with the
-    agent afterwards; never raises."""
+    ("Finding a Note again"): B1's to its pool; a client file's client's
+    to the original assignee (`original`, "Assignee:" as read before the
+    take; task 9.13). True when the Note is no longer with the agent
+    afterwards; never raises."""
     if note_id is None:
         return False
+    target = client.return_target(original)
     try:
         with driver.open_browser(
             headed=options.headed, slow_mo=options.slow_mo
         ) as page:
             window = driver.find_note_again(guard, page, *login, note_id)
-            if driver.read_assignee(window) == agent:
-                driver.return_note(
-                    guard,
-                    window,
-                    agent,
-                    client.return_target(),
-                    log,
-                    note_id,
-                )
+            if driver.read_assignee(window) != agent:
+                pass  # a person has it now: left with them
+            elif profile is None:  # B1: its pool, as before there were two clients
+                driver.return_note(guard, window, agent, target, log, note_id)
+            else:
+                driver.return_to_assignee(guard, window, agent, target, log, note_id)
     except Exception:  # noqa: BLE001 - never raises: any failure is "not returned"
         return False
     return True
