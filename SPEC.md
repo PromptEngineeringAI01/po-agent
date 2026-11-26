@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.78 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.79 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -280,7 +280,7 @@ What the driver and booker do on each screen, built from `docs/screen-map.md` v1
 **Note window (rows 02–04, 13–15)**
 - **Send Email Notification** is ticked every time a Note window opens (row 02). Before **every write on the Note window** (Assign to agent, Assign to pool, Link to Project, Solved) the agent unticks it and reads it back unticked, **after** `before_write` (whose assignee check can reopen the window, ticking the box again) and right before the committing click. The detailed log records each read-back.
 - **Assign to agent** (step 2): user list = `agent_user_name` (it's pre-selected even when the Note is in the pool), pool list reads `--Select Pool--`, Assign. Read back: "Assignee:" reads the agent, and a new log line "User Assigned: … to <agent>".
-- **Assign to pool** (every skip and decide-only): user list = `--Select User--`, pool list = `pool_name`, **one** Assign (row 15b: this works from a freshly opened window where the user list pre-selects the agent). Read back: "Assignee:" reads `pool_name`, a new log line "… From <agent> to <pool>", Status Pending. Never Unassign or Unlink.
+- **Assign to pool** (every skip and decide-only): user list = `--Select User--`, pool list = `pool_name`, **one** Assign (row 15b: this works from a freshly opened window where the user list pre-selects the agent). Read back: "Assignee:" reads `pool_name`, a new log line "… From <agent> to <pool>" or, as the test site also writes it, "… Unassigned from <agent> to" with an empty target (decisions, 26 Nov 2026, pool return log line), Status Pending. Never Unassign or Unlink.
 - After an Assign both lists reset and Assign is disabled (row 04). That's expected, not an unexpected screen.
 - **Already linked** (step 2a): after Assign to agent, the window must show **Link to Project**. A project button or **Change Project** → `NOTE_ALREADY_LINKED`, back to the pool.
 - **Email body** (task Note, S3): the Note's body text as the Note window shows it (row 02), e.g. "Please find attached Purchase Order / Quotation file 2600001B_048_1.pdf". The title is not part of it. It comes from exactly one source whose text ends with the file name: a `<pre>` (test site) or the document body of an `iframe` in the window (live email Notes; its two lines keep their line break), else `UNEXPECTED_SCREEN`; an iframe still empty is waited for up to 15 s (decisions, 10 Nov 2026, Note body iframe).

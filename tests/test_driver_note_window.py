@@ -266,6 +266,76 @@ def test_return_note_with_no_new_log_line_stops(page, guard, log):
         driver.return_note(guard, window, AGENT, POOL, log, NOTE_ID)
 
 
+# The test site's pool return as it logs it at Checkpoint S-C (26 Nov 2026):
+# "User Assigned: (By <agent>)" then "Unassigned from <agent> to" and an
+# empty <strong>, not "From <agent> to <pool>". The fake's new log line,
+# rewritten to that shape; `from_whom` replaces `was` (the old assignee).
+FROM_TO = " From <strong>' + was + '</strong> to <strong>' + who + '</strong>"
+
+
+def blank_target_page(*, assignee: str = AGENT, from_whom: str = "was") -> str:
+    blank = (
+        f" Unassigned from <strong>' + {from_whom} + '</strong> to <strong></strong>"
+    )
+    page = note_page(assignee=assignee)
+    assert FROM_TO in page
+    return page.replace(FROM_TO, blank)
+
+
+def test_return_note_reads_back_the_pool_line_with_a_blank_target(
+    page, guard, log, tmp_path
+):
+    window = window_of(page, blank_target_page())
+
+    driver.return_note(guard, window, AGENT, POOL, log, NOTE_ID)
+
+    assert driver.read_assignee(window) == POOL
+    assert body_data(page, "assigns") == "1"
+    log_line = [e["ok"] for e in events(tmp_path) if e.get("field") == "log_line"]
+    assert log_line == [True]
+
+
+def test_return_note_blank_target_line_from_someone_else_stops(page, guard, log):
+    window = window_of(page, blank_target_page(from_whom="'Fake Person'"))
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.return_note(guard, window, AGENT, POOL, log, NOTE_ID)
+    assert caught.value.field == "log_line"
+
+
+def test_take_note_blank_target_line_stops(page, guard, log):
+    # The take names the agent as the new assignee: a blank one is not it.
+    window = window_of(page, blank_target_page(assignee=POOL))
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.take_note(guard, window, AGENT, log, NOTE_ID)
+    assert caught.value.field == "log_line"
+
+
+def test_return_to_a_user_blank_target_line_stops(page, guard, log):
+    # Summit's return to a person (task 9.13) still needs that person named.
+    window = window_of(page, blank_target_page())
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.return_to_assignee(guard, window, AGENT, "Fake Person", log, NOTE_ID)
+    assert caught.value.field == "log_line"
+
+
+# A user Unlink (screen-map row 30, decisions S6) logs the same empty-target
+# line but leaves "Assignee:" at `---`: only the Assignee read-back tells it
+# from a pool return, so it must still stop the return.
+SETS_ASSIGNEE = "document.getElementById('assignee').textContent = who;"
+
+
+def test_return_note_that_ends_unassigned_stops_on_the_assignee(page, guard, log):
+    html = blank_target_page()
+    assert SETS_ASSIGNEE in html
+    unlinked = html.replace(
+        SETS_ASSIGNEE, "document.getElementById('assignee').textContent = '---';"
+    )
+    window = window_of(page, unlinked)
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.return_note(guard, window, AGENT, POOL, log, NOTE_ID)
+    assert caught.value.field == "assignee"
+
+
 # --- Reload between Notes (rows 25, 27) ------------------------------------------
 
 LOGIN_PAGE = """

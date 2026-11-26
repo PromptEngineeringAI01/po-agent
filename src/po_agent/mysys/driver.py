@@ -752,21 +752,30 @@ def log_line_count(window: Locator) -> int:
         raise UnexpectedScreen("Note log not readable") from None
 
 
-def _new_log_line(window: Locator, before: int, was: str, now: str) -> bool:
+def _new_log_line(
+    window: Locator, before: int, was: str, now: str, *, to_pool: bool = False
+) -> bool:
     """One more log line than `before`: the newest is "User Assigned" from
-    `was` (when known) to `now`."""
+    `was` (when known) to `now`. `to_pool` (a return to a pool: B1's, and
+    Summit's when its original assignee is a pool) also takes the other
+    form MySys writes for it, "Unassigned from <was> to" with an empty
+    target (decisions, 26 Nov 2026, pool return log line). A user Unlink
+    logs the same line, so only "Assignee:" reading the pool, read back
+    first, tells them apart."""
     lines = _log_lines(window)
     if lines.count() != before + 1:
         return False
     newest = lines.first
     said = " ".join(newest.locator("em").inner_text().split())
     names = [" ".join(s.split()) for s in newest.locator("strong").all_inner_texts()]
-    return (
-        "User Assigned:" in said
-        and len(names) == 2
-        and names[1] == now
-        and (not was or names[0] == was)
-    )
+    if "User Assigned:" not in said or len(names) != 2:
+        return False
+    if was and names[0] != was:
+        return False
+    if names[1] == now:
+        return True
+    blank = names[1] == "" and "Unassigned from" in newest.inner_text()
+    return to_pool and bool(was) and blank
 
 
 def is_unlinked(window: Locator, log: RunLog, note_id: str) -> bool:
@@ -885,9 +894,11 @@ def _assign(
     step: str,
     was: str,
     now: str,
+    *,
+    to_pool: bool = False,
 ) -> None:
     """Send Email checked right before the one Assign (Must never #4), then
-    "Assignee:" and the new log line read back."""
+    "Assignee:" and the new log line read back (`to_pool`: _new_log_line)."""
     check_send_email(window, log, note_id, step)
     before = log_line_count(window)
     assign = window.get_by_role("button", name="Assign", exact=True)
@@ -901,7 +912,7 @@ def _assign(
         note_id,
         step,
         "log_line",
-        lambda: _new_log_line(window, before, was, now),
+        lambda: _new_log_line(window, before, was, now, to_pool=to_pool),
     )
 
 
@@ -930,13 +941,14 @@ def return_note(
 ) -> None:
     """Row 15b: Send Email unticked, --Select User-- and the pool, one Assign,
     no key press; read back Assignee = pool, the new log line "From <agent>
-    to <pool>" and Status Pending. The lists reset and Assign is disabled
+    to <pool>" (or "Unassigned from <agent> to" with an empty target, the
+    other form MySys writes) and Status Pending. The lists reset and Assign is disabled
     afterwards, as expected."""
     step = "return"
     untick_send_email(guard, window)
     guard.act("select_note_user", window, _list(window, SELECT_USER), SELECT_USER)
     guard.act("select_note_pool", window, _list(window, SELECT_POOL), pool)
-    _assign(guard, window, log, note_id, step, was=agent, now=pool)
+    _assign(guard, window, log, note_id, step, was=agent, now=pool, to_pool=True)
     _read_back(
         window,
         log,
