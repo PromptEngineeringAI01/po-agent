@@ -756,10 +756,12 @@ def _new_log_line(
     window: Locator, before: int, was: str, now: str, *, to_pool: bool = False
 ) -> bool:
     """One more log line than `before`: the newest is "User Assigned" from
-    `was` (when known) to `now`. `to_pool` (B1's pool return) also takes
-    the line the test site writes for it since Checkpoint S-C, "Unassigned
-    from <was> to" with an empty target (decisions, 26 Nov 2026, pool
-    return log line): "Assignee:" already read back the pool."""
+    `was` (when known) to `now`. `to_pool` (a return to a pool: B1's, and
+    Summit's when its original assignee is a pool) also takes the other
+    form MySys writes for it, "Unassigned from <was> to" with an empty
+    target (decisions, 26 Nov 2026, pool return log line). A user Unlink
+    logs the same line, so only "Assignee:" reading the pool, read back
+    first, tells them apart."""
     lines = _log_lines(window)
     if lines.count() != before + 1:
         return False
@@ -939,8 +941,8 @@ def return_note(
 ) -> None:
     """Row 15b: Send Email unticked, --Select User-- and the pool, one Assign,
     no key press; read back Assignee = pool, the new log line "From <agent>
-    to <pool>" (or "Unassigned from <agent> to", as the test site writes it
-    since 26 Nov 2026) and Status Pending. The lists reset and Assign is disabled
+    to <pool>" (or "Unassigned from <agent> to" with an empty target, the
+    other form MySys writes) and Status Pending. The lists reset and Assign is disabled
     afterwards, as expected."""
     step = "return"
     untick_send_email(guard, window)
