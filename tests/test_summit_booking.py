@@ -522,7 +522,7 @@ def test_a_creator_not_exactly_one_option_is_write_not_started_with_nothing_sele
     with pytest.raises(WriteNotStarted) as stopped:
         run_book(served, guard, proceed_for(TABLE_COMPANY), folder)
 
-    assert stopped.value.reason == "CREATOR_UNKNOWN"
+    assert (stopped.value.reason, stopped.value.step) == ("CREATOR_UNKNOWN", "W1")
     # The form was opened, nothing was selected or filled, nothing submitted.
     assert actions(guard) == [*REOPEN, "open_create_new_task"]
     assert page.is_closed()
@@ -552,6 +552,7 @@ def test_a_previous_task_changed_since_the_peek_is_write_not_started_before_the_
         run_book(served, guard, proceed_for(PREVIOUS_COMPANY), folder)
 
     assert stopped.value.step == "W1"
+    assert stopped.value.detail == "project changed since the decision"
     assert actions(guard) == REOPEN  # Create New Task never opened
 
 
@@ -774,6 +775,7 @@ def test_a_creator_not_in_the_select_stops_and_returns_the_note(
     ((kind, alert),) = alerts_of(lines)
     assert kind == "UNEXPECTED_SCREEN"  # WriteNotStarted's ALERT
     assert "reason=CREATOR_UNKNOWN" in alert["detail"]
+    assert alert["step"] == "W1"  # the ops runbook keys on the step
     assert "Note not returned" not in alert["detail"]
     assert notes_of(lines) == []
     assert fake.notes[NOTE_ID].assignee == original

@@ -320,8 +320,8 @@ def fake_mysys(monkeypatch, folder, note) -> FakeMySys:
 
 
 def book_run(monkeypatch, folder, tmp_path) -> int:
-    """Summit's run that books, from the run loop (cli.py refuses it until
-    9.14), at 07:59 Perth."""
+    """Summit's run that books, from the run loop (the command is
+    tests/test_summit_booking.py's), at 07:59 Perth."""
     monkeypatch.setattr(controls, "now", lambda: AT_0759_PERTH)
     config = load_config("live", folder)
     profile = load_client("summit", "live", folder)

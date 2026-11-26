@@ -396,10 +396,15 @@ class FakeMySys:
         self._step("fill")  # Compaction Test ticked and filled (screen-map row 09)
         self.creators.append(("fill", creator))
         self.document_names.append(("fill", filed_as))
-        if self.creator_options is not None and creator not in self.creator_options:
-            # The option is read before anything is selected (decisions,
-            # 26 Nov 2026, Summit booking).
-            raise WriteNotStarted("creator not an option", reason="CREATOR_UNKNOWN")
+        # The option is read before anything is selected: exactly one
+        # option equal to the creator once both are stripped (decisions,
+        # 26 Nov 2026, Summit booking).
+        options = self.creator_options
+        wanted = creator.strip()
+        if options is not None and [o.strip() for o in options].count(wanted) != 1:
+            raise WriteNotStarted(
+                "creator not an option", reason="CREATOR_UNKNOWN", step="W1"
+            )
 
     def submit_task(self, guard, form):
         self._step("submit")  # the write (screen-map row 08)
