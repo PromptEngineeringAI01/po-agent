@@ -31,6 +31,8 @@ BASH = shutil.which("bash")
 RUN_ID = "20261105T000700Z-3fa2"
 TAG_SHA = "0123456789abcdef0123456789abcdef01234567"
 REAL_CONFIG = (ROOT / "config" / "test.toml").read_text()
+SUMMIT_CONFIG = (ROOT / "config" / "clients" / "summit.toml").read_text()
+SUMMIT_PLIST = ROOT / "scripts" / "au.com.prompteng.po-agent.summit.plist"
 
 
 def live_config() -> str:
@@ -72,7 +74,13 @@ case "$1" in
     echo "$STUB_TAG_SHA" ;;
   show)
     [ "${STUB_SHOW_EXIT:-0}" = 0 ] || exit "$STUB_SHOW_EXIT"
-    if [ -n "${STUB_MAIN_CONFIG+set}" ]; then
+    if [ "$2" = origin/main:config/clients/summit.toml ]; then
+      if [ -n "${STUB_CLIENT_CONFIG+set}" ]; then
+        printf '%s\\n' "$STUB_CLIENT_CONFIG"
+      else
+        cat "$STUB_DIR/client.toml"
+      fi
+    elif [ -n "${STUB_MAIN_CONFIG+set}" ]; then
       printf '%s\\n' "$STUB_MAIN_CONFIG"
     else
       cat "$STUB_DIR/main.toml"
@@ -83,6 +91,7 @@ exit 0
 """
 STUB_UV = """#!/bin/bash
 echo "uv $*" >> "$STUB_DIR/calls"
+echo "uv $1 $2: ${PLAYWRIGHT_BROWSERS_PATH-unset}" >> "$STUB_DIR/uv.browsers"
 if [ "$1" = run ] && [ "$2" = po-agent ]; then
   exec bash "$STUB_DIR/agent.sh"
 fi
@@ -122,6 +131,11 @@ printf '%s\\0' "$@" >> "$STUB_DIR/security.args"
 if [ -n "${STUB_KEYCHAIN_URL:-}" ] && [ "$*" = \\
   "find-generic-password -s po-agent -a healthchecks_ping_url -w" ]; then
   printf '%s\\n' "$STUB_KEYCHAIN_URL"
+  exit 0
+fi
+if [ -n "${STUB_KEYCHAIN_URL_SUMMIT:-}" ] && [ "$*" = \\
+  "find-generic-password -s po-agent -a healthchecks_ping_url_summit -w" ]; then
+  printf '%s\\n' "$STUB_KEYCHAIN_URL_SUMMIT"
   exit 0
 fi
 echo "security: SecKeychainSearchCopyNext: The specified item could not be found." >&2
@@ -191,6 +205,8 @@ class Box:
             stub.write_text(body, newline="\n")
             stub.chmod(0o755)
         (self.stubs / "main.toml").write_text(REAL_CONFIG, newline="\n")
+        # config/clients/summit.toml on origin/main: the committed file.
+        (self.stubs / "client.toml").write_text(SUMMIT_CONFIG, newline="\n")
         # The checkout's own config (an old tag's) still says enabled = true.
         (self.repo / "config").mkdir()
         (self.repo / "config" / "test.toml").write_text(REAL_CONFIG, newline="\n")
@@ -198,6 +214,8 @@ class Box:
         self.home.mkdir()
         environ = dict(os.environ)
         environ.pop("PO_AGENT_HEALTHCHECKS_PING_URL", None)
+        environ.pop("PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT", None)
+        environ.pop("PLAYWRIGHT_BROWSERS_PATH", None)
         self.env = {
             **environ,
             "MACMINI_RUN_PATH_PREFIX": posix(self.stubs),
@@ -295,13 +313,13 @@ def test_modes_map_to_the_cli(box, mode, agent_call):
         ("run", "staging"),
         ("run", "LIVE"),
         ("run", ""),
-        ("run", "test", "extra"),
+        ("run", "test", "summit", "extra"),
         ("demo", "test"),
         ("demo", "live"),
+        ("demo", "live", "summit"),
         ("",),
         (),
         ("run", "--detailed-log"),
-        ("run", "test", "--detailed-log"),
     ),
 )
 def test_other_arguments_run_nothing(box, args):
@@ -311,6 +329,34 @@ def test_other_arguments_run_nothing(box, args):
 
     assert result.returncode == 2
     assert box.calls() == []
+
+
+# A third argument names the client (task 9.15): only `summit` is one. Any
+# other refuses and alerts (plan 9.15 acceptance), with nothing fetched or
+# run and no client's ping (it is no client's scheduled run).
+@pytest.mark.parametrize(
+    "args",
+    (
+        ("run", "live", "summit2"),
+        ("run", "live", "Summit"),
+        ("spike", "live", ""),
+        ("run", "test", "extra"),
+        ("run", "test", "--detailed-log"),
+    ),
+)
+def test_unknown_client_refuses_and_alerts(box, args):
+    box.agent([summary(0)], 0)
+
+    result = box.run(*args, PO_AGENT_HEALTHCHECKS_PING_URL=HC_URL)
+
+    assert result.returncode == 2
+    assert box.calls() == ["gh issue create"]
+    title, body = issue(box.gh_args())
+    assert title == "po-agent alert no run_id"
+    line = "wrapper: unknown client, agent not run"
+    assert body.splitlines() == [line, "exit code: 2"]
+    assert line in box.runs_log().splitlines()
+    assert hc_pings(box) == 0
 
 
 def test_alert_run_opens_an_issue_with_only_the_alert_lines(box):
@@ -743,6 +789,268 @@ def test_plist_schedules_55_weekday_runs():
     assert all(set(entry) == {"Weekday", "Hour", "Minute"} for entry in entries)
     assert {(e["Weekday"], e["Hour"], e["Minute"]) for e in entries} == set(
         itertools.product(range(1, 6), range(7, 18), (7,))
+    )
+    for key in ("StandardOutPath", "StandardErrorPath"):
+        assert plist[key].startswith("/Users/poagent/Library/Logs/po-agent/")
+    assert "RunAtLoad" not in plist
+    assert "KeepAlive" not in plist
+
+
+# Summit's run on the Mac Mini (task 9.15; SPEC.md -> Client 2, The separate
+# run): `macmini-run.sh <mode> live summit`, its own kill switch, alert title,
+# Healthchecks check and Playwright browsers; no GitHub heartbeat (plan
+# Phase S, open question 4: Healthchecks only).
+
+HC_URL_SUMMIT = "https://hc-ping.example/11111111-fake-uuid-summit-check"
+SUMMIT_BROWSERS = "/Library/Caches/ms-playwright-summit"
+
+
+def live_on() -> str:
+    return re.sub(r"(?m)^enabled = \w+", "enabled = true", live_config())
+
+
+def summit_on() -> str:
+    return re.sub(r"(?m)^enabled = \w+", "enabled = true", SUMMIT_CONFIG)
+
+
+SUMMIT_FETCH_CALLS = [
+    FETCH_CALLS[0],
+    "git show origin/main:config/live.toml",
+    "git show origin/main:config/clients/summit.toml",
+]
+SUMMIT_SETUP_CALLS = [*SUMMIT_FETCH_CALLS, *SETUP_CALLS[2:]]
+
+
+@pytest.mark.parametrize(
+    ("mode", "agent_call"),
+    (
+        ("run", "uv run po-agent run --site live --client summit"),
+        (
+            "decide-only",
+            "uv run po-agent run --decide-only --site live --client summit",
+        ),
+        ("spike", "uv run po-agent spike --site live --client summit"),
+    ),
+)
+def test_summit_client_reaches_the_agent(box, mode, agent_call):
+    box.agent([summary(0)], 0)
+
+    result = box.run(
+        mode,
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_on(),
+    )
+
+    assert result.returncode == 0
+    # No GitHub heartbeat: it keeps meaning "B1 ran".
+    assert box.calls() == [*SUMMIT_SETUP_CALLS, agent_call]
+    assert f"macmini-run.sh {mode} live summit ===" in box.runs_log().splitlines()[0]
+
+
+def test_committed_summit_switch_off_on_main_runs_nothing(box):
+    # config/clients/summit.toml is committed enabled = false until S.2.
+    box.agent([summary(0)], 0)
+
+    result = box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT=HC_URL_SUMMIT,
+    )
+
+    assert result.returncode == 0
+    assert box.calls() == SUMMIT_FETCH_CALLS
+    assert box.gh_args() is None
+    log = box.runs_log().splitlines()
+    assert "wrapper: enabled = false on main, agent not run" in log
+    assert hc_pings(box) == 1  # the run still ended: its own check hears it
+
+
+def test_summit_with_the_site_switched_off_on_main_runs_nothing(box):
+    box.agent([summary(0)], 0)
+    live_off = re.sub(r"(?m)^enabled = \w+", "enabled = false", live_config())
+
+    result = box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_off,
+        STUB_CLIENT_CONFIG=summit_on(),
+    )
+
+    assert result.returncode == 0
+    assert not any("po-agent" in call for call in box.calls())
+    assert box.gh_args() is None
+    log = box.runs_log().splitlines()
+    assert "wrapper: enabled = false on main, agent not run" in log
+
+
+@pytest.mark.parametrize(
+    "client_config",
+    (
+        'client = "summit"',
+        "enabled = maybe",
+        "enabled = true\nenabled = true",
+    ),
+)
+def test_summit_client_file_without_one_enabled_line_alerts(box, client_config):
+    box.agent([summary(0)], 0)
+
+    result = box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=client_config,
+    )
+
+    assert result.returncode == 2
+    assert not any("po-agent" in call for call in box.calls())
+    title, body = issue(box.gh_args())
+    assert title == "po-agent alert summit no run_id"
+    line = "wrapper: setup failed (enabled on main), agent not run"
+    assert body.splitlines() == [line, "exit code: 2"]
+
+
+def test_summit_alert_issue_is_titled_summit(box):
+    box.agent([INFO, ALERT_1, summary(1)], 1)
+
+    result = box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_on(),
+    )
+
+    assert result.returncode == 1
+    title, body = issue(box.gh_args())
+    assert title == f"po-agent alert summit {RUN_ID}"
+    assert body.splitlines() == [
+        'ALERT UNEXPECTED_SCREEN {"step": null, "detail": "Note window did not open"}',
+        "exit code: 1",
+    ]
+
+
+def test_b1_live_run_never_reads_summit_or_its_browsers(box):
+    box.agent([summary(0)], 0)
+
+    result = box.run("run", "live", STUB_MAIN_CONFIG=live_on())
+
+    assert result.returncode == 0
+    assert box.calls() == [
+        FETCH_CALLS[0],
+        "git show origin/main:config/live.toml",
+        *SETUP_CALLS[2:],
+        "uv run po-agent run --site live",
+        *PING_CALLS,
+    ]
+    browsers = (box.stubs / "uv.browsers").read_text().splitlines()
+    assert browsers and all(line.endswith(": unset") for line in browsers)
+
+
+@pytest.mark.parametrize(
+    ("client", "sent"),
+    ((None, HC_URL), ("summit", HC_URL_SUMMIT)),
+)
+@pytest.mark.parametrize("exit_code", (0, 1))
+def test_one_healthchecks_ping_per_run_to_its_own_client(box, client, sent, exit_code):
+    box.agent([summary(exit_code)], exit_code)
+    args = ("run", "live") if client is None else ("run", "live", client)
+
+    result = box.run(
+        *args,
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_on(),
+        PO_AGENT_HEALTHCHECKS_PING_URL=HC_URL,
+        PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT=HC_URL_SUMMIT,
+    )
+
+    assert result.returncode == exit_code
+    assert hc_pings(box) == 1
+    assert hc_url_sent(box) == sent
+
+
+def test_summit_ping_url_comes_from_its_own_keychain_item(box):
+    box.agent([summary(0)], 0)
+
+    result = box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_on(),
+        STUB_KEYCHAIN_URL=HC_URL,
+        STUB_KEYCHAIN_URL_SUMMIT=HC_URL_SUMMIT,
+    )
+
+    assert result.returncode == 0
+    assert hc_pings(box) == 1
+    assert hc_url_sent(box) == HC_URL_SUMMIT
+
+
+@pytest.mark.parametrize(
+    "b1_url",
+    ({"PO_AGENT_HEALTHCHECKS_PING_URL": HC_URL}, {"STUB_KEYCHAIN_URL": HC_URL}),
+)
+def test_summit_without_its_url_never_pings_b1s_check(box, b1_url):
+    box.agent([summary(0)], 0)
+
+    result = box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_on(),
+        **b1_url,
+    )
+
+    assert result.returncode == 0
+    assert hc_pings(box) == 0
+    assert "wrapper: healthchecks ping not configured" in box.runs_log().splitlines()
+
+
+def test_summit_uses_and_kills_only_its_own_playwright_browsers(box):
+    box.agent([INFO, summary(0)], 0)
+
+    box.run(
+        "run",
+        "live",
+        "summit",
+        STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_on(),
+    )
+
+    browsers = (box.stubs / "uv.browsers").read_text().splitlines()
+    home = posix(box.home)
+    assert f"uv run playwright: {home}{SUMMIT_BROWSERS}" in browsers
+    assert f"uv run po-agent: {home}{SUMMIT_BROWSERS}" in browsers
+    args = (box.stubs / "pkill.calls").read_text().splitlines()[-1].split()
+    assert args[:2] == ["pkill", "-KILL"]
+    # Not B1's ms-playwright/: a B1 run may be going on now.
+    assert args[args.index("-f") + 1] == "ms-playwright-summit/"
+
+
+def test_summit_plist_runs_at_half_past_on_weekdays():
+    # Joey, 24 Nov 2026: 07:30-17:30 Monday-Friday Perth; B1 stays at :07.
+    with SUMMIT_PLIST.open("rb") as file:
+        plist = plistlib.load(file)
+
+    assert plist["Label"] == "au.com.prompteng.po-agent.summit"
+    assert plist["ProgramArguments"] == [
+        "/Users/poagent/po-agent/scripts/macmini-run.sh",
+        "run",
+        "live",
+        "summit",
+    ]
+    entries = plist["StartCalendarInterval"]
+    assert len(entries) == 55
+    assert all(set(entry) == {"Weekday", "Hour", "Minute"} for entry in entries)
+    assert {(e["Weekday"], e["Hour"], e["Minute"]) for e in entries} == set(
+        itertools.product(range(1, 6), range(7, 18), (30,))
     )
     for key in ("StandardOutPath", "StandardErrorPath"):
         assert plist[key].startswith("/Users/poagent/Library/Logs/po-agent/")
