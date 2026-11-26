@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.74 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.75 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -578,6 +578,8 @@ Company names, creators and aliases may be committed; they are in `config/client
 
 Summit North West is an old name that won't appear again (Joey, 25 Nov 2026): no row, so a project under it is not a match (`PROJECT_NOT_FOUND`).
 
+The previous-task rule stands (Joey, 26 Nov 2026): the creator is the Task Creator of the highest-numbered task that is not a Compaction Test and not Cancelled, not the Project Creator, although in 3 real Summit Projects bookings seen in S.0 staff picked the Project Creator.
+
 Names are compared trimmed and case-insensitive, whole name only. A name not in the table (including a company the paper list strikes out) is `COMPANY_UNKNOWN`: a missing alias costs coverage, never a wrong write.
 
 **Previous task** (Joey, 23 Nov 2026: such a project always has an earlier task that isn't a compaction task): from the settled Tasks table, the task with the **highest task number** whose name is not `Compaction Test` and whose Status is not Cancelled; its details row's **Task Creator** is the creator. No such task, or a Task Creator empty or `---` → `CREATOR_UNKNOWN`.
@@ -590,14 +592,14 @@ On PROCEED in `run`:
 - **Take:** `before_write` (kill switch), find the Note again; its "Assignee:" must still read the original assignee, else `"outcome": "untouched", "reason": "NOTE_TAKEN"`. Untick Send Email and read it back (the shared control; unchanged by Joey's "doesn't matter": CLAUDE.md Must never #4), user list = `Agent 2 (Summit Homes)`, pool list `--Select Pool--`, **Assign**, read back as B1 (Assignee reads the agent, a new "User Assigned" log line). The window must still show Link to Project.
 - **W1-W5 as B1** ([MySys screen rules](#mysys-screen-rules)), with these values: Creator = the decided creator (if the option is not in the Creator select: close the browser context, `WRITE_NOT_STARTED`, reason `CREATOR_UNKNOWN`, Note returned); PO Number = the full PO; Documents = the PDF; Note = the email body; Hold note `ON HOLD UNTIL CALL UP`; Link to the pln; Solved. W1's recheck of the project also requires, for a previous-task row, the same previous task and Task Creator as decided, else `WRITE_NOT_STARTED`. Read-backs as B1, with Lodged By and "Solved by" = Agent 2, and Task Creator = the decided creator.
 - **Email body:** the Note window's email body is one `iframe` (an HTML table, a line of text and a Disclaimer; Joey copies all of it). Rule: exactly one `iframe` in the Note window whose body text is not empty, still empty after 15 s or more than one → `UNEXPECTED_SCREEN`. Its text, line breaks kept, is the task Note; read back whitespace-collapsed as B1. B1 keeps its "ends with the file name" rule. As built (task 9.12): read once the window holds an iframe and every iframe has its text, or after 15 s; a `<pre>` is never Summit's body; table cells read tab-separated.
-- **Documents file name:** the Documents row's name is compared to the PDF's file name after MySys's own renaming, if it has one (open question S4: one screenshot showed `-` uploaded as `_`). Until that is pinned, a mismatch stops before Submit as `WRITE_NOT_STARTED`, which is safe.
+- **Documents file name:** the Documents row's name is compared to the PDF's file name after MySys's own renaming: MySys files a `-` in the name as `_` (open question S4, answered in S.0, 26 Nov 2026, on staff uploads of Summit POs). Any other mismatch stops before Submit as `WRITE_NOT_STARTED`, which is safe.
 
 ### Return to the original assignee
 
 A Note is returned only when it was taken and then stopped **before Submit** (kill switch before W1/W2, `WRITE_NOT_STARTED`, a W1 recheck change). With the peek, every business skip happens before the take, so a return is rare. One **Assign**, never Unassign or Unlink (Joey, 23 Nov 2026):
 - Original assignee a **user** (an option of the Note window's user list): user list = that user, pool list `--Select Pool--`.
 - Original assignee a **pool** (an option of the pool list): B1's return (user list `--Select User--`, pool list = that pool).
-- Original assignee **`---`**: back to `---` (Joey, 24 Nov 2026: "assign to the original assignee so it can be anyone or ---"; replaces 23 Nov's Gita Valani): user list `--Select User--`, pool list `--Select Pool--`, Assign, and "Assignee:" must read `---`. Whether MySys accepts that Assign is open question S6, checked by hand in S.0; until it is confirmed, this case stays with Agent 2 with the ALERT below.
+- Original assignee **`---`**: for phase 1 the Note stays with Agent 2 with `ALERT UNEXPECTED_SCREEN` (fixed detail "Note not returned"), exit 1, and a person unlinks it by hand (Joey, 26 Nov 2026: "好，先留給 Agent 2"); the stale-Note stop holds later Summit runs until it is moved, as below. Assign with `--Select User--` and `--Select Pool--` changes nothing in MySys (open question S6, S.0). The agent never presses Unlink (Must never #2 unchanged). A guard PR letting the agent press the Assignee block's `unlinkUser` may follow after go-live (owner Joey); before it, check whether an Unlink sends email (Joey can look in Agent 2's mailbox at his test press).
 - The name in both lists or neither: the Note stays with Agent 2, `ALERT UNEXPECTED_SCREEN` (fixed detail "Note not returned"), exit 1; the stale-Note stop holds later Summit runs until Joey moves it by hand.
 - Read back: "Assignee:" reads the target and a new "User Assigned" (or pool) log line. Every return unticks Send Email first, through the shared control.
 
@@ -643,7 +645,7 @@ locked_filter = "Unlocked"
 any_assignee_before = "08:00"     # Perth; a run starting earlier takes any non-agent assignee, later runs only `---`
 max_notes_per_run = 1               # bookings per run; raised by its own PR for hourly runs
 max_peeks_per_run = 10              # Notes opened per run; set from the spike and decide-only (S3)
-project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
+project_document_type = "Client Documents"         # W2 Type (S4, confirmed in S.0)
 
 [[company]]
 name = "Summit Easystart"
@@ -682,6 +684,8 @@ creator_rule = "previous_task"
 | Note Pool count at Source + Unlocked + Pending | the footer | the spike (`MORE_PAGES`) |
 | Opening a Note and downloading its PDF changes nothing | the Note's log after decide-only | S.3 |
 
+S.0 (25-26 Nov 2026) saw the first four rows by hand: `docs/screen-map.md` 1.7, Live: Summit S.0.
+
 **Live steps (Joey, Mac Mini, in the G.5-G.7 order; each with its own dated `docs/decisions.md` entry first):**
 
 | Step | What | Passes when |
@@ -707,10 +711,10 @@ A miss at any step stops the order until it is understood, as for B1.
 
 - **S1** Closed (24 Nov 2026): Joey saved 11 real Summit POs at the top of `private/summit/`; the readers task moves them into `private/summit/pdfs/`.
 - **S2** Closed (Joey, 24 Nov 2026): Summit Project covers Summit Developments; MySys spells the company Summit Projects, the same row (Joey, 25 Nov 2026).
-- **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings.
-- **S4** Documents: does MySys rename `-` to `_` in an uploaded name; is the Type Client Documents; is Sale Office "Prompt Engineering Pty Ltd" on Summit projects.
-- **S5** Locked/Unlocked after the take (open question 12 for Summit): does a taken Note move to Locked, and does Agent 2's My Notes list it.
-- **S6** Returning a Note to `---`: does Assign with `--Select User--` and `--Select Pool--` leave "Assignee:" reading `---` (no Unassign, Must never #2)? Joey tries it by hand in S.0 on a Note he is handling anyway. If MySys refuses, Joey picks the fallback target then.
+- **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings. S.0 (25 Nov 2026, mid-afternoon, not shown to be a busy time): 10 items, one page.
+- **S4** Closed (S.0, 26 Nov 2026): MySys files a `-` in an uploaded name as `_` (seen on staff uploads, not yet on the agent's); the Type is Client Documents; Sale Office defaults to "Prompt Engineering Pty Ltd" on Summit projects.
+- **S5** Closed (S.0, 26 Nov 2026, on the test site): a Note assigned to Agent 2 is listed under Locked, not under Unlocked, and Agent 2's My Notes lists it.
+- **S6** Closed (S.0, 26 Nov 2026): Assign with `--Select User--` and `--Select Pool--` changes nothing, even after a reload. By hand, the Assignee block's Unlink (`click: unlinkUser` while the Note is on a user) leaves "Assignee:" reading `---` (test site). Joey (26 Nov 2026): for phase 1 a `---` Note stays with Agent 2 with the ALERT, exit 1, and a person unlinks it; the agent never presses Unlink (Return to the original assignee). A guard PR for `unlinkUser` may follow after go-live (Joey); before it, check whether an Unlink sends email (Joey can look in Agent 2's mailbox at his test press).
 
 ## Open Questions
 

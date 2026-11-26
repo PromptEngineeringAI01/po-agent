@@ -147,6 +147,8 @@ When the agent account's password has changed (or was reset). The live account's
 5. Check `runs.log`: `INFO  logged in` and `"exit_code": 0` in the last `RUN_SUMMARY`.
 6. Lock the screen (Control-Command-Q).
 
+**Summit's Agent 2 (Summit Homes):** the MySys admin says its password has no expiry date and its login has no MFA (S.0, 26 Nov 2026), so it changes only when someone changes it. Its Keychain items and steps come with task 9.15.
+
 The username works the same way with `mysys_live_username`. For the test site, use the `mysys_test_` names and `spike test`.
 
 ### 3.8 Who is told
