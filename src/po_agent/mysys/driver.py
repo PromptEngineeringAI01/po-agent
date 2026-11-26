@@ -1272,9 +1272,10 @@ def reopen_project(
     """W1's reopen (the assignee check reloaded, so step 10's window is
     gone): the same reads as step 10, and the project must still be the
     one decided: the client's `rule` matches the Proceed's pln, its judge of
-    the opened project (Client Internal No. for B1) passes and the settled
-    Compaction Test tasks are the Proceed's (none created meanwhile). Any
-    mismatch -> WriteNotStarted."""
+    the opened project (Client Internal No. for B1) passes, the settled
+    Compaction Test tasks are the Proceed's (none created meanwhile) and
+    the rule's recheck passes (Summit: a previous-task row's task and Task
+    Creator unchanged, task 9.14). Any mismatch -> WriteNotStarted."""
     lookup, window = _lookup_and_window(
         guard,
         page,
@@ -1293,6 +1294,8 @@ def reopen_project(
     # Cancellation meanwhile) would make this booking a duplicate.
     if task_table.live_tasks({t.task_no: t.status for t in lookup.tasks}):
         raise WriteNotStarted("project tasks changed since step 10", step="W1")
+    if not rule.recheck(lookup, proceed):
+        raise WriteNotStarted("project changed since the decision", step="W1")
     return window
 
 

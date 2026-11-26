@@ -22,6 +22,7 @@ from po_agent.core.models import (
     COMPACTION_TEST,
     MySysLookup,
     NoteSnapshot,
+    Proceed,
     ProjectTask,
     SearchRow,
     Skip,
@@ -99,6 +100,22 @@ class SummitProjectRule:
         if fold(lookup.project_internal_no) != fold(internal_no):
             return _skip(SkipReason.UNEXPECTED_SCREEN)
         return pln
+
+    def recheck(self, lookup: MySysLookup, proceed: Proceed) -> bool:
+        """W1's reopen (task 9.14; SPEC: The take and the booking): for a
+        previous-task row, the same rule on the Tasks table read now must
+        give the same task number and Task Creator as at the peek. A fixed
+        creator's row takes nothing more from the project."""
+        if not isinstance(proceed, SummitProceed):
+            return False
+        if proceed.previous_task_no is None:
+            return True
+        found = previous_task(lookup.project_tasks)
+        return (
+            not isinstance(found, Skip)
+            and found.task_no == proceed.previous_task_no
+            and found.task_creator.strip() == proceed.previous_task_creator
+        )
 
 
 def previous_task(tasks: Sequence[ProjectTask]) -> Skip | ProjectTask:

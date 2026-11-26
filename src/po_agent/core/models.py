@@ -170,6 +170,13 @@ class Proceed(Frozen):
     existing_task_nos: tuple[Annotated[str, Field(pattern=r"^tsk_[0-9]+$")], ...]
     creator: str = Field(min_length=1)
 
+    @property
+    def document_names(self) -> tuple[str, ...]:
+        """The names the Documents block (W1) and the Documents tab's File
+        (W2) may show the uploaded PDF as: its own name only. A client
+        whose uploads MySys renames widens it (`SummitProceed`)."""
+        return (self.pdf_file_name,)
+
 
 class NotePoolFilters(Frozen):
     """The Note Pool filters a client's run sets, each read back; every
@@ -205,4 +212,10 @@ class ProjectRule(Protocol):
 
     def judge(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
         """The opened project still passes: its pln, else a Skip."""
+        ...
+
+    def recheck(self, lookup: MySysLookup, proceed: Proceed) -> bool:
+        """W1's reopen: the opened project still gives what the decision
+        took from it beyond its pln and Compaction Test tasks (Summit: a
+        previous-task row's task and Task Creator; B1: nothing more)."""
         ...

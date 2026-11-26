@@ -3,7 +3,7 @@ What is shared with B1, and what is Summit's).
 
 `core/run.py` asks the run's client for every value that differs between
 clients and imports no client package: `b1/client.py` implements it for
-B1, `summit/client.py` as a stub that refuses until tasks 9.9-9.14 fill it.
+B1, `summit/client.py` for Summit (filled by tasks 9.9-9.14).
 The CLI picks the client (`--client`, task 9.3). One member per difference
 SPEC lists, nothing for a client not yet known (ADR-003's rule of three):
 

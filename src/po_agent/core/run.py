@@ -46,8 +46,8 @@ B1's take does, and the window must still show Link to Project; then the
 booker. A Note taken and stopped before Submit goes back, by the same stop
 path as B1's, to its original assignee (`driver.return_to_assignee`); a
 name in both of the Note window's lists or neither (`---` among them:
-decisions, 26 Nov 2026) stays with the agent, ALERT "Note not returned".
-`cli.py` refuses Summit's run until its booking lands (9.14).
+decisions, 26 Nov 2026) stays with the agent, ALERT "Note not returned",
+which carries the stop's reason (CREATOR_UNKNOWN at W1, task 9.14).
 
 Hold re-check (decisions, 11 Nov 2026, hold re-check): right after login,
 before the stale-Note read and before any Note, both modes re-read the
@@ -493,8 +493,11 @@ def _note_loop(
                 note_id=progress.note_id,
             ) from error
         if not returned:  # to its original assignee: a user, a pool or ---
+            # The stop's reason (CREATOR_UNKNOWN at W1) tells why it stays.
             raise UnexpectedScreen(
-                "run stopped; Note not returned", note_id=progress.note_id
+                "run stopped; Note not returned",
+                note_id=progress.note_id,
+                reason=error.reason if isinstance(error, PoAgentError) else None,
             ) from error
         if progress.note_id is None:
             raise
