@@ -64,6 +64,9 @@ class FakeNote:
     # (decisions, 2 Nov 2026, decide-only: how each Note is opened).
     person_takes_at: str | None = None
     kill_at: str | None = None  # a call during which `enabled` is set false
+    # A call during which a person links the Note to a project: Link to
+    # Project no longer shows (screen-map rows 02, 13).
+    link_at: str | None = None
     taken: int = 0
 
 
@@ -90,6 +93,13 @@ class FakeMySys:
     my_notes_pages: int = 1
     pool_pages: int = 1  # pages of the run's filtered Note Pool read
     config_dir: Path | None = None  # the run's config, for `kill_at`
+    # The file `kill_at` turns `enabled` off in, under `config_dir`: the
+    # site's, or a client's own (Summit: clients/summit.toml).
+    kill_file: str = "test.toml"
+    # The Note window's user and pool lists, placeholders left out, for
+    # Summit's return to the original assignee (screen-map row 26).
+    note_users: tuple[str, ...] = ()
+    note_pools: tuple[str, ...] = ()
     task_no: str = "tsk_200002"  # the task the fake Submit creates
     current: str | None = None  # the Note last named in a call
     calls: list[str] = field(default_factory=list)
@@ -128,8 +138,10 @@ class FakeMySys:
         named = (name, f"{name}#{self.counts[note_id, name]}")
         if note and note.person_takes_at in named:
             note.assignee = PERSON
+        if note and note.link_at in named:
+            note.linked = True
         if note and note.kill_at in named:
-            toml = self.config_dir / "test.toml"
+            toml = self.config_dir / self.kill_file
             text = toml.read_text("utf-8")
             assert "enabled = true" in text
             toml.write_text(text.replace("enabled = true", "enabled = false"), "utf-8")
@@ -325,6 +337,26 @@ class FakeMySys:
             raise UnexpectedScreen("fake return failure", note_id=note_id)
         note.assignee = pool
 
+    def return_to_assignee(self, guard, window, agent, assignee, log, note_id):
+        # Summit's return (SPEC.md -> Return to the original assignee): one
+        # Assign to the name as the window's lists show it; a name in both
+        # lists or neither is not returned (decisions, 26 Nov 2026).
+        _, note = self._note(window)
+        self._call("return", note_id)
+        name = assignee.strip()
+        if (name in self.note_users) == (name in self.note_pools):
+            raise UnexpectedScreen("Note not returned", note_id=note_id)
+        self._acted(
+            guard,
+            "untick_send_email_notification",
+            "select_note_user",
+            "select_note_pool",
+            "assign_note",
+        )
+        if self.fail_return:
+            raise UnexpectedScreen("fake return failure", note_id=note_id)
+        note.assignee = name
+
     # --- the booker's MySys steps (4.5), named after the Note in hand ------------
 
     def _step(self, name: str) -> None:
@@ -470,6 +502,8 @@ DRIVER_NAMES = (
     "project_lookup",
     "return_note",
 )
+# Summit's return to the original assignee (task 9.13).
+SUMMIT_DRIVER_NAMES = ("return_to_assignee",)
 # The booker's MySys steps (4.5).
 BOOKER_DRIVER_NAMES = (
     "search_note",
@@ -623,13 +657,20 @@ def summit_titled(po: str = SUMMIT_PO, company: str = SUMMIT_COMPANY) -> str:
 
 
 def install(
-    monkeypatch: pytest.MonkeyPatch, fake: FakeMySys, *, booker: bool = True
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakeMySys,
+    *,
+    booker: bool = True,
+    summit: bool = False,
 ) -> FakeMySys:
     """Patches the driver's MySys steps (`DRIVER_NAMES`) and, with `booker`,
-    the booker's (`BOOKER_DRIVER_NAMES`, `BOOKING_NAMES`) with `fake`'s.
-    Every name must exist in its module, so a renamed driver function fails
-    here instead of staying silently unpatched."""
+    the booker's (`BOOKER_DRIVER_NAMES`, `BOOKING_NAMES`) with `fake`'s;
+    with `summit`, Summit's return too (`SUMMIT_DRIVER_NAMES`). Every name
+    must exist in its module, so a renamed driver function fails here
+    instead of staying silently unpatched."""
     names = DRIVER_NAMES + BOOKER_DRIVER_NAMES if booker else DRIVER_NAMES
+    if summit:
+        names += SUMMIT_DRIVER_NAMES
     for name in names:
         monkeypatch.setattr(run.driver, name, getattr(fake, name))
     if booker:

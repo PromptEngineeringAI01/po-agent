@@ -79,5 +79,5 @@ class B1Client:
     def document_type(self) -> str:
         return self.config.project_document_type
 
-    def return_target(self) -> str:
-        return self.config.pool_name
+    def return_target(self, original: str) -> str:
+        return self.config.pool_name  # the pool, whoever had it before
