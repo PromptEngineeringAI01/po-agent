@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 
 import keyring
 import pytest
+from fakes.config import switched
 from fakes.mysys import (
     SUMMIT_AGENT,
     SUMMIT_BODY,
@@ -120,8 +121,9 @@ def client_file(tmp_path, *changes: tuple[str, str]) -> None:
     if path.exists():
         text = path.read_text("utf-8")
     else:
-        text = (CONFIG_DIR / "clients" / "summit.toml").read_text("utf-8")
-        changes = (("enabled = false", "enabled = true"), *changes)
+        text = switched(
+            (CONFIG_DIR / "clients" / "summit.toml").read_text("utf-8"), True
+        )
     for old, new in changes:
         assert text.count(old) == 1
         text = text.replace(old, new)

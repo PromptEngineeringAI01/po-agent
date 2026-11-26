@@ -16,9 +16,10 @@ separate run; docs/decisions.md, 23 Nov 2026, separate run).
 - RUN_SUMMARY names the client, B1's too; `run_id` stays its first key (the
   Mac Mini wrapper reads it from there).
 
-Summit's run books since 9.14; the committed client file's kill switch
-(`enabled = false`) stops it before any secret, login or browser here, and
-nothing here reads a real secret or contacts MySys. Values are fake;
+Summit's run books since 9.14 and its committed client file is `enabled =
+true` since S.2, so every test here that runs Summit's command line sets
+Summit's switch in its own config folder: off stops it before any secret,
+login or browser. Nothing here reads a real secret or contacts MySys. Values are fake;
 expected values are written out from SPEC.md and the plan.
 """
 
@@ -150,14 +151,15 @@ def test_two_summit_runs_on_one_site_block_each_other(env, started, capsys, tmp_
 
 
 def test_a_b1_run_does_not_block_a_summit_run(env, started, capsys, tmp_path):
+    env.setattr(cli, "CONFIG_DIR", config_dir(tmp_path, site_on=True, summit_on=False))
     b1 = hold(tmp_path, "run-live.lock")
     try:
         code, lines = run_cli(capsys, SUMMIT_RUN)
     finally:
         b1.release()
 
-    # Past the lock: the run meets the committed client file's kill switch
-    # (`enabled = false`; Summit's refusal before 9.14).
+    # Past the lock: the run meets Summit's own kill switch, off here, and
+    # stops before any secret, login or browser.
     assert LOCK_HELD not in lines
     assert code == 0
     assert KILL_SWITCH in lines
@@ -375,7 +377,8 @@ def test_a_b1_run_s_summary_names_b1_and_starts_with_run_id(
     assert summary_of(lines)["client"] == "b1"
 
 
-def test_a_summit_run_s_summary_names_summit(env, started, capsys):
+def test_a_summit_run_s_summary_names_summit(env, started, capsys, tmp_path):
+    env.setattr(cli, "CONFIG_DIR", config_dir(tmp_path, site_on=True, summit_on=False))
     _, lines = run_cli(capsys, SUMMIT_RUN)
 
     assert lines[-1].startswith('RUN_SUMMARY {"run_id": ')
@@ -452,9 +455,10 @@ def test_an_unknown_client_s_before_write_fails_closed(tmp_path):
     assert checked == []
 
 
-def test_a_stopped_summit_run_releases_its_lock(env, started, capsys):
-    # Review Nit 3: a stop after the lock releases it (the kill switch since
-    # 9.14 lifted Summit's refusal).
+def test_a_stopped_summit_run_releases_its_lock(env, started, capsys, tmp_path):
+    # Review Nit 3: a stop after the lock releases it (here the kill switch,
+    # Summit's set off in the test's own config folder).
+    env.setattr(cli, "CONFIG_DIR", config_dir(tmp_path, site_on=True, summit_on=False))
     for _ in range(2):
         code, lines = run_cli(capsys, SUMMIT_RUN)
 

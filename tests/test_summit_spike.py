@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 import keyring
 import pytest
+from fakes.config import switched
 from fakes.mysys import (
     SUMMIT_AGENT,
     SUMMIT_MAILBOX,
@@ -70,9 +71,8 @@ def env(monkeypatch, tmp_path):
     live = (CONFIG_DIR / "live.toml").read_text("utf-8")
     assert "\nenabled = true" in live
     (folder / "live.toml").write_text(live, "utf-8")
-    summit = (CONFIG_DIR / "clients" / "summit.toml").read_text("utf-8")
+    summit = switched((CONFIG_DIR / "clients" / "summit.toml").read_text("utf-8"), True)
     for old, new in (
-        ("enabled = false", "enabled = true"),
         (
             'source_filter = "support@prompteng.com.au"',
             f'source_filter = "{SUMMIT_MAILBOX}"',

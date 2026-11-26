@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.79 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.80 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -639,7 +639,7 @@ Run:          scripts/macmini-run.sh run live summit
 ```toml
 client = "summit"
 sites = ["live"]                    # no test-site profile
-enabled = false                     # kill switch, with the site's; flipped by its own PR before the spike
+enabled = true                      # kill switch, with the site's; flipped on by its own PR before the spike (S.2; decisions, 26 Nov 2026)
 agent_user_name = "Agent 2 (Summit Homes)"
 source_filter = "support@prompteng.com.au"         # Note Pool Source filter (receiving mailbox)
 sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
@@ -694,7 +694,7 @@ S.0 (25-26 Nov 2026) saw the first four rows by hand: `docs/screen-map.md` 1.7, 
 |---|---|---|
 | S.0 | By-hand screenshots above; 3-5+ real Summit POs and `cases.toml` in `private/summit/` | Screens written into `docs/screen-map.md` (redacted); real-PO seam `false PROCEED: 0` |
 | S.1 | Agent 2's secrets in `poagent`'s Keychain; `po-agent preflight --site live --client summit`; Agent 2's My Notes holds no Pending Note and the team stops assigning to Agent 2 by hand | pre-flight exit 0 |
-| S.2 | Kill-switch PR flips the client's `enabled`; Joey moves the `production` tag; `spike live summit` (G.5) | exit 0, eligible count read, no `MORE_PAGES`; at least 1 eligible when Joey knows a Summit Note is waiting (unlinked, Assignee `---`), else a list-level rule is missing it (decisions, 25 Nov 2026, Summit Note Pool list) |
+| S.2 | Kill-switch PR flips the client's `enabled` (from its merge `run live summit` books: until S.4 Joey runs only `spike` and `decide-only`, and loads no Summit job before S.5; decisions, 26 Nov 2026, S.2); Joey moves the `production` tag; `spike live summit` (G.5) | exit 0, eligible count read, no `MORE_PAGES`; at least 1 eligible when Joey knows a Summit Note is waiting (unlinked, Assignee `---`), else a list-level rule is missing it (decisions, 25 Nov 2026, Summit Note Pool list) |
 | S.3 | `decide-only live summit` (G.6) | Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee |
 | S.4 | `run live summit`, `max_notes_per_run = 1`, watched (G.7); 5.2's trace check on the first | each booked task correct in MySys (Creator, PO, Documents, Note, On Hold, linked, Solved) |
 | S.5 | Cap raised by its own PR; the Summit launchd job and Healthchecks check loaded (G.8) | first hourly run watched, exit 0 |
