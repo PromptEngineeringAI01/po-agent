@@ -4,19 +4,16 @@
 a NOTE line shows, the one-iframe body rule, the project rule and the
 decision (`summit/decision.py`) on what the peek read, with the Note's
 original assignee; where a Note taken and stopped before Submit goes back
-(task 9.13: its original assignee). The W2 Documents Type refuses with
-ConfigError (ALERT CONFIG, exit 2), as `cli.py` refuses Summit's run, until
-task 9.14 fills it. Pure, no browser code, as `b1/`."""
+(task 9.13: its original assignee); the W2 Documents Type (task 9.14: the
+client file's `project_document_type`). Pure, no browser code, as `b1/`."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NoReturn
 
 from po_agent.b1 import readers
 from po_agent.core.client import EligibleNote
 from po_agent.core.config import ClientProfile, Config
-from po_agent.core.errors import ConfigError
 from po_agent.core.models import (
     MySysLookup,
     NotePoolFilters,
@@ -28,10 +25,6 @@ from po_agent.core.models import (
     Skip,
 )
 from po_agent.summit import decision, eligibility
-
-
-def _refuse() -> NoReturn:
-    raise ConfigError("mode not built for this client yet")
 
 
 @dataclass(frozen=True)
@@ -99,7 +92,8 @@ class SummitClient:
         )
 
     def document_type(self) -> str:
-        _refuse()
+        # Client Documents (S4, confirmed in S.0).
+        return self.profile.project_document_type
 
     def return_target(self, original: str) -> str:
         # SPEC: Return to the original assignee, as the peek read it; the

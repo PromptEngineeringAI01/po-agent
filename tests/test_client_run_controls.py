@@ -16,8 +16,9 @@ separate run; docs/decisions.md, 23 Nov 2026, separate run).
 - RUN_SUMMARY names the client, B1's too; `run_id` stays its first key (the
   Mac Mini wrapper reads it from there).
 
-Summit's modes are still refused before any secret, login or browser (9.3,
-9.4); nothing here reads a real secret or contacts MySys. Values are fake;
+Summit's run books since 9.14; the committed client file's kill switch
+(`enabled = false`) stops it before any secret, login or browser here, and
+nothing here reads a real secret or contacts MySys. Values are fake;
 expected values are written out from SPEC.md and the plan.
 """
 
@@ -129,7 +130,7 @@ def hold(tmp_path: Path, name: str) -> runlock.RunLock:
 
 
 LOCK_HELD = "INFO  run lock held: run not started"
-NOT_BUILT = "mode not built for this client yet"
+KILL_SWITCH = "INFO  kill switch on: run not started"
 
 
 # --- the run lock ---------------------------------------------------------------
@@ -155,10 +156,11 @@ def test_a_b1_run_does_not_block_a_summit_run(env, started, capsys, tmp_path):
     finally:
         b1.release()
 
-    # Past the lock: the run meets Summit's refusal (until 9.11-9.14).
+    # Past the lock: the run meets the committed client file's kill switch
+    # (`enabled = false`; Summit's refusal before 9.14).
     assert LOCK_HELD not in lines
-    assert code == 2
-    assert any(NOT_BUILT in line for line in lines if line.startswith("ALERT CONFIG"))
+    assert code == 0
+    assert KILL_SWITCH in lines
     assert started == []
 
 
@@ -450,11 +452,12 @@ def test_an_unknown_client_s_before_write_fails_closed(tmp_path):
     assert checked == []
 
 
-def test_a_refused_summit_run_releases_its_lock(env, started, capsys):
-    # Review Nit 3: the refusal comes after the lock, which it releases.
+def test_a_stopped_summit_run_releases_its_lock(env, started, capsys):
+    # Review Nit 3: a stop after the lock releases it (the kill switch since
+    # 9.14 lifted Summit's refusal).
     for _ in range(2):
         code, lines = run_cli(capsys, SUMMIT_RUN)
 
-        assert code == 2
+        assert code == 0
         assert LOCK_HELD not in lines
-        assert any(NOT_BUILT in line for line in lines if line.startswith("ALERT"))
+        assert KILL_SWITCH in lines

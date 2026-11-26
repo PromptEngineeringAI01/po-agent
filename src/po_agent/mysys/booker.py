@@ -151,6 +151,7 @@ def _w1(
             proceed.pdf_file_name,
             proceed.pdf_bytes,
             creator=proceed.creator,
+            filed_as=proceed.document_names,
         )
     except Exception as error:
         _close_context(page)  # abandons the form: nothing is saved
@@ -198,7 +199,13 @@ def _w2(
         )
         booking.back_to_project(guard, page, window, proceed.pln)
         booking.check_project_document(
-            guard, page, proceed.pln, task_no, proceed.pdf_file_name, document_type
+            guard,
+            page,
+            proceed.pln,
+            task_no,
+            proceed.pdf_file_name,
+            document_type,
+            filed_as=proceed.document_names,
         )
         return task_no
     except GuardRefusal as error:

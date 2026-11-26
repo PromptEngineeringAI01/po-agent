@@ -17,7 +17,7 @@ Reads that fail become a fixed `UnexpectedScreen` (or `WriteNotStarted` /
 """
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -30,6 +30,7 @@ from po_agent.core.errors import (
     UnexpectedScreen,
     WriteNotStarted,
 )
+from po_agent.core.models import SkipReason
 from po_agent.core.runlog import RunLog
 from po_agent.mysys import driver, wait
 from po_agent.mysys import tasks as task_table
@@ -633,6 +634,30 @@ def open_task_form(guard: ActionGuard, page: Page, project: Locator) -> Locator:
     return form
 
 
+def creator_option(select: Locator, creator: str) -> str:
+    """The Creator option to choose, read before anything is selected
+    (task 9.14; advisor, 26 Nov 2026): the one option whose text, surrounding
+    whitespace stripped, equals `creator` stripped, case-sensitive; returned
+    as the page shows it (the guard selects only an option's exact text).
+    None or more than one -> WriteNotStarted CREATOR_UNKNOWN: no near match,
+    no repair of a repeated label."""
+    if select.count() != 1:
+        raise UnexpectedScreen("Creator select not found once")
+    try:
+        texts = select.locator("option").all_text_contents()
+    except PlaywrightError:
+        raise UnexpectedScreen("Creator options not readable") from None
+    wanted = creator.strip()
+    found = [text for text in texts if text.strip() == wanted]
+    if len(found) != 1:
+        raise WriteNotStarted(
+            "creator not an option",
+            reason=SkipReason.CREATOR_UNKNOWN.value,
+            step="W1",
+        )
+    return found[0]
+
+
 def fill_task_form(
     guard: ActionGuard,
     form: Locator,
@@ -642,12 +667,16 @@ def fill_task_form(
     data: bytes,
     *,
     creator: str,
+    filed_as: Sequence[str] | None = None,
 ) -> None:
-    """Step 6 up to Submit: Creator (the Proceed's), - Compaction Test, PO
-    Number, the PDF to Documents from memory (the admin's block: the task's
-    own Client Documents; decisions, 12 Nov 2026), Note = the email body;
-    then every read-back."""
-    guard.act("set_creator", form, _field(form, "Creator", "select"), creator)
+    """Step 6 up to Submit: Creator (the Proceed's, an option read first:
+    `creator_option`), - Compaction Test, PO Number, the PDF to Documents
+    from memory (the admin's block: the task's own Client Documents;
+    decisions, 12 Nov 2026), Note = the email body; then every read-back.
+    `filed_as`: the names the Documents block may show the PDF as (the
+    Proceed's `document_names`; None: `file_name` only)."""
+    select = _field(form, "Creator", "select")
+    guard.act("set_creator", form, select, creator_option(select, creator))
     compaction = form.get_by_role("checkbox", name="- Compaction Test", exact=True)
     guard.act("tick_compaction_test", form, compaction)
     po_box = _field(form, "PO Number", "input")
@@ -662,15 +691,29 @@ def fill_task_form(
     }
     guard.act("upload_document", form, upload, payload)
     guard.act("set_task_note", form, _field(form, "Note", "textarea"), body)
-    check_task_form(form, po_number, body, file_name, creator=creator)
+    check_task_form(
+        form, po_number, body, file_name, creator=creator, filed_as=filed_as
+    )
 
 
 def check_task_form(
-    form: Locator, po_number: str, body: str, file_name: str, *, creator: str
+    form: Locator,
+    po_number: str,
+    body: str,
+    file_name: str,
+    *,
+    creator: str,
+    filed_as: Sequence[str] | None = None,
 ) -> None:
-    """Row 09 read-back before Submit; any mismatch -> WriteNotStarted."""
+    """Row 09 read-back before Submit; any mismatch -> WriteNotStarted.
+    The Documents block shows the PDF as exactly one of `filed_as` (None:
+    `file_name`)."""
     documents = _container(form, "Documents", 'input[type="file"]')
-    if not _shows(documents.get_by_text(file_name, exact=True), wait.LOAD_TIMEOUT_MS):
+    names = tuple(filed_as) if filed_as else (file_name,)
+    shown = documents.get_by_text(names[0], exact=True)
+    for name in names[1:]:
+        shown = shown.or_(documents.get_by_text(name, exact=True))
+    if not _shows(shown, wait.LOAD_TIMEOUT_MS):
         raise WriteNotStarted("task form not as expected", field="documents")
     # No file row (a header row is not one); not found once is not empty.
     po_docs = _container(form, "PO Documents", 'input[type="file"]')
@@ -896,12 +939,15 @@ def check_project_document(
     task_no: str,
     file_name: str,
     document_type: str,
+    *,
+    filed_as: Sequence[str] | None = None,
 ) -> Locator:
     """Row 19: the project's Documents tab, the section headed by the new
     task number (older tasks have their own copies): exactly one row, Type
     `document_type` (the profile's: Client Documents on both sites, the
     Documents block's Type; decisions, 12 Nov 2026), File starting with the
-    PDF's file name. No section ->
+    PDF's file name, or with one of `filed_as` when given (the Proceed's
+    `document_names`, task 9.14). No section ->
     PartialWrite; "No Document Found" or any other row -> AccuracyBreach.
     Then the Tasks button, back to the task table for W3; returns the
     project window."""
@@ -928,7 +974,8 @@ def check_project_document(
     (cells,) = rows
     if len(cells) < 3 or cells[1] != document_type:
         raise AccuracyBreach("document not as booked", field="document_type")
-    if not cells[2].startswith(file_name):
+    names = tuple(filed_as) if filed_as else (file_name,)
+    if not any(cells[2].startswith(name) for name in names):
         raise AccuracyBreach("document not as booked", field="document_file")
     tasks = window.get_by_role("button", name="Tasks", exact=True)
     guard.act("open_project_tasks", window, tasks)

@@ -18,15 +18,14 @@ Two layers, values fake, expected values written out from SPEC.md:
   must still read the original (else `untouched` / NOTE_TAKEN), Agent 2
   takes it and Link to Project must still show; a Note taken and stopped
   before Submit goes back to its original assignee, or stays with Agent 2
-  with ALERT UNEXPECTED_SCREEN "Note not returned". `cli.py` refuses
-  Summit's run until 9.14, so these call the run loop itself.
+  with ALERT UNEXPECTED_SCREEN "Note not returned". These call the run
+  loop itself; the command is tests/test_summit_booking.py's (9.14).
 
 B1's take and return are pinned unchanged by tests/test_driver_note_window.py,
 tests/seam2/test_run_loop_offline.py and B1's seam 2 assignee cases.
 """
 
 import argparse
-import contextlib
 import html
 import json
 from collections.abc import Iterator
@@ -48,7 +47,7 @@ from playwright.sync_api import Browser, Page
 
 from po_agent.core import controls, output, run, runlog
 from po_agent.core.config import CONFIG_DIR, load_client, load_config
-from po_agent.core.errors import ConfigError, UnexpectedScreen
+from po_agent.core.errors import UnexpectedScreen
 from po_agent.mysys import driver, wait
 from po_agent.mysys.guard import ActionGuard
 from po_agent.summit.client import SummitClient
@@ -321,8 +320,8 @@ def fake_mysys(monkeypatch, folder, note) -> FakeMySys:
 
 
 def book_run(monkeypatch, folder, tmp_path) -> int:
-    """Summit's run that books, from the run loop (cli.py refuses it until
-    9.14), at 07:59 Perth."""
+    """Summit's run that books, from the run loop (the command is
+    tests/test_summit_booking.py's), at 07:59 Perth."""
     monkeypatch.setattr(controls, "now", lambda: AT_0759_PERTH)
     config = load_config("live", folder)
     profile = load_client("summit", "live", folder)
@@ -354,13 +353,11 @@ def after_peek(fake: FakeMySys) -> list[str]:
 def test_a_proceed_note_still_with_its_original_assignee_is_taken_by_agent_2(
     original, monkeypatch, folder, tmp_path
 ):
-    # What follows the take (W1-W5) is 9.14's: only the take is pinned here.
-    # Until then the booking refuses (ConfigError) and the stop's return
-    # follows (UnexpectedScreen when the Note can't go back).
+    # What follows the take (W1-W5, 9.14) is tests/test_summit_booking.py's:
+    # only the take is pinned here.
     fake = fake_mysys(monkeypatch, folder, summit_note(assignee=original))
 
-    with contextlib.suppress(ConfigError, UnexpectedScreen):
-        book_run(monkeypatch, folder, tmp_path)
+    book_run(monkeypatch, folder, tmp_path)
 
     assert after_peek(fake)[:5] == [
         f"lookup {NOTE_ID}",
@@ -456,20 +453,18 @@ def test_a_note_whose_original_assignee_is_in_both_lists_or_neither_stays_with_a
     assert fake.notes[NOTE_ID].assignee == SUMMIT_AGENT
 
 
-def test_until_9_14_a_taken_proceed_stops_before_any_booker_step_and_goes_back(
-    monkeypatch, folder, tmp_path
-):
-    # The interim path (9.13 second-model review, Nit 1): with cli.py's
-    # refusal bypassed, the run loop takes a PROCEED, Summit's booking
-    # refuses before W1 (ConfigError), and the Note goes back to its
-    # original assignee. 9.14 fills the booking and replaces this test.
+def test_a_taken_proceed_is_booked_and_never_returned(monkeypatch, folder, tmp_path):
+    # Replaces 9.13's interim pin (a taken PROCEED stopped before any booker
+    # step and went back): from 9.14 the booking follows the take
+    # (decisions, 26 Nov 2026, Summit booking).
     fake = fake_mysys(monkeypatch, folder, summit_note(assignee=STAFF))
 
-    with pytest.raises(ConfigError):
-        book_run(monkeypatch, folder, tmp_path)
+    code = book_run(monkeypatch, folder, tmp_path)
 
+    assert code == 0
+    steps = [c.split()[0] for c in after_peek(fake)]
+    assert steps[steps.index("take") :][:4] == ["take", "2a", "check", "reopen"]
+    assert {"submit", "solved", "gone"} <= set(steps)
     assert fake.notes[NOTE_ID].taken == 1
-    assert not {"check", "reopen", "form", "fill", "submit"} & {
-        c.split()[0] for c in fake.calls
-    }
-    assert fake.notes[NOTE_ID].assignee == STAFF
+    assert fake.notes[NOTE_ID].assignee == SUMMIT_AGENT
+    assert not [c for c in fake.calls if c.startswith("return")]

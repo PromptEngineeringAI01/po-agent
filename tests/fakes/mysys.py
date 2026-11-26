@@ -22,7 +22,7 @@ import pytest
 from seam1.seam1_cases import CASES, text_pdf
 
 from po_agent.core import run
-from po_agent.core.errors import UnexpectedScreen
+from po_agent.core.errors import UnexpectedScreen, WriteNotStarted
 from po_agent.core.models import (
     MySysLookup,
     NotePoolFilters,
@@ -101,6 +101,10 @@ class FakeMySys:
     note_users: tuple[str, ...] = ()
     note_pools: tuple[str, ...] = ()
     task_no: str = "tsk_200002"  # the task the fake Submit creates
+    # The Create New Task form's Creator options, placeholder left out
+    # (screen-map row 08); None: every creator is an option. A creator not
+    # among them stops W1 as the real form read does (task 9.14).
+    creator_options: tuple[str, ...] | None = None
     current: str | None = None  # the Note last named in a call
     calls: list[str] = field(default_factory=list)
     downloads: list[Path | None] = field(default_factory=list)
@@ -114,6 +118,10 @@ class FakeMySys:
     rules: list = field(default_factory=list)
     document_types: list = field(default_factory=list)
     agents: list = field(default_factory=list)
+    # (step, creator) where the booker sets or reads back the Creator, and
+    # (step, names) where it reads back the Documents file name (task 9.14).
+    creators: list = field(default_factory=list)
+    document_names: list = field(default_factory=list)
     # With `record_actions`, each fake step appends to the run's guard
     # history the actions the real step takes through guard.act (named after
     # mysys/driver.py and mysys/booking.py), so a test can read which kinds
@@ -382,8 +390,21 @@ class FakeMySys:
         self._step("form")  # Create New Task (screen-map row 08)
         return "form"
 
-    def fill_task_form(self, guard, form, po_number, body, file_name, data, *, creator):
+    def fill_task_form(
+        self, guard, form, po_number, body, file_name, data, *, creator, filed_as=None
+    ):
         self._step("fill")  # Compaction Test ticked and filled (screen-map row 09)
+        self.creators.append(("fill", creator))
+        self.document_names.append(("fill", filed_as))
+        # The option is read before anything is selected: exactly one
+        # option equal to the creator once both are stripped (decisions,
+        # 26 Nov 2026, Summit booking).
+        options = self.creator_options
+        wanted = creator.strip()
+        if options is not None and [o.strip() for o in options].count(wanted) != 1:
+            raise WriteNotStarted(
+                "creator not an option", reason="CREATOR_UNKNOWN", step="W1"
+            )
 
     def submit_task(self, guard, form):
         self._step("submit")  # the write (screen-map row 08)
@@ -397,26 +418,30 @@ class FakeMySys:
     def check_new_task_row(self, project, task_no, agent, *, creator):
         self._step("task_row")  # the new task's details row (screen-map row 10)
         self.agents.append(("task_row", agent))
+        self.creators.append(("task_row", creator))
         return "details"
 
     def open_task_detail(self, guard, project, details, *, creator):
         self._step("open_detail")  # opened from the details row (screen-map row 19)
+        self.creators.append(("open_detail", creator))
 
     def check_task_detail(self, page, task_no, po_number, body, agent, *, creator):
         self._step("detail")  # the task detail screen (screen-map row 19)
         self.agents.append(("detail", agent))
+        self.creators.append(("detail", creator))
         return "detail-window"
 
     def back_to_project(self, guard, page, window, pln):
         self._step("back")  # "-- Select Task --" (screen-map row 19)
 
     def check_project_document(
-        self, guard, page, pln, task_no, file_name, document_type
+        self, guard, page, pln, task_no, file_name, document_type, *, filed_as=None
     ):
         # The new task's section of the project's Documents tab (screen-map
         # row 19).
         self._step("document")
         self.document_types.append(document_type)
+        self.document_names.append(("document", filed_as))
 
     def project_window(self, page, pln):
         self._step("project_window")  # the project window (screen-map row 07)

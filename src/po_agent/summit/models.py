@@ -24,6 +24,17 @@ class SummitProceed(Proceed):
     previous_task_no: str | None = Field(None, pattern=r"^tsk_[0-9]+$")
     previous_task_creator: str | None = None
 
+    @property
+    def document_names(self) -> tuple[str, ...]:
+        """The PDF's name, or that name with every "-" as "_": MySys was
+        seen filing a staff upload's "-" as "_" (S.0; the agent's own
+        upload is unproven, so both are accepted, nothing else; advisor,
+        26 Nov 2026)."""
+        filed = self.pdf_file_name.replace("-", "_")
+        if filed == self.pdf_file_name:
+            return (self.pdf_file_name,)
+        return (self.pdf_file_name, filed)
+
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         if self.po_number.split("/")[0] != self.internal_no:

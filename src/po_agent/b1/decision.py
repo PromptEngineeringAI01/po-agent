@@ -21,6 +21,7 @@ from po_agent.core.models import (
     NotePoolFilters,
     NotePoolRow,
     NoteSnapshot,
+    Proceed,
     SearchRow,
     Skip,
     SkipReason,
@@ -210,6 +211,11 @@ class B1ProjectRule:
 
     def judge(self, lookup: MySysLookup, internal_no: str) -> Skip | str:
         return check_project(lookup, internal_no, self.site)
+
+    def recheck(self, lookup: MySysLookup, proceed: Proceed) -> bool:
+        # B1's decision takes nothing more from the project than its pln
+        # and Compaction Test tasks, which reopen_project checks itself.
+        return True
 
 
 def check_duplicate(
