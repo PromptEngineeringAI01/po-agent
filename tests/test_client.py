@@ -7,11 +7,12 @@ pinned through the run loop's offline tests (tests/seam2/
 test_run_loop_offline.py, tests/test_run_spike.py, tests/test_exit_codes.py,
 tests/test_hold_recheck.py), which pass unchanged; here: the interface holds
 SPEC's differences and nothing more (ADR-003's rule of three), and Summit's
-implementation refuses every one not built yet: 9.11 filled `filters` and
+implementation was filled task by task: 9.11 filled `filters` and
 `eligible` (tests/test_summit_eligibility.py), 9.12 `po_number`,
 `body_rule`, `project_rule` and `decide` (tests/test_summit_client.py,
 tests/test_summit_decide_only.py), 9.13 `return_target`
-(tests/test_summit_take_return.py), 9.14 the rest.
+(tests/test_summit_take_return.py), 9.14 `document_type`
+(tests/test_summit_booking.py): no member refuses any more.
 """
 
 import tomllib
@@ -22,8 +23,6 @@ import pytest
 from po_agent.b1.client import B1Client
 from po_agent.core.client import Client, EligibleNote
 from po_agent.core.config import CONFIG_DIR, load_config, parse_client
-from po_agent.core.errors import ConfigError
-from po_agent.core.models import MySysLookup, NoteSnapshot
 from po_agent.summit.client import SummitClient
 
 # The plan's list (9.4) of what the run loop asks a client, one member per
@@ -43,25 +42,6 @@ MEMBERS = {
     "return_target",
 }
 
-NOTE = EligibleNote(note_id="300001", internal_no="123456")
-SNAPSHOT = NoteSnapshot(
-    note_id="300001",
-    title="",
-    body="fake body",
-    attachment_names=("123456_020_01.pdf",),
-    project_linked=False,
-)
-
-
-def lookup() -> MySysLookup:
-    raise AssertionError("no MySys read for a client that refuses")
-
-
-# One refusal per member: the call the run loop makes.
-SUMMIT_CALLS = {
-    "document_type": (),
-}
-
 
 def members(cls: type) -> set[str]:
     return {name for name in vars(cls) if not name.startswith("_")}
@@ -76,20 +56,6 @@ def test_each_client_implements_every_member(implementation: type) -> None:
     assert MEMBERS <= members(implementation)
 
 
-# Built in 9.11 (tests/test_summit_eligibility.py), 9.12, the peek
-# (tests/test_summit_client.py), and 9.13, the return
-# (tests/test_summit_take_return.py).
-SUMMIT_BUILT = {
-    "filters",
-    "eligible",
-    "po_number",
-    "body_rule",
-    "project_rule",
-    "decide",
-    "return_target",
-}
-
-
 def summit_profile():
     with open(CONFIG_DIR / "clients" / "summit.toml", "rb") as file:
         return parse_client(tomllib.load(file))
@@ -100,19 +66,10 @@ def summit() -> SummitClient:
     return SummitClient(load_config("live", CONFIG_DIR), summit_profile(), started)
 
 
-def test_every_member_not_built_has_a_summit_refusal_row() -> None:
-    assert set(SUMMIT_CALLS) == MEMBERS - SUMMIT_BUILT
-
-
-@pytest.mark.parametrize(("member", "args"), sorted(SUMMIT_CALLS.items()))
-def test_summit_s_stub_refuses_every_member(member: str, args: tuple) -> None:
-    # As 9.3's refusal of Summit's modes: ALERT CONFIG, exit 2, before any
-    # MySys read (the lookup is never called).
-    with pytest.raises(ConfigError) as refused:
-        getattr(summit(), member)(*args)
-
-    assert refused.value.exit_code == 2
-    assert str(refused.value) == "mode not built for this client yet"
+def test_summit_s_w2_documents_type_is_its_client_file_s() -> None:
+    # SPEC.md -> config shape: project_document_type = "Client Documents"
+    # (S4, confirmed in S.0; task 9.14).
+    assert summit().document_type() == "Client Documents"
 
 
 def test_b1_s_values_come_from_its_site_profile() -> None:
