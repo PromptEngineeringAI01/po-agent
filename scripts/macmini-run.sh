@@ -1,40 +1,49 @@
 #!/bin/bash
 # Mac Mini wrapper for the PO Agent (docs/macmini-setup.md section 8).
 #
-#   scripts/macmini-run.sh <run|spike|decide-only> <test|live>
+#   scripts/macmini-run.sh <run|spike|decide-only> <test|live> [summit]
 #
 # The site is required, with no default (decisions, 10 Nov 2026, live
 # profile): after go-live launchd runs `run live`. Only launchd or Joey runs
-# it on live; Claude never does (CLAUDE.md Must never #3).
+# it on live; Claude never does (CLAUDE.md Must never #3). A third argument
+# names the client (task 9.15; SPEC.md -> Client 2, The separate run):
+# without it the run is B1's, exactly as before there were two clients;
+# `summit` passes --client summit. Any other client: a fixed line to
+# runs.log, an alert issue, exit 2, nothing else run.
 #
 # 1. Release pinning (plan task 7.4): fetches origin (moved and deleted tags
-#    too), reads enabled from config/<site>.toml on origin/main (false: a
-#    fixed line to runs.log, exit 0, nothing else run), then checks out the
-#    production tag's commit, detached. Only Joey moves that tag, by hand;
-#    this script never creates, moves or pushes it. Then uv sync --locked and
-#    uv run playwright install chromium. If any step fails, or enabled on main
-#    isn't exactly one "enabled = true|false" line, the agent doesn't run:
-#    a fixed line to runs.log, an alert issue, exit 2.
+#    too), reads enabled from config/<site>.toml on origin/main, and for
+#    Summit also from config/clients/summit.toml (either false: a fixed line
+#    to runs.log, exit 0, nothing else run), then checks out the production
+#    tag's commit, detached. Only Joey moves that tag, by hand; this script
+#    never creates, moves or pushes it. Then uv sync --locked and uv run
+#    playwright install chromium. If any step fails, or enabled on main
+#    isn't exactly one "enabled = true|false" line in each file read, the
+#    agent doesn't run: a fixed line to runs.log, an alert issue, exit 2.
 # 2. Runs the agent on that site (never --detailed-log) with a hard time
 #    limit, in its own process group, and kills the whole group plus this
-#    user's Playwright browsers when it ends or hits the limit, so nothing
-#    overlaps the next run.
+#    client's Playwright browsers when it ends or hits the limit, so nothing
+#    overlaps the next run. Summit's browsers live in their own folder
+#    (PLAYWRIGHT_BROWSERS_PATH), so one client's kill never reaches the
+#    other client's run.
 # 3. Appends a timestamp line and the agent's stdout to runs.log; its stderr
 #    goes to /dev/null (a crash's text could quote page content).
 # 4. On any ALERT line or a non-zero exit, opens a GitHub issue labelled
 #    po-agent-alert whose body is only the ALERT lines, without any Note ID
 #    (the repo is public; audit N4), and the exit code. runs.log keeps the
-#    ALERT lines whole.
-# 5. At the end of every run, whatever the exit code (a failed setup and a
-#    killed agent too), pings: the body of the one open issue labelled
+#    ALERT lines whole. Summit's titles say "summit"; B1's are unchanged.
+# 5. B1 only: at the end of every run, whatever the exit code (a failed setup
+#    and a killed agent too), pings: the body of the one open issue labelled
 #    po-agent-heartbeat becomes the time, the exit code and the run_id. The
 #    heartbeat workflow (.github/workflows/heartbeat.yml) opens an alert when
 #    no ping arrives for 2 hours inside the schedule. A failed ping only logs
-#    a fixed line; it never changes the exit code.
-# 6. Then, every run too, pings the run's Healthchecks.io check (decisions,
-#    19 Nov 2026), whose URL is in poagent's Keychain; Healthchecks.io emails
-#    Joey when a scheduled run doesn't ping. No URL, or a failed ping, only
-#    logs a fixed line; it never changes the exit code.
+#    a fixed line; it never changes the exit code. Summit runs leave it
+#    alone, so it keeps meaning "B1 ran" (plan Phase S, open question 4).
+# 6. Then, every run too, pings the client's own Healthchecks.io check
+#    (decisions, 19 Nov 2026), whose URL is in poagent's Keychain;
+#    Healthchecks.io emails Joey when a scheduled run doesn't ping. No URL,
+#    or a failed ping, only logs a fixed line; it never changes the exit
+#    code. A Summit run never pings B1's check, nor B1's run Summit's.
 #
 # Written for macOS's /bin/bash 3.2: no GNU timeout, no setsid.
 
@@ -55,11 +64,11 @@ LOG_DIR="$HOME/Library/Logs/po-agent"
 RUNS_LOG="$LOG_DIR/runs.log"
 
 usage() {
-  echo "usage: macmini-run.sh <run|spike|decide-only> <test|live>" >&2
+  echo "usage: macmini-run.sh <run|spike|decide-only> <test|live> [summit]" >&2
   exit 2
 }
 
-[ "$#" -eq 2 ] || usage
+[ "$#" -eq 2 ] || [ "$#" -eq 3 ] || usage
 case "$2" in
   test | live) SITE="$2" ;;
   *) usage ;;
@@ -71,6 +80,33 @@ case "$1" in
   *) usage ;;
 esac
 MODE="$1"
+CLIENT=b1
+CLIENT_KNOWN=1
+if [ "$#" -eq 3 ]; then
+  case "$3" in
+    summit) CLIENT=summit ;;
+    *) CLIENT_KNOWN=0 ;; # refused below, once the log and alert work
+  esac
+fi
+# Per client: the agent's --client, the alert title, the Healthchecks item,
+# the browsers folder and the pattern that finds this client's browsers.
+# B1's are exactly what they were before there were two clients.
+if [ "$CLIENT" = summit ]; then
+  AGENT_ARGS="$AGENT_ARGS --client summit"
+  TITLE_PREFIX="po-agent alert summit"
+  HC_ITEM=healthchecks_ping_url_summit
+  HC_URL_ENV="${PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT:-}"
+  PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright-summit"
+  export PLAYWRIGHT_BROWSERS_PATH
+  BROWSERS='ms-playwright-summit/'
+  HEADER="$MODE $SITE summit"
+else
+  TITLE_PREFIX="po-agent alert"
+  HC_ITEM=healthchecks_ping_url
+  HC_URL_ENV="${PO_AGENT_HEALTHCHECKS_PING_URL:-}"
+  BROWSERS='ms-playwright/' # not ms-playwright-summit/: Summit's are its own
+  HEADER="$MODE $SITE"
+fi
 OUT=""
 AGENT_PID=""
 KEEP_BROWSERS=0 # 1: the agent skipped, another run holds the run lock
@@ -105,6 +141,7 @@ gh_limited() {
 # the detail's "note_id=<id>" (core/errors.py) are cut; a line that still
 # names one, in any case, keeps only "ALERT <KIND>".
 public_alerts() {
+  [ -n "$OUT" ] || return 0
   grep '^ALERT ' "$OUT" | sed -E \
     -e 's/"note_id": *("[^"]*"|null), *//g' \
     -e 's/, *"note_id": *("[^"]*"|null)//g' \
@@ -131,7 +168,7 @@ open_issue() {
   fi
   body="${body:+$body
 }exit code: $2"
-  if ! gh_limited issue create --label po-agent-alert --title "po-agent alert $1" \
+  if ! gh_limited issue create --label po-agent-alert --title "$TITLE_PREFIX $1" \
     --body "$body" > /dev/null 2>&1; then
     log "wrapper: alert issue not opened"
   fi
@@ -139,8 +176,9 @@ open_issue() {
 
 # Stops the agent's process group: SIGTERM, then SIGKILL after GRACE_S.
 # Playwright starts Chromium detached (its own process group), so the group
-# kill can't reach it: then every Playwright browser of this user is killed.
-# Only one agent runs on the Mac Mini at a time (docs/macmini-setup.md).
+# kill can't reach it: then every Playwright browser of this client is
+# killed (B1's under ms-playwright/, Summit's under ms-playwright-summit/),
+# never the other client's, whose run may be going on now.
 stop_group() {
   local waited=0
   [ -n "$AGENT_PID" ] || return 0
@@ -154,16 +192,18 @@ stop_group() {
   # Not when the agent skipped for the run lock: the browsers then belong to
   # the run that holds it (decisions, 21 Nov 2026, run lock).
   if [ "$KEEP_BROWSERS" -eq 0 ] &&
-    pkill -KILL -u "$(id -u)" -f 'ms-playwright/' 2> /dev/null; then
+    pkill -KILL -u "$(id -u)" -f "$BROWSERS" 2> /dev/null; then
     log "wrapper: leftover Playwright browser killed"
   fi
   return 0
 }
 
-# The ping (step 5). gh finds the repo from this checkout's remote, as for
-# the alert issue. No PO data: only the time, $1 (the exit code) and run_id.
+# The ping (step 5), B1's runs only. gh finds the repo from this checkout's
+# remote, as for the alert issue. No PO data: only the time, $1 (the exit
+# code) and run_id.
 heartbeat() {
   local issue
+  [ "$CLIENT" = b1 ] || return 0
   issue="$(gh_limited issue list --label po-agent-heartbeat --state open --limit 1 \
     --json number --jq '.[0].number' 2> /dev/null)" || issue=""
   case "$issue" in
@@ -177,17 +217,18 @@ run_id: ${run_id:-none}" > /dev/null 2>&1; then
 }
 
 # The Healthchecks.io ping (step 6; decisions, 19 Nov 2026): a plain GET of
-# the check's ping URL, whatever the exit code (failed runs already open an
-# alert issue). The URL is a secret: from PO_AGENT_HEALTHCHECKS_PING_URL (the
-# tests), else poagent's login Keychain (service po-agent, the store keyring
-# uses). It goes to curl as config on stdin, so it is never in the process
-# list, and curl's output goes nowhere, so it never reaches a log. curl's own
-# limits (20 s an attempt, 2 retries, no retry after 40 s) keep a hung
-# network from holding the wrapper.
+# the client's check's ping URL, whatever the exit code (failed runs already
+# open an alert issue). The URL is a secret: from PO_AGENT_HEALTHCHECKS_PING_URL
+# (B1) or PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT (Summit; the tests), else
+# poagent's login Keychain (service po-agent, the store keyring uses), item
+# healthchecks_ping_url or healthchecks_ping_url_summit. It goes to curl as
+# config on stdin, so it is never in the process list, and curl's output goes
+# nowhere, so it never reaches a log. curl's own limits (20 s an attempt, 2
+# retries, no retry after 40 s) keep a hung network from holding the wrapper.
 healthchecks_ping() {
-  local url="${PO_AGENT_HEALTHCHECKS_PING_URL:-}"
+  local url="$HC_URL_ENV"
   if [ -z "$url" ]; then
-    url="$(security find-generic-password -s po-agent -a healthchecks_ping_url \
+    url="$(security find-generic-password -s po-agent -a "$HC_ITEM" \
       -w 2> /dev/null)" || url=""
   fi
   case "$url" in
@@ -217,6 +258,17 @@ cleanup() {
   [ -z "$OUT" ] || rm -f "$OUT"
 }
 
+mkdir -p "$LOG_DIR" || exit 2
+
+# An unknown client: no client's run, so no client's ping either.
+if [ "$CLIENT_KNOWN" -eq 0 ]; then
+  line="wrapper: unknown client, agent not run"
+  log "=== $(date '+%Y-%m-%dT%H:%M:%S%z') macmini-run.sh $MODE $SITE ? ==="
+  log "$line"
+  open_issue "no run_id" 2 "$line"
+  exit 2
+fi
+
 # Every exit from here on (setup failure, agent exit, time limit, a signal)
 # cleans up, then pings, then exits with the run's own code. A second signal
 # during this must not skip the ping, so signals are ignored from here.
@@ -231,10 +283,9 @@ on_exit() {
 trap on_exit EXIT
 trap 'exit 1' INT TERM HUP
 
-mkdir -p "$LOG_DIR" || exit 2
 OUT="$(mktemp "${TMPDIR:-/tmp}/po-agent-run.XXXXXX")" || exit 2
 
-log "=== $(date '+%Y-%m-%dT%H:%M:%S%z') macmini-run.sh $MODE $SITE ==="
+log "=== $(date '+%Y-%m-%dT%H:%M:%S%z') macmini-run.sh $HEADER ==="
 
 setup_failed() { # $1 = the step that failed
   local line="wrapper: setup failed ($1), agent not run"
@@ -242,13 +293,13 @@ setup_failed() { # $1 = the step that failed
   open_issue "no run_id" 2 "$line"
   exit 2
 }
-# enabled from config/<site>.toml on origin/main: prints true or false, or
+# enabled from $1 (a config file) on origin/main: prints true or false, or
 # fails unless there is exactly one "enabled = true|false" line (a trailing
 # comment allowed). Read from main, not the tag, so enabled = false stops the
 # next run without a tag move (decisions, 9 Nov 2026, release pinning).
 main_enabled() {
   local config value
-  config="$(git show "origin/main:config/$SITE.toml")" || return 1
+  config="$(git show "origin/main:$1")" || return 1
   [ "$(printf '%s\n' "$config" | grep -cE '^[[:space:]]*enabled[[:space:]]*=')" = 1 ] || return 1
   value="$(printf '%s\n' "$config" | sed -n -E \
     's/^[[:space:]]*enabled[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*(#.*)?$/\1/p')"
@@ -260,7 +311,12 @@ main_enabled() {
 
 # Their own output goes to launchd.log (the plist's StandardOutPath).
 git fetch --force --prune --prune-tags origin || setup_failed "git fetch"
-enabled="$(main_enabled)" || setup_failed "enabled on main"
+enabled="$(main_enabled "config/$SITE.toml")" || setup_failed "enabled on main"
+# Summit also needs its client file's switch (SPEC.md -> The separate run).
+if [ "$CLIENT" = summit ] && [ "$enabled" = true ]; then
+  enabled="$(main_enabled "config/clients/summit.toml")" ||
+    setup_failed "enabled on main"
+fi
 if [ "$enabled" = false ]; then
   log "wrapper: enabled = false on main, agent not run"
   exit 0

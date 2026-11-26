@@ -1,10 +1,14 @@
 # Ops runbook - PO Agent on the Mac Mini (live and test site)
 
-**Version:** 1 · 9 Nov 2026 · **Owner:** Joey Wu · **For:** the backup admin (go-live gate 4) and Joey · **Spec:** `SPEC.md` → Commands (exit codes), Code style (run output), Production (Safe trace); `docs/macmini-setup.md` sections 8-11
+**Version:** 1.1 · 26 Nov 2026 (1.1: Summit Home's run beside B1's, task 9.15: its job, alerts, Healthchecks check, Agent 2's Keychain items, giving a Summit Note back by hand, stopping Summit alone; decisions, 26 Nov 2026, Summit on the Mac Mini) · **Owner:** Joey Wu · **For:** the backup admin (go-live gate 4) and Joey · **Spec:** `SPEC.md` → Commands (exit codes), Code style (run output), Production (Safe trace); `docs/macmini-setup.md` sections 8-11
 
 What to do when the agent raises an alert. Written so the backup admin can follow it without Joey. From go-live the Mac Mini runs **live MySys** only (`run live`; decisions, 10 Nov 2026, live profile). The steps are the same on both sites; where the sites differ, both are named.
 
 The agent runs on the office Mac Mini as the macOS user `poagent`, every weekday at 7 minutes past each hour, 07:07 to 17:07 Perth time. Each run books B1 Homes compaction POs from the agent's pool (**PO Allocation Pool** on live, Agent Pool on test): a Compaction Test task on the project with the PO PDF attached, put On Hold, then the Note linked to the project and Solved. When it is unsure, it hands the Note back to that pool and changes nothing. When something goes wrong, it stops and raises an alert.
+
+**Summit Home** (client 2, from go-live step S.5; `SPEC.md` -> Client 2) runs beside it as a separate run: its own launchd job `au.com.prompteng.po-agent.summit` at **30 minutes past** each hour, 07:30 to 17:30 Perth, weekdays, logged in to live MySys as **Agent 2 (Summit Homes)**. It reads the Note Pool at Source `support@prompteng.com.au` + Unlocked, opens a Note only to read it, takes it only when every check passed, books it like B1 (Creator from the creator table in `config/clients/summit.toml`), and gives a Note it can't finish back to whoever had it (its original assignee). B1's runs and alerts are unchanged. Where Summit differs, the entry says **Summit**. Both runs write to the same `runs.log`; a Summit run's first line ends `... live summit ===` and its `RUN_SUMMARY` has `"client": "summit"`.
+
+**One run at a time by hand:** before starting any run by hand, as `poagent`: `pgrep -fl macmini-run.sh` must print nothing (no run going). Both jobs use the same checkout `~/po-agent`, and the schedule (:07 and :30, each agent run stopped at 20 minutes) usually keeps them apart; a slow setup (a Chromium download after a Playwright update) can make a B1 run still be going at :30. That is safe unless the `production` tag moved in between, so Joey moves the tag only when no run is going.
 
 **Never, while following this runbook:**
 - Type or paste a password, token or other secret into a chat, an issue, a file or a message. Type it only into the prompt or field that asks for it.
@@ -28,9 +32,10 @@ Every alert is a GitHub issue labelled `po-agent-alert`, and GitHub sends an ema
 |---|---|---|
 | `po-agent alert <run_id>` | The Mac Mini, after a run that printed an `ALERT` line or exited non-zero | The `ALERT` lines without Note IDs, sometimes a `wrapper:` line, and `exit code: <n>` |
 | `po-agent alert no run_id` | The Mac Mini, when the agent didn't start or printed no summary | A `wrapper:` line and `exit code: <n>` |
+| `po-agent alert summit <run_id>` or `po-agent alert summit no run_id` | The Mac Mini, after a **Summit** run, as the two rows above | The same |
 | `po-agent heartbeat missed` | GitHub itself (`.github/workflows/heartbeat.yml`) | No run has finished for more than 2 hours inside the schedule. Checked about once each weekday afternoon, so it can arrive hours after runs stopped. A backup since 19 Nov 2026 |
 
-**One alert is an email, not an issue:** Healthchecks.io emails Joey when the check `po-agent b1-homes` goes **down**: no run has ended within 40 minutes of a scheduled :07 (decisions, 19 Nov 2026). It comes within about an hour of a stop; see "Healthchecks.io down" in section 4. It emails again when the check is **up**.
+**One alert is an email, not an issue:** Healthchecks.io emails Joey when the check `po-agent b1-homes` goes **down**: no run has ended within 40 minutes of a scheduled :07 (decisions, 19 Nov 2026). It comes within about an hour of a stop; see "Healthchecks.io down" in section 4. It emails again when the check is **up**. **Summit** has its own check, `po-agent summit` (within 40 minutes of a scheduled :30). The GitHub `po-agent heartbeat missed` issue is about B1's runs only: Summit runs don't update the heartbeat issue.
 
 An `ALERT` line looks like this (placeholders in `<>`):
 
@@ -66,10 +71,32 @@ Either one stops the next run. After an `ACCURACY_BREACH`, do both.
    ```bash
    sudo launchctl bootout gui/$(id -u poagent)/au.com.prompteng.po-agent
    ```
-   Check: `launchctl print gui/$(id -u)/au.com.prompteng.po-agent` (as `poagent`) now says it can't find the service. If a run was going (from :07, for up to 20 minutes), it is stopped too and may leave a Note with the agent: check for one (3.3) before you restart. Between about :30 and :05 no run is going.
+   Check: `launchctl print gui/$(id -u)/au.com.prompteng.po-agent` (as `poagent`) now says it can't find the service. If a run was going (from :07, for up to 20 minutes), it is stopped too and may leave a Note with the agent: check for one (3.3) before you restart. Between about :30 and :05 no B1 run is going.
 2. **The kill switch** (Joey): `enabled = false` in the site's config on `main` (`config/live.toml` after go-live, `config/test.toml` for test runs), through a pull request. The next run reads it from `main` whatever commit the `production` tag is on, logs `wrapper: enabled = false on main, agent not run`, runs nothing, opens no alert and exits 0.
 
 While the job is unloaded, the heartbeat check will open `po-agent heartbeat missed` once 2 hours inside the schedule have passed, at its next weekday-afternoon check. That is expected: leave it open until runs are back. The Healthchecks.io check goes down within about an hour too and emails Joey; if the stop is planned, Joey can **Pause** the check in Healthchecks.io (the next ping resumes it). The kill switch doesn't trip either alert: each run still ends and pings.
+
+These stop B1 and, through the site's switch (`config/live.toml`), Summit too. Unloading B1's job leaves Summit's running; to stop Summit too, also do 3.1a step 1.
+
+### 3.1a Stop Summit alone
+
+B1 keeps running. Either one stops the next Summit run:
+
+1. **Unload Summit's job**, as `poagent`:
+   ```bash
+   launchctl bootout gui/$(id -u)/au.com.prompteng.po-agent.summit
+   ```
+   Or as an admin: `sudo launchctl bootout gui/$(id -u poagent)/au.com.prompteng.po-agent.summit`. Check: `launchctl print gui/$(id -u)/au.com.prompteng.po-agent.summit` says it can't find the service. If a Summit run was going (from :30, for up to 20 minutes), it is stopped too and may leave a Note with Agent 2: check for one (3.3) before you restart.
+2. **Summit's kill switch** (Joey): `enabled = false` in `config/clients/summit.toml` on `main`, through a pull request. The next Summit run logs `wrapper: enabled = false on main, agent not run` and exits 0; B1 is untouched.
+
+**Then, while Summit stays stopped, delete its leftover download folders** (B1's runs no longer clear Summit's; one may hold a Summit PO PDF; decisions, 25 Nov 2026, per-client run controls). Once no run is going (`pgrep -fl macmini-run.sh` prints nothing), as `poagent`:
+
+```bash
+ls -d "$TMPDIR"po-agent-dl-summit-* /tmp/po-agent-dl-summit-* 2>/dev/null
+rm -rf "$TMPDIR"po-agent-dl-summit-* /tmp/po-agent-dl-summit-*
+```
+
+Delete them, don't copy them. Joey can **Pause** the `po-agent summit` check in Healthchecks.io while Summit is stopped on purpose.
 
 ### 3.2 Restart the agent
 
@@ -92,6 +119,19 @@ While the job is unloaded, the heartbeat check will open `po-agent heartbeat mis
    ```
 6. Check its `RUN_SUMMARY` in `runs.log`. Lock the screen when you leave (Control-Command-Q); don't log `poagent` out.
 
+**Summit:** the same steps with Summit's names. Step 1: no Pending Note with **Agent 2 (Summit Homes)** (3.3). Step 2: Summit's own switch is `enabled` in `config/clients/summit.toml`; both it and the site's must say `true`, on `main` and at the tag. Step 3 (not within a few minutes of :30, and only when `pgrep -fl macmini-run.sh` prints nothing):
+```bash
+~/po-agent/scripts/macmini-run.sh spike live summit
+tail -20 ~/Library/Logs/po-agent/runs.log
+```
+Healthy as above, with `"client": "summit"` in the `RUN_SUMMARY`. Steps 4-5 with Summit's job:
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/au.com.prompteng.po-agent.summit.plist
+launchctl print gui/$(id -u)/au.com.prompteng.po-agent.summit | head -30
+launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent.summit
+```
+The `kickstart` books (up to `max_notes_per_run`); skip it to wait for the next :30.
+
 ### 3.3 Find a Note and its project in MySys
 
 Log in to MySys (live after go-live, else the test site) with your own account. Get the `<note_id>` from the Mac Mini (section 2): the alert issue doesn't carry it.
@@ -101,6 +141,10 @@ Log in to MySys (live after go-live, else the test site) with your own account. 
 3. Open the Note. Its attachment is named `<internal no>_048.pdf` (sometimes with `_1` before `.pdf`); the PO number is `<internal no>/048`.
 4. **Project:** Project → Projects, search `<internal no>`, and open the row with Company **B1 Homes** and Client Ref No. exactly `<internal no>`. Its `pln_...` is the `<pln>`.
 5. On the project's **Tasks** tab, look for Compaction Test tasks that aren't Cancelled. A task the agent made has Lodged By "Agent 1 (MySys Only)".
+
+**Summit:** step 2: still with the agent means Assignee **"Agent 2 (Summit Homes)"** and Status Pending. Step 3: the Note's title carries the PO number (`<internal no>/...`); the PDF keeps its own name (MySys may file a `-` in it as `_`). Step 4: search the PO number's part before the first `/` and open the row whose Client Ref No. is exactly that and whose Company is a Summit company (`config/clients/summit.toml`). Step 5: Lodged By "Agent 2 (Summit Homes)".
+
+**Who had a Summit Note before Agent 2** (its original assignee): open the Note; its log's "User Assigned" line for Agent 2's take names who had it (a person, a pool such as PO Allocation Pool, or nobody: `---`).
 
 ### 3.4 Return a Note to the agent's pool by hand
 
@@ -112,6 +156,18 @@ Only for a Note the agent took but where **no task was created** for it (no new 
 4. Check: Assignee reads that pool, Status Pending.
 
 The next run picks it up again. Never use Unassign or Unlink.
+
+### 3.4a Give a Summit Note back by hand
+
+**Summit** only, for a Note Agent 2 took where **no task was created** for it. The agent gives a Note back to whoever had it; when it can't (the `ALERT UNEXPECTED_SCREEN` "run stopped; Note not returned", section 4), the Note stays with Agent 2 and **every later Summit run stops at the start** ("a Note is still assigned to the agent from an earlier run") until a person does this. B1 is unaffected.
+
+1. Find the Note and who had it before Agent 2 (3.3, Summit).
+2. Open it and untick **Send Email Notification**.
+3. Give it back:
+   - **It had nobody (`---`)**, the usual case for a new Summit email: press the red **Unlink** button beside "Assignee: Agent 2 (Summit Homes)". "Assignee:" now reads `---` (the admins' own practice; decisions, 26 Nov 2026, S.0 live findings). The agent itself never presses Unlink.
+   - **It had a person:** User list = that person, Pool list `--Select Pool--`, press **Assign** once.
+   - **It had a pool:** User list `--Select User--`, Pool list = that pool, press **Assign** once.
+4. Check: "Assignee:" reads the original assignee (or `---`), Status Pending. The next Summit run goes on by itself.
 
 ### 3.5 Finish a booking by hand
 
@@ -127,9 +183,11 @@ For a Note the agent left after the **Submit** click (step W2 to W5). The goal i
 5. **Solved** (if the Note isn't Solved): untick **Send Email Notification**, then Status → **Solved**.
 6. Leave the Note assigned to the agent. Once it is Solved, runs no longer stop on it.
 
+**Summit:** the same steps, except: "None" in step 1 means give the Note back (3.4a); in step 2 the PO Number is the full PO number from the Note's title, the Task Creator is the creator table's for the project's company (`config/clients/summit.toml`; for a "previous task" company, the Task Creator of the project's highest-numbered task that is not a Compaction Test and not Cancelled), and the PDF's name may show a `-` as `_`; the Note stays with Agent 2 once Solved.
+
 ### 3.6 Book a PO by hand
 
-Only when a task had to be cancelled in 3.5. On project `<pln>`: **Create New Task**. Creator (Client section) = **Perth Scheduling**; tick **- Compaction Test**; PO Number = `<internal no>/048`; upload the Note's PDF to **Documents** (not PO Documents, which never reaches the task's Client Documents; decisions, 12 Nov 2026); Note = the Note's body text; leave everything else as it is; **Submit**. Then 3.5 steps 3 to 6.
+Only when a task had to be cancelled in 3.5. On project `<pln>`: **Create New Task**. Creator (Client section) = **Perth Scheduling**; tick **- Compaction Test**; PO Number = `<internal no>/048`; upload the Note's PDF to **Documents** (not PO Documents, which never reaches the task's Client Documents; decisions, 12 Nov 2026); Note = the Note's body text; leave everything else as it is; **Submit**. Then 3.5 steps 3 to 6. **Summit:** Creator and PO Number as 3.5's Summit paragraph says.
 
 ### 3.7 Change the MySys password in the Keychain
 
@@ -147,7 +205,14 @@ When the agent account's password has changed (or was reset). The live account's
 5. Check `runs.log`: `INFO  logged in` and `"exit_code": 0` in the last `RUN_SUMMARY`.
 6. Lock the screen (Control-Command-Q).
 
-**Summit's Agent 2 (Summit Homes):** the MySys admin says its password has no expiry date and its login has no MFA (S.0, 26 Nov 2026), so it changes only when someone changes it. Its Keychain items and steps come with task 9.15.
+**Summit's Agent 2 (Summit Homes):** the MySys admin says its password has no expiry date and its login has no MFA (S.0, 26 Nov 2026), so it changes only when someone changes it. If it does, the same steps with its own items, `mysys_live_summit_password` (and `mysys_live_summit_username`), and Summit's checks:
+```bash
+cd ~/po-agent
+uv run keyring set po-agent mysys_live_summit_password
+uv run po-agent preflight --site live --client summit
+~/po-agent/scripts/macmini-run.sh spike live summit
+```
+The spike: not within a few minutes of :30, and only when `pgrep -fl macmini-run.sh` prints nothing. A wrong Agent 2 password gives `ALERT LOGIN_FAILED` on Summit runs only; B1 keeps running.
 
 The username works the same way with `mysys_live_username`. For the test site, use the `mysys_test_` names and `spike test`.
 
@@ -188,6 +253,10 @@ The username works the same way with `mysys_live_username`. For the test site, u
 - **Means:** MySys didn't look as expected, or an unexpected error happened. The run stops on the **first** one, so a MySys screen change can't make every Note skip quietly: this alert is the signal for that (there is no separate "all skipped" alert). Business skips such as `NOT_B1` or `DUPLICATE_TASK` never alert. Check the `detail`:
   - **"a Note is still assigned to the agent from an earlier run"** (with a `note_id`): an earlier run left that Note half done, or couldn't hand it back. No Note was taken this run. Find that `note_id` on the Mac Mini (section 2) and look at the earlier alert for it. Then in MySys (3.3): if no task was made for it, return it (3.4); if one was, finish it (3.5). Runs go on by themselves once the Note isn't Pending with the agent.
   - **"run stopped; Note not returned to the pool"**: the agent stopped before Submit and couldn't hand the Note back. Return it by hand (3.4).
+  - **Summit: "run stopped; Note not returned"** (often with a `reason=`, for example `reason=CREATOR_UNKNOWN`): Agent 2 took the Note, stopped before Submit and couldn't give it back. Always so for a Note whose assignee was `---` (Joey, 26 Nov 2026: the agent never presses Unlink). Nothing was submitted. Give it back by hand (3.4a); until then every Summit run stops at the start with the next detail.
+  - **Summit: "a Note is still assigned to the agent from an earlier run"**: a Pending Note sits in Agent 2's My Notes. Either an earlier Summit run left it (above) or a person assigned a Note to Agent 2 by hand (nobody should, from go-live step S.1). Find it (3.3) and give it back (3.4a), or finish it (3.5) if a task was made. Then runs go on by themselves.
+  - **Summit, step W1, `reason=CREATOR_UNKNOWN`** ("creator not an option"): the creator the table gives for the project's company isn't in that project's Creator list, so nothing was selected or submitted. Give the Note back if it is still with Agent 2 (3.4a), book the PO by hand if it is due, and tell Joey: the creator table (`config/clients/summit.toml`) or the project's Creator list has changed. The same Note will stop at W1 again on the next runs until it is fixed.
+  - **Summit, step W1, "project changed since the decision"**: for a "previous task" company, the project's tasks changed between the agent's read and W1. Nothing was submitted; the Note was given back (or, if `---`, see "Note not returned" above). The next run decides again.
   - **Anything else** (for example "unexpected error (type=...)", "Note not found once"): nothing was submitted and the Note was handed back. Nothing to undo. If the alert has step W2 to W5, treat it as `PARTIAL_WRITE` (3.5).
 - **Restart:** the next run tries again by itself. If the same alert comes **two runs in a row**, POs aren't being booked: stop the agent (3.1) and tell Joey that a MySys screen may have changed.
 - **Told:** Joey (automatic).
@@ -224,7 +293,7 @@ The username works the same way with `mysys_live_username`. For the test site, u
   - **"secret not set (env var or keyring)"** (with `secret=<name>`): that item is missing from `poagent`'s Keychain. Add it (3.7, with that name).
   - To see which items are not `ok` before fixing: `uv run po-agent preflight --site live` as `poagent` (3.7 step 3).
   - **"secret store unavailable"**: the Keychain couldn't be read, usually because it is locked. Log in at the Mac as `poagent`, run one spike (3.7 steps 3 to 6), and lock the screen.
-  - **"leftover download folder not removed"**: a temp folder from an earlier run couldn't be deleted. As `poagent`: `ls -d "$TMPDIR"po-agent-dl-* /tmp/po-agent-dl-*` shows them; `rm -rf "$TMPDIR"po-agent-dl-* /tmp/po-agent-dl-*` deletes them. It may hold a PO PDF, so delete it, don't copy it. If that fails too, restart the Mac (`docs/macmini-setup.md` section 10).
+  - **"leftover download folder not removed"**: a temp folder from an earlier run couldn't be deleted. **First make sure no run is going** (as `poagent`, `pgrep -fl macmini-run.sh` prints nothing): the folders of a run going now (B1's or Summit's) match the same names. Then as `poagent`: `ls -d "$TMPDIR"po-agent-dl-* /tmp/po-agent-dl-*` shows them (Summit's are `po-agent-dl-summit-*`); `rm -rf "$TMPDIR"po-agent-dl-* /tmp/po-agent-dl-*` deletes them. It may hold a PO PDF, so delete it, don't copy it. If that fails too, restart the Mac (`docs/macmini-setup.md` section 10).
   - **"config file not readable"**, **"config file is not valid TOML"**, **"invalid config value"**, **"unknown site"**, **"config file is for another site"**, **"unknown time zone"** or **"invalid command line"**: the code or the site's config (`config/live.toml` or `config/test.toml`) at the `production` tag is wrong. Joey fixes it on `main` and moves the tag.
 - **Restart:** after a Keychain or folder fix, run one spike (3.2 step 3); scheduled runs then go on. For a config fix, Joey restarts (3.2 step 2).
 - **Told:** Joey (automatic).
@@ -232,8 +301,14 @@ The username works the same way with `mysys_live_username`. For the test site, u
 ### RUN_LOCK_STUCK (exit 1)
 
 - **Means:** another run has held the run lock for over an hour. Runs take minutes and the wrapper kills a scheduled run at 20 minutes, so this is a hung manual run (or a hung process outside the wrapper). Nothing in MySys changed by this run, which did not start. Every hourly run raises it again until the holder ends. A lock held for less than an hour is normal (a manual run overlapping) and prints only `INFO  run lock held: run not started`, exit 0, with no alert.
-- **Do:** as `poagent`, `ps aux | grep po-agent` finds the holder (its pid is in `state/run-<site>.lock` in the checkout). If it is a manual run Joey left open, end it; the lock frees itself. Don't delete the lock file.
+- **Do:** as `poagent`, `ps aux | grep po-agent` finds the holder (its pid is in `~/po-agent/state/run-<site>.lock` for B1, `~/po-agent/state/run-live-summit.lock` for Summit; each client has its own lock, so a B1 run never holds Summit's or the other way round). If it is a manual run Joey left open, end it; the lock frees itself. Don't delete the lock file.
 - **Told:** Joey (automatic).
+
+### Summit lines that are not alerts
+
+- **`NOTE ... "outcome": "untouched", "reason": "NOTE_TAKEN"`**: a person took the Note between Agent 2's read and its take, so Agent 2 left it alone. Nothing to do.
+- **`NOTE ... "outcome": "untouched", "reason": "DECIDE_ONLY"`**: a `decide-only` run would have booked this Note; nothing was taken.
+- **`NOTE ... "outcome": "untouched"` with another reason** (for example `COMPANY_UNKNOWN`, `DUPLICATE_TASK`): Agent 2 read the Note and decided not to book it; it never took it, so it is still where it was. The admins book it as before.
 
 ### 7.2's alert: no separate alert
 
@@ -241,7 +316,7 @@ Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was neve
 
 ### Missed heartbeat (`po-agent heartbeat missed`)
 
-- **Means:** no run has finished for more than 2 hours inside the schedule (07:07 to 17:30 Perth, weekdays). Every run, even a failed one, updates the issue labelled `po-agent-heartbeat`, so this means runs aren't happening or can't reach GitHub. Nothing alerts at night, at weekends or in the first 2 hours of a day. GitHub runs the check about once each weekday afternoon (decisions, 18 Nov 2026), so runs that stopped in the morning are alerted about that afternoon, and runs that stopped after the day's check, the next weekday afternoon: they may have been down for most of a working day.
+- **Means:** no **B1** run has finished for more than 2 hours inside the schedule (07:07 to 17:30 Perth, weekdays). Every B1 run, even a failed one, updates the issue labelled `po-agent-heartbeat` (Summit runs don't), so this means runs aren't happening or can't reach GitHub. Nothing alerts at night, at weekends or in the first 2 hours of a day. GitHub runs the check about once each weekday afternoon (decisions, 18 Nov 2026), so runs that stopped in the morning are alerted about that afternoon, and runs that stopped after the day's check, the next weekday afternoon: they may have been down for most of a working day.
 - **Check, in this order:**
   1. **Did someone unload the job on purpose** (after an earlier alert)? Then this is expected: leave it open until runs are back.
   2. **At the Mac** (the most likely cause; 18-19 Nov 2026): if it shows the FileVault unlock screen (after a power cut, restart or macOS update), or an admin account is logged in, or `poagent` isn't, follow "`poagent` logged out, or an admin session left on" below. If it is off, turn it on and do the same.
@@ -259,6 +334,7 @@ Plan task 7.2 planned an "every Note skipped" alert (`ALL_SKIPPED`). It was neve
 - **In MySys:** nothing to undo. Notes wait in the pool until runs are back.
 - **Restart:** as in 3.2 (log `poagent` in, lock the screen with Control-Command-Q, load the job if it is gone). Nothing to close: the next run's ping turns the check **up**, and Healthchecks.io emails that too. If the GitHub backup also opened `po-agent heartbeat missed`, close that once a run has finished.
 - **Told:** Joey (automatic; only his Healthchecks.io account gets the email). The backup admin sees no email for this one: Joey asks them to go to the Mac if he is away.
+- **Summit's check `po-agent summit`** (cron `30 7-17 * * 1-5`, 40-minute grace): the same, for Summit's runs at :30 and its job `au.com.prompteng.po-agent.summit` (in step 3 of Missed heartbeat, print and load that job instead). Its ping URL is Keychain item `healthchecks_ping_url_summit`. If only Summit's check is down, B1 is running: look for an unloaded Summit job (3.1a) first. If both are down, the Mac or `poagent` is the cause (next entry).
 
 ### `poagent` logged out, or an admin session left on
 
@@ -282,7 +358,7 @@ The issue (`po-agent alert no run_id`) holds `wrapper: setup failed (<step>), ag
 | `<step>` | Means | Fix |
 |---|---|---|
 | `git fetch` | The Mac Mini couldn't reach GitHub: internet down, or its GitHub token expired | Internet: wait, the next run tries again. Token: as `poagent`, `cd ~/po-agent && git fetch origin` shows an authentication error. Joey makes a new token (`docs/macmini-setup.md` section 1), then as `poagent`: `gh auth login --hostname github.com --git-protocol https --with-token`, type it, then Control-D. An expired token also stops alert issues and the heartbeat, so this one often arrives as a missed heartbeat |
-| `enabled on main` | The site's config (`config/live.toml` or `config/test.toml`) on `main` doesn't have exactly one `enabled = true` or `enabled = false` line | Joey fixes `main` |
+| `enabled on main` | The site's config (`config/live.toml` or `config/test.toml`), or for Summit also `config/clients/summit.toml`, on `main` doesn't have exactly one `enabled = true` or `enabled = false` line | Joey fixes `main` |
 | `production tag missing` | There is no `production` tag | Joey creates it (`docs/macmini-setup.md` section 8). Nobody else |
 | `git checkout` | The tagged code couldn't be checked out, usually because a file in `~/po-agent` was edited by hand | As `poagent`: `cd ~/po-agent && git status`. For each file it lists as modified: `git restore <file>` (this throws away the hand edit; nobody should edit files there). Then run one spike (3.2 step 3) |
 | `uv sync` or `playwright install` | Installing the agent's packages or browser failed: internet down or disk full | Check the internet and free disk space; the next run tries again |
@@ -298,4 +374,5 @@ The issue (`po-agent alert no run_id`) holds `wrapper: setup failed (<step>), ag
 - **`wrapper: healthchecks ping not sent`** (in `runs.log` only): the run's Healthchecks.io ping failed (no internet, or Healthchecks.io down). The run itself is unaffected. Once in a while is fine; on every run the check goes down and emails Joey.
 - **`wrapper: healthchecks ping not configured`** (in `runs.log` only): no Healthchecks.io ping URL in `poagent`'s Keychain, so no ping is sent. Expected until Joey stores it (`docs/macmini-setup.md` sections 1 and 7); after that, Joey stores it again.
 - **`wrapper: enabled = false on main, agent not run`**: not an alert. The kill switch is on; runs start again when Joey sets it back to `true`.
-- **`wrapper: leftover Playwright browser killed`**: not an alert. Housekeeping after a run.
+- **`wrapper: leftover Playwright browser killed`**: not an alert. Housekeeping after a run: only that run's client's browsers (Summit's live in their own folder, `~/Library/Caches/ms-playwright-summit`), so a B1 run never kills a Summit run's browser or the other way round.
+- **`wrapper: unknown client, agent not run`** (exit 2, in a `po-agent alert no run_id` issue): the wrapper was started with a third argument other than `summit`, so nothing ran. Its `runs.log` header reads `=== <time> macmini-run.sh <mode> <site> ? ===` (the argument itself is not written). A launchd plist copied wrong, or a typo in a run by hand: check `~/Library/LaunchAgents/au.com.prompteng.po-agent.summit.plist` says `run`, `live`, `summit` (`docs/macmini-setup.md` section 8).
