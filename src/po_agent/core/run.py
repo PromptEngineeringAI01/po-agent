@@ -897,8 +897,8 @@ def _return_after_stop(
     afterwards; never raises."""
     if note_id is None:
         return False
-    target = client.return_target(original)
     try:
+        target = client.return_target(original)
         with driver.open_browser(
             headed=options.headed, slow_mo=options.slow_mo
         ) as page:

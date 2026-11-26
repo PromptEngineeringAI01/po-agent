@@ -67,6 +67,7 @@ NO_RECORD = "No record could be found."
 PROJECTS_NO_RECORD = "No record found."
 SELECT_USER = "--Select User--"
 SELECT_POOL = "--Select Pool--"
+UNASSIGNED = "---"  # "Assignee:" of a Note with no assignee (screen-map row 01)
 ALL_POOLS = "All Pools"
 ALL_LOCKED = "All"
 # Row 13: a linked Note shows a button named for its project.
@@ -972,12 +973,17 @@ def return_to_assignee(
     case-sensitive, against the option texts: never a near match. Only in the user
     list: user list = that user, pool list --Select Pool--, Assign, then
     "Assignee:" and a new "User Assigned" log line read back. Only in the
-    pool list: B1's return (`return_note`). In both lists or neither (`---`
-    among them: decisions, 26 Nov 2026) nothing is pressed: UnexpectedScreen
+    pool list: B1's return (`return_note`). `---` (decisions, 26 Nov
+    2026), checked before any list is read, or a name in both lists or
+    neither: nothing is pressed, UnexpectedScreen
     "Note not returned", and the Note stays with the agent. Never Unassign
     or Unlink (Must never #2)."""
     step = "return"
     name = assignee.strip()
+    if (
+        name == UNASSIGNED
+    ):  # Joey, 26 Nov 2026: stays with the agent, whatever the lists
+        raise UnexpectedScreen("Note not returned", note_id=note_id, step=step)
     users = _option_names(_list(window, SELECT_USER), SELECT_USER)
     pools = _option_names(_list(window, SELECT_POOL), SELECT_POOL)
     if (name in users) == (name in pools):
