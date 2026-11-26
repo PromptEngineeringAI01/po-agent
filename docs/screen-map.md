@@ -99,7 +99,7 @@ Opens from a Note Pool row. Heading **"Note 300001 - created on 12 Oct 2026"**; 
 **Read:** title, body, file name, assignee, status.
 **Opening a Note changes nothing visible:** no log line, no status change (check 3.5).
 
-**Live Summit email Note** (Joey's live screenshots, 25 Nov 2026, kept in `private/summit/`; shapes only): "Assignee:" reads a staff user, a pool (e.g. **PO Allocation Pool**) or **---**, with a red **Unlink** (trash) button beside a user or a pool, none beside `---` (row 30; **danger**, never targeted until Joey's own change); both lists open at **--Select User--** / **--Select Pool--** (no Agent 1 pre-select, unlike the test site); **Send Email Notification** ticked on open; **Link to Project** shown; one "Download document" link whose file name is the PDF's, with `_` in the PO; the email body is one `iframe` holding a header table, the PO details table, one line of text and a Disclaimer (task 9.12's body rule: SPEC.md -> Client 2, Email body).
+**Live Summit email Note** (Joey's live screenshots, 25 Nov 2026, kept in `private/summit/`; shapes only): "Assignee:" reads a staff user, a pool (e.g. **PO Allocation Pool**) or **---**, with a red **Unlink** (trash) button beside a user or a pool, none beside `---` (row 30; **danger**, never targeted); both lists open at **--Select User--** / **--Select Pool--** (no Agent 1 pre-select, unlike the test site); **Send Email Notification** ticked on open; **Link to Project** shown; one "Download document" link whose file name is the PDF's, with `_` in the PO; the email body is one `iframe` holding a header table, the PO details table, one line of text and a Disclaimer (task 9.12's body rule: SPEC.md -> Client 2, Email body).
 
 ### Rows 03–04 · Assign the Note to the agent
 
