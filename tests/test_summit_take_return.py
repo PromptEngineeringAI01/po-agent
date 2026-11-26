@@ -261,6 +261,21 @@ def test_send_email_ticked_again_before_the_return_s_assign_stops_without_assign
     assert unticked == [("return", False)]
 
 
+def test_a_dashes_original_is_never_returned_even_when_a_list_offers_dashes(
+    page, guard, log
+):
+    # Joey, 26 Nov 2026 ("好，先留給 Agent 2"): `---` stays with Agent 2
+    # whatever the page's lists hold (9.13 second-model review, Nit 2).
+    window = window_of(page, note_page(users=(SUMMIT_AGENT, "---", STAFF)))
+
+    with pytest.raises(UnexpectedScreen) as stopped:
+        driver.return_to_assignee(guard, window, SUMMIT_AGENT, " --- ", log, NOTE_ID)
+
+    assert stopped.value.detail == NOT_RETURNED
+    assert guard.history == []
+    assert body_data(page, "assigns") == "0"
+
+
 # --- the run loop that books: the take and the return ---------------------------
 
 
@@ -439,3 +454,22 @@ def test_a_note_whose_original_assignee_is_in_both_lists_or_neither_stays_with_a
     )
     assert stopped.value.note_id == NOTE_ID
     assert fake.notes[NOTE_ID].assignee == SUMMIT_AGENT
+
+
+def test_until_9_14_a_taken_proceed_stops_before_any_booker_step_and_goes_back(
+    monkeypatch, folder, tmp_path
+):
+    # The interim path (9.13 second-model review, Nit 1): with cli.py's
+    # refusal bypassed, the run loop takes a PROCEED, Summit's booking
+    # refuses before W1 (ConfigError), and the Note goes back to its
+    # original assignee. 9.14 fills the booking and replaces this test.
+    fake = fake_mysys(monkeypatch, folder, summit_note(assignee=STAFF))
+
+    with pytest.raises(ConfigError):
+        book_run(monkeypatch, folder, tmp_path)
+
+    assert fake.notes[NOTE_ID].taken == 1
+    assert not {"check", "reopen", "form", "fill", "submit"} & {
+        c.split()[0] for c in fake.calls
+    }
+    assert fake.notes[NOTE_ID].assignee == STAFF
