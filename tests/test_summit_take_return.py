@@ -32,6 +32,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
+from fakes.config import switched
 from fakes.mysys import (
     PERSON,
     SUMMIT_AGENT,
@@ -289,9 +290,8 @@ def folder(tmp_path):
     live = [line for line in live if not line.startswith("trace_dir")]
     live.append(f'trace_dir = "{(tmp_path / "trace").as_posix()}"')
     (folder / "live.toml").write_text("\n".join(live) + "\n", "utf-8")
-    text = (CONFIG_DIR / "clients" / "summit.toml").read_text("utf-8")
+    text = switched((CONFIG_DIR / "clients" / "summit.toml").read_text("utf-8"), True)
     for old, new in (
-        ("enabled = false", "enabled = true"),
         (
             'source_filter = "support@prompteng.com.au"',
             f'source_filter = "{SUMMIT_MAILBOX}"',

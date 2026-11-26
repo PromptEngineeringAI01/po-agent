@@ -813,6 +813,10 @@ def summit_on() -> str:
     return re.sub(r"(?m)^enabled = \w+", "enabled = true", SUMMIT_CONFIG)
 
 
+def summit_off() -> str:
+    return re.sub(r"(?m)^enabled = \w+", "enabled = false", SUMMIT_CONFIG)
+
+
 SUMMIT_FETCH_CALLS = [
     FETCH_CALLS[0],
     "git show origin/main:config/live.toml",
@@ -849,8 +853,9 @@ def test_summit_client_reaches_the_agent(box, mode, agent_call):
     assert f"macmini-run.sh {mode} live summit ===" in box.runs_log().splitlines()[0]
 
 
-def test_committed_summit_switch_off_on_main_runs_nothing(box):
-    # config/clients/summit.toml is committed enabled = false until S.2.
+def test_summit_switch_off_on_main_runs_nothing(box):
+    # Summit's client file on origin/main says enabled = false (committed
+    # true since S.2; set off here, so the test pins the stop, not the file).
     box.agent([summary(0)], 0)
 
     result = box.run(
@@ -858,6 +863,7 @@ def test_committed_summit_switch_off_on_main_runs_nothing(box):
         "live",
         "summit",
         STUB_MAIN_CONFIG=live_on(),
+        STUB_CLIENT_CONFIG=summit_off(),
         PO_AGENT_HEALTHCHECKS_PING_URL_SUMMIT=HC_URL_SUMMIT,
     )
 
