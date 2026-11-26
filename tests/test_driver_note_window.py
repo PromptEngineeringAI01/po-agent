@@ -297,22 +297,43 @@ def test_return_note_reads_back_the_pool_line_with_a_blank_target(
 
 def test_return_note_blank_target_line_from_someone_else_stops(page, guard, log):
     window = window_of(page, blank_target_page(from_whom="'Fake Person'"))
-    with pytest.raises(UnexpectedScreen):
+    with pytest.raises(UnexpectedScreen) as caught:
         driver.return_note(guard, window, AGENT, POOL, log, NOTE_ID)
+    assert caught.value.field == "log_line"
 
 
 def test_take_note_blank_target_line_stops(page, guard, log):
     # The take names the agent as the new assignee: a blank one is not it.
     window = window_of(page, blank_target_page(assignee=POOL))
-    with pytest.raises(UnexpectedScreen):
+    with pytest.raises(UnexpectedScreen) as caught:
         driver.take_note(guard, window, AGENT, log, NOTE_ID)
+    assert caught.value.field == "log_line"
 
 
 def test_return_to_a_user_blank_target_line_stops(page, guard, log):
     # Summit's return to a person (task 9.13) still needs that person named.
     window = window_of(page, blank_target_page())
-    with pytest.raises(UnexpectedScreen):
+    with pytest.raises(UnexpectedScreen) as caught:
         driver.return_to_assignee(guard, window, AGENT, "Fake Person", log, NOTE_ID)
+    assert caught.value.field == "log_line"
+
+
+# A user Unlink (screen-map row 30, decisions S6) logs the same empty-target
+# line but leaves "Assignee:" at `---`: only the Assignee read-back tells it
+# from a pool return, so it must still stop the return.
+SETS_ASSIGNEE = "document.getElementById('assignee').textContent = who;"
+
+
+def test_return_note_that_ends_unassigned_stops_on_the_assignee(page, guard, log):
+    html = blank_target_page()
+    assert SETS_ASSIGNEE in html
+    unlinked = html.replace(
+        SETS_ASSIGNEE, "document.getElementById('assignee').textContent = '---';"
+    )
+    window = window_of(page, unlinked)
+    with pytest.raises(UnexpectedScreen) as caught:
+        driver.return_note(guard, window, AGENT, POOL, log, NOTE_ID)
+    assert caught.value.field == "assignee"
 
 
 # --- Reload between Notes (rows 25, 27) ------------------------------------------
