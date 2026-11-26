@@ -6,7 +6,7 @@
 # comes from PO_AGENT_* env vars or keyring at run time, set by Joey only.
 client = "summit"
 sites = ["live"]                    # no test-site profile
-enabled = false                     # kill switch, with the site's; flipped by its own PR before the spike
+enabled = true                      # kill switch, with the site's; flipped on by its own PR before the spike (S.2)
 agent_user_name = "Agent 2 (Summit Homes)"
 source_filter = "support@prompteng.com.au"         # Note Pool Source filter (receiving mailbox)
 sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
