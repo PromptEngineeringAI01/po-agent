@@ -91,6 +91,15 @@ expect_po = "123456/020/01"
 expect_creator = "NH Sub Floor"
 
 [[case]]
+id = "creator-easystart-older-alias-in-title"
+title = "New Generation and EasyStart - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
+pdf_replace = [["Summit Homes Group\nPurchase", "Summit Easystart\nPurchase"]]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Easystart" }]
+expect_pln = "pln_20001"
+expect_po = "123456/020/01"
+expect_creator = "NH Sub Floor"
+
+[[case]]
 id = "creator-new-homes"
 title = "Summit New Homes - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
 pdf_replace = [["Summit Homes Group\nPurchase", "Summit New Homes\nPurchase"]]
@@ -116,7 +125,7 @@ search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit 
 project_tasks = []
 expect_pln = "pln_20001"
 expect_po = "123456/020/01"
-expect_creator = "Allison Wells"
+expect_creator = "Alison Wells"
 
 # --- Creator: previous task (highest number, not Compaction Test, not Cancelled) ---
 
@@ -124,7 +133,7 @@ expect_creator = "Allison Wells"
 id = "previous-task-project-by-its-alias"
 title = "Summit Developments - Lot 1 Fake Street Fakeville - PO: 123456/020/01 - READY"
 pdf_replace = [["Summit Homes Group\nPurchase", "Summit Developments\nPurchase"]]
-search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Project" }]
+search_rows = [{ pln = "pln_20001", client_ref_no = "123456", company = "Summit Projects" }]
 project_tasks = [
   { task_no = "tsk_300001", name = "Site Start", status = "Complete", task_creator = "Fake Staff One" },
   { task_no = "tsk_300005", name = "Frame Inspection", status = "New Project", task_creator = "Fake Staff Five" },

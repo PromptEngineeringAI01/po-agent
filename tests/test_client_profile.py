@@ -19,17 +19,22 @@ from po_agent.core.errors import ConfigError
 ROOT = Path(__file__).resolve().parent.parent
 SUMMIT_TOML = ROOT / "config" / "clients" / "summit.toml"
 
-# SPEC.md -> Creator table, with Joey's corrections of 24 and 25 Nov 2026: (name,
-# aliases, creator, creator_rule), in the table's order.
+# SPEC.md -> Creator table, with Joey's corrections of 24, 25 and 26 Nov 2026:
+# (name, aliases, creator, creator_rule), in the table's order.
 SPEC_CREATOR_TABLE = [
-    ("Summit Easystart", ("New Gen and EasyStart",), "NH Sub Floor", None),
+    (
+        "Summit Easystart",
+        ("New Gen and EasyStart", "New Generation and EasyStart"),
+        "NH Sub Floor",
+        None,
+    ),
     ("Summit Homes Group", (), "Compactions", None),
     ("Summit New Homes", (), "NH Sub Floor", None),
     ("Summit SouthWest", ("Summit South West",), "Compactions", None),
-    ("Summit Granny Flats", (), "Allison Wells", None),
+    ("Summit Granny Flats", (), "Alison Wells", None),
     (
-        "Summit Project",
-        ("Summit Developments", "Summit Projects"),
+        "Summit Projects",
+        ("Summit Developments", "Summit Project"),
         None,
         "previous_task",
     ),
@@ -142,7 +147,7 @@ def test_a_creator_rule_other_than_previous_task_is_refused():
         # a second row named like the first, after trim and case-fold
         (1, {"name": "  summit EASYSTART "}),
         # an alias equal to another row's name
-        (1, {"aliases": ["SUMMIT PROJECT"]}),
+        (1, {"aliases": ["SUMMIT PROJECTS"]}),
         # an alias equal to another row's alias
         (1, {"aliases": [" new gen and easystart"]}),
         # an alias equal to its own row's name

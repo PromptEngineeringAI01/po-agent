@@ -1,7 +1,8 @@
 # Summit Home's client profile (SPEC.md -> Client 2: Summit Home, The separate
-# run and Creator table; decisions, 23 Nov 2026, separate run, and 24 Nov 2026,
-# Summit creator table). Client values only: the live host, run window, trace
-# and stale_read stay in config/live.toml. No secrets here: Agent 2's pair
+# run and Creator table; decisions, 23 Nov 2026, separate run, 24 Nov 2026,
+# Summit creator table, and 26 Nov 2026, Summit names from MySys). Client
+# values only: the live host, run window, trace and stale_read stay in
+# config/live.toml. No secrets here: Agent 2's pair
 # comes from PO_AGENT_* env vars or keyring at run time, set by Joey only.
 client = "summit"
 sites = ["live"]                    # no test-site profile
@@ -21,7 +22,7 @@ project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
 
 [[company]]
 name = "Summit Easystart"
-aliases = ["New Gen and EasyStart"]
+aliases = ["New Gen and EasyStart", "New Generation and EasyStart"]   # the second: older Note titles (Joey, 26 Nov 2026)
 creator = "NH Sub Floor"
 
 [[company]]
@@ -39,11 +40,11 @@ creator = "Compactions"
 
 [[company]]
 name = "Summit Granny Flats"
-creator = "Allison Wells"
+creator = "Alison Wells"             # one L, as MySys spells her (Joey, 26 Nov 2026)
 
 [[company]]
-name = "Summit Project"
-aliases = ["Summit Developments", "Summit Projects"]   # Summit Projects: MySys's spelling (Joey, 25 Nov 2026)
+name = "Summit Projects"            # MySys's spelling (Joey, 26 Nov 2026)
+aliases = ["Summit Developments", "Summit Project"]   # Summit Project: the row's old name
 creator_rule = "previous_task"
 
 [[company]]

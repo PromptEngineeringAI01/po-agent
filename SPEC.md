@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.75 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.76 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -567,12 +567,12 @@ Company names, creators and aliases may be committed; they are in `config/client
 
 | Company (row) | Aliases | Creator |
 |---|---|---|
-| Summit Easystart | New Gen and EasyStart | NH Sub Floor |
+| Summit Easystart | New Gen and EasyStart; New Generation and EasyStart (older Note titles; Joey, 26 Nov 2026) | NH Sub Floor |
 | Summit Homes Group | - | Compactions |
 | Summit New Homes | - | NH Sub Floor |
 | Summit SouthWest | Summit South West (MySys's spelling; Joey, 25 Nov 2026) | Compactions |
-| Summit Granny Flats | - | Allison Wells |
-| Summit Project | Summit Developments (Joey, 24 Nov 2026); Summit Projects (MySys's spelling; Joey, 25 Nov 2026) | previous task |
+| Summit Granny Flats | - | Alison Wells (Joey, 26 Nov 2026) |
+| Summit Projects (MySys's spelling; Joey, 26 Nov 2026) | Summit Developments (Joey, 24 Nov 2026); Summit Project (the row's old name) | previous task |
 | Summit Renovations (was Summit Home Improvement) | - | previous task |
 | Summit Homes Display | - | previous task |
 
@@ -649,12 +649,12 @@ project_document_type = "Client Documents"         # W2 Type (S4, confirmed in S
 
 [[company]]
 name = "Summit Easystart"
-aliases = ["New Gen and EasyStart"]
+aliases = ["New Gen and EasyStart", "New Generation and EasyStart"]
 creator = "NH Sub Floor"
 
 [[company]]
-name = "Summit Project"
-aliases = ["Summit Developments", "Summit Projects"]
+name = "Summit Projects"
+aliases = ["Summit Developments", "Summit Project"]
 creator_rule = "previous_task"
 # ... one [[company]] per table row; exactly one of creator / creator_rule
 ```
@@ -678,7 +678,7 @@ creator_rule = "previous_task"
 
 | Screen | By hand (Joey, on live) | Otherwise caught by |
 |---|---|---|
-| Creator select options on Summit projects (NH Sub Floor, Compactions, Allison Wells, a previous-task name) | open Create New Task on a few Summit projects, screenshot the open list, abandon | W1 before Submit (`WRITE_NOT_STARTED`) in a watched run |
+| Creator select options on Summit projects (NH Sub Floor, Compactions, Alison Wells, a previous-task name) | open Create New Task on a few Summit projects, screenshot the open list, abandon | W1 before Submit (`WRITE_NOT_STARTED`) in a watched run |
 | Documents file name with a `-`; Type of the row; Sale Office default | a past Summit task's Documents row and form | W1 read-back before Submit |
 | Locked/Unlocked after an Assign to Agent 2; Agent 2's My Notes lists it | after he assigns one by hand (before S.1) | the first watched run's stale read |
 | Note Pool count at Source + Unlocked + Pending | the footer | the spike (`MORE_PAGES`) |
@@ -710,7 +710,7 @@ A miss at any step stops the order until it is understood, as for B1.
 ### Open questions (Summit)
 
 - **S1** Closed (24 Nov 2026): Joey saved 11 real Summit POs at the top of `private/summit/`; the readers task moves them into `private/summit/pdfs/`.
-- **S2** Closed (Joey, 24 Nov 2026): Summit Project covers Summit Developments; MySys spells the company Summit Projects, the same row (Joey, 25 Nov 2026).
+- **S2** Closed (Joey, 24 Nov 2026): Summit Project covers Summit Developments; MySys spells the company Summit Projects, the same row (Joey, 25 Nov 2026), and the row is now named Summit Projects (Joey, 26 Nov 2026).
 - **S3** Volume: how many Notes Source + Unlocked + Pending lists (page 1 = 50), and so `max_peeks_per_run` and `max_run_minutes`; set from the spike and decide-only timings. S.0 (25 Nov 2026, mid-afternoon, not shown to be a busy time): 10 items, one page.
 - **S4** Closed (S.0, 26 Nov 2026): MySys files a `-` in an uploaded name as `_` (seen on staff uploads, not yet on the agent's); the Type is Client Documents; Sale Office defaults to "Prompt Engineering Pty Ltd" on Summit projects.
 - **S5** Closed (S.0, 26 Nov 2026, on the test site): a Note assigned to Agent 2 is listed under Locked, not under Unlocked, and Agent 2's My Notes lists it.
