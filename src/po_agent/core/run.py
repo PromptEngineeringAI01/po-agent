@@ -197,6 +197,9 @@ def spike(
         driver.login(guard, page, credentials[username], credentials[password])
         output.info("logged in")
         panel = driver.open_note_pool(guard, page)
+        # The pointer off the header before any click below it: Summit's
+        # Source select is opened by a click (decisions, 27 Nov 2026).
+        driver.leave_menu(guard, page)
         driver.set_note_pool_filters(guard, panel, filters)
         output.info("note pool filters set")
         _read_eligible(guard, panel, client, filters, summary)
