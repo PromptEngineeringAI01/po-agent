@@ -14,9 +14,11 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 
 **Before 9.1 (admin)**
 - [x] **A.1** (done 24 Nov 2026) Joey approves Phase S (freeze point for this phase) · by hand
-- [ ] **A.2** PR 165's hand edits merged (CLAUDE.md first line and Must never #6, `docs/workflow.md` phases) · Joey
+- [x] **A.2** PR 165's hand edits merged (CLAUDE.md first line and Must never #6, `docs/workflow.md` phases) · Joey
+  - Done 24 Nov 2026: PR 165 merged (961a0e7).
 - [x] **A.3** `/start-task` brief no longer says "B1 Homes only" or "in the order of Phase P" (`.claude/skills/start-task/SKILL.md`, Claude-editable: the advisor or a small task, or Joey by hand)
-- [ ] **A.4** `production` tag moves during the build as Joey picks (plan -> Phase S, open question 2), each followed by one watched B1 hourly run · by hand
+- [x] **A.4** `production` tag moves during the build as Joey picks (plan -> Phase S, open question 2), each followed by one watched B1 hourly run · by hand
+  - Done 26 Nov 2026: the build's one move was S.1's, e8f9d2c -> 6247dc0 (decisions, 26 Nov 2026, Checkpoint S-C passed), followed by the watched B1 run at 16:07 on 6247dc0d3026, exit 0 (S.1 below). The go-live moves since (b641e91 at S.2, b1320fd on 27 Nov) are S-D's.
 
 **S-A Seam, B1 unchanged**
 - [x] **9.1** Shared models (`core/models.py`); the Creator travels in the `Proceed`, no `CREATOR` constant in `mysys/` · step · refactor · high
@@ -32,7 +34,8 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
 - [x] **9.7** Summit readers: company line, `Purchase Order No:`, COMPACTION TEST under Description; seam-1 fake cases; the 11 real PDFs move to `private/summit/pdfs/` and agree on both readers (S.0 expected compaction values pending: the real-PDF check skips until `cases.toml` gives them) · step · **review stop** · high
 - [x] **9.8** Tasks read: every task's number, name, status and Task Creator in `MySysLookup`; B1's duplicate check unchanged on mapped headers (unmapped header buttons: quiet `DUPLICATE_TASK`, Joey 25 Nov 2026) · step · high
 - [x] **9.9** Summit decision engine: SPEC's decision table in order, three-way company match with aliases, Client Internal No., duplicate (a Cancelled Compaction Test task doesn't block; Joey, 25 Nov 2026), previous-task creator; `COMPANY_UNKNOWN`, `COMPANY_MISMATCH`, `CREATOR_UNKNOWN`; seam 1 `false PROCEED: 0` · step · high
-- [ ] **9.10** Summit real-PO seam on the 11 POs with `private/summit/fixtures/cases.toml` (needs S.0) · step · pauses: laptop runs
+- [x] **9.10** Summit real-PO seam on the 11 POs with `private/summit/fixtures/cases.toml` (needs S.0) · step · pauses: laptop runs
+  - Done 26 Nov 2026: harness PR 192; after the names fix (PR 197; decisions, 26 Nov 2026, Summit names from MySys) readers agree 11/11, as expected 11/11, `false PROCEED: 0`. Rerun on the laptop on main b1320fd (27 Nov 2026): Summit 11/11, coverage 9 of 9, `false PROCEED: 0`; B1 5 of 5, `false PROCEED: 0`.
 
 **Checkpoint S-B:** Summit seam 1 `false PROCEED: 0` in CI; friction log's "Proposed" rows decided; real-PO `false PROCEED: 0` on the laptop, clean-PO skips reviewed with Joey.
 
@@ -60,7 +63,8 @@ Build tasks 9.1-9.15 in this order, one PR each; Joey's live steps S.0-S.5 as SP
   - Done 27 Nov 2026 11:27: 24 rows / 1 eligible (the same Note), untouched, booked 0, exit 0. The watched first booking and its 5.2 trace check were waived: the first booking comes on an unwatched :30 run at cap 1 (decisions, 27 Nov 2026, Summit go-live waiver).
 - [x] **S.5** Healthchecks check `po-agent summit` (cron `30 7-17 * * 1-5`, Perth, 40 min grace); Summit launchd job loaded (:30) at cap 1; first hourly run watched; the cap is raised by its own PR only after Joey checks the first booking (decisions, 27 Nov 2026, Summit go-live waiver) · by hand
   - Done 27 Nov 2026: job loaded with `max_notes_per_run = 1`. First scheduled run 12:30:01 Perth on `production` b641e914ecbb: `"client": "summit"`, seen 16, eligible 2, booked 1, skipped 0, partial 0, 137 s, exit 0; no ALERT and no `healthchecks ping` line; launchd's last exit code 0. Joey checked the booking in MySys and the Healthchecks check: "all correct". The cap raise is its own PR.
-- [ ] **Post-go-live: `---` return by the Assignee Unlink** (Joey, 27 Nov 2026; decisions, Summit `---` return by the Assignee Unlink): guard action `unlink_assignee` and the driver's `---` return built offline · Joey merges (guard, Must never #2) and moves the `production` tag; the first live occurrence is the proof (`docs/ops-runbook.md` 3.4a)
+- [x] **Post-go-live: `---` return by the Assignee Unlink** (Joey, 27 Nov 2026; decisions, Summit `---` return by the Assignee Unlink): guard action `unlink_assignee` and the driver's `---` return built offline · Joey merges (guard, Must never #2) and moves the `production` tag; the first live occurrence is the proof (`docs/ops-runbook.md` 3.4a)
+  - Done 27 Nov 2026: PR 209 merged (42347d5); the `production` tag is on b1320fd, which holds it. The first live `---` return, the proof, has not happened yet.
 - [ ] **After phase 1** (Joey, 25 Nov 2026; decisions, Summit PDF patterns): open question 3's address fallback. A PDF whose PO differs between pages is decided by the site address (suburb + street name, street number ignored), exactly one project, else skip. It needs the PDF address read on both readers, a Projects search by address (a `mysys/` read, B1 seam 2) and the decide branch. The PO written is the page PO equal to the Note title's whose part before the first `/` equals the found project's Client Ref No. and Client Internal No.; none or both -> skip `PO_MISMATCH`. Phase 1 skips it `PO_MISMATCH` · step · high
 
 ## Production order (from 29 Oct 2026; plan -> Phase P, `SPEC.md` -> Production)
