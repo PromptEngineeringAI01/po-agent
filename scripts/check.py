@@ -15,6 +15,15 @@ Runs each step in order, stops on the first failure, and prints
   QUICK_PARALLEL_MIN selected tests. An inner-loop check, not the gate.
 - `--repo-data-only`: just the repo-data rule (the pre-commit hook).
 
+The full check runs one at a time on a machine: it first takes an OS file
+lock on `po-agent-check.lock` in the user's temp dir (never the repo, which
+differs per worktree), waiting up to CHECK_LOCK_WAIT_S and printing the
+holder's PID, worktree and start time, then fails "at check lock" if it is
+still held. The OS frees the lock when its holder dies; if the file can't be
+opened at all the check runs without it. `--quick` and `--repo-data-only`
+take no lock (friction log, 26 Nov 2026; decisions, 27 Nov 2026, friction
+rows).
+
 `-n` lives here, never in pyproject `addopts`, so a plain `uv run pytest`
 (seam 2 included) stays serial; tests/xdist_guard.py fails any `testsite`
 test inside an xdist worker, before its fixtures.
@@ -22,11 +31,16 @@ test inside an xdist worker, before its fixtures.
 
 import argparse
 import fnmatch
+import json
+import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -75,6 +89,17 @@ LIVE_CONFIG = "config/live*.toml"
 # The one committed live config, at the repo root; it holds no secrets
 # (decisions, 10 Nov 2026, live profile).
 COMMITTED_LIVE_CONFIG = "config/live.toml"
+
+# One full check at a time: three parallel full checks made each other's page
+# waits time out (friction log, 26 Nov 2026). A full check takes minutes, so
+# half an hour covers a queue of a few; past that the holder is stuck.
+CHECK_LOCK_NAME = "po-agent-check.lock"
+CHECK_LOCK_WAIT_S = 30 * 60
+CHECK_LOCK_POLL_S = 5
+# Windows locks one byte far past the holder info, so other processes can
+# still read the info; POSIX flock locks the whole file, advisory only (as
+# tests/testsite_lock.py and core/runlock.py).
+_WINDOWS_LOCK_OFFSET = 2**30
 
 Step = tuple[str, Callable[[], bool]]
 
@@ -309,6 +334,130 @@ def quick_steps(paths: list[str]) -> list[Step]:
     ]
 
 
+class CheckLockTimeout(Exception):
+    """Another full check still held the lock after the wait."""
+
+
+@dataclass
+class CheckLock:
+    fd: int
+
+    def release(self) -> None:
+        os.ftruncate(self.fd, 0)
+        _unlock(self.fd)
+        os.close(self.fd)
+
+
+def check_lock_path() -> Path:
+    return Path(tempfile.gettempdir()) / CHECK_LOCK_NAME
+
+
+def _read_holder(path: Path) -> dict[str, object]:
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _holder_text(holder: dict[str, object]) -> str:
+    unknown = "unknown"
+    return (
+        f"PID {holder.get('pid', unknown)}, "
+        f"worktree {holder.get('worktree', unknown)}, "
+        f"since {holder.get('started', unknown)}"
+    )
+
+
+def take_check_lock(
+    path: Path,
+    wait_s: float,
+    poll_s: float,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> CheckLock | None:
+    """Take the lock, waiting up to `wait_s` and printing the holder; raise
+    CheckLockTimeout naming the holder after that. None (run unlocked) if
+    the lock file can't be opened."""
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError as error:
+        print(f"check: running without the check lock ({path}: {error})")
+        return None
+    start = clock()
+    shown: dict[str, object] | None = None
+    while True:
+        try:
+            _lock(fd)
+            break
+        except OSError:
+            holder = _read_holder(path)
+            waited = clock() - start
+            if waited >= wait_s:
+                os.close(fd)
+                raise CheckLockTimeout(
+                    f"another full check still holds the check lock after "
+                    f"{int(waited)} s: {_holder_text(holder)}. Lock file: {path}"
+                ) from None
+            if holder != shown:
+                print(
+                    "check: waiting for the check lock (one full check at a time"
+                    f" on this machine): {_holder_text(holder)}; giving up after"
+                    f" {int(wait_s)} s. Lock file: {path}",
+                    flush=True,
+                )
+                shown = holder
+            sleep(min(poll_s, wait_s - waited))
+    if shown is not None:
+        print(f"check: got the check lock after {int(clock() - start)} s", flush=True)
+    info = {
+        "pid": os.getpid(),
+        "worktree": str(ROOT),
+        "started": datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    os.ftruncate(fd, 0)
+    os.lseek(fd, 0, os.SEEK_SET)
+    os.write(fd, json.dumps(info).encode("utf-8"))
+    return CheckLock(fd)
+
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock(fd: int) -> None:
+        os.lseek(fd, _WINDOWS_LOCK_OFFSET, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+
+    def _unlock(fd: int) -> None:
+        os.lseek(fd, _WINDOWS_LOCK_OFFSET, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+
+else:
+    import fcntl
+
+    def _lock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def _unlock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def full_check() -> int:
+    """The gate: every step, one full check at a time on this machine."""
+    try:
+        lock = take_check_lock(check_lock_path(), CHECK_LOCK_WAIT_S, CHECK_LOCK_POLL_S)
+    except CheckLockTimeout as held:
+        print(f"check: {held}")
+        print("check: failed at check lock")
+        return 1
+    try:
+        return run_checks(STEPS)
+    finally:
+        if lock is not None:
+            lock.release()
+
+
 def run_checks(steps: list[Step]) -> int:
     for name, run in steps:
         print(f"check: {name}", flush=True)
@@ -336,12 +485,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     if args.repo_data_only:
-        steps = [("repo data", repo_data)]
-    elif args.quick:
-        steps = quick_steps(args.quick)
-    else:
-        steps = STEPS
-    sys.exit(run_checks(steps))
+        sys.exit(run_checks([("repo data", repo_data)]))
+    if args.quick:
+        sys.exit(run_checks(quick_steps(args.quick)))
+    sys.exit(full_check())
 
 
 if __name__ == "__main__":

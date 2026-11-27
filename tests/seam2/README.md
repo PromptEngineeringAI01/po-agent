@@ -15,7 +15,8 @@ Before the first run:
 - The test site is reset (`docs/workflow.md` 6.1, Joey, by hand, with his own
   account): no non-cancelled Compaction Test task on the 3 trial plns, exactly
   one Pending, unlinked Note per trial PO in the Agent Pool, nothing assigned
-  to the agent account.
+  to the agent account. How to place a fresh trial Note: `docs/workflow.md`
+  6.1, "Placing a fresh trial Note".
 
 After every reset, run `uv run po-agent run --site test --decide-only` first
 and read the skip reasons: a seam-2 failure report shows only the test name
