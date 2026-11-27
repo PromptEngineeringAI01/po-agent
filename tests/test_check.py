@@ -826,13 +826,13 @@ def test_a_lock_file_that_cant_be_opened_runs_unlocked(tmp_path, capsys, check_s
     assert "running without the check lock" in capsys.readouterr().out
 
 
-HOLD_THE_LOCK = """import importlib.util, sys
+HOLD_THE_LOCK = """import importlib.util, os, sys
 from pathlib import Path
 spec = importlib.util.spec_from_file_location("check_script", sys.argv[1])
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 lock = check.take_check_lock(Path(sys.argv[2]), 0, 1)
-print("held", flush=True)
+print(os.getpid(), flush=True)
 sys.stdin.readline()
 """
 
@@ -841,7 +841,8 @@ def test_another_process_holding_the_lock_is_named_and_freed_on_exit(
     lock_path, check_script
 ):
     # A real second process, as two worktrees' checks would be; it exits
-    # without releasing, as a killed check would.
+    # without releasing, as a killed check would. It prints its own PID: on
+    # Windows a venv's python.exe is a launcher, so Popen.pid is another one.
     holder = subprocess.Popen(
         [sys.executable, "-c", HOLD_THE_LOCK]
         + [str(ROOT / "scripts" / "check.py"), str(lock_path)],
@@ -850,10 +851,10 @@ def test_another_process_holding_the_lock_is_named_and_freed_on_exit(
         text=True,
     )
     try:
-        assert holder.stdout.readline().strip() == "held"
+        pid = holder.stdout.readline().strip()
         with pytest.raises(check_script.CheckLockTimeout) as info:
             check_script.take_check_lock(lock_path, 0, 1)
-        assert f"PID {holder.pid}" in str(info.value)
+        assert f"PID {pid}," in str(info.value)
     finally:
         holder.communicate("\n", timeout=30)
 
