@@ -17,6 +17,7 @@ from po_agent.core.errors import GuardRefusal, UnexpectedScreen
 from po_agent.mysys.guard import (
     ALLOWLIST,
     DENYLIST,
+    SELECT_OPENERS,
     ActionGuard,
     Allowed,
     Refusal,
@@ -1226,3 +1227,40 @@ def test_open_source_filter_takes_no_value(page, guard):
     refused = refusal(guard, "open_source_filter", scope, source, "All Sources")
 
     assert refused == Refusal.VALUE_MISMATCH
+
+
+def test_the_only_select_opener_is_the_source_select():
+    # Any widening (another action, another select) fails here.
+    assert SELECT_OPENERS == {"open_source_filter": "filter_source"}
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    ['aria-label="Close sources"', 'title="Remove source"'],
+)
+def test_open_source_filter_on_a_denylisted_source_select_is_refused(
+    page, guard, attrs
+):
+    page.set_content(
+        LAZY_PANEL.replace('name="filter_source"', f'name="filter_source" {attrs}')
+    )
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    assert refusal(guard, "open_source_filter", scope, source) == Refusal.DENYLISTED
+
+
+def test_open_source_filter_ignores_a_denylisted_word_in_an_option(page, guard):
+    # The opener chooses no option, so the options' texts are not its own.
+    page.set_content(
+        LAZY_PANEL.replace(
+            "<option>All Sources</option>",
+            "<option>All Sources</option><option>close-out@example.test</option>",
+        )
+    )
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    guard.act("open_source_filter", scope, source)
+
+    assert guard.history == [("open_source_filter", "done")]

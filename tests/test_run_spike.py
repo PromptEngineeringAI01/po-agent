@@ -66,6 +66,9 @@ class FakeDriver:
         self.calls.append("open_note_pool")
         return "panel"
 
+    def leave_menu(self, guard, page):
+        self.calls.append("leave_menu")
+
     def set_note_pool_filters(self, guard, panel, filters):
         self.calls.append(f"filters {filters.pool}")
 
@@ -85,6 +88,7 @@ def fake(monkeypatch):
             "go_home",
             "login",
             "open_note_pool",
+            "leave_menu",
             "set_note_pool_filters",
             "read_note_pool",
         ):
@@ -138,6 +142,7 @@ def test_spike_logs_in_reads_the_list_once_and_prints_counts(env, fake, capsys):
         "go_home",
         "login fake-user",
         "open_note_pool",
+        "leave_menu",  # the pointer off the header (decisions, 27 Nov 2026)
         f"filters {POOL}",
         "read",
         "closed",
