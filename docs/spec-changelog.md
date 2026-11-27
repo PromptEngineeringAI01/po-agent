@@ -2,6 +2,7 @@
 
 Version history of `SPEC.md`, moved verbatim from its status line on 19 Nov 2026 (v1.47). Newest first, one line per version; each line cites the `docs/decisions.md` entry behind it, where there is one. Add the next version here, at the top, in the same commit as the `SPEC.md` change, and bump the version on `SPEC.md` line 3.
 
+- 1.81: Client 2, Note Pool filters: the Source option is matched after stripping the whitespace around its text and passed to the guard as the page shows it (live S.2 stopped with `OPTION_NOT_FOUND`); none or more than one still refused (decisions, 27 Nov 2026, Source option whitespace)
 - 1.80: Client 2, config shape and Live steps S.2: `config/clients/summit.toml` is `enabled = true`; from that merge `run live summit` books, so until S.4 Joey runs only `spike` and `decide-only`, and loads no Summit job before S.5 (decisions, 26 Nov 2026, S.2)
 - 1.79: MySys screen rules, Assign to pool: the new log line may also read "Unassigned from <agent> to" with an empty target, as the test site writes it (decisions, 26 Nov 2026, pool return log line)
 - 1.78: Secrets, Commands and Client 2, The separate run (Mac Mini row): Summit on the Mac Mini as built (task 9.15): the wrapper's `summit` argument reads both kill switches on `main`, Summit's job at :30 (07:30-17:30 Monday-Friday Perth; Joey, 24 Nov 2026), its own Healthchecks item, alert title and Playwright browsers folder, no GitHub heartbeat; an unknown client alerts (decisions, 26 Nov 2026, Summit on the Mac Mini)

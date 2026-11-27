@@ -459,10 +459,25 @@ def _set_filter(
         if _chosen(panel, name) == label:
             return  # already set: choosing it again wouldn't reload the list
         before = _first_row(panel)
+        select = panel.locator(f'select[name="{name}"]')
+        option = _option_as_shown(select, label)
     except PlaywrightError:
         raise UnexpectedScreen("Note Pool filters not readable") from None
-    guard.act(action, panel, panel.locator(f'select[name="{name}"]'), label)
+    guard.act(action, panel, select, option)
     wait_for_list(panel, before)
+
+
+def _option_as_shown(select: Locator, label: str) -> str:
+    """`label` as the page shows it, for the guard, which selects only an
+    option's exact text: `label` itself if it is an option's text; else the
+    one option whose text, whitespace around it stripped, equals it (live
+    S.2: the Source option's text has whitespace around it); else `label`
+    unchanged, so the guard refuses it (none, or more than one)."""
+    texts = select.locator("option").all_text_contents()
+    if label in texts:
+        return label
+    found = [text for text in texts if text.strip() == label]
+    return found[0] if len(found) == 1 else label
 
 
 def _read_list(panel: Locator, columns: dict[str, str]) -> NotePoolList | None:
