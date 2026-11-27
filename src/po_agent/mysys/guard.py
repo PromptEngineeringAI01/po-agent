@@ -65,6 +65,9 @@ ALLOWLIST: dict[str, Kind] = {
     "set_locked_filter": Kind.SELECT,
     # Summit's Source filter, `filter_source` (SPEC -> Client 2, task 9.6).
     "set_source_filter": Kind.SELECT,
+    # Live's Source select loads its options only when opened (decisions,
+    # 27 Nov 2026, Source options load on open): pinned in SELECT_OPENERS.
+    "open_source_filter": Kind.CLICK,
     "search_note_pool": Kind.FILL,
     "refresh_note_pool": Kind.CLICK,  # row 27 (decisions, 25 Oct 2026)
     "open_note": Kind.CLICK,
@@ -175,6 +178,9 @@ CLICK_TARGETS: dict[str, tuple[str, str | None]] = {
 # A CLICK action whose one target's whole text (whitespace collapsed) is
 # exactly this: a Project menu item has no role or name of its own.
 TEXT_TARGETS = {"open_my_notes": "My Notes"}
+# The only CLICKs allowed on a select: each action opens only the select
+# with this `name` attribute, choosing nothing (decisions, 27 Nov 2026).
+SELECT_OPENERS = {"open_source_filter": "filter_source"}
 # A SELECT action that may choose only this one option.
 SELECT_VALUES = {"back_to_project": "-- Select Task --"}
 # A MOVE's only target: a list's status line, its footer or its empty text.
@@ -221,8 +227,8 @@ class ActionGuard:
         Reads the page only. Checks, in order: the action is allowlisted and
         the value fits it; the scope is exactly one visible window; the target
         is exactly one visible element, inside that window; a pinned action's
-        element has its one role and name (PRESS_TARGETS, CLICK_TARGETS) or
-        text (TEXT_TARGETS); the element's own
+        element has its one role and name (PRESS_TARGETS, CLICK_TARGETS),
+        text (TEXT_TARGETS) or select name (SELECT_OPENERS); the element's own
         name and text (for a select: its name plus the chosen option) miss the
         denylist; it isn't the Pending button; it isn't a checkbox while a
         Hold Task window is open.
@@ -262,7 +268,11 @@ class ActionGuard:
 
         page = scope.page
         is_select = resolved.and_(page.locator("select")).count() == 1
-        if (kind == Kind.SELECT) != is_select:
+        if action in SELECT_OPENERS:
+            opens = page.locator(f'select[name="{SELECT_OPENERS[action]}"]')
+            if resolved.and_(opens).count() != 1:
+                return Refused(Refusal.WRONG_ELEMENT)
+        elif (kind == Kind.SELECT) != is_select:
             return Refused(Refusal.WRONG_ELEMENT)
 
         # Pin the element now: act() uses this handle, never a second lookup.
@@ -298,7 +308,8 @@ class ActionGuard:
             return Refused(Refusal.WRONG_ELEMENT)
         texts = [name, *(element.get_attribute(a) or "" for a in NAME_ATTRIBUTES)]
         if is_select:
-            texts.append(str(value))  # the chosen option, never the others
+            # The chosen option, never the others; an opener chooses none.
+            texts.append(value if isinstance(value, str) else "")
         else:
             texts.append(element.text_content() or "")
         own_text = " ".join(texts).lower()
@@ -314,7 +325,7 @@ class ActionGuard:
             or resolved.and_(page.locator("label")).count() > 0
         ):
             return Refused(Refusal.HOLD_CHECKBOX)
-        if is_select and not self._has_option(resolved, str(value)):
+        if kind == Kind.SELECT and not self._has_option(resolved, str(value)):
             return Refused(Refusal.OPTION_NOT_FOUND)
         return Allowed(element)
 

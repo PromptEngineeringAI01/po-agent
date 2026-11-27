@@ -206,12 +206,14 @@ def set_note_pool_filters(
     """Assigned Pool, Source and Locked/Unlocked as the client's `filters`
     say (a filter it leaves None stays at its default), each read back;
     every other filter at its default and every textbox empty. B1 sets its
-    pool and Locked; Summit Source and Unlocked (task 9.11)."""
+    pool and Locked; Summit Source and Unlocked (task 9.11), Source opened
+    first when its option isn't there yet (`_load_source_options`)."""
     wanted: dict[str, str] = {LOCK_FILTER: filters.locked}
     if filters.pool is not None:
         _set_filter(guard, panel, "set_pool_filter", POOL_FILTER, filters.pool)
         wanted[POOL_FILTER] = filters.pool
     if filters.source is not None:
+        _load_source_options(guard, panel, filters.source)
         _set_filter(guard, panel, "set_source_filter", SOURCE_FILTER, filters.source)
         wanted[SOURCE_FILTER] = filters.source
     _set_filter(guard, panel, "set_locked_filter", LOCK_FILTER, filters.locked)
@@ -450,6 +452,27 @@ def _first_row(panel: Locator) -> ElementHandle | None:
 def _chosen(panel: Locator, name: str) -> str:
     select = panel.locator(f'select[name="{name}"]')
     return (select.locator("option:checked").text_content() or "").strip()
+
+
+def _load_source_options(guard: ActionGuard, panel: Locator, label: str) -> None:
+    """Live's Source select lists only "All Sources" until it is opened
+    (decisions, 27 Nov 2026, Source options load on open): when `label` is
+    neither chosen nor exactly one option's text, open the select through
+    the guard, then wait (LOAD_TIMEOUT_MS) for exactly one option with that
+    exact text. If it never comes, set_source_filter is refused
+    (OPTION_NOT_FOUND), as before."""
+    select = panel.locator(f'select[name="{SOURCE_FILTER}"]')
+
+    def loaded() -> bool:
+        return select.locator("option").all_text_contents().count(label) == 1
+
+    try:
+        if _chosen(panel, SOURCE_FILTER) == label or loaded():
+            return
+    except PlaywrightError:
+        raise UnexpectedScreen("Note Pool filters not readable") from None
+    guard.act("open_source_filter", panel, select)
+    wait.until(wait.within(panel.page), loaded)
 
 
 def _set_filter(
