@@ -370,11 +370,18 @@ class FakeMySys:
 
     def return_to_assignee(self, guard, window, agent, assignee, log, note_id):
         # Summit's return (SPEC.md -> Return to the original assignee): one
-        # Assign to the name as the window's lists show it; a name in both
-        # lists or neither is not returned (decisions, 26 Nov 2026).
+        # Assign to the name as the window's lists show it; `---` by the
+        # Assignee block's user Unlink (decisions, 27 Nov 2026); a name in
+        # both lists or neither is not returned (decisions, 26 Nov 2026).
         _, note = self._note(window)
         self._call("return", note_id)
         name = assignee.strip()
+        if name == UNASSIGNED:
+            self._acted(guard, "untick_send_email_notification", "unlink_assignee")
+            if self.fail_return:
+                raise UnexpectedScreen("fake return failure", note_id=note_id)
+            note.assignee = UNASSIGNED
+            return
         if (name in self.note_users) == (name in self.note_pools):
             raise UnexpectedScreen("Note not returned", note_id=note_id)
         self._acted(

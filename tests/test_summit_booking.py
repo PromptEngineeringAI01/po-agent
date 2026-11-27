@@ -20,8 +20,10 @@ and the advisor's 26 Nov 2026 decisions:
   detail. Only `driver.search_note` (W1's assignee check) is faked.
 - The command on the offline fake MySys (tests/fakes/mysys.py):
   `run --client summit` books up to the client file's `max_notes_per_run`
-  (bookings; each test sets its own cap), and a creator not in the select stops before Submit with the Note
-  returned under 9.13's rules (`---` stays with Agent 2 with the ALERT).
+  (bookings; each test sets its own cap), and a creator not in the select
+  stops before Submit with the Note returned under 9.13's rules (`---` by
+  the Assignee Unlink, decisions 27 Nov 2026; an Unlink that fails leaves
+  it with Agent 2 with the ALERT).
 
 B1's booking stays pinned by tests/test_booker_offline.py and B1's seam 2
 booking cases.
@@ -864,14 +866,36 @@ def test_a_creator_not_in_the_select_stops_and_returns_the_note(
     assert not [c for c in fake.calls if c.startswith("submit")]
 
 
-def test_a_dashes_original_stays_with_agent_2_with_the_alert_naming_the_reason(
+def test_a_dashes_original_stopped_at_w1_goes_back_by_the_assignee_unlink(
     env, capsys, tmp_path
 ):
-    # Joey, 26 Nov 2026: a taken `---` Note stays with Agent 2 ("先留給
-    # Agent 2"); the ALERT still says why the booking stopped.
+    # Joey, 27 Nov 2026: a taken `---` Note goes back by the Assignee
+    # block's user Unlink (replaces 26 Nov's "先留給 Agent 2").
     fake = fake_mysys(
         env, tmp_path, {NOTE_ID: summit_note()}, creator_options=("NH Sub Floor",)
     )
+
+    code, lines = run_summit(env, capsys, AT_1000_PERTH)
+
+    assert code == 1
+    ((kind, alert),) = alerts_of(lines)
+    assert kind == "UNEXPECTED_SCREEN"
+    assert "reason=CREATOR_UNKNOWN" in alert["detail"]
+    assert alert["step"] == "W1"
+    assert "Note not returned" not in alert["detail"]
+    assert fake.notes[NOTE_ID].assignee == "---"
+    assert not [c for c in fake.calls if c.startswith("submit")]
+
+
+def test_a_dashes_original_whose_unlink_fails_stays_with_agent_2_naming_the_reason(
+    env, capsys, tmp_path
+):
+    # The Unlink refused or not read back: the Note stays with Agent 2 and
+    # the ALERT still says why the booking stopped.
+    fake = fake_mysys(
+        env, tmp_path, {NOTE_ID: summit_note()}, creator_options=("NH Sub Floor",)
+    )
+    fake.fail_return = True
 
     code, lines = run_summit(env, capsys, AT_1000_PERTH)
 
