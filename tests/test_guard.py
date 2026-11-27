@@ -1505,6 +1505,18 @@ def test_unlink_assignee_on_a_hidden_button_is_refused(page, guard):
     assert refused == Refusal.TARGET_NOT_FOUND
 
 
+def test_unlink_assignee_on_a_disabled_button_is_refused(page, guard):
+    # `disable: !can_assign_note()`: a disabled Unlink is never clicked.
+    page.set_content(
+        unlink_note(assignee_block(unlink_button(USER_BINDING, "disabled")))
+    )
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert guard.history == [("unlink_assignee", "WRONG_ELEMENT")]
+
+
 def test_unlink_assignee_takes_no_value(page, guard):
     page.set_content(unlink_note())
     scope = note_scope(page)

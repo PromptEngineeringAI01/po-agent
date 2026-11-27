@@ -21,7 +21,8 @@ and the advisor's 26 Nov 2026 decisions:
 - The command on the offline fake MySys (tests/fakes/mysys.py):
   `run --client summit` books, one Note per run (`max_notes_per_run = 1`),
   and a creator not in the select stops before Submit with the Note
-  returned under 9.13's rules (`---` stays with Agent 2 with the ALERT).
+  returned under 9.13's rules (`---` by the Assignee Unlink, decisions
+  27 Nov 2026; an Unlink that fails leaves it with Agent 2 with the ALERT).
 
 B1's booking stays pinned by tests/test_booker_offline.py and B1's seam 2
 booking cases.
