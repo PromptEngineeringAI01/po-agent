@@ -43,6 +43,7 @@ from fakes.mysys import (
     SUMMIT_SENDER,
     FakeMySys,
     install,
+    summit_lookup,
     summit_note,
     summit_pdf,
     summit_row,
@@ -782,8 +783,12 @@ def test_run_client_summit_books_several_notes_in_one_run(env, capsys, tmp_path)
         env,
         tmp_path,
         {
-            "462003": summit_note("654322/020/01"),
-            "462002": summit_note("654321/020/01"),
+            "462003": summit_note(
+                "654322/020/01", lookup=summit_lookup("654322", pln="pln_20003")
+            ),
+            "462002": summit_note(
+                "654321/020/01", lookup=summit_lookup("654321", pln="pln_20002")
+            ),
             "462001": summit_note(),
         },
     )
@@ -792,9 +797,11 @@ def test_run_client_summit_books_several_notes_in_one_run(env, capsys, tmp_path)
     code, lines = run_summit(env, capsys, AT_1000_PERTH)
 
     assert code == 0
-    assert [(n["note_id"], n["outcome"], n["po_number"]) for n in notes_of(lines)] == [
-        ("462003", "booked", "654322/020/01"),  # newest first
-        ("462002", "booked", "654321/020/01"),
+    assert [
+        (n["note_id"], n["outcome"], n["po_number"], n["pln"]) for n in notes_of(lines)
+    ] == [
+        ("462003", "booked", "654322/020/01", "pln_20003"),  # newest first
+        ("462002", "booked", "654321/020/01", "pln_20002"),  # its own project
     ]
     assert "INFO  run cap reached: 1 notes left for the next run" in lines
     assert alerts_of(lines) == []
@@ -808,6 +815,33 @@ def test_run_client_summit_books_several_notes_in_one_run(env, capsys, tmp_path)
     assert fake.notes["462002"].assignee == AGENT
     assert fake.notes["462001"].assignee != AGENT  # never taken
     assert not [c for c in fake.calls if c.startswith("find_again 462001")]
+
+
+def test_a_second_note_for_a_project_booked_in_the_same_run_is_a_duplicate(
+    env, capsys, tmp_path
+):
+    # The same PO sent twice: with a cap above 1 both Notes are peeked in one
+    # run. The second Note's peek reads the project's Tasks table again and
+    # finds the Compaction Test task the first booking added (decisions, 27
+    # Nov 2026, Summit cap 15), so it is never taken.
+    fake = fake_mysys(
+        env,
+        tmp_path,
+        {"462002": summit_note(), "462001": summit_note()},
+    )
+    capped(tmp_path, 2)
+
+    code, lines = run_summit(env, capsys, AT_1000_PERTH)
+
+    assert code == 0
+    assert [(n["note_id"], n["outcome"], n["reason"]) for n in notes_of(lines)] == [
+        ("462002", "booked", None),
+        ("462001", "untouched", "DUPLICATE_TASK"),
+    ]
+    assert alerts_of(lines) == []
+    assert summary_of(lines)["booked"] == 1
+    assert [c for c in fake.calls if c.startswith("submit")] == ["submit 462002"]
+    assert fake.notes["462001"].assignee != AGENT  # never taken
 
 
 @pytest.mark.parametrize("original", [STAFF, POOL])
