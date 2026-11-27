@@ -84,7 +84,9 @@ def test_the_committed_summit_file_loads_with_specs_values():
     assert profile.client == "summit"
     assert profile.sites == ("live",)
     assert profile.enabled is True  # flipped by its own PR before the spike (S.2)
-    assert profile.max_notes_per_run == 1  # the watched runs book one (S.4)
+    # Hourly runs book up to 15 (decisions, 27 Nov 2026, Summit cap 15); the
+    # first live runs booked one.
+    assert profile.max_notes_per_run == 15
     assert profile.max_peeks_per_run == 10  # SPEC draft value (open question S3)
     assert profile.agent_user_name == "Agent 2 (Summit Homes)"
     assert profile.source_filter == "support@prompteng.com.au"
