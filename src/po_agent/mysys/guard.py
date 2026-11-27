@@ -75,6 +75,9 @@ ALLOWLIST: dict[str, Kind] = {
     "select_note_user": Kind.SELECT,
     "select_note_pool": Kind.SELECT,
     "assign_note": Kind.CLICK,
+    # Summit's `---` return: the Assignee block's user Unlink, pinned below
+    # (Joey, decisions 27 Nov 2026; CLAUDE.md Must never #2).
+    "unlink_assignee": Kind.CLICK,
     "download_attachment": Kind.CLICK,
     "untick_send_email_notification": Kind.UNCHECK,
     "link_to_project": Kind.CLICK,
@@ -120,6 +123,8 @@ DENYLIST = (
     "delete",
     "close",
 )
+# The one denylisted word an action may carry, after its pins (UNLINK_*).
+DENYLIST_SPARED = {"unlink_assignee": "unlink"}
 # Attributes that can carry an element's name besides its accessible name.
 NAME_ATTRIBUTES = ("aria-label", "title", "value", "alt")
 HOLD_HEADING = re.compile(r"^Hold Task\b")
@@ -181,6 +186,15 @@ TEXT_TARGETS = {"open_my_notes": "My Notes"}
 # The only CLICKs allowed on a select: each action opens only the select
 # with this `name` attribute, choosing nothing (decisions, 27 Nov 2026).
 SELECT_OPENERS = {"open_source_filter": "filter_source"}
+# The only Unlink the guard allows (Joey, decisions 27 Nov 2026; screen-map
+# row 30): `unlink_assignee`, on the button bound exactly to this, whose text
+# is exactly "Unlink", in the block of the scope's one "Assignee:" label (the
+# "Current Assignee Section"), the scope's only element with this binding. A
+# pool's Unlink (`unlinkPool`) and the project's Unlink never match.
+UNLINK_ACTION = "unlink_assignee"
+UNLINK_USER_BINDING = "click: unlinkUser, disable: !can_assign_note()"
+UNLINK_TEXT = "Unlink"
+ASSIGNEE_LABEL = re.compile(r"^\s*Assignee:\s*$")
 # A SELECT action that may choose only this one option.
 SELECT_VALUES = {"back_to_project": "-- Select Task --"}
 # A MOVE's only target: a list's status line, its footer or its empty text.
@@ -228,10 +242,12 @@ class ActionGuard:
         the value fits it; the scope is exactly one visible window; the target
         is exactly one visible element, inside that window; a pinned action's
         element has its one role and name (PRESS_TARGETS, CLICK_TARGETS),
-        text (TEXT_TARGETS) or select name (SELECT_OPENERS); the element's own
-        name and text (for a select: its name plus the chosen option) miss the
-        denylist; it isn't the Pending button; it isn't a checkbox while a
-        Hold Task window is open.
+        text (TEXT_TARGETS), select name (SELECT_OPENERS) or, for
+        `unlink_assignee`, the Assignee block's user Unlink (UNLINK_*); the
+        element's own name and text (for a select: its name plus the chosen
+        option) miss the denylist, but for the one word DENYLIST_SPARED gives
+        that action; it isn't the Pending button; it isn't a checkbox while
+        a Hold Task window is open.
         """
         try:
             return self._vet(action, scope, target, value)
@@ -296,6 +312,10 @@ class ActionGuard:
             " ".join((element.text_content() or "").split()) != TEXT_TARGETS[action]
         ):
             return Refused(Refusal.WRONG_ELEMENT)
+        if action == UNLINK_ACTION and not self._is_assignee_unlink(
+            window, resolved, element, role
+        ):
+            return Refused(Refusal.WRONG_ELEMENT)
         if kind == Kind.MOVE and (
             role not in MOVE_ROLES
             or not MOVE_TARGET.fullmatch(
@@ -314,7 +334,8 @@ class ActionGuard:
             texts.append(element.text_content() or "")
         own_text = " ".join(texts).lower()
 
-        if any(word in own_text for word in DENYLIST):
+        spared = DENYLIST_SPARED.get(action)
+        if any(word in own_text for word in DENYLIST if word != spared):
             return Refused(Refusal.DENYLISTED)
         if role == "button" and "pending" in own_text:
             return Refused(Refusal.PENDING_BUTTON)
@@ -384,6 +405,29 @@ class ActionGuard:
             self.history.append((action, "failed"))
             raise UnexpectedScreen("guard action failed", action=action) from None
         self.history.append((action, "done"))
+
+    @staticmethod
+    def _is_assignee_unlink(
+        window: Locator, resolved: Locator, element: ElementHandle, role: str
+    ) -> bool:
+        """The Assignee block's user Unlink (UNLINK_USER_BINDING): a button,
+        bound exactly so, text exactly "Unlink", the window's only element
+        with that binding, in the block (the label's parent) of the window's
+        one visible "Assignee:" label."""
+        bound = window.locator(f'[data-bind="{UNLINK_USER_BINDING}"]')
+        labels = window.locator("strong").filter(has_text=ASSIGNEE_LABEL).visible
+        if (
+            role != "button"
+            or resolved.and_(window.page.locator("button")).count() != 1
+            or element.get_attribute("data-bind") != UNLINK_USER_BINDING
+            or " ".join((element.text_content() or "").split()) != UNLINK_TEXT
+            or bound.count() != 1
+            or labels.count() != 1
+        ):
+            return False
+        # https://playwright.dev/python/docs/locators#locate-by-css-or-xpath
+        block = labels.locator("xpath=..")
+        return resolved.and_(block.locator("button")).count() == 1
 
     @staticmethod
     def _hold_window_open(page: Page) -> bool:
