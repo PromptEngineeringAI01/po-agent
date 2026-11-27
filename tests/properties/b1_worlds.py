@@ -10,8 +10,7 @@ passes every check, so it builds one consistent world from SPEC's rules (the
 Note, both readers' text in the layouts SPEC -> Project address describes,
 and the MySys lookup). `MUTATIONS` lists single faults, each with the skip
 reason SPEC gives it and whether it stops before the project lookup.
-`outcome()` runs `decide()` of any module set (the current code or
-tests/oracle) on a world, so the decision and differential tests share it.
+`outcome()` runs `decide()` of the given module set on a world.
 """
 
 import dataclasses
@@ -443,7 +442,7 @@ class Result(NamedTuple):
 def outcome(
     world: World, models: ModuleType, readers: ModuleType, decision: ModuleType
 ) -> Result:
-    """decide() of the given modules (the current code or tests/oracle)."""
+    """decide() of the given modules."""
     calls: list[int] = []
 
     def lookup():  # the project read in MySys, faked (step 8)
