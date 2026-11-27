@@ -42,7 +42,7 @@ Each PO takes about 2 minutes, at 0–50 POs a week, and someone has to check th
 ## Principles (in priority order)
 
 1. **Accuracy beats coverage.** When in doubt, skip. A skipped PO costs the admin 2 minutes; a wrong booking costs much more.
-2. **Never destroy, never undo.** The agent can't delete, and it never presses Discard, Unlink, Cancel, Unassign or remove-document, or touches the related-task checkboxes in the Hold dialog. This is enforced by how the code is built, not by care.
+2. **Never destroy, never undo.** The agent can't delete, and it never presses Discard, Unlink, Cancel, Unassign or remove-document (one pinned exception: the Assignee block's Unlink, to give a Summit Note back to no one; decisions, 27 Nov 2026), or touches the related-task checkboxes in the Hold dialog. This is enforced by how the code is built, not by care.
 3. **The script clicks; Claude only reads.**
 4. **Read-only on email.** Email is seen only as MySys Notes. No replies, forwards, deletes, Outlook access or email notifications.
 5. **No secrets in docs or code.** Credentials come from a secret store at run time.

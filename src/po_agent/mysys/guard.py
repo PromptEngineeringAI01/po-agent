@@ -410,15 +410,17 @@ class ActionGuard:
     def _is_assignee_unlink(
         window: Locator, resolved: Locator, element: ElementHandle, role: str
     ) -> bool:
-        """The Assignee block's user Unlink (UNLINK_USER_BINDING): a button,
-        bound exactly so, text exactly "Unlink", the window's only element
-        with that binding, in the block (the label's parent) of the window's
-        one visible "Assignee:" label."""
+        """The Assignee block's user Unlink (UNLINK_USER_BINDING): an enabled
+        button, bound exactly so, text exactly "Unlink", the window's only
+        element with that binding, in the block (the label's parent) of the
+        window's one visible "Assignee:" label."""
         bound = window.locator(f'[data-bind="{UNLINK_USER_BINDING}"]')
         labels = window.locator("strong").filter(has_text=ASSIGNEE_LABEL).visible
         if (
             role != "button"
             or resolved.and_(window.page.locator("button")).count() != 1
+            # https://playwright.dev/python/docs/api/class-elementhandle#element-handle-is-enabled
+            or not element.is_enabled()
             or element.get_attribute("data-bind") != UNLINK_USER_BINDING
             or " ".join((element.text_content() or "").split()) != UNLINK_TEXT
             or bound.count() != 1
