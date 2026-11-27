@@ -17,7 +17,9 @@ from po_agent.core.errors import GuardRefusal, UnexpectedScreen
 from po_agent.mysys.guard import (
     ALLOWLIST,
     DENYLIST,
+    DENYLIST_SPARED,
     SELECT_OPENERS,
+    UNLINK_USER_BINDING,
     ActionGuard,
     Allowed,
     Refusal,
@@ -97,6 +99,9 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "select_note_user": "select",
         "select_note_pool": "select",
         "assign_note": "click",
+        # Summit's `---` return: the Assignee block's user Unlink only
+        # (Joey, 27 Nov 2026; CLAUDE.md Must never #2)
+        "unlink_assignee": "click",
         "download_attachment": "click",
         "search_project": "fill",
         "submit_project_search": "press",  # Enter, Joey 28 Oct 2026
@@ -1264,3 +1269,281 @@ def test_open_source_filter_ignores_a_denylisted_word_in_an_option(page, guard):
     guard.act("open_source_filter", scope, source)
 
     assert guard.history == [("open_source_filter", "done")]
+
+
+# --- The Assignee block's Unlink (Summit's `---` return; Joey, 27 Nov 2026) ----
+# The one Unlink the guard allows: `unlink_assignee`, on the visible button
+# bound exactly to `click: unlinkUser, disable: !can_assign_note()`, text
+# "Unlink", in the block of the Note window's one "Assignee:" label (the
+# "Current Assignee Section", screen-map row 30), the one such binding in the
+# window. The project's Unlink, `unlinkPool`, Change Project, Discard and a
+# plain "Unlink" stay refused. Fake values; bindings other than unlinkUser
+# and unlinkPool are made up.
+
+USER_BINDING = "click: unlinkUser, disable: !can_assign_note()"
+POOL_BINDING = "click: unlinkPool, disable: !can_assign_note()"
+
+
+def unlink_button(binding: str, attrs: str = "", text: str = "Unlink") -> str:
+    return (
+        f'<button class="btn btn-danger btn-mini pull-right" data-bind="{binding}" '
+        f"{attrs} onclick=\"this.dataset.clicked='yes'\">{text}</button>"
+    )
+
+
+def assignee_block(button_html: str, who: str = "Fake Agent (Fake Homes)") -> str:
+    return (
+        '<div class="well well-small"><!-- Current Assignee Section -->'
+        f"<strong>Assignee:</strong> <span>{who}</span> {button_html}</div>"
+    )
+
+
+PROJECT_BLOCK = (
+    "<div><strong>Project:</strong> "
+    + button("pln_123456")
+    + button("Change Project", 'data-bind="click: changeProject"')
+    + button("Unlink", 'id="project-unlink" data-bind="click: unlinkProject"')
+    + "</div>"
+)
+STATUS_BLOCK = (
+    '<div role="group" aria-label="Status buttons">'
+    + button("Pending", "disabled")
+    + button("Solved")
+    + button("Discard")
+    + "</div>"
+)
+
+
+def unlink_note(assignee_html: str | None = None, extra: str = "") -> str:
+    if assignee_html is None:
+        assignee_html = assignee_block(unlink_button(USER_BINDING))
+    return window(
+        "Note 300001",
+        assignee_html + PROJECT_BLOCK + STATUS_BLOCK + button("Assign") + extra,
+    )
+
+
+def note_scope(page: Page) -> Locator:
+    return win(page, "Note 300001")
+
+
+def user_unlink(scope: Locator) -> Locator:
+    return scope.locator(f'button[data-bind="{USER_BINDING}"]')
+
+
+def test_unlink_assignee_clicks_the_assignee_block_s_user_unlink(page, guard):
+    page.set_content(unlink_note())
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    guard.act("unlink_assignee", scope, target)
+
+    assert clicked(target)
+    assert guard.history == [("unlink_assignee", "done")]
+
+
+def test_the_pinned_binding_and_the_one_spared_denylist_word():
+    # Any widening (another binding, another action, another word) fails here.
+    assert UNLINK_USER_BINDING == USER_BINDING
+    assert DENYLIST_SPARED == {"unlink_assignee": "unlink"}
+
+
+@pytest.mark.parametrize(
+    "locate",
+    [
+        lambda s: s.locator("#project-unlink"),  # the project's Unlink
+        lambda s: s.get_by_role("button", name="Change Project", exact=True),
+        lambda s: s.get_by_role("button", name="Discard", exact=True),
+        lambda s: s.get_by_role("button", name="Solved", exact=True),
+        lambda s: s.get_by_role("button", name="Assign", exact=True),
+        lambda s: s.get_by_role("button", name="pln_123456", exact=True),
+    ],
+    ids=["project-unlink", "change-project", "discard", "solved", "assign", "pln"],
+)
+def test_unlink_assignee_on_any_other_note_window_button_is_refused(
+    page, guard, locate
+):
+    page.set_content(unlink_note())
+    scope = note_scope(page)
+    target = locate(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+    assert not clicked(user_unlink(scope))
+
+
+def test_unlink_assignee_on_the_assignee_name_is_refused(page, guard):
+    page.set_content(unlink_note())
+    scope = note_scope(page)
+    target = scope.get_by_text("Fake Agent (Fake Homes)", exact=True)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(user_unlink(scope))
+
+
+def test_unlink_assignee_on_a_pool_s_unlink_is_refused(page, guard):
+    # A pool assignee's Unlink (`unlinkPool`): never pressed.
+    page.set_content(unlink_note(assignee_block(unlink_button(POOL_BINDING))))
+    scope = note_scope(page)
+    target = scope.locator(f'button[data-bind="{POOL_BINDING}"]')
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        "click: unlinkUser",  # a part of the binding
+        "click: unlinkUser,  disable: !can_assign_note()",  # spacing differs
+        "click: UnlinkUser, disable: !can_assign_note()",  # case differs
+        USER_BINDING + ", visible: true",  # more than the binding
+    ],
+)
+def test_unlink_assignee_on_a_binding_that_is_not_exact_is_refused(
+    page, guard, binding
+):
+    page.set_content(unlink_note(assignee_block(unlink_button(binding))))
+    scope = note_scope(page)
+    target = scope.locator(".well button")
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+@pytest.mark.parametrize("text", ["Unlink all", "Unlink Project", "Assign"])
+def test_unlink_assignee_on_a_button_whose_text_is_not_unlink_is_refused(
+    page, guard, text
+):
+    page.set_content(
+        unlink_note(assignee_block(unlink_button(USER_BINDING, text=text)))
+    )
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+def test_unlink_assignee_outside_the_assignee_block_is_refused(page, guard):
+    # The exact binding, but in another block: not the Assignee Unlink.
+    page.set_content(
+        unlink_note(
+            "<div><strong>Assignee:</strong> <span>---</span></div>"
+            "<div><strong>Owner:</strong> " + unlink_button(USER_BINDING) + "</div>"
+        )
+    )
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+def test_unlink_assignee_with_no_assignee_label_is_refused(page, guard):
+    page.set_content(
+        unlink_note(
+            '<div class="well"><strong>Assigned:</strong> '
+            + unlink_button(USER_BINDING)
+            + "</div>"
+        )
+    )
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+def test_unlink_assignee_with_two_assignee_labels_is_refused(page, guard):
+    page.set_content(
+        unlink_note(extra="<div><strong>Assignee:</strong> <span>x</span></div>")
+    )
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+def test_unlink_assignee_with_a_second_user_unlink_in_the_window_is_refused(
+    page, guard
+):
+    # A hidden copy too: the binding must be the only one in the window.
+    page.set_content(
+        unlink_note(extra=f"<div hidden>{unlink_button(USER_BINDING)}</div>")
+    )
+    scope = note_scope(page)
+    target = scope.locator(f'.well button[data-bind="{USER_BINDING}"]')
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
+
+
+def test_unlink_assignee_in_another_window_is_refused(page, guard):
+    page.set_content(
+        unlink_note()
+        + window(
+            "Note 300002", assignee_block(unlink_button(USER_BINDING, 'id="other"'))
+        )
+    )
+    scope = note_scope(page)
+    outside = page.locator("#other")
+
+    refused = refusal(guard, "unlink_assignee", scope, outside)
+
+    assert refused == Refusal.TARGET_OUTSIDE_SCOPE
+    assert not clicked(outside)
+
+
+def test_unlink_assignee_on_a_hidden_button_is_refused(page, guard):
+    page.set_content(unlink_note(assignee_block(unlink_button(USER_BINDING, "hidden"))))
+    scope = note_scope(page)
+
+    refused = refusal(guard, "unlink_assignee", scope, user_unlink(scope))
+
+    assert refused == Refusal.TARGET_NOT_FOUND
+
+
+def test_unlink_assignee_takes_no_value(page, guard):
+    page.set_content(unlink_note())
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    refused = refusal(guard, "unlink_assignee", scope, target, "---")
+
+    assert refused == Refusal.VALUE_MISMATCH
+    assert not clicked(target)
+
+
+@pytest.mark.parametrize("attrs", ['aria-label="Unlink and close"', 'title="Delete"'])
+def test_unlink_assignee_still_refuses_every_other_denylisted_word(page, guard, attrs):
+    # Only "unlink" is spared, and only for this action.
+    page.set_content(unlink_note(assignee_block(unlink_button(USER_BINDING, attrs))))
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.DENYLISTED
+    assert not clicked(target)
+
+
+@pytest.mark.parametrize("action", ["assign_note", "mark_solved", "open_hold"])
+def test_any_other_action_on_the_assignee_unlink_is_still_denylisted(
+    page, guard, action
+):
+    page.set_content(unlink_note())
+    scope = note_scope(page)
+    target = user_unlink(scope)
+
+    assert refusal(guard, action, scope, target) == Refusal.DENYLISTED
+    assert not clicked(target)
+
+
+def test_a_plain_unlink_elsewhere_is_still_refused(page, guard):
+    page.set_content(window("Note 300001", button("Unlink")))
+    scope = note_scope(page)
+    target = scope.get_by_role("button", name="Unlink", exact=True)
+
+    assert refusal(guard, "assign_note", scope, target) == Refusal.DENYLISTED
+    assert refusal(guard, "unlink_assignee", scope, target) == Refusal.WRONG_ELEMENT
+    assert not clicked(target)
