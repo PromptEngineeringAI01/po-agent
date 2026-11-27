@@ -19,16 +19,18 @@ and the advisor's 26 Nov 2026 decisions:
   nothing else; the long body is read back whitespace-collapsed on the task
   detail. Only `driver.search_note` (W1's assignee check) is faked.
 - The command on the offline fake MySys (tests/fakes/mysys.py):
-  `run --client summit` books, one Note per run (`max_notes_per_run = 1`),
-  and a creator not in the select stops before Submit with the Note
-  returned under 9.13's rules (`---` by the Assignee Unlink, decisions
-  27 Nov 2026; an Unlink that fails leaves it with Agent 2 with the ALERT).
+  `run --client summit` books up to the client file's `max_notes_per_run`
+  (bookings; each test sets its own cap), and a creator not in the select
+  stops before Submit with the Note returned under 9.13's rules (`---` by
+  the Assignee Unlink, decisions 27 Nov 2026; an Unlink that fails leaves
+  it with Agent 2 with the ALERT).
 
 B1's booking stays pinned by tests/test_booker_offline.py and B1's seam 2
 booking cases.
 """
 
 import json
+import re
 import tempfile
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -43,6 +45,7 @@ from fakes.mysys import (
     SUMMIT_SENDER,
     FakeMySys,
     install,
+    summit_lookup,
     summit_note,
     summit_pdf,
     summit_row,
@@ -620,7 +623,7 @@ def test_any_other_documents_name_at_w2_is_an_accuracy_breach(serve, guard, fold
     assert (stopped.value.field, stopped.value.step) == ("document_file", "W2")
 
 
-# --- the command: `run --client summit` books, one Note per run ---------------
+# --- the command: `run --client summit` books up to its cap -------------------
 
 RUN = ["run", "--site", "live", "--client", "summit"]
 STAFF = "Fake Admin"  # a staff user as the original assignee
@@ -688,6 +691,19 @@ def fake_mysys(env, tmp_path, notes, **kwargs) -> FakeMySys:
     return install(env, fake, summit=True)
 
 
+def capped(tmp_path: Path, cap: int) -> None:
+    """The env's Summit client file with `max_notes_per_run = cap`, whatever
+    the committed file says, so a cap test never depends on it."""
+    file = tmp_path / "config" / "clients" / "summit.toml"
+    text, count = re.subn(
+        r"(?m)^max_notes_per_run = \d+",
+        f"max_notes_per_run = {cap}",
+        file.read_text("utf-8"),
+    )
+    assert count == 1
+    file.write_text(text, "utf-8")
+
+
 def run_summit(env, capsys, at: datetime) -> tuple[int, list[str]]:
     env.setattr(controls, "now", lambda: at)
     code = cli.main(RUN)
@@ -714,13 +730,14 @@ def summary_of(lines: list[str]) -> dict:
     return json.loads(lines[-1].removeprefix("RUN_SUMMARY "))
 
 
-def test_run_client_summit_books_one_note_per_run(env, capsys, tmp_path):
+def test_run_client_summit_books_one_note_per_run_at_cap_1(env, capsys, tmp_path):
     # Two Notes that would both be booked; the client file's cap is 1.
     fake = fake_mysys(
         env,
         tmp_path,
         {"462002": summit_note("654321/020/01"), "462001": summit_note()},
     )
+    capped(tmp_path, 1)
 
     code, lines = run_summit(env, capsys, AT_1000_PERTH)
 
@@ -758,6 +775,75 @@ def test_run_client_summit_books_one_note_per_run(env, capsys, tmp_path):
     assert fake.document_types == ["Client Documents"]
     assert fake.notes["462002"].assignee == AGENT  # booked: never returned
     assert not [c for c in fake.calls if c.startswith("find_again 462001")]
+
+
+def test_run_client_summit_books_several_notes_in_one_run(env, capsys, tmp_path):
+    # Three Notes that would all be booked; the client file's cap is 2: the
+    # run books the two newest, one after the other, and leaves the third
+    # untouched for the next run (decisions, 27 Nov 2026, Summit cap 15).
+    fake = fake_mysys(
+        env,
+        tmp_path,
+        {
+            "462003": summit_note(
+                "654322/020/01", lookup=summit_lookup("654322", pln="pln_20003")
+            ),
+            "462002": summit_note(
+                "654321/020/01", lookup=summit_lookup("654321", pln="pln_20002")
+            ),
+            "462001": summit_note(),
+        },
+    )
+    capped(tmp_path, 2)
+
+    code, lines = run_summit(env, capsys, AT_1000_PERTH)
+
+    assert code == 0
+    assert [
+        (n["note_id"], n["outcome"], n["po_number"], n["pln"]) for n in notes_of(lines)
+    ] == [
+        ("462003", "booked", "654322/020/01", "pln_20003"),  # newest first
+        ("462002", "booked", "654321/020/01", "pln_20002"),  # its own project
+    ]
+    assert "INFO  run cap reached: 1 notes left for the next run" in lines
+    assert alerts_of(lines) == []
+    summary = summary_of(lines)
+    assert (summary["client"], summary["booked"], summary["exit_code"]) == (
+        "summit",
+        2,
+        0,
+    )
+    assert fake.notes["462003"].assignee == AGENT  # booked: never returned
+    assert fake.notes["462002"].assignee == AGENT
+    assert fake.notes["462001"].assignee != AGENT  # never taken
+    assert not [c for c in fake.calls if c.startswith("find_again 462001")]
+
+
+def test_a_second_note_for_a_project_booked_in_the_same_run_is_a_duplicate(
+    env, capsys, tmp_path
+):
+    # The same PO sent twice: with a cap above 1 both Notes are peeked in one
+    # run. The second Note's peek reads the project's Tasks table again and
+    # finds the Compaction Test task the first booking added (decisions, 27
+    # Nov 2026, Summit cap 15), so it is never taken.
+    fake = fake_mysys(
+        env,
+        tmp_path,
+        {"462002": summit_note(), "462001": summit_note()},
+    )
+    capped(tmp_path, 2)
+
+    code, lines = run_summit(env, capsys, AT_1000_PERTH)
+
+    assert code == 0
+    assert [(n["note_id"], n["outcome"], n["reason"]) for n in notes_of(lines)] == [
+        ("462002", "booked", None),
+        ("462001", "untouched", "DUPLICATE_TASK"),
+    ]
+    assert alerts_of(lines) == []
+    assert summary_of(lines)["booked"] == 1
+    assert [c for c in fake.calls if c.startswith("submit")] == ["submit 462002"]
+    assert fake.notes["462001"].assignee != AGENT  # never taken
 
 
 @pytest.mark.parametrize("original", [STAFF, POOL])

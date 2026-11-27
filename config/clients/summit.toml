@@ -12,7 +12,7 @@ source_filter = "support@prompteng.com.au"         # Note Pool Source filter (re
 sender = "noreply@summithomesgroup.com.au"         # Source column must equal this
 locked_filter = "Unlocked"
 any_assignee_before = "08:00"       # Perth; a run starting earlier takes any non-agent assignee, later runs only `---`
-max_notes_per_run = 1               # bookings per run; raised by its own PR for hourly runs
+max_notes_per_run = 15              # bookings per run, hourly (Joey, 27 Nov 2026: "limit 15 is fine"); 12 minutes and 10 peeks bind first
 max_peeks_per_run = 10              # Notes opened per run; set from the spike and decide-only (S3)
 project_document_type = "Client Documents"         # W2 Type, to confirm (S4)
 

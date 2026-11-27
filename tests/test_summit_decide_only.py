@@ -23,6 +23,7 @@ driver's own page tests and B1's seam 2 (9.12 second-model review).
 """
 
 import json
+import re
 import tempfile
 from datetime import UTC, datetime
 
@@ -357,8 +358,17 @@ def test_the_peek_cap_stops_opening_notes(env, capsys, tmp_path):
 
 
 def test_the_run_cap_counts_bookings_only(env, capsys, tmp_path):
-    # max_notes_per_run = 1 in the client file: three Notes that would be
-    # booked are all peeked, since decide-only books none.
+    # max_notes_per_run = 1, set here whatever the committed file says: three
+    # Notes that would be booked are all peeked, since decide-only books none
+    # (a cap on Notes opened would stop after the first).
+    path = tmp_path / "config" / "clients" / "summit.toml"
+    text, count = re.subn(
+        r"(?m)^max_notes_per_run = \d+",
+        "max_notes_per_run = 1",
+        path.read_text("utf-8"),
+    )
+    assert count == 1
+    path.write_text(text, "utf-8")
     fake = fake_mysys(
         env,
         tmp_path,

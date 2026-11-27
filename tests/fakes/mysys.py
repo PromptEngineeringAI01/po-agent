@@ -24,6 +24,7 @@ from seam1.seam1_cases import CASES, text_pdf
 from po_agent.core import run
 from po_agent.core.errors import UnexpectedScreen, WriteNotStarted
 from po_agent.core.models import (
+    COMPACTION_TEST,
     MySysLookup,
     NotePoolFilters,
     NotePoolRow,
@@ -106,6 +107,11 @@ class FakeMySys:
     # among them stops W1 as the real form read does (task 9.14).
     creator_options: tuple[str, ...] | None = None
     current: str | None = None  # the Note last named in a call
+    # The Client Internal Nos. of the projects the fake Submit added a
+    # Compaction Test task to: a later lookup of that project lists it, as
+    # the real Tasks table does (screen-map row 10), so a second Note for the
+    # same project in one run reads the first one's task.
+    booked_projects: set[str] = field(default_factory=set)
     calls: list[str] = field(default_factory=list)
     downloads: list[Path | None] = field(default_factory=list)
     reads: int = 0
@@ -316,7 +322,9 @@ class FakeMySys:
     ):
         # The real one reloads base_url: the Note window is gone after it
         # (screen-map rows 25, 27).
-        (note_id,) = [n for n, v in self.notes.items() if v.internal_no == internal_no]
+        matches = [n for n, v in self.notes.items() if v.internal_no == internal_no]
+        # Two Notes for one project: the one in hand.
+        (note_id,) = [self.current] if self.current in matches else matches
         self._call("lookup", note_id)
         self.rules.append(("lookup", rule))
         self._acted(
@@ -327,7 +335,22 @@ class FakeMySys:
             "submit_project_search",
             "open_project",
         )
-        return self.notes[note_id].lookup
+        lookup = self.notes[note_id].lookup
+        if internal_no not in self.booked_projects:
+            return lookup
+        added = ProjectTask(
+            task_no=self.task_no,
+            name=COMPACTION_TEST,
+            status="On Hold",
+            task_creator="Fake Creator",
+        )
+        return MySysLookup(
+            search_rows=lookup.search_rows,
+            more_pages=lookup.more_pages,
+            project_internal_no=lookup.project_internal_no,
+            address=lookup.address,
+            project_tasks=(*lookup.project_tasks, added),
+        )
 
     def return_note(self, guard, window, agent, pool, log, note_id):
         # One Assign with --Select User-- and the pool: "Assignee:" reads the
@@ -420,6 +443,7 @@ class FakeMySys:
     def new_task_after_submit(self, form, project, before):
         # One new Compaction Test task on the project (screen-map row 10).
         self._step("new_task")
+        self.booked_projects.add(self.notes[self.current].internal_no)
         return self.task_no
 
     def check_new_task_row(self, project, task_no, agent, *, creator):
