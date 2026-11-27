@@ -1,6 +1,6 @@
 # Spec: PO Agent MVP (test site, run on the office Mac Mini)
 
-**Status:** **Approved by Joey, 15 Oct 2026** · v1.83 (history: docs/spec-changelog.md)
+**Status:** **Approved by Joey, 15 Oct 2026** · v1.84 (history: docs/spec-changelog.md)
 **Active spec.** Build this first. The full v1 design stays in `docs/specs/spec.md` and is built after the MVP has proved the agent works (roadmap phase 2).
 **Built from:** `docs/intent.md`, `docs/decisions.md` (wins if anything disagrees), `docs/specs/spec.md` v1.2, `docs/specs/ADR-001-po-agent-architecture.md` (Accepted), `docs/specs/ADR-002-po-agent-hosting.md` (Accepted, CEO decision 3, 15 Oct 2026).
 
@@ -697,8 +697,8 @@ S.0 (25-26 Nov 2026) saw the first four rows by hand: `docs/screen-map.md` 1.7, 
 | S.1 | Agent 2's secrets in `poagent`'s Keychain; `po-agent preflight --site live --client summit`; Agent 2's My Notes holds no Pending Note and the team stops assigning to Agent 2 by hand | pre-flight exit 0 |
 | S.2 | Kill-switch PR flips the client's `enabled` (from its merge `run live summit` books: until S.4 Joey runs only `spike` and `decide-only`, and loads no Summit job before S.5; decisions, 26 Nov 2026, S.2); Joey moves the `production` tag; `spike live summit` (G.5) | exit 0, eligible count read, no `MORE_PAGES`; at least 1 eligible when Joey knows a Summit Note is waiting (unlinked, Assignee `---`), else a list-level rule is missing it (decisions, 25 Nov 2026, Summit Note Pool list) |
 | S.3 | `decide-only live summit` (G.6) | Joey reads every NOTE line against the Notes; one peeked Note's log shows no new line and the same assignee |
-| S.4 | `run live summit`, `max_notes_per_run = 1`, watched (G.7); 5.2's trace check on the first | each booked task correct in MySys (Creator, PO, Documents, Note, On Hold, linked, Solved) |
-| S.5 | Cap raised by its own PR; the Summit launchd job and Healthchecks check loaded (G.8) | first hourly run watched, exit 0 |
+| S.4 | `run live summit`, `max_notes_per_run = 1`, watched (G.7); 5.2's trace check on the first booking. Waived on 27 Nov 2026 when no compaction-test Note came in: S.4 ran watched and booked nothing, and the first booking came on a scheduled run at S.5 (decisions, 27 Nov 2026, Summit go-live waiver) | exit 0; each booked task correct in MySys (Creator, PO, Documents, Note, On Hold, linked, Solved) |
+| S.5 | The Summit launchd job and Healthchecks check loaded (G.8) at `max_notes_per_run = 1`; Joey checks the first booking in MySys (Creator, PO, Documents name `-` or `_`, On Hold); only then the cap raised by its own PR (decisions, 27 Nov 2026, Summit go-live waiver) | first hourly run watched, exit 0, Healthchecks check up; the first booking correct in MySys |
 
 A miss at any step stops the order until it is understood, as for B1.
 
