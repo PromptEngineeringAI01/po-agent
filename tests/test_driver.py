@@ -19,7 +19,7 @@ from po_agent.b1.decision import note_pool_filters
 from po_agent.core.errors import LoginFailed, UnexpectedScreen
 from po_agent.core.models import NotePoolFilters
 from po_agent.mysys import driver, wait
-from po_agent.mysys.guard import ActionGuard
+from po_agent.mysys.guard import ActionGuard, GuardRefusal, Refusal
 
 POOL = "Agent Pool"
 USER = "fake-user"
@@ -355,6 +355,59 @@ def test_the_pool_off_its_default_with_summit_s_filters_is_an_unexpected_screen(
 
     with pytest.raises(UnexpectedScreen):
         driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+
+# Live S.2 (27 Nov 2026): the Source select holds only "All Sources" until it
+# is opened; opening it loads the mailboxes (Joey's DevTools checks). The
+# agent stopped with GUARD_REFUSAL OPTION_NOT_FOUND. Fake values.
+ADD_MAILBOX = (
+    f"const o=document.createElement('option');o.text={json.dumps(MAILBOX)};s.add(o);"
+)
+
+
+def lazy_source_page(event: str | None) -> str:
+    """Summit's Note Pool whose Source select gets the mailbox only on its
+    first `event` (None: never)."""
+    html = note_pool_page(rows=SUMMIT_ROWS)
+    plain = f"<option>{MAILBOX}</option>"
+    assert html.count(plain) == 1
+    script = "const s=document.querySelector('select[name=filter_source]');"
+    if event is not None:
+        script += f"s.addEventListener('{event}',()=>{{{ADD_MAILBOX}}},{{once:true}});"
+    return html.replace(plain, "") + f"<script>{script}</script>"
+
+
+@pytest.mark.parametrize("event", ["mousedown", "focus"])
+def test_a_source_select_whose_options_load_on_open_is_opened_then_set(
+    page, guard, event
+):
+    panel = panel_of(page, lazy_source_page(event))
+
+    driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+    assert guard.history == [
+        ("open_source_filter", "done"),
+        ("set_source_filter", "done"),
+        ("set_locked_filter", "done"),
+    ]
+    listing = driver.read_note_pool(guard, panel, with_source=True)
+    assert [(row.note_id, row.source) for row in listing.rows] == [("462003", SENDER)]
+
+
+def test_a_source_option_that_never_loads_is_still_refused(page, guard):
+    panel = panel_of(page, lazy_source_page(None))
+
+    with pytest.raises(GuardRefusal) as caught:
+        driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+    assert caught.value.reason == Refusal.OPTION_NOT_FOUND
+    assert guard.history == [
+        ("open_source_filter", "done"),
+        ("set_source_filter", Refusal.OPTION_NOT_FOUND),
+    ]
+    assert panel.locator('select[name="filter_source"]').input_value() == (
+        "All Sources"
+    )
 
 
 def test_b1_s_read_leaves_the_source_cell_unread(page, guard):
