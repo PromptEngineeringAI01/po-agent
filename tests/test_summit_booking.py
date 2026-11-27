@@ -779,14 +779,36 @@ def test_a_creator_not_in_the_select_stops_and_returns_the_note(
     assert not [c for c in fake.calls if c.startswith("submit")]
 
 
-def test_a_dashes_original_stays_with_agent_2_with_the_alert_naming_the_reason(
+def test_a_dashes_original_stopped_at_w1_goes_back_by_the_assignee_unlink(
     env, capsys, tmp_path
 ):
-    # Joey, 26 Nov 2026: a taken `---` Note stays with Agent 2 ("先留給
-    # Agent 2"); the ALERT still says why the booking stopped.
+    # Joey, 27 Nov 2026: a taken `---` Note goes back by the Assignee
+    # block's user Unlink (replaces 26 Nov's "先留給 Agent 2").
     fake = fake_mysys(
         env, tmp_path, {NOTE_ID: summit_note()}, creator_options=("NH Sub Floor",)
     )
+
+    code, lines = run_summit(env, capsys, AT_1000_PERTH)
+
+    assert code == 1
+    ((kind, alert),) = alerts_of(lines)
+    assert kind == "UNEXPECTED_SCREEN"
+    assert "reason=CREATOR_UNKNOWN" in alert["detail"]
+    assert alert["step"] == "W1"
+    assert "Note not returned" not in alert["detail"]
+    assert fake.notes[NOTE_ID].assignee == "---"
+    assert not [c for c in fake.calls if c.startswith("submit")]
+
+
+def test_a_dashes_original_whose_unlink_fails_stays_with_agent_2_naming_the_reason(
+    env, capsys, tmp_path
+):
+    # The Unlink refused or not read back: the Note stays with Agent 2 and
+    # the ALERT still says why the booking stopped.
+    fake = fake_mysys(
+        env, tmp_path, {NOTE_ID: summit_note()}, creator_options=("NH Sub Floor",)
+    )
+    fake.fail_return = True
 
     code, lines = run_summit(env, capsys, AT_1000_PERTH)
 
