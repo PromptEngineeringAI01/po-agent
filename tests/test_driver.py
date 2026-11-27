@@ -19,7 +19,7 @@ from po_agent.b1.decision import note_pool_filters
 from po_agent.core.errors import LoginFailed, UnexpectedScreen
 from po_agent.core.models import NotePoolFilters
 from po_agent.mysys import driver, wait
-from po_agent.mysys.guard import ActionGuard
+from po_agent.mysys.guard import ActionGuard, GuardRefusal, Refusal
 
 POOL = "Agent Pool"
 USER = "fake-user"
@@ -355,6 +355,60 @@ def test_the_pool_off_its_default_with_summit_s_filters_is_an_unexpected_screen(
 
     with pytest.raises(UnexpectedScreen):
         driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+
+# Live S.2 (26 Nov 2026): the Source option's text has whitespace around it
+# in the page's HTML (a DOM option's .text strips it, so DevTools showed none).
+# The guard selects only an option's exact text, so it refused the bare
+# mailbox with OPTION_NOT_FOUND. Fake values and fake whitespace.
+PADDED = f"<option>\n      {MAILBOX}\n    </option>"
+
+
+def padded_source_page(rows=SUMMIT_ROWS, copies: int = 1) -> str:
+    html = note_pool_page(rows=rows)
+    plain = f"<option>{MAILBOX}</option>"
+    assert html.count(plain) == 1
+    return html.replace(plain, PADDED * copies)
+
+
+def test_a_source_option_with_whitespace_around_its_text_is_set_and_read_back(
+    page, guard
+):
+    panel = panel_of(page, padded_source_page())
+
+    driver.set_note_pool_filters(guard, panel, SUMMIT_FILTERS)
+
+    assert guard.history == [
+        ("set_source_filter", "done"),
+        ("set_locked_filter", "done"),
+    ]
+    listing = driver.read_note_pool(guard, panel, with_source=True)
+    assert [row.note_id for row in listing.rows] == ["462003"]
+
+
+@pytest.mark.parametrize(
+    "html, source",
+    [
+        (lambda: note_pool_page(rows=SUMMIT_ROWS), "other@fake-mailbox.test"),
+        (lambda: padded_source_page(), "other@fake-mailbox.test"),
+        (lambda: padded_source_page(), "support@fake-mailbox"),  # part of it
+        (lambda: padded_source_page(copies=2), MAILBOX),  # two options match
+    ],
+)
+def test_a_source_that_is_not_exactly_one_option_is_still_refused(
+    page, guard, html, source
+):
+    panel = panel_of(page, html())
+
+    with pytest.raises(GuardRefusal) as caught:
+        driver.set_note_pool_filters(
+            guard, panel, NotePoolFilters(source=source, locked="Unlocked")
+        )
+
+    assert caught.value.reason == Refusal.OPTION_NOT_FOUND
+    assert panel.locator('select[name="filter_source"]').input_value().strip() == (
+        "All Sources"
+    )
 
 
 def test_b1_s_read_leaves_the_source_cell_unread(page, guard):
