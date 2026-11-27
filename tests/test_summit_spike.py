@@ -13,6 +13,7 @@ and sender, `enabled` on, in a temp config folder.
 
 import json
 import tempfile
+from contextlib import contextmanager
 from datetime import UTC, datetime
 
 import keyring
@@ -28,9 +29,10 @@ from fakes.mysys import (
     summit_title,
 )
 from keyring.backends.null import Keyring as NullKeyring
+from test_driver import lazy_source_page
 
 from po_agent import cli
-from po_agent.core import controls, secrets
+from po_agent.core import controls, run, secrets
 from po_agent.core.config import CONFIG_DIR
 from po_agent.core.models import NotePoolFilters
 
@@ -121,6 +123,7 @@ def test_the_spike_sets_summit_s_filters_reads_once_and_opens_no_note(
         "go_home",
         "login",
         "open_note_pool",
+        "leave_menu",  # the pointer off the header (decisions, 27 Nov 2026)
         "filters",
         "read with source",
         "closed",
@@ -176,3 +179,56 @@ def test_the_spike_prints_no_page_text_and_no_note_line(env, capsys, tmp_path):
         "fake-summit",
     ):
         assert text not in out
+
+
+# Live S.2 (27 Nov 2026): Source's options load only when the select is
+# opened, and opening it is the spike's first click below the header. After
+# the Project menu the pointer is parked in the header, and while the header
+# is hovered the page covers the body (decisions, 28 Oct 2026; the fake in
+# tests/test_booking.py, with CSS only). The real spike, driver and guard run
+# on a fake page with both; only the browser, go_home and login are faked.
+HEADER_COVER = """
+<style>
+  header { position: relative; z-index: 20; height: 40px; }
+  header .drop { display: none; position: absolute; }
+  header li:hover .drop { display: block; }
+  body:has(header:hover)::before {
+    content: ""; position: fixed; inset: 0; z-index: 10;
+  }
+</style>
+<header>
+  <ul><li><span>Project</span><ul class="drop"><li>Note Pool</li></ul></li></ul>
+</header>
+"""
+
+
+def test_the_spike_moves_the_pointer_off_the_menu_then_opens_source(
+    env, capsys, browser, short_waits
+):
+    page = browser.new_page()
+    page.set_default_timeout(3000)
+    page.set_content(
+        HEADER_COVER
+        + '<main style="margin-top: 80px">'
+        + lazy_source_page("mousedown")
+        + "</main>"
+    )
+
+    @contextmanager
+    def open_browser(*, headed: bool, slow_mo: int):
+        yield page
+
+    env.setattr(run.driver, "open_browser", open_browser)
+    env.setattr(run.driver, "go_home", lambda page, base_url: None)
+    env.setattr(run.driver, "login", lambda guard, page, username, password: None)
+
+    code, lines = spike(env, capsys, AT_0800_PERTH)
+    page.close()
+
+    assert lines[:-1] == [
+        "INFO  config loaded",
+        "INFO  logged in",
+        "INFO  note pool filters set",
+        "INFO  note pool read: 1 rows, 1 eligible",
+    ]
+    assert code == 0

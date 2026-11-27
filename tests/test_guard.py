@@ -17,6 +17,7 @@ from po_agent.core.errors import GuardRefusal, UnexpectedScreen
 from po_agent.mysys.guard import (
     ALLOWLIST,
     DENYLIST,
+    SELECT_OPENERS,
     ActionGuard,
     Allowed,
     Refusal,
@@ -89,6 +90,7 @@ def test_allowlist_is_spec_section_5_plus_the_spec_additions():
         "set_pool_filter": "select",
         "set_locked_filter": "select",
         "set_source_filter": "select",  # Summit's Source filter (task 9.6)
+        "open_source_filter": "click",  # its options load on open (27 Nov 2026)
         "search_note_pool": "fill",
         "refresh_note_pool": "click",
         "open_note": "click",
@@ -1129,3 +1131,136 @@ def test_source_filter_outside_the_note_pool_panel_is_refused(page, guard):
     assert refused == Refusal.TARGET_OUTSIDE_SCOPE
     assert outside.input_value() == "All Sources"
     assert scope.locator("select").input_value() == "All Sources"
+
+
+# --- Opening the Source select (live S.2, 27 Nov 2026) --------------------------
+# Live's Source select holds only "All Sources" until it is opened; opening
+# it loads the mailboxes (Joey's DevTools checks, 27 Nov 2026). The one CLICK
+# the guard allows on a select: open_source_filter, on the Note Pool panel's
+# `filter_source` select only. Fake values.
+
+LAZY_SOURCE = (
+    "<script>const s=document.querySelector('select[name=filter_source]');"
+    "s.addEventListener('mousedown',()=>{const o=document.createElement('option');"
+    "o.text='orders@example.test';s.add(o);},{once:true});</script>"
+)
+LAZY_PANEL = (
+    '<div id="user_note__1002">'
+    + button("New Note")
+    + '<input type="text" aria-label="Search/filter">'
+    '<label>Source<select name="filter_source"><option>All Sources</option>'
+    "</select></label>"
+    '<label>Status<select name="filter_status"><option>All Status</option>'
+    "<option selected>Pending</option></select></label></div>"
+)
+
+
+def test_open_source_filter_clicks_the_source_select_and_its_options_load(page, guard):
+    page.set_content(LAZY_PANEL + LAZY_SOURCE)
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    guard.act("open_source_filter", scope, source)
+
+    assert guard.history == [("open_source_filter", "done")]
+    assert source.locator("option").all_text_contents() == [
+        "All Sources",
+        "orders@example.test",
+    ]
+    assert source.input_value() == "All Sources"  # opened, nothing chosen
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        'select[name="filter_status"]',  # another select in the panel
+        "button",  # not a select
+        "input",
+    ],
+)
+def test_open_source_filter_on_anything_but_the_source_select_is_refused(
+    page, guard, target
+):
+    page.set_content(LAZY_PANEL)
+    scope = note_pool_panel(page)
+
+    refused = refusal(guard, "open_source_filter", scope, scope.locator(target))
+
+    assert refused == Refusal.WRONG_ELEMENT
+
+
+def test_any_other_click_on_the_source_select_is_still_refused(page, guard):
+    page.set_content(LAZY_PANEL)
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    assert refusal(guard, "open_pool", scope, source) == Refusal.WRONG_ELEMENT
+
+
+def test_open_source_filter_outside_the_note_pool_panel_is_refused(page, guard):
+    page.set_content(LAZY_PANEL + NOTE_WINDOW_SOURCE)
+    scope = note_pool_panel(page)
+    outside = win(page, "Note 300001").locator('select[name="filter_source"]')
+
+    refused = refusal(guard, "open_source_filter", scope, outside)
+
+    assert refused == Refusal.TARGET_OUTSIDE_SCOPE
+
+
+def test_open_source_filter_on_a_hidden_source_select_is_refused(page, guard):
+    page.set_content(
+        LAZY_PANEL.replace('name="filter_source"', 'name="filter_source" hidden')
+    )
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    assert refusal(guard, "open_source_filter", scope, source) == (
+        Refusal.TARGET_NOT_FOUND
+    )
+
+
+def test_open_source_filter_takes_no_value(page, guard):
+    page.set_content(LAZY_PANEL)
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    refused = refusal(guard, "open_source_filter", scope, source, "All Sources")
+
+    assert refused == Refusal.VALUE_MISMATCH
+
+
+def test_the_only_select_opener_is_the_source_select():
+    # Any widening (another action, another select) fails here.
+    assert SELECT_OPENERS == {"open_source_filter": "filter_source"}
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    ['aria-label="Close sources"', 'title="Remove source"'],
+)
+def test_open_source_filter_on_a_denylisted_source_select_is_refused(
+    page, guard, attrs
+):
+    page.set_content(
+        LAZY_PANEL.replace('name="filter_source"', f'name="filter_source" {attrs}')
+    )
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    assert refusal(guard, "open_source_filter", scope, source) == Refusal.DENYLISTED
+
+
+def test_open_source_filter_ignores_a_denylisted_word_in_an_option(page, guard):
+    # The opener chooses no option, so the options' texts are not its own.
+    page.set_content(
+        LAZY_PANEL.replace(
+            "<option>All Sources</option>",
+            "<option>All Sources</option><option>close-out@example.test</option>",
+        )
+    )
+    scope = note_pool_panel(page)
+    source = scope.locator('select[name="filter_source"]')
+
+    guard.act("open_source_filter", scope, source)
+
+    assert guard.history == [("open_source_filter", "done")]
