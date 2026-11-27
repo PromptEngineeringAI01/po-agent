@@ -1,8 +1,11 @@
 """Tests for scripts/check.py: the repo-data rule and the check command's steps."""
 
 import importlib.util
+import json
+import os
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -732,3 +735,202 @@ def test_failed_tests_reads_a_real_parallel_pytest_report(tmp_path, check_script
         ("tests/sub/test_probe.py::TestA::test_b[x y]", True),
         ("tests/sub/test_probe.py::test_plain", False),
     ]
+
+
+# --- one full check at a time (friction log, 26 Nov 2026; decisions, 27 Nov
+# 2026, friction rows): the full check waits for a lock in the temp dir,
+# printing who holds it, and fails after CHECK_LOCK_WAIT_S; --quick and
+# --repo-data-only take no lock. ---
+
+
+@pytest.fixture
+def lock_path(tmp_path, monkeypatch, check_script):
+    path = tmp_path / "check.lock"
+    monkeypatch.setattr(check_script, "check_lock_path", lambda: path)
+    return path
+
+
+def fake_clock():
+    """A clock that only moves when the fake sleep is called."""
+    now = [0.0]
+    sleeps: list[float] = []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    return sleep, (lambda: now[0]), sleeps
+
+
+def test_the_check_lock_lives_in_the_temp_dir(check_script):
+    # Never the repo, which differs per worktree.
+    expected = Path(tempfile.gettempdir()) / "po-agent-check.lock"
+    assert check_script.check_lock_path() == expected
+
+
+def test_a_free_lock_is_taken_and_names_its_holder(lock_path, check_script):
+    lock = check_script.take_check_lock(lock_path, 0, 1)
+    try:
+        holder = json.loads(lock_path.read_text("utf-8"))
+        assert holder["pid"] == os.getpid()
+        assert holder["worktree"] == str(check_script.ROOT)
+        assert holder["started"]
+    finally:
+        lock.release()
+
+    assert lock_path.read_text("utf-8") == ""  # a clean release empties it
+    check_script.take_check_lock(lock_path, 0, 1).release()  # free again
+
+
+def test_a_held_lock_is_waited_for_and_its_holder_printed(
+    lock_path, capsys, check_script
+):
+    holder = check_script.take_check_lock(lock_path, 0, 1)
+    sleep, clock, sleeps = fake_clock()
+
+    def sleep_then_free(seconds):
+        sleep(seconds)
+        if len(sleeps) == 3:
+            holder.release()
+
+    lock = check_script.take_check_lock(
+        lock_path, 60, 5, sleep=sleep_then_free, clock=clock
+    )
+    lock.release()
+
+    assert sleeps == [5, 5, 5]
+    out = capsys.readouterr().out
+    assert out.count("check: waiting for the check lock") == 1
+    assert f"PID {os.getpid()}" in out
+    assert f"worktree {check_script.ROOT}" in out
+    assert "check: got the check lock after 15 s" in out
+
+
+def test_a_lock_held_past_the_wait_fails_naming_its_holder(lock_path, check_script):
+    holder = check_script.take_check_lock(lock_path, 0, 1)
+    sleep, clock, sleeps = fake_clock()
+    try:
+        with pytest.raises(check_script.CheckLockTimeout) as info:
+            check_script.take_check_lock(lock_path, 60, 7, sleep=sleep, clock=clock)
+    finally:
+        holder.release()
+
+    assert sum(sleeps) == 60  # never sleeps past the wait
+    assert f"PID {os.getpid()}" in str(info.value)
+    assert str(lock_path) in str(info.value)
+
+
+def test_a_lock_file_that_cant_be_opened_runs_unlocked(tmp_path, capsys, check_script):
+    # A folder can't be opened as the lock file: the check still runs.
+    assert check_script.take_check_lock(tmp_path, 0, 1) is None
+    assert "running without the check lock" in capsys.readouterr().out
+
+
+HOLD_THE_LOCK = """import importlib.util, os, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("check_script", sys.argv[1])
+check = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(check)
+lock = check.take_check_lock(Path(sys.argv[2]), 0, 1)
+print(os.getpid(), flush=True)
+sys.stdin.readline()
+"""
+
+
+def test_another_process_holding_the_lock_is_named_and_freed_on_exit(
+    lock_path, check_script
+):
+    # A real second process, as two worktrees' checks would be; it exits
+    # without releasing, as a killed check would. It prints its own PID: on
+    # Windows a venv's python.exe is a launcher, so Popen.pid is another one.
+    holder = subprocess.Popen(
+        [sys.executable, "-c", HOLD_THE_LOCK]
+        + [str(ROOT / "scripts" / "check.py"), str(lock_path)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        pid = holder.stdout.readline().strip()
+        with pytest.raises(check_script.CheckLockTimeout) as info:
+            check_script.take_check_lock(lock_path, 0, 1)
+        assert f"PID {pid}," in str(info.value)
+    finally:
+        holder.communicate("\n", timeout=30)
+
+    check_script.take_check_lock(lock_path, 0, 1).release()
+
+
+def test_the_full_check_holds_the_lock_while_its_steps_run(
+    lock_path, monkeypatch, check_script
+):
+    seen = []
+
+    def step():
+        with pytest.raises(check_script.CheckLockTimeout):
+            check_script.take_check_lock(lock_path, 0, 1)
+        seen.append("held")
+        return True
+
+    monkeypatch.setattr(check_script, "STEPS", [("a", step)])
+
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main([])
+
+    assert exit_info.value.code == 0
+    assert seen == ["held"]
+    check_script.take_check_lock(lock_path, 0, 1).release()  # released after
+
+
+def test_a_failed_full_check_releases_the_lock(lock_path, monkeypatch, check_script):
+    monkeypatch.setattr(check_script, "STEPS", [("a", lambda: False)])
+
+    with pytest.raises(SystemExit) as exit_info:
+        check_script.main([])
+
+    assert exit_info.value.code == 1
+    check_script.take_check_lock(lock_path, 0, 1).release()
+
+
+def test_a_full_check_that_cant_get_the_lock_fails_before_any_step(
+    lock_path, monkeypatch, capsys, check_script
+):
+    monkeypatch.setattr(check_script, "CHECK_LOCK_WAIT_S", 0)
+    monkeypatch.setattr(
+        check_script, "STEPS", [("a", lambda: pytest.fail("ran a step"))]
+    )
+    holder = check_script.take_check_lock(lock_path, 0, 1)
+    try:
+        with pytest.raises(SystemExit) as exit_info:
+            check_script.main([])
+    finally:
+        holder.release()
+
+    assert exit_info.value.code == 1
+    out = capsys.readouterr().out
+    assert f"PID {os.getpid()}" in out
+    assert out.strip().splitlines()[-1] == "check: failed at check lock"
+
+
+def test_quick_takes_no_lock(lock_path, monkeypatch, check_script):
+    fake_quick_run(monkeypatch, check_script, collected=1)
+    monkeypatch.setattr(check_script, "CHECK_LOCK_WAIT_S", 0)
+    holder = check_script.take_check_lock(lock_path, 0, 1)
+    try:
+        with pytest.raises(SystemExit) as exit_info:
+            check_script.main(["--quick", "tests/test_check.py"])
+    finally:
+        holder.release()
+    assert exit_info.value.code == 0
+
+
+def test_repo_data_only_takes_no_lock(tmp_path, lock_path, monkeypatch, check_script):
+    monkeypatch.setattr(check_script, "ROOT", make_repo(tmp_path / "repo", CLEAN))
+    monkeypatch.setattr(check_script, "CHECK_LOCK_WAIT_S", 0)
+    holder = check_script.take_check_lock(lock_path, 0, 1)
+    try:
+        with pytest.raises(SystemExit) as exit_info:
+            check_script.main(["--repo-data-only"])
+    finally:
+        holder.release()
+    assert exit_info.value.code == 0

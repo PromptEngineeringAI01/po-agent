@@ -340,8 +340,16 @@ Change the expected result in one seam-1 fixture.
 **6.1 Reset the test site** (after mapping, before M3, after every booking test, and before the demo), with **your own account**, by hand. The agent never cancels anything.
 
 - [ ] On pln_66935, pln_66938 and pln_66940: **cancel** every non-cancelled Compaction Test task with the trial PO numbers (2609017B/048, 2609034B/048, 2610002B/048).
-- [ ] **Exactly one** Pending Note per trial PO in the **Agent Pool**: unassigned, **not linked** to a project (its Project column reads `---`), with its PDF. Place fresh copies if earlier ones were Solved; move any extra copy out of the Agent Pool.
+- [ ] **Exactly one** Pending Note per trial PO in the **Agent Pool**: unassigned, **not linked** to a project (its Project column reads `---`), with its PDF. Place fresh copies if earlier ones were Solved (steps below); move any extra copy out of the Agent Pool.
 - [ ] Nothing is left assigned to the agent account.
+
+**Placing a fresh trial Note** (friction log, 26 Nov 2026; decisions, 27 Nov 2026, friction rows: accepted in part). **Open: nobody has written down how to make one.** Joey has never placed one himself (27 Nov 2026), the repo and the test-site captures only say "place a fresh copy", and Claude can't look on the test site, since that means logging in. The open questions are below; the answers go here when the MySys admin or whoever places the next one gives them. What is known is what the agent needs:
+
+1. Values from `private/`, never from memory: the PO's Note title and body from `private/fixtures/cases.toml` (`note_title`, `note_body` of that PO's case) and its PDF from `private/pdfs/` (`<internal no>_048[_n].pdf`, the file the body names).
+2. **Open:** where a Note is made (the Note Pool has a **New Note** button, screen map row 01; its form is not mapped) or whether a Solved one can be copied; which fields it asks for (Company **B1 Homes**? title, body, Note Type, Source?); how the one PDF is attached.
+3. **Open:** how the new Note ends up **Pending**, **Locked** and in the **Agent Pool** with no user and no project. If it needs an Assign: in the Note window choose **Agent Pool** in the pool list (`--Select Pool--`) -> **Assign**, with **Send Email Notification** unticked; never Unassign or Unlink.
+4. Check in the Note Pool, filtered Assigned Pool = **Agent Pool**, Locked/Unlocked = **Locked**, Status **Pending**: exactly one row for the PO, Assignee **Agent Pool**, Project `---`, and Subject/Note containing `<internal no>_048[_n].pdf` exactly once (the test title rule, `SPEC.md` -> In the MVP, §2). Open it: one attachment, the right PDF.
+5. Then the post-reset decide-only (`tests/seam2/README.md`) shows it as `DECIDE_ONLY`; a skip there means a wrong title, body or attachment.
 
 **6.2 Seam 2 from the laptop:** `uv run pytest tests/seam2 -m testsite` (Claude may run it if you ask). ✓ All cases pass; reset again afterwards. One laptop test-site run at a time; the Mac Mini's live job keeps running (decisions, 20 Nov 2026, one Send Email control).
 
