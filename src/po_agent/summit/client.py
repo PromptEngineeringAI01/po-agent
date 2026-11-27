@@ -98,5 +98,6 @@ class SummitClient:
     def return_target(self, original: str) -> str:
         # SPEC: Return to the original assignee, as the peek read it; the
         # driver strips it and finds it in exactly one of the Note window's
-        # lists, else the Note stays with Agent 2 (task 9.13).
+        # lists, `---` by the Assignee Unlink (decisions, 27 Nov 2026), else
+        # the Note stays with Agent 2 (task 9.13).
         return original

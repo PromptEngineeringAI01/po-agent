@@ -57,7 +57,7 @@ from po_agent.core.runlog import RunLog
 from po_agent.core.trace import Booking
 from po_agent.mysys import tasks as task_table
 from po_agent.mysys import wait
-from po_agent.mysys.guard import ActionGuard
+from po_agent.mysys.guard import UNLINK_USER_BINDING, ActionGuard
 
 if TYPE_CHECKING:  # booking imports this module
     from po_agent.mysys.booking import HoldState
@@ -785,20 +785,41 @@ def _new_log_line(
     target (decisions, 26 Nov 2026, pool return log line). A user Unlink
     logs the same line, so only "Assignee:" reading the pool, read back
     first, tells them apart."""
-    lines = _log_lines(window)
-    if lines.count() != before + 1:
+    newest = _newest_line(window, before)
+    if newest is None:
         return False
-    newest = lines.first
-    said = " ".join(newest.locator("em").inner_text().split())
-    names = [" ".join(s.split()) for s in newest.locator("strong").all_inner_texts()]
+    said, names, text = newest
     if "User Assigned:" not in said or len(names) != 2:
         return False
     if was and names[0] != was:
         return False
     if names[1] == now:
         return True
-    blank = names[1] == "" and "Unassigned from" in newest.inner_text()
+    blank = names[1] == "" and "Unassigned from" in text
     return to_pool and bool(was) and blank
+
+
+def _newest_line(window: Locator, before: int) -> tuple[str, list[str], str] | None:
+    """With exactly one log line more than `before`: the newest line's
+    italic part, its bold names and its whole text; else None."""
+    lines = _log_lines(window)
+    if lines.count() != before + 1:
+        return None
+    newest = lines.first
+    said = " ".join(newest.locator("em").inner_text().split())
+    names = [" ".join(s.split()) for s in newest.locator("strong").all_inner_texts()]
+    return said, names, newest.inner_text()
+
+
+def _unlinked_line(window: Locator, before: int, was: str) -> bool:
+    """Exactly one log line more than `before`, the newest the one the
+    Assignee block's user Unlink writes (screen-map row 30): "User
+    Assigned: ... Unassigned from <was> to" with an empty target."""
+    newest = _newest_line(window, before)
+    if newest is None:
+        return False
+    said, names, text = newest
+    return "User Assigned:" in said and names == [was, ""] and "Unassigned from" in text
 
 
 def is_unlinked(window: Locator, log: RunLog, note_id: str) -> bool:
@@ -1008,17 +1029,17 @@ def return_to_assignee(
     case-sensitive, against the option texts: never a near match. Only in the user
     list: user list = that user, pool list --Select Pool--, Assign, then
     "Assignee:" and a new "User Assigned" log line read back. Only in the
-    pool list: B1's return (`return_note`). `---` (decisions, 26 Nov
-    2026), checked before any list is read, or a name in both lists or
-    neither: nothing is pressed, UnexpectedScreen
-    "Note not returned", and the Note stays with the agent. Never Unassign
-    or Unlink (Must never #2)."""
+    pool list: B1's return (`return_note`). `---`, checked before any list
+    is read: the Assignee block's user Unlink (`_return_by_unlink`; Joey,
+    decisions 27 Nov 2026), never an Assign. A name in both lists or
+    neither: nothing is pressed, UnexpectedScreen "Note not returned", and
+    the Note stays with the agent. Never Unassign, and no other Unlink
+    (Must never #2)."""
     step = "return"
     name = assignee.strip()
-    if (
-        name == UNASSIGNED
-    ):  # Joey, 26 Nov 2026: stays with the agent, whatever the lists
-        raise UnexpectedScreen("Note not returned", note_id=note_id, step=step)
+    if name == UNASSIGNED:  # whatever the lists hold: an Assign can't give it back
+        _return_by_unlink(guard, window, agent, log, note_id)
+        return
     users = _option_names(_list(window, SELECT_USER), SELECT_USER)
     pools = _option_names(_list(window, SELECT_POOL), SELECT_POOL)
     if (name in users) == (name in pools):
@@ -1030,6 +1051,55 @@ def return_to_assignee(
     guard.act("select_note_user", window, _list(window, SELECT_USER), name)
     guard.act("select_note_pool", window, _list(window, SELECT_POOL), SELECT_POOL)
     _assign(guard, window, log, note_id, step, was=agent, now=name)
+    log.flush(note_id=note_id, step=step)
+
+
+def _unlink_user(window: Locator) -> Locator:
+    # Row 30: the Assignee block's Unlink while a user is assigned.
+    return window.locator(f'button[data-bind="{UNLINK_USER_BINDING}"]')
+
+
+def _return_by_unlink(
+    guard: ActionGuard, window: Locator, agent: str, log: RunLog, note_id: str
+) -> None:
+    """Summit's `---` return (Joey, decisions 27 Nov 2026; screen-map row
+    30): only while "Assignee:" reads the agent (else "Note not returned",
+    nothing pressed). Send Email unticked and read back, then one
+    `unlink_assignee`; read back "Assignee:" `---`, exactly one new log line
+    "Unassigned from <agent> to" with an empty target, and no user Unlink
+    left. The open window's user list and Status stay stale after it, so
+    only "Assignee:" is read."""
+    step = "return"
+    if read_assignee(window) != agent:
+        raise UnexpectedScreen("Note not returned", note_id=note_id, step=step)
+    untick_send_email(guard, window)
+    check_send_email(window, log, note_id, step)
+    before = log_line_count(window)
+    guard.act("unlink_assignee", window, _unlink_user(window))
+    _read_back(
+        window,
+        log,
+        note_id,
+        step,
+        "assignee",
+        lambda: read_assignee(window) == UNASSIGNED,
+    )
+    _read_back(
+        window,
+        log,
+        note_id,
+        step,
+        "log_line",
+        lambda: _unlinked_line(window, before, agent),
+    )
+    _read_back(
+        window,
+        log,
+        note_id,
+        step,
+        "unlink_button",
+        lambda: _unlink_user(window).count() == 0,
+    )
     log.flush(note_id=note_id, step=step)
 
 
