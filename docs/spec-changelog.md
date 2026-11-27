@@ -2,6 +2,7 @@
 
 Version history of `SPEC.md`, moved verbatim from its status line on 19 Nov 2026 (v1.47). Newest first, one line per version; each line cites the `docs/decisions.md` entry behind it, where there is one. Add the next version here, at the top, in the same commit as the `SPEC.md` change, and bump the version on `SPEC.md` line 3.
 
+- 1.82: Client 2, Live steps S.4 and S.5: Joey's go-live waiver: S.4's watched first booking and its trace check waived when no compaction-test Note came in; the first booking comes on a scheduled run at cap 1, and the cap is raised by its own PR only after Joey checks it in MySys (decisions, 27 Nov 2026, Summit go-live waiver)
 - 1.81: Client 2, What is shared (guard row) and Note Pool filters: live's Source select loads its options only when opened; the new guard action `open_source_filter` (a CLICK on that one select only) opens it, `spike` moving the pointer off the menu first when the option isn't there, then the agent waits up to 15 s for it; never there is `OPTION_NOT_FOUND` as before (decisions, 27 Nov 2026, Source options load on open)
 - 1.80: Client 2, config shape and Live steps S.2: `config/clients/summit.toml` is `enabled = true`; from that merge `run live summit` books, so until S.4 Joey runs only `spike` and `decide-only`, and loads no Summit job before S.5 (decisions, 26 Nov 2026, S.2)
 - 1.79: MySys screen rules, Assign to pool: the new log line may also read "Unassigned from <agent> to" with an empty target, as the test site writes it (decisions, 26 Nov 2026, pool return log line)

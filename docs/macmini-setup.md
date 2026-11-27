@@ -1,6 +1,6 @@
 # Mac Mini setup — PO Agent (office Mac Mini, test site first)
 
-**Version:** 1.8 · 27 Nov 2026 (1.8: scheduled runs rarely overlap, so move the tag only when no run is going; the header line's optional ` summit`; the release teach-back is a concepts file in `learning/`, no quiz (decisions, 27 Nov 2026, Mac Mini setup wording). 1.7: Summit Home's run, task 9.15: the wrapper's `summit` argument, the second job at :30, its Healthchecks check, Agent 2's Keychain items, steps S.1-S.5 and stopping Summit alone (section 13); decisions, 26 Nov 2026, Summit on the Mac Mini. 1.6: a rollback to a commit from before task 9.5 stops the hold re-check on later bookings; check them by hand (decisions, 25 Nov 2026, per-client run controls). 1.5: read Claude's release summary and answer its teach-back before moving the `production` tag (decisions, 25 Nov 2026, loop review; teach-back). 1.4: a laptop test-site run no longer unloads the live job (decisions, 20 Nov 2026, one Send Email control). 1.3: release pinning, task 7.4: the wrapper runs the `production` tag, which only Joey moves; `enabled` is read from `origin/main`; how to move the tag and roll back. 1.2: plan freeze, decisions D1, D6 and D7: wrapper mode mapping, no run after a failed pull, process-group kill, stderr dropped; job unloaded after the S1 spike and loaded only for the first bookings and from M6; one agent at a time; the stale-Note stop. 1.1: "This Mac Mini" check for the office's model A3238) · **Owner:** Joey Wu · **Spec:** `SPEC.md` → Trial conditions, Commands · **Decision:** CEO decision 3 (`docs/decisions.md`, 15 Oct 2026; `docs/specs/ADR-002-po-agent-hosting.md`)
+**Version:** 1.9 · 27 Nov 2026 (1.9: section 13 S.4 and S.5 as the go-live went: the watched first booking waived, the job loaded at cap 1, the cap raised by its own PR only after Joey checks the first booking (decisions, 27 Nov 2026, Summit go-live waiver). 1.8: scheduled runs rarely overlap, so move the tag only when no run is going; the header line's optional ` summit`; the release teach-back is a concepts file in `learning/`, no quiz (decisions, 27 Nov 2026, Mac Mini setup wording). 1.7: Summit Home's run, task 9.15: the wrapper's `summit` argument, the second job at :30, its Healthchecks check, Agent 2's Keychain items, steps S.1-S.5 and stopping Summit alone (section 13); decisions, 26 Nov 2026, Summit on the Mac Mini. 1.6: a rollback to a commit from before task 9.5 stops the hold re-check on later bookings; check them by hand (decisions, 25 Nov 2026, per-client run controls). 1.5: read Claude's release summary and answer its teach-back before moving the `production` tag (decisions, 25 Nov 2026, loop review; teach-back). 1.4: a laptop test-site run no longer unloads the live job (decisions, 20 Nov 2026, one Send Email control). 1.3: release pinning, task 7.4: the wrapper runs the `production` tag, which only Joey moves; `enabled` is read from `origin/main`; how to move the tag and roll back. 1.2: plan freeze, decisions D1, D6 and D7: wrapper mode mapping, no run after a failed pull, process-group kill, stderr dropped; job unloaded after the S1 spike and loaded only for the first bookings and from M6; one agent at a time; the stale-Note stop. 1.1: "This Mac Mini" check for the office's model A3238) · **Owner:** Joey Wu · **Spec:** `SPEC.md` → Trial conditions, Commands · **Decision:** CEO decision 3 (`docs/decisions.md`, 15 Oct 2026; `docs/specs/ADR-002-po-agent-hosting.md`)
 Do this in slice **M1**, once `pyproject.toml`, `uv.lock`, `po-agent spike`, `scripts/macmini-run.sh` and `scripts/au.com.prompteng.po-agent.plist` exist on `main`. Section 2 (the test login) can be done today.
 
 The Mac Mini runs the agent for the MVP trial and, after go-live sign-off, for production. During the MVP it holds **test-site credentials only** and no real client data on disk. The one exception: the 3 trial POs are real, and runs read them from the test site in memory (`SPEC.md` → Trial conditions; the CEO confirms decision 2 before the first such run).
@@ -315,6 +315,8 @@ grep '<run_id>' ~/Library/Logs/po-agent/trace/$(date +%F).jsonl
 
 Put the run's `run_id` from its `RUN_SUMMARY` in the `grep`, and check 5.2's trace rule on it (`SPEC.md` -> Production, gate 5). In MySys check the booked task: Creator, PO Number, Documents, Note, On Hold, the Note linked and Solved.
 
+**As it went (27 Nov 2026):** no compaction-test Note came in, so S.4 ran watched and booked nothing, and Joey waived the watched first booking and its trace check (decisions, 27 Nov 2026, Summit go-live waiver). The first booking then came on a scheduled :30 run at S.5, at `max_notes_per_run = 1`.
+
 **S.5 - hourly.** In Healthchecks.io (as section 1): **Add Check** `po-agent summit`, **Cron** `30 7-17 * * 1-5`, time zone `Australia/Perth`, **grace time 40 minutes**, email to Joey on. Store its ping URL (it prompts twice; never paste it anywhere else) and check it is there:
 
 ```bash
@@ -322,7 +324,7 @@ security add-generic-password -s po-agent -a healthchecks_ping_url_summit -w
 security find-generic-password -s po-agent -a healthchecks_ping_url_summit > /dev/null && echo stored
 ```
 
-Raise `max_notes_per_run` by its own PR and move the tag to it. The job's :30 schedule is the Mac's own clock, so it must be on Perth time (section 4). Then load Summit's job:
+Load the job with `max_notes_per_run = 1` still in `config/clients/summit.toml`: the cap is raised only after the first booking is checked (below). The job's :30 schedule is the Mac's own clock, so it must be on Perth time (section 4). Then load Summit's job:
 
 ```bash
 date +%Z
@@ -334,6 +336,8 @@ launchctl print gui/$(id -u)/au.com.prompteng.po-agent.summit | head -30
 ```
 
 Healthy: `date +%Z` prints `AWST` (anything else: fix the time zone first, section 4, `sudo systemsetup -settimezone Australia/Perth`); `plutil` says `OK`; `launchctl print` shows the job. Watch the first hourly run at the next :30 (`tail -40 ~/Library/Logs/po-agent/runs.log`: exit 0, no `healthchecks ping` line) and the check turning **up**.
+
+**Then the first booking and the cap.** Check the first task a Summit run books in MySys: Creator, PO Number, the Documents name (the PDF's own name, or with each `-` filed as `_`), On Hold, the Note linked and Solved. Only then raise `max_notes_per_run` by its own PR and move the `production` tag to its merge commit (section 8), when no run is going. Done 27 Nov 2026: the 12:30 run booked one, exit 0, and Joey found it all correct (decisions, 27 Nov 2026, Summit go-live waiver).
 
 **Run Summit now** (it books): `launchctl kickstart gui/$(id -u)/au.com.prompteng.po-agent.summit`.
 
